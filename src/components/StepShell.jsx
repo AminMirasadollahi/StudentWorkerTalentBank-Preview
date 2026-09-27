@@ -1,0 +1,139 @@
+const chapters = [
+  { label: 'آشنایی با همکاری', from: 1, to: 2 },
+  { label: 'درباره شما', from: 3, to: 8 },
+  { label: 'حوزه همکاری', from: 9, to: 10 },
+  { label: 'زمان‌های در دسترس', from: 11, to: 11 },
+  { label: 'مهارت‌ها و توانمندی‌ها', from: 12, to: 13 },
+  { label: 'تجربه و هدف', from: 14, to: 16 },
+  { label: 'حریم خصوصی و مرور', from: 17, to: 18 },
+]
+
+function chapterFor(step) {
+  const index = chapters.findIndex(chapter => step >= chapter.from && step <= chapter.to)
+  return {
+    index: index < 0 ? 0 : index,
+    chapter: chapters[index < 0 ? 0 : index],
+  }
+}
+
+function BookMark() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4.5 5.3A2.8 2.8 0 0 1 7.3 2.5H11v17H7.2a2.7 2.7 0 0 0-2.7 2.7V5.3Z" />
+      <path d="M19.5 5.3a2.8 2.8 0 0 0-2.8-2.8H13v17h3.8a2.7 2.7 0 0 1 2.7 2.7V5.3Z" />
+    </svg>
+  )
+}
+
+export default function StepShell({
+  eyebrow,
+  title,
+  description,
+  children,
+  onBack,
+  onNext,
+  nextLabel = 'ادامه',
+  nextDisabled = false,
+  step,
+  total,
+}) {
+  const progress = Math.round((step / total) * 100)
+  const { index: chapterIndex, chapter } = chapterFor(step)
+
+  return (
+    <main className="experience-shell">
+      <aside className="journey-rail" aria-label="مسیر تکمیل فرم">
+        <div className="rail-brand">
+          <span className="rail-brand__mark"><BookMark /></span>
+          <span className="rail-brand__copy">
+            <strong>همکاری دانشجویی کتابخانه</strong>
+            <small>روابط عمومی · پژوهش</small>
+          </span>
+        </div>
+
+        <div className="rail-caption">مسیر تکمیل فرم</div>
+        <ol className="chapter-list">
+          {chapters.map((item, index) => {
+            const state = index < chapterIndex ? 'done' : index === chapterIndex ? 'active' : 'upcoming'
+            return (
+              <li
+                key={item.label}
+                className={`chapter-item is-${state}`}
+                aria-current={state === 'active' ? 'step' : undefined}
+              >
+                <span className="chapter-dot">{state === 'done' ? '✓' : index + 1}</span>
+                <span>{item.label}</span>
+              </li>
+            )
+          })}
+        </ol>
+
+        <div className="draft-state" role="note">
+          <span className="draft-state__dot" aria-hidden="true" />
+          <span>
+            <strong>ذخیره موقت فعال است</strong>
+            <small>پاسخ‌های ناتمام فقط روی همین دستگاه نگهداری می‌شوند.</small>
+          </span>
+        </div>
+      </aside>
+
+      <section className="journey-stage">
+        <header className="mobile-brand">
+          <span className="mobile-brand__mark"><BookMark /></span>
+          <span>
+            <strong>همکاری دانشجویی کتابخانه</strong>
+            <small>فرصت‌های همراه در روابط عمومی و پژوهش</small>
+          </span>
+        </header>
+
+        <div className="stage-progress" aria-label={`مرحله ${step} از ${total}`}>
+          <div className="stage-progress__meta">
+            <span className="stage-progress__chapter">
+              <strong>بخش {chapterIndex + 1} از {chapters.length}</strong>
+              <span>{chapter.label}</span>
+            </span>
+            <span className="stage-progress__count">{step} از {total}</span>
+          </div>
+          <div className="progress-track" aria-hidden="true">
+            <div className="progress-bar" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+
+        <section className="question-panel">
+          <div className="question-panel__inner">
+            {eyebrow && <div className="eyebrow">{eyebrow}</div>}
+            <h1>{title}</h1>
+            {description && <p className="description">{description}</p>}
+            <div className="step-content">{children}</div>
+          </div>
+        </section>
+
+        <nav className="nav-row" aria-label="حرکت بین سؤال‌ها">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onBack}
+            disabled={!onBack}
+          >
+            <span aria-hidden="true">→</span>
+            بازگشت
+          </button>
+
+          <span className="mobile-draft-note" aria-hidden="true">
+            پاسخ‌ها روی این دستگاه ذخیره می‌شوند
+          </span>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onNext}
+            disabled={nextDisabled}
+          >
+            {nextLabel}
+            <span aria-hidden="true">←</span>
+          </button>
+        </nav>
+      </section>
+    </main>
+  )
+}
