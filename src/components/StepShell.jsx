@@ -49,24 +49,12 @@ export default function StepShell({
 
         <div className="system-hero__inner">
           <div className="system-hero__identity">
-            <div className="system-hero__institution">
-              <span className="system-hero__mark"><BookMark /></span>
-              <span>دانشکده علوم انسانی شهید رجایی بابل</span>
-            </div>
-
+            <span className="system-hero__mark"><BookMark /></span>
             <div className="system-hero__copy">
-              <span className="system-hero__badge">فرصت همکاری دانشجویی</span>
-              <strong className="system-hero__title">همکاری دانشجویی کتابخانه</strong>
+              <span className="system-hero__institution">دانشکده علوم انسانی شهید رجایی بابل</span>
+              <strong className="system-hero__title">همکاری دانشجویی با کتابخانه</strong>
               <p>تجربه، یادگیری و مشارکت؛ همراه با فرصت‌های روابط عمومی و پژوهش</p>
             </div>
-          </div>
-
-          <div className="system-hero__status" role="note" aria-label="وضعیت ذخیره موقت">
-            <span className="system-hero__status-dot" aria-hidden="true" />
-            <span>
-              <strong>ذخیره موقت فعال</strong>
-              <small>پاسخ‌ها فقط روی همین دستگاه نگهداری می‌شوند</small>
-            </span>
           </div>
         </div>
       </header>
@@ -116,10 +104,6 @@ export default function StepShell({
             <span aria-hidden="true">→</span>
             بازگشت
           </button>
-
-          <span className="mobile-draft-note" aria-hidden="true">
-            پاسخ‌ها روی این دستگاه ذخیره می‌شوند
-          </span>
 
           <button
             type="button"
