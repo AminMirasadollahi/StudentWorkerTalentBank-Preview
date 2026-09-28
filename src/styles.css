@@ -1816,9 +1816,9 @@ svg {
   z-index: 20;
   width: 100%;
   background:
-    linear-gradient(135deg, rgba(232, 240, 245, 0.98), rgba(238, 246, 246, 0.98));
-  border-bottom: 1px solid #cbd9df;
-  box-shadow: 0 4px 18px rgba(18, 53, 75, 0.035);
+    linear-gradient(135deg, #dbe7ee 0%, #e2eeee 58%, #dce8ec 100%);
+  border-bottom: 1px solid #bfd0d8;
+  box-shadow: 0 5px 20px rgba(18, 53, 75, 0.06);
   backdrop-filter: blur(14px);
 }
 
