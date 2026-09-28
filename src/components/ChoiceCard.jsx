@@ -29,7 +29,7 @@ export default function ChoiceCard({ selected, title, description, value, code, 
   return (
     <button
       type="button"
-      className={`choice-card ${selected ? 'selected' : ''}`}
+      className={`choice-card choice-card--${code || 'generic'} ${selected ? 'selected' : ''}`}
       onClick={onClick}
       aria-pressed={selected}
     >
