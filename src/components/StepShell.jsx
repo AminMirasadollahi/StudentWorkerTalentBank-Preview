@@ -41,51 +41,28 @@ export default function StepShell({
   const { index: chapterIndex, chapter } = chapterFor(step)
 
   return (
-    <main className="experience-shell">
-      <aside className="journey-rail" aria-label="مسیر تکمیل فرم">
-        <div className="rail-brand">
-          <span className="rail-brand__mark"><BookMark /></span>
-          <span className="rail-brand__copy">
-            <strong>همکاری دانشجویی کتابخانه</strong>
-            <small>روابط عمومی · پژوهش</small>
-          </span>
-        </div>
+    <main className={`experience-shell chapter-tone-${chapterIndex}`}>
+      <header className="app-header">
+        <div className="app-header__inner">
+          <div className="header-brand">
+            <span className="header-brand__mark"><BookMark /></span>
+            <span className="header-brand__copy">
+              <strong>همکاری دانشجویی کتابخانه</strong>
+              <small>فرصت‌های همراه در روابط عمومی و پژوهش</small>
+            </span>
+          </div>
 
-        <div className="rail-caption">مسیر تکمیل فرم</div>
-        <ol className="chapter-list">
-          {chapters.map((item, index) => {
-            const state = index < chapterIndex ? 'done' : index === chapterIndex ? 'active' : 'upcoming'
-            return (
-              <li
-                key={item.label}
-                className={`chapter-item is-${state}`}
-                aria-current={state === 'active' ? 'step' : undefined}
-              >
-                <span className="chapter-dot">{state === 'done' ? '✓' : index + 1}</span>
-                <span>{item.label}</span>
-              </li>
-            )
-          })}
-        </ol>
-
-        <div className="draft-state" role="note">
-          <span className="draft-state__dot" aria-hidden="true" />
-          <span>
-            <strong>ذخیره موقت فعال است</strong>
-            <small>پاسخ‌های ناتمام فقط روی همین دستگاه نگهداری می‌شوند.</small>
-          </span>
+          <div className="header-draft-state" role="note" aria-label="وضعیت ذخیره موقت">
+            <span className="header-draft-state__dot" aria-hidden="true" />
+            <span>
+              <strong>ذخیره موقت فعال</strong>
+              <small>فقط روی همین دستگاه</small>
+            </span>
+          </div>
         </div>
-      </aside>
+      </header>
 
       <section className="journey-stage">
-        <header className="mobile-brand">
-          <span className="mobile-brand__mark"><BookMark /></span>
-          <span>
-            <strong>همکاری دانشجویی کتابخانه</strong>
-            <small>فرصت‌های همراه در روابط عمومی و پژوهش</small>
-          </span>
-        </header>
-
         <div className="stage-progress" aria-label={`مرحله ${step} از ${total}`}>
           <div className="stage-progress__meta">
             <span className="stage-progress__chapter">
@@ -94,6 +71,18 @@ export default function StepShell({
             </span>
             <span className="stage-progress__count">{step} از {total}</span>
           </div>
+
+          <div className="chapter-scale" aria-hidden="true">
+            {chapters.map((item, index) => {
+              const state = index < chapterIndex ? 'done' : index === chapterIndex ? 'active' : 'upcoming'
+              return (
+                <span key={item.label} className={`chapter-scale__item is-${state}`}>
+                  {item.label}
+                </span>
+              )
+            })}
+          </div>
+
           <div className="progress-track" aria-hidden="true">
             <div className="progress-bar" style={{ width: `${progress}%` }} />
           </div>
