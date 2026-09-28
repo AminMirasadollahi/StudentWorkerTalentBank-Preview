@@ -11,6 +11,7 @@ const initialForm = {
   fullName: '',
   studentNumber: '',
   phone: '',
+  socialPhone: '',
   major: '',
   majorOther: '',
   entryYear: '',
@@ -241,25 +242,44 @@ export default function App() {
       key="phone"
       step={5}
       total={TOTAL_STEPS}
-      title="شماره همراه"
-      description="اگر برای مرحله بعد نیاز به هماهنگی باشد از این شماره استفاده می‌کنیم."
+      title="راه ارتباطی شما"
+      description="یک شماره برای تماس لازم است. اگر شماره‌ای که در ایتا یا شبکه‌های اجتماعی استفاده می‌کنید متفاوت است، آن را هم وارد کنید."
       onBack={back}
       onNext={next}
-      nextDisabled={!/^09\d{9}$/.test(form.phone)}
+      nextDisabled={
+        !/^09\d{9}$/.test(form.phone)
+        || (form.socialPhone && !/^09\d{9}$/.test(form.socialPhone))
+      }
     >
-      <label className="input-shell">
-        <span className="input-shell__label">شماره همراه</span>
-        <input
-          autoFocus
-          inputMode="tel"
-          dir="ltr"
-          className="text-input ltr"
-          value={form.phone}
-          onChange={event => set('phone', event.target.value.replace(/\D/g, '').slice(0, 11))}
-          placeholder="09123456789"
-          autoComplete="tel"
-        />
-      </label>
+      <div className="contact-fields">
+        <label className="input-shell">
+          <span className="input-shell__label">شماره همراه برای تماس <em>لازم</em></span>
+          <input
+            autoFocus
+            inputMode="tel"
+            dir="ltr"
+            className="text-input ltr"
+            value={form.phone}
+            onChange={event => set('phone', event.target.value.replace(/\D/g, '').slice(0, 11))}
+            placeholder="09123456789"
+            autoComplete="tel"
+          />
+          <small>اگر برای هماهنگی لازم باشد از این شماره با شما تماس می‌گیریم.</small>
+        </label>
+
+        <label className="input-shell input-shell--social">
+          <span className="input-shell__label">شماره ایتا / شبکه اجتماعی <em>اختیاری</em></span>
+          <input
+            inputMode="tel"
+            dir="ltr"
+            className="text-input ltr"
+            value={form.socialPhone}
+            onChange={event => set('socialPhone', event.target.value.replace(/\D/g, '').slice(0, 11))}
+            placeholder="اگر با شماره تماس فرق دارد"
+          />
+          <small>اگر خالی بگذارید، همان شماره تماس را برای ارتباط در گروه یا پیام‌رسان در نظر می‌گیریم.</small>
+        </label>
+      </div>
     </StepShell>,
 
     <StepShell
@@ -353,8 +373,8 @@ export default function App() {
       step={9}
       total={TOTAL_STEPS}
       eyebrow="اولویت همکاری"
-      title="بیشتر دوست دارید در کدام حوزه همکاری کنید؟"
-      description="شرح کوتاه هر حوزه را بخوانید و گزینه‌ای را انتخاب کنید که بیشتر با علاقه و توانایی شما جور است."
+      title="اولویت اصلی شما برای همکاری کدام حوزه است؟"
+      description="در این مرحله فقط یک گزینه را به‌عنوان اولویت اصلی انتخاب کنید. در مرحله بعد می‌توانید دو حوزه دیگر را هم به‌عنوان اولویت‌های بعدی مشخص کنید."
       onBack={back}
       onNext={next}
       nextDisabled={!form.primaryUnit}
@@ -385,8 +405,8 @@ export default function App() {
       key="secondary-units"
       step={10}
       total={TOTAL_STEPS}
-      title="در حوزه دیگری هم مایل به همکاری هستید؟"
-      description={`اولویت اصلی شما «${primaryUnit?.label || ''}» است. این مرحله اختیاری است و می‌توانید بدون انتخاب گزینه دیگری ادامه دهید.`}
+      title="در صورت تمایل، اولویت‌های بعدی‌تان را هم مشخص کنید"
+      description={`اولویت اصلی شما «${primaryUnit?.label || ''}» است. می‌توانید یکی، هر دو، یا هیچ‌کدام از حوزه‌های باقی‌مانده را انتخاب کنید.`}
       onBack={back}
       onNext={next}
     >
@@ -439,7 +459,7 @@ export default function App() {
                   data-slot-hours={slot.hours}
                   onClick={() => toggleArray('availability', key)}
                 >
-                  <span className="slot-check" aria-hidden="true">{selected ? '✓' : ''}</span>
+                  <span className="slot-box" aria-hidden="true">{selected ? '✓' : ''}</span>
                   <span className="slot-mobile-copy">
                     <strong>{slot.label}</strong>
                     <small>{slot.hours}</small>
@@ -679,6 +699,8 @@ export default function App() {
       <div className="review-grid">
         <div><span>نام</span><strong>{form.fullName}</strong></div>
         <div><span>رشته / ورودی</span><strong>{form.major === 'سایر' ? form.majorOther : form.major} / {form.entryYear}</strong></div>
+        <div><span>شماره تماس</span><strong dir="ltr">{form.phone}</strong></div>
+        <div><span>ایتا / شبکه اجتماعی</span><strong dir="ltr">{form.socialPhone || form.phone}</strong></div>
         <div><span>اولویت همکاری</span><strong>{unitLabel(form.primaryUnit)}</strong></div>
         <div><span>سایر حوزه‌ها</span><strong>{form.secondaryUnits.length ? form.secondaryUnits.map(unitLabel).join('، ') : '—'}</strong></div>
         <div><span>مهارت‌ها</span><strong>{form.selectedSkills.length} مورد</strong></div>
