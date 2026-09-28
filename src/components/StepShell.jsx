@@ -42,21 +42,30 @@ export default function StepShell({
 
   return (
     <main className={`experience-shell chapter-tone-${chapterIndex}`}>
-      <header className="app-header">
-        <div className="app-header__inner">
-          <div className="header-brand">
-            <span className="header-brand__mark"><BookMark /></span>
-            <span className="header-brand__copy">
-              <strong>همکاری دانشجویی کتابخانه</strong>
-              <small>فرصت‌های همراه در روابط عمومی و پژوهش</small>
-            </span>
+      <header className="system-hero" aria-label="معرفی سامانه همکاری دانشجویی">
+        <span className="system-hero__shape system-hero__shape--one" aria-hidden="true" />
+        <span className="system-hero__shape system-hero__shape--two" aria-hidden="true" />
+        <span className="system-hero__shape system-hero__shape--three" aria-hidden="true" />
+
+        <div className="system-hero__inner">
+          <div className="system-hero__identity">
+            <div className="system-hero__institution">
+              <span className="system-hero__mark"><BookMark /></span>
+              <span>دانشکده علوم انسانی شهید رجایی بابل</span>
+            </div>
+
+            <div className="system-hero__copy">
+              <span className="system-hero__badge">فرصت همکاری دانشجویی</span>
+              <strong className="system-hero__title">همکاری دانشجویی کتابخانه</strong>
+              <p>تجربه، یادگیری و مشارکت؛ همراه با فرصت‌های روابط عمومی و پژوهش</p>
+            </div>
           </div>
 
-          <div className="header-draft-state" role="note" aria-label="وضعیت ذخیره موقت">
-            <span className="header-draft-state__dot" aria-hidden="true" />
+          <div className="system-hero__status" role="note" aria-label="وضعیت ذخیره موقت">
+            <span className="system-hero__status-dot" aria-hidden="true" />
             <span>
               <strong>ذخیره موقت فعال</strong>
-              <small>فقط روی همین دستگاه</small>
+              <small>پاسخ‌ها فقط روی همین دستگاه نگهداری می‌شوند</small>
             </span>
           </div>
         </div>
