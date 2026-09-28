@@ -118,8 +118,8 @@ export default function App() {
       step={1}
       total={TOTAL_STEPS}
       eyebrow="فرصت همکاری دانشجویی"
-      title="همکاری دانشجویی با کتابخانه"
-      description="با امکان همکاری در حوزه‌های روابط عمومی و پژوهش"
+      title="آشنایی کوتاه با این فرصت"
+      description="پیش از شروع، ویدیوی معرفی کتابخانه و چند نکته کوتاه را ببینید."
       onNext={next}
       nextLabel="شروع فرم"
     >
