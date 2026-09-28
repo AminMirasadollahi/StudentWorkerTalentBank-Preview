@@ -2287,3 +2287,329 @@ svg {
     color: #72858d;
   }
 }
+
+
+/* =========================================================
+   UI ARCHITECTURE FINAL — System hero banner
+   Global structure: Hero -> Progress -> Question -> Navigation
+   ========================================================= */
+
+.system-hero {
+  position: relative;
+  isolation: isolate;
+  width: min(76rem, calc(100% - 2.5rem));
+  margin: clamp(0.75rem, 1.8vw, 1.25rem) auto 0;
+  overflow: hidden;
+  color: #f5fbfc;
+  background:
+    linear-gradient(118deg, #102f49 0%, #154866 48%, #176d70 100%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1.45rem;
+  box-shadow:
+    0 18px 44px rgba(15, 47, 70, 0.17),
+    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
+.system-hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset-inline: 7%;
+  inset-block-end: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 211, 126, 0.55),
+    rgba(132, 226, 210, 0.65),
+    transparent
+  );
+}
+
+.system-hero__inner {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(1.2rem, 3vw, 3.5rem);
+  min-height: 9.3rem;
+  padding: clamp(1.25rem, 2.7vw, 2.05rem) clamp(1.45rem, 3.2vw, 2.7rem);
+  align-items: center;
+}
+
+.system-hero__identity {
+  display: grid;
+  gap: 0.72rem;
+  min-width: 0;
+}
+
+.system-hero__institution {
+  display: inline-flex;
+  width: fit-content;
+  gap: 0.56rem;
+  align-items: center;
+  color: rgba(232, 244, 247, 0.76);
+  font-size: 0.74rem;
+  font-weight: var(--weight-label);
+}
+
+.system-hero__mark {
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  place-items: center;
+  color: #ecfaf7;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.68rem;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.08);
+}
+
+.system-hero__mark svg {
+  width: 1.18rem;
+  height: 1.18rem;
+}
+
+.system-hero__copy {
+  display: grid;
+  gap: 0.22rem;
+  min-width: 0;
+}
+
+.system-hero__badge {
+  display: inline-flex;
+  width: fit-content;
+  margin-bottom: 0.22rem;
+  padding: 0.19rem 0.6rem;
+  color: #ffe3a6;
+  font-size: 0.67rem;
+  font-weight: var(--weight-control);
+  background: rgba(235, 180, 76, 0.1);
+  border: 1px solid rgba(255, 213, 132, 0.18);
+  border-radius: 999px;
+}
+
+.system-hero__title {
+  color: #ffffff;
+  font-size: clamp(1.65rem, 2.7vw, 2.45rem);
+  font-weight: var(--weight-title);
+  line-height: 1.28;
+  letter-spacing: -0.018em;
+  text-shadow: 0 2px 14px rgba(4, 29, 43, 0.16);
+}
+
+.system-hero__copy p {
+  max-width: 46rem;
+  margin: 0.12rem 0 0;
+  color: rgba(236, 247, 249, 0.76);
+  font-size: clamp(0.76rem, 1.1vw, 0.9rem);
+  line-height: 1.8;
+}
+
+.system-hero__status {
+  display: grid;
+  grid-template-columns: 0.52rem minmax(0, 1fr);
+  gap: 0.65rem;
+  min-width: 10.5rem;
+  padding: 0.76rem 0.82rem;
+  align-items: start;
+  color: #dcebed;
+  background: rgba(7, 36, 49, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.9rem;
+  box-shadow: 0 7px 20px rgba(7, 36, 49, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.system-hero__status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.28rem;
+  background: #69d1a3;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(105, 209, 163, 0.1);
+}
+
+.system-hero__status > span:last-child {
+  display: grid;
+  gap: 0.05rem;
+}
+
+.system-hero__status strong {
+  color: #f6fbfc;
+  font-size: 0.72rem;
+  font-weight: var(--weight-control);
+}
+
+.system-hero__status small {
+  color: rgba(227, 241, 244, 0.66);
+  font-size: 0.62rem;
+  line-height: 1.55;
+}
+
+.system-hero__shape {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.system-hero__shape--one {
+  width: 15rem;
+  height: 15rem;
+  inset-block-start: -7.3rem;
+  inset-inline-start: -2rem;
+  background: rgba(121, 218, 202, 0.11);
+  border: 1px solid rgba(193, 244, 236, 0.05);
+}
+
+.system-hero__shape--two {
+  width: 10.5rem;
+  height: 10.5rem;
+  inset-block-end: -6rem;
+  inset-inline-start: 18%;
+  background: rgba(255, 205, 111, 0.055);
+}
+
+.system-hero__shape--three {
+  width: 19rem;
+  height: 19rem;
+  inset-block-start: -13rem;
+  inset-inline-end: 28%;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.system-hero + .journey-stage {
+  min-height: calc(100vh - 10.5rem);
+  min-height: calc(100dvh - 10.5rem);
+}
+
+/* Keep progress visually connected to the hero without merging the surfaces. */
+.system-hero + .journey-stage .stage-progress {
+  margin-top: 0.05rem;
+}
+
+@media (max-width: 900px) {
+  .system-hero {
+    width: min(100% - 1.1rem, 48rem);
+    margin-top: 0.55rem;
+    border-radius: 1.15rem;
+  }
+
+  .system-hero__inner {
+    min-height: 8.1rem;
+    padding: 1.05rem 1.15rem;
+    gap: 1rem;
+  }
+
+  .system-hero__institution {
+    font-size: 0.67rem;
+  }
+
+  .system-hero__mark {
+    width: 1.95rem;
+    height: 1.95rem;
+  }
+
+  .system-hero__title {
+    font-size: clamp(1.4rem, 4.7vw, 1.85rem);
+  }
+
+  .system-hero__copy p {
+    font-size: 0.74rem;
+  }
+
+  .system-hero__status {
+    min-width: 8.5rem;
+    padding: 0.62rem 0.68rem;
+  }
+
+  .system-hero__status small {
+    display: none;
+  }
+
+  .system-hero + .journey-stage {
+    min-height: calc(100dvh - 9rem);
+  }
+}
+
+@media (max-width: 640px) {
+  .system-hero {
+    width: calc(100% - 0.9rem);
+    border-radius: 1rem;
+    box-shadow: 0 12px 30px rgba(15, 47, 70, 0.14);
+  }
+
+  .system-hero__inner {
+    grid-template-columns: 1fr;
+    gap: 0.78rem;
+    min-height: auto;
+    padding: 1rem 1rem 0.95rem;
+  }
+
+  .system-hero__identity {
+    gap: 0.55rem;
+  }
+
+  .system-hero__institution {
+    max-width: calc(100% - 1rem);
+  }
+
+  .system-hero__badge {
+    margin-top: 0.05rem;
+  }
+
+  .system-hero__title {
+    font-size: 1.42rem;
+  }
+
+  .system-hero__copy p {
+    max-width: 31rem;
+    font-size: 0.7rem;
+    line-height: 1.72;
+  }
+
+  .system-hero__status {
+    display: inline-flex;
+    width: fit-content;
+    min-width: 0;
+    gap: 0.5rem;
+    padding: 0.48rem 0.62rem;
+    align-items: center;
+    border-radius: 0.7rem;
+  }
+
+  .system-hero__status-dot {
+    margin-top: 0;
+  }
+
+  .system-hero__status strong {
+    font-size: 0.65rem;
+  }
+
+  .system-hero__shape--one {
+    width: 11rem;
+    height: 11rem;
+    inset-block-start: -6rem;
+    inset-inline-start: -3.5rem;
+  }
+
+  .system-hero__shape--two {
+    width: 8rem;
+    height: 8rem;
+    inset-block-end: -4.7rem;
+    inset-inline-start: 36%;
+  }
+
+  .system-hero__shape--three {
+    width: 13rem;
+    height: 13rem;
+    inset-block-start: -9rem;
+    inset-inline-end: 15%;
+  }
+
+  .system-hero + .journey-stage {
+    min-height: auto;
+  }
+}
