@@ -130,7 +130,7 @@ export default function App() {
             <svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z" /></svg>
           </span>
           <strong>ویدیوی کوتاه معرفی کتابخانه</strong>
-          <small>در نسخه نهایی، نمای سه‌بعدی کتابخانه از آپارات در همین بخش پخش می‌شود.</small>
+          <small>ویدیوی معرفی سه‌بعدی کتابخانه از آپارات در همین بخش پخش خواهد شد.</small>
         </div>
 
         <div className="info-grid">
@@ -148,10 +148,6 @@ export default function App() {
           </div>
         </div>
 
-        <div className="prototype-badge">
-          <strong>نسخه آزمایشی</strong>
-          <span>فعلاً هیچ اطلاعاتی به سرور ارسال نمی‌شود.</span>
-        </div>
       </div>
     </StepShell>,
 
@@ -691,10 +687,10 @@ export default function App() {
       total={TOTAL_STEPS}
       eyebrow="مرور نهایی"
       title="یک نگاه آخر؛ بعد ثبت"
-      description="این نسخه هنوز آزمایشی است و دکمه ثبت نهایی عمداً به دیتابیس متصل نشده است."
+      description="اطلاعات واردشده را یک‌بار مرور کنید و در صورت تأیید، ثبت نهایی را انجام دهید."
       onBack={back}
       onNext={() => setPrototypeNotice(true)}
-      nextLabel="ثبت نهایی — آزمایشی"
+      nextLabel="ثبت نهایی"
     >
       <div className="review-grid">
         <div><span>نام</span><strong>{form.fullName}</strong></div>
@@ -714,13 +710,13 @@ export default function App() {
 
       {prototypeNotice && (
         <div className="prototype-alert">
-          <strong>ثبت آزمایشی انجام شد.</strong>
-          <span>اتصال Production هنوز فعال نشده است؛ بنابراین هیچ اطلاعاتی از مرورگر شما خارج نشد.</span>
+          <strong>پیش‌نمایش ثبت نهایی</strong>
+          <span>رابط کاربری آماده است؛ اتصال نهایی به پایگاه داده در مرحله بعد فعال می‌شود.</span>
         </div>
       )}
 
       <button type="button" className="link-button danger-link" onClick={resetDraft}>
-        پاک کردن پاسخ‌های آزمایشی و شروع دوباره
+        پاک کردن پاسخ‌ها و شروع دوباره
       </button>
     </StepShell>,
   ]
