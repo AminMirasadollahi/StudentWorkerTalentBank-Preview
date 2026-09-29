@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import StepShell from './components/StepShell'
 import ChoiceCard from './components/ChoiceCard'
 import InfoIcon from './components/InfoIcon'
@@ -44,7 +44,8 @@ export default function App() {
   const [step, setStep] = useState(0)
   const [form, setForm] = useState(readDraft)
   const [showAllSkills, setShowAllSkills] = useState(false)
-  const [prototypeNotice, setPrototypeNotice] = useState(false)
+  const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false)
+  const submissionModalRef = useRef(null)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(form))
@@ -54,6 +55,28 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'auto' })
     document.querySelector('.question-panel')?.scrollTo({ top: 0, behavior: 'auto' })
   }, [step])
+
+  useEffect(() => {
+    if (!isSubmissionModalOpen) return
+
+    const previousActiveElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
+
+    document.body.classList.add('modal-open')
+    window.requestAnimationFrame(() => submissionModalRef.current?.focus())
+
+    const handleKeyDown = event => {
+      if (event.key === 'Escape') setIsSubmissionModalOpen(false)
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.classList.remove('modal-open')
+      document.removeEventListener('keydown', handleKeyDown)
+      previousActiveElement?.focus()
+    }
+  }, [isSubmissionModalOpen])
 
   const set = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
 
@@ -110,7 +133,7 @@ export default function App() {
     localStorage.removeItem(STORAGE_KEY)
     setStep(0)
     setShowAllSkills(false)
-    setPrototypeNotice(false)
+    setIsSubmissionModalOpen(false)
   }
 
   const pages = [
@@ -705,7 +728,7 @@ export default function App() {
       title="یک نگاه آخر؛ بعد ثبت"
       description="اطلاعات واردشده را یک‌بار مرور کنید و در صورت تأیید، ثبت نهایی را انجام دهید."
       onBack={back}
-      onNext={() => setPrototypeNotice(true)}
+      onNext={() => setIsSubmissionModalOpen(true)}
       nextLabel="ثبت نهایی"
     >
       <div className="review-grid">
@@ -724,18 +747,65 @@ export default function App() {
         <p>{form.benefitExpectation}</p>
       </div>
 
-      {prototypeNotice && (
-        <div className="prototype-alert">
-          <strong>پیش‌نمایش ثبت نهایی</strong>
-          <span>رابط کاربری آماده است؛ اتصال نهایی به پایگاه داده در مرحله بعد فعال می‌شود.</span>
-        </div>
-      )}
-
       <button type="button" className="link-button danger-link" onClick={resetDraft}>
         پاک کردن پاسخ‌ها و شروع دوباره
       </button>
     </StepShell>,
   ]
 
-  return <div className="app" dir="rtl">{pages[step]}</div>
+  return (
+    <div className="app" dir="rtl">
+      {pages[step]}
+
+      {isSubmissionModalOpen && (
+        <div
+          className="submission-modal show"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="submission-modal-title"
+          aria-describedby="submission-modal-message"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) setIsSubmissionModalOpen(false)
+          }}
+        >
+          <div
+            ref={submissionModalRef}
+            className="submission-modal-card"
+            role="document"
+            tabIndex={-1}
+          >
+            <div className="submission-modal-icon is-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9" />
+                <path d="m8 12 2.5 2.5L16.5 8.5" />
+              </svg>
+            </div>
+
+            <h2 id="submission-modal-title">فرم برای ثبت نهایی آماده است</h2>
+            <p id="submission-modal-message">
+              در نسخه متصل به پایگاه داده، پس از ثبت موفق درخواست همین پنجره نتیجه نمایش داده می‌شود.
+              اطلاعات واردشده فعلاً فقط در پیش‌نمایش این دستگاه نگهداری شده‌اند.
+            </p>
+
+            <div className="submission-modal-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsSubmissionModalOpen(false)}
+              >
+                بازگشت به فرم
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={resetDraft}
+              >
+                شروع فرم جدید
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
