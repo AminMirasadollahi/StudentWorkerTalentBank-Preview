@@ -201,3 +201,30 @@
     grid-template-columns: 1fr 1.2fr;
   }
 }
+
+
+/* Production video embed */
+.aparat-embed {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 100 / 57;
+  overflow: hidden;
+  background: #0f2f46;
+  border: 1px solid rgba(21, 62, 92, 0.12);
+  border-radius: 1rem;
+  box-shadow: 0 10px 28px rgba(15, 47, 70, 0.1);
+}
+
+.aparat-embed iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .aparat-embed {
+    border-radius: 0.82rem;
+  }
+}
