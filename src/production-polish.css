@@ -915,3 +915,251 @@ body,
     padding: 0.4rem 0.5rem;
   }
 }
+
+
+/* =========================================================
+   V2.4 — Mobile viewport hardening + submission result modal
+   ========================================================= */
+
+.modal-open {
+  overflow: hidden;
+}
+
+.submission-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(9, 31, 45, 0.58);
+  backdrop-filter: blur(5px);
+}
+
+.submission-modal-card {
+  width: min(31rem, 100%);
+  padding: 1.55rem 1.45rem;
+  text-align: center;
+  background: #fff;
+  border: 1px solid rgba(198, 213, 220, 0.9);
+  border-radius: 1.35rem;
+  box-shadow: 0 28px 80px rgba(9, 31, 45, 0.28);
+}
+
+.submission-modal-card:focus {
+  outline: none;
+}
+
+.submission-modal-icon {
+  display: grid;
+  width: 4.15rem;
+  height: 4.15rem;
+  margin: 0 auto 0.9rem;
+  place-items: center;
+  color: var(--success);
+  background: var(--success-soft);
+  border-radius: 50%;
+  box-shadow: 0 0 0 8px rgba(25, 114, 79, 0.07);
+}
+
+.submission-modal-icon svg {
+  width: 2.05rem;
+  height: 2.05rem;
+  stroke-width: 1.9;
+}
+
+.submission-modal-card h2 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 1.25rem;
+  line-height: 1.6;
+}
+
+.submission-modal-card > p {
+  max-width: 26rem;
+  margin: 0.45rem auto 0;
+  color: var(--muted);
+  font-size: 0.83rem;
+  line-height: 1.85;
+}
+
+.submission-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  margin-top: 1.15rem;
+}
+
+.submission-modal-actions .btn {
+  min-width: 9.5rem;
+}
+
+/* Hard viewport constraints for real mobile widths. */
+@media (max-width: 640px) {
+  html,
+  body,
+  #root,
+  .app,
+  .experience-shell {
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  .system-hero {
+    width: calc(100vw - 0.7rem) !important;
+    max-width: calc(100vw - 0.7rem);
+    min-width: 0;
+    margin-inline: auto !important;
+  }
+
+  .system-hero__inner,
+  .system-hero__identity,
+  .system-hero__copy {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .system-hero__copy {
+    overflow: hidden;
+  }
+
+  .system-hero__institution,
+  .system-hero__title,
+  .system-hero__copy p {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .system-hero + .journey-stage {
+    width: calc(100vw - 0.55rem) !important;
+    max-width: calc(100vw - 0.55rem);
+    min-width: 0;
+    margin-inline: auto;
+  }
+
+  .stage-progress,
+  .question-panel,
+  .question-panel__inner,
+  .nav-row,
+  .welcome-panel,
+  .aparat-embed,
+  .info-grid,
+  .contact-fields,
+  .choice-list,
+  .skill-groups,
+  .review-grid {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .stage-progress__meta {
+    min-width: 0;
+    gap: 0.35rem;
+  }
+
+  .stage-progress__chapter {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .stage-progress__count {
+    flex: 0 0 auto;
+  }
+
+  .nav-row {
+    overflow: hidden;
+  }
+
+  .nav-row .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .question-panel h1,
+  .description,
+  .input-shell,
+  .input-shell__label,
+  .helper-text,
+  .choice-card,
+  .chip,
+  .consent-card,
+  .review-benefit {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .aparat-embed iframe {
+    max-width: 100%;
+  }
+
+  .submission-modal {
+    padding: 0.65rem;
+  }
+
+  .submission-modal-card {
+    width: 100%;
+    max-width: 26rem;
+    padding: 1.25rem 0.9rem;
+    border-radius: 1.05rem;
+  }
+
+  .submission-modal-icon {
+    width: 3.6rem;
+    height: 3.6rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .submission-modal-card h2 {
+    font-size: 1.08rem;
+  }
+
+  .submission-modal-card > p {
+    font-size: 0.76rem;
+    line-height: 1.7;
+  }
+
+  .submission-modal-actions {
+    flex-direction: column;
+    margin-top: 0.9rem;
+  }
+
+  .submission-modal-actions .btn {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .stage-progress__chapter span {
+    display: none;
+  }
+
+  .stage-progress__meta {
+    align-items: center;
+  }
+
+  .step-1 .system-hero__title {
+    font-size: 1.06rem;
+  }
+
+  .step-1 .system-hero__copy p {
+    font-size: 0.55rem;
+  }
+
+  .question-panel__inner {
+    padding-inline: 0.7rem;
+  }
+
+  .info-grid > div {
+    min-width: 0;
+  }
+
+  .info-grid > div > span:last-child {
+    min-width: 0;
+  }
+}
