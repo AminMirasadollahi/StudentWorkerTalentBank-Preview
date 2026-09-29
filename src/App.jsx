@@ -118,7 +118,6 @@ export default function App() {
       key="welcome"
       step={1}
       total={TOTAL_STEPS}
-      eyebrow="فرصت همکاری دانشجویی"
       title="آشنایی کوتاه با این فرصت"
       description="پیش از شروع، ویدیوی معرفی کتابخانه و چند نکته کوتاه را ببینید."
       onNext={next}
