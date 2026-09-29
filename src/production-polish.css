@@ -742,3 +742,176 @@ body,
     max-width: 7rem;
   }
 }
+
+
+/* =========================================================
+   V2.3 — First-screen final polish
+   Stronger identity, smaller video, less first-page scrolling.
+   ========================================================= */
+
+.step-1 .system-hero {
+  box-shadow:
+    0 15px 38px rgba(15, 47, 70, 0.17),
+    0 1px 0 rgba(255, 255, 255, 0.09) inset;
+}
+
+.step-1 .system-hero__inner {
+  padding: 1rem 1.5rem 1.04rem;
+}
+
+.step-1 .system-hero__identity {
+  grid-template-columns: 2.45rem minmax(0, 1fr);
+  gap: 0.86rem;
+}
+
+.step-1 .system-hero__mark {
+  width: 2.45rem;
+  height: 2.45rem;
+}
+
+.step-1 .system-hero__mark svg {
+  width: 1.28rem;
+  height: 1.28rem;
+}
+
+.step-1 .system-hero__institution {
+  font-size: 0.68rem;
+}
+
+.step-1 .system-hero__title {
+  font-size: clamp(1.72rem, 2.5vw, 2.05rem);
+  line-height: 1.24;
+}
+
+.step-1 .system-hero__copy p {
+  font-size: clamp(0.71rem, 1vw, 0.82rem);
+}
+
+.step-1 .question-panel__inner {
+  padding-top: 0.9rem;
+  padding-bottom: 1rem;
+}
+
+.step-1 .question-panel h1,
+.step-1 .description {
+  margin-inline: auto;
+  text-align: center;
+}
+
+.step-1 .question-panel h1 {
+  font-size: clamp(1.55rem, 2.35vw, 1.9rem);
+}
+
+.step-1 .description {
+  max-width: 34rem;
+}
+
+.step-1 .step-content {
+  margin-top: 0.62rem;
+}
+
+.step-1 .welcome-panel {
+  width: min(40rem, 100%);
+  gap: 0.52rem;
+}
+
+.step-1 .aparat-embed {
+  width: min(36rem, 100%);
+  margin-inline: auto;
+}
+
+.step-1 .info-grid {
+  width: min(40rem, 100%);
+  margin-inline: auto;
+  text-align: right;
+}
+
+.step-1 .nav-row {
+  margin-top: 0.48rem;
+}
+
+@media (max-width: 900px) {
+  .step-1 .system-hero__inner {
+    padding: 0.78rem 0.95rem 0.82rem;
+  }
+
+  .step-1 .system-hero__identity {
+    grid-template-columns: 2.1rem minmax(0, 1fr);
+    gap: 0.68rem;
+  }
+
+  .step-1 .system-hero__mark {
+    width: 2.1rem;
+    height: 2.1rem;
+  }
+
+  .step-1 .system-hero__title {
+    font-size: clamp(1.3rem, 4.3vw, 1.62rem);
+  }
+
+  .step-1 .question-panel__inner {
+    padding-top: 0.8rem;
+  }
+
+  .step-1 .aparat-embed {
+    width: min(34rem, 100%);
+  }
+}
+
+@media (max-width: 640px) {
+  .step-1 .system-hero__inner {
+    padding: 0.68rem 0.78rem 0.7rem;
+  }
+
+  .step-1 .system-hero__identity {
+    grid-template-columns: 1.9rem minmax(0, 1fr);
+    gap: 0.54rem;
+  }
+
+  .step-1 .system-hero__mark {
+    width: 1.9rem;
+    height: 1.9rem;
+  }
+
+  .step-1 .system-hero__institution {
+    font-size: 0.55rem;
+  }
+
+  .step-1 .system-hero__title {
+    font-size: clamp(1.08rem, 5.6vw, 1.24rem);
+  }
+
+  .step-1 .system-hero__copy p {
+    font-size: 0.58rem;
+  }
+
+  .step-1 .question-panel__inner {
+    padding-top: 0.72rem;
+    padding-bottom: 0.82rem;
+  }
+
+  .step-1 .question-panel h1 {
+    font-size: clamp(1.22rem, 6.7vw, 1.48rem);
+  }
+
+  .step-1 .description {
+    font-size: 0.73rem;
+  }
+
+  .step-1 .step-content {
+    margin-top: 0.5rem;
+  }
+
+  .step-1 .aparat-embed {
+    width: 100%;
+  }
+
+  .step-1 .info-grid {
+    gap: 0.3rem;
+  }
+
+  .step-1 .info-grid > div {
+    min-height: 2.45rem;
+    padding: 0.4rem 0.5rem;
+  }
+}
