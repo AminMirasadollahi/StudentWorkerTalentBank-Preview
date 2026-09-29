@@ -3,6 +3,7 @@ import StepShell from './components/StepShell'
 import ChoiceCard from './components/ChoiceCard'
 import InfoIcon from './components/InfoIcon'
 import { availabilitySlots, entryYears, majors, skills, units, weekDays } from './data'
+import { getOpenCampaign, submitStudentWorkerApplication } from './lib/supabase'
 
 const STORAGE_KEY = 'student-worker-form-v2'
 const TOTAL_STEPS = 18
@@ -40,11 +41,41 @@ function readDraft() {
   }
 }
 
+function createSubmissionId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function friendlySubmissionError(error) {
+  const code = error?.code || ''
+  const message = String(error?.message || '')
+
+  if (code === '23505' && message.includes('applications_campaign_student_unique')) {
+    return 'برای این شماره دانشجویی قبلاً یک درخواست در همین فراخوان ثبت شده است.'
+  }
+
+  if (code === '42501' || message.toLowerCase().includes('row-level security')) {
+    return 'ثبت عمومی این فراخوان در حال حاضر فعال نیست. لطفاً کمی بعد دوباره تلاش کنید.'
+  }
+
+  if (code === '23514') {
+    return 'بخشی از اطلاعات با قالب مورد انتظار سامانه سازگار نیست. لطفاً پاسخ‌ها را یک‌بار مرور کنید.'
+  }
+
+  if (message.toLowerCase().includes('fetch') || message.toLowerCase().includes('network')) {
+    return 'ارتباط با سامانه برقرار نشد. اینترنت را بررسی کنید و دوباره تلاش کنید.'
+  }
+
+  return 'ثبت درخواست کامل نشد. پاسخ‌های شما محفوظ مانده‌اند و می‌توانید دوباره تلاش کنید.'
+}
+
 export default function App() {
   const [step, setStep] = useState(0)
   const [form, setForm] = useState(readDraft)
   const [showAllSkills, setShowAllSkills] = useState(false)
   const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false)
+  const [submissionStatus, setSubmissionStatus] = useState('idle')
+  const [submissionError, setSubmissionError] = useState('')
   const submissionModalRef = useRef(null)
 
   useEffect(() => {
@@ -66,7 +97,9 @@ export default function App() {
     window.requestAnimationFrame(() => submissionModalRef.current?.focus())
 
     const handleKeyDown = event => {
-      if (event.key === 'Escape') setIsSubmissionModalOpen(false)
+      if (event.key === 'Escape' && submissionStatus !== 'submitting') {
+        setIsSubmissionModalOpen(false)
+      }
     }
 
     document.addEventListener('keydown', handleKeyDown)
@@ -76,7 +109,7 @@ export default function App() {
       document.removeEventListener('keydown', handleKeyDown)
       previousActiveElement?.focus()
     }
-  }, [isSubmissionModalOpen])
+  }, [isSubmissionModalOpen, submissionStatus])
 
   const set = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
 
@@ -133,6 +166,90 @@ export default function App() {
     localStorage.removeItem(STORAGE_KEY)
     setStep(0)
     setShowAllSkills(false)
+    setIsSubmissionModalOpen(false)
+    setSubmissionStatus('idle')
+    setSubmissionError('')
+  }
+
+  const submitApplication = async () => {
+    if (submissionStatus === 'submitting' || submissionStatus === 'success') return
+
+    const studentNumber = form.studentNumber.trim()
+    const major = (form.major === 'سایر' ? form.majorOther : form.major).trim()
+    const rawEntryYear = form.entryYear === 'سایر' ? form.entryYearOther : form.entryYear
+    const entryYear = Number(rawEntryYear)
+    const portfolioUrl = form.portfolioUrl.trim()
+
+    if (!/^\d+$/.test(studentNumber)) {
+      setSubmissionError('شماره دانشجویی باید فقط شامل عدد باشد.')
+      setSubmissionStatus('error')
+      setIsSubmissionModalOpen(true)
+      return
+    }
+
+    if (!Number.isInteger(entryYear) || entryYear < 1300 || entryYear > 1500) {
+      setSubmissionError('سال ورود را به‌صورت یک سال معتبر وارد کنید.')
+      setSubmissionStatus('error')
+      setIsSubmissionModalOpen(true)
+      return
+    }
+
+    if (portfolioUrl && !/^https?:\/\//i.test(portfolioUrl)) {
+      setSubmissionError('لینک نمونه‌کار باید با http:// یا https:// شروع شود.')
+      setSubmissionStatus('error')
+      setIsSubmissionModalOpen(true)
+      return
+    }
+
+    setSubmissionStatus('submitting')
+    setSubmissionError('')
+    setIsSubmissionModalOpen(true)
+
+    try {
+      const campaign = await getOpenCampaign()
+
+      if (!campaign) {
+        const error = new Error('campaign_not_open')
+        error.code = '42501'
+        throw error
+      }
+
+      await submitStudentWorkerApplication({
+        client_submission_id: createSubmissionId(),
+        campaign_code: campaign.code,
+        full_name: form.fullName.trim(),
+        student_number: studentNumber,
+        phone: form.phone.trim(),
+        social_phone: form.socialPhone.trim() || null,
+        major,
+        entry_year: entryYear,
+        current_semester: Number(form.currentSemester),
+        primary_unit: form.primaryUnit,
+        secondary_units: form.secondaryUnits,
+        availability: form.availability,
+        selected_skills: form.selectedSkills,
+        top_skills: form.topSkills,
+        other_skill_text: form.otherSkill.trim() || null,
+        has_relevant_experience: Boolean(form.hasExperience),
+        experience_summary: form.hasExperience ? form.experienceSummary.trim() : null,
+        benefit_expectation: form.benefitExpectation.trim(),
+        portfolio_url: portfolioUrl || null,
+        consent_current_application: form.consentCurrent,
+        consent_talent_bank: form.consentTalentBank,
+        privacy_notice_version: campaign.privacy_notice_version,
+        form_schema_version: campaign.form_schema_version,
+      })
+
+      localStorage.removeItem(STORAGE_KEY)
+      setSubmissionStatus('success')
+    } catch (error) {
+      setSubmissionError(friendlySubmissionError(error))
+      setSubmissionStatus('error')
+    }
+  }
+
+  const closeSubmissionModal = () => {
+    if (submissionStatus === 'submitting') return
     setIsSubmissionModalOpen(false)
   }
 
@@ -240,7 +357,7 @@ export default function App() {
       description="برای تشخیص درخواست‌های تکراری و تطبیق اولیه اطلاعات."
       onBack={back}
       onNext={next}
-      nextDisabled={!/^\d{5,20}$/.test(form.studentNumber)}
+      nextDisabled={!/^\d+$/.test(form.studentNumber)}
     >
       <label className="input-shell">
         <span className="input-shell__label">شماره دانشجویی</span>
@@ -668,6 +785,7 @@ export default function App() {
       description="اختیاری است. اگر جایی نمونه فعالیت شما دیده می‌شود، لینک آن را بفرستید."
       onBack={back}
       onNext={next}
+      nextDisabled={Boolean(form.portfolioUrl.trim()) && !/^https?:\/\//i.test(form.portfolioUrl.trim())}
     >
       <label className="input-shell">
         <span className="input-shell__label">لینک نمونه‌کار</span>
@@ -727,12 +845,20 @@ export default function App() {
       eyebrow="مرور نهایی"
       title="یک نگاه آخر؛ بعد ثبت"
       description="اطلاعات واردشده را یک‌بار مرور کنید و در صورت تأیید، ثبت نهایی را انجام دهید."
-      onBack={back}
-      onNext={() => setIsSubmissionModalOpen(true)}
-      nextLabel="ثبت نهایی"
+      onBack={submissionStatus === 'success' ? undefined : back}
+      onNext={submitApplication}
+      nextLabel={
+        submissionStatus === 'submitting'
+          ? 'در حال ثبت…'
+          : submissionStatus === 'success'
+            ? 'ثبت انجام شد'
+            : 'ثبت نهایی'
+      }
+      nextDisabled={submissionStatus === 'submitting' || submissionStatus === 'success'}
     >
       <div className="review-grid">
         <div><span>نام</span><strong>{form.fullName}</strong></div>
+        <div><span>شماره دانشجویی</span><strong dir="ltr">{form.studentNumber}</strong></div>
         <div><span>رشته / ورودی</span><strong>{form.major === 'سایر' ? form.majorOther : form.major} / {form.entryYear === 'سایر' ? form.entryYearOther : form.entryYear}</strong></div>
         <div><span>شماره تماس</span><strong dir="ltr">{form.phone}</strong></div>
         <div><span>ایتا / شبکه اجتماعی</span><strong dir="ltr">{form.socialPhone || form.phone}</strong></div>
@@ -765,7 +891,12 @@ export default function App() {
           aria-labelledby="submission-modal-title"
           aria-describedby="submission-modal-message"
           onMouseDown={event => {
-            if (event.target === event.currentTarget) setIsSubmissionModalOpen(false)
+            if (
+              event.target === event.currentTarget
+              && submissionStatus !== 'submitting'
+            ) {
+              closeSubmissionModal()
+            }
           }}
         >
           <div
@@ -774,35 +905,75 @@ export default function App() {
             role="document"
             tabIndex={-1}
           >
-            <div className="submission-modal-icon is-success" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="9" />
-                <path d="m8 12 2.5 2.5L16.5 8.5" />
-              </svg>
+            <div
+              className={`submission-modal-icon is-${submissionStatus}`}
+              aria-hidden="true"
+            >
+              {submissionStatus === 'submitting' ? (
+                <span className="submission-spinner" />
+              ) : submissionStatus === 'success' ? (
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="m8 12 2.5 2.5L16.5 8.5" />
+                </svg>
+              ) : (
+                <span className="submission-error-mark">!</span>
+              )}
             </div>
 
-            <h2 id="submission-modal-title">فرم برای ثبت نهایی آماده است</h2>
+            <h2 id="submission-modal-title">
+              {submissionStatus === 'submitting'
+                ? 'در حال ثبت درخواست'
+                : submissionStatus === 'success'
+                  ? 'درخواست شما با موفقیت ثبت شد'
+                  : 'ثبت درخواست کامل نشد'}
+            </h2>
+
             <p id="submission-modal-message">
-              در نسخه متصل به پایگاه داده، پس از ثبت موفق درخواست همین پنجره نتیجه نمایش داده می‌شود.
-              اطلاعات واردشده فعلاً فقط در پیش‌نمایش این دستگاه نگهداری شده‌اند.
+              {submissionStatus === 'submitting'
+                ? 'اطلاعات در حال ارسال امن به سامانه است. لطفاً چند لحظه صبر کنید و این صفحه را نبندید.'
+                : submissionStatus === 'success'
+                  ? 'اطلاعات شما برای بررسی همکاری دانشجویی دریافت شد. در صورت نیاز به هماهنگی بیشتر، از راه ارتباطی ثبت‌شده با شما تماس می‌گیریم.'
+                  : submissionError}
             </p>
 
-            <div className="submission-modal-actions">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setIsSubmissionModalOpen(false)}
-              >
-                بازگشت به فرم
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={resetDraft}
-              >
-                شروع فرم جدید
-              </button>
-            </div>
+            {submissionStatus === 'submitting' && (
+              <div className="submission-modal-progress" aria-live="polite">
+                <small>در حال ارتباط با پایگاه داده…</small>
+              </div>
+            )}
+
+            {submissionStatus !== 'submitting' && (
+              <div className="submission-modal-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closeSubmissionModal}
+                >
+                  {submissionStatus === 'success' ? 'بستن' : 'بازگشت و بررسی'}
+                </button>
+
+                {submissionStatus === 'error' && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={submitApplication}
+                  >
+                    تلاش دوباره
+                  </button>
+                )}
+
+                {submissionStatus === 'success' && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={resetDraft}
+                  >
+                    شروع فرم جدید
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
