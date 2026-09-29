@@ -15,6 +15,7 @@ const initialForm = {
   major: '',
   majorOther: '',
   entryYear: '',
+  entryYearOther: '',
   currentSemester: '',
   primaryUnit: '',
   secondaryUnits: [],
@@ -124,13 +125,13 @@ export default function App() {
       nextLabel="شروع فرم"
     >
       <div className="welcome-panel">
-        <div className="video-placeholder" role="img" aria-label="جایگاه ویدیوی معرفی کتابخانه">
-          <span className="video-placeholder__orb" aria-hidden="true" />
-          <span className="play-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z" /></svg>
-          </span>
-          <strong>ویدیوی کوتاه معرفی کتابخانه</strong>
-          <small>ویدیوی معرفی سه‌بعدی کتابخانه از آپارات در همین بخش پخش خواهد شد.</small>
+        <div className="aparat-embed">
+          <iframe
+            src="https://www.aparat.com/video/video/embed/videohash/mlcki4e/vt/frame?titleShow=true"
+            title="ویدیوی معرفی همکاری دانشجویی با کتابخانه"
+            allow="autoplay; fullscreen"
+            allowFullScreen
+          />
         </div>
 
         <div className="info-grid">
@@ -283,7 +284,7 @@ export default function App() {
       step={6}
       total={TOTAL_STEPS}
       title="رشته تحصیلی"
-      description="فهرست رشته‌ها پیش از انتشار نهایی با رشته‌های فعال دانشکده تطبیق داده می‌شود."
+      description="رشته تحصیلی‌تان را از فهرست انتخاب کنید. اگر رشته شما در فهرست نیست، «سایر» را بزنید."
       onBack={back}
       onNext={next}
       nextDisabled={!form.major || (form.major === 'سایر' && form.majorOther.trim().length < 2)}
@@ -325,20 +326,36 @@ export default function App() {
       description="سال ورودتان به دانشگاه را انتخاب کنید."
       onBack={back}
       onNext={next}
-      nextDisabled={!form.entryYear}
+      nextDisabled={!form.entryYear || (form.entryYear === 'سایر' && form.entryYearOther.trim().length < 2)}
     >
-      <div className="chip-grid chip-grid--years">
-        {entryYears.map(year => (
-          <button
-            key={year}
-            type="button"
-            className={`chip ${Number(form.entryYear) === year ? 'selected' : ''}`}
-            onClick={() => set('entryYear', year)}
-          >
-            {year}
-          </button>
-        ))}
-      </div>
+      <label className="input-shell">
+        <span className="input-shell__label">سال ورود</span>
+        <select
+          className="select-input"
+          value={form.entryYear}
+          onChange={event => setForm(prev => ({
+            ...prev,
+            entryYear: event.target.value,
+            entryYearOther: event.target.value === 'سایر' ? prev.entryYearOther : '',
+          }))}
+        >
+          <option value="">انتخاب کنید</option>
+          {entryYears.map(year => <option key={year} value={year}>{year}</option>)}
+        </select>
+      </label>
+      {form.entryYear === 'سایر' && (
+        <label className="input-shell input-shell--conditional">
+          <span className="input-shell__label">سال ورود</span>
+          <input
+            autoFocus
+            inputMode="numeric"
+            className="text-input"
+            value={form.entryYearOther}
+            onChange={event => set('entryYearOther', event.target.value.slice(0, 10))}
+            placeholder="مثلاً ۱۳۹۷"
+          />
+        </label>
+      )}
     </StepShell>,
 
     <StepShell
@@ -694,7 +711,7 @@ export default function App() {
     >
       <div className="review-grid">
         <div><span>نام</span><strong>{form.fullName}</strong></div>
-        <div><span>رشته / ورودی</span><strong>{form.major === 'سایر' ? form.majorOther : form.major} / {form.entryYear}</strong></div>
+        <div><span>رشته / ورودی</span><strong>{form.major === 'سایر' ? form.majorOther : form.major} / {form.entryYear === 'سایر' ? form.entryYearOther : form.entryYear}</strong></div>
         <div><span>شماره تماس</span><strong dir="ltr">{form.phone}</strong></div>
         <div><span>ایتا / شبکه اجتماعی</span><strong dir="ltr">{form.socialPhone || form.phone}</strong></div>
         <div><span>اولویت همکاری</span><strong>{unitLabel(form.primaryUnit)}</strong></div>
