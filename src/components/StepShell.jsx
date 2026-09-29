@@ -41,7 +41,7 @@ export default function StepShell({
   const { index: chapterIndex, chapter } = chapterFor(step)
 
   return (
-    <main className={`experience-shell chapter-tone-${chapterIndex}`}>
+    <main className={`experience-shell chapter-tone-${chapterIndex} step-${step}`}>
       <header className="system-hero" aria-label="معرفی سامانه همکاری دانشجویی">
         <span className="system-hero__shape system-hero__shape--one" aria-hidden="true" />
         <span className="system-hero__shape system-hero__shape--two" aria-hidden="true" />
