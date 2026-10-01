@@ -110,6 +110,7 @@ export default function StepShell({
             className="btn btn-primary"
             onClick={onNext}
             disabled={nextDisabled}
+            data-analytics-action={step === 1 ? 'form-start' : undefined}
           >
             {nextLabel}
             <span aria-hidden="true">←</span>
