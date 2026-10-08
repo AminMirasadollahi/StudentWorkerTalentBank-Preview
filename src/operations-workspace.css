@@ -1,0 +1,62 @@
+
+.ow-workspace { display: grid; gap: 0.75rem; }
+.ow-workspace * { box-sizing: border-box; }
+.ow-summary { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 0.65rem; }
+.ow-summary article { padding: 0.83rem 0.9rem; min-width: 0; background: white;
+ border:1px solid var(--report-border); border-radius:0.9rem; }
+.ow-summary article span { display: block; color: var(--report-muted); font-size: 0.72rem; }
+.ow-summary article b { display: block; color:var(--report-navy); font-size:1.35rem; margin-top:0.25rem; }
+.ow-tabs { display: flex; gap: 0.35rem; flex-wrap: wrap; align-items:center;
+ border-bottom:1px solid var(--report-border); padding:0.3rem 0; }
+.ow-tab { border:0; border-radius:0.6rem; padding:0.62rem 0.9rem; cursor:pointer;
+ color:var(--report-navy); background:transparent; font:inherit; font-weight:700; }
+.ow-tab.is-selected { background: var(--report-teal); color:white; }
+.ow-fields { display: grid; gap:0.65rem; margin:0.8rem 0; }
+.ow-fields--two { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.ow-fields--three { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.ow-fields--four { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.ow-workspace .report-panel { margin:0; padding:1rem; }
+.ow-workspace .report-panel h2 { color:var(--report-navy); font-size:1.1rem; margin:0 0 0.7rem; }
+.ow-workspace .report-panel h3 { color:var(--report-navy); margin:0 0 0.65rem; font-size:0.95rem; }
+.ow-muted { color:var(--report-muted); font-size:0.8rem; line-height:1.8; }
+.ow-warning { color:#93611b; background:#fff6e7; border-radius:0.5rem;
+ padding:0.42rem 0.6rem; font-size:0.75rem; }
+.ow-short-notice { padding:0.7rem; margin:0.45rem 0; border:1px solid #f1d5a3;
+ border-radius:0.6rem; background:#fff9ef; }
+.ow-list { display:grid; gap:0.55rem; margin-top:0.7rem; }
+.ow-item { min-width:0; padding:0.75rem 0.85rem; border:1px solid var(--report-border);
+ background:#fcfefe; border-radius:0.75rem; }
+.ow-item strong { color:var(--report-navy); }
+.ow-item small { color:var(--report-muted); display:block; margin-top:0.2rem; font-size:0.75rem; }
+.ow-item p { color:#536d79; line-height:1.8; font-size:0.77rem; margin:0.5rem 0 0; }
+.ow-item-header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.5rem; }
+.ow-status { padding:0.15rem 0.53rem; border-radius:100px; background:#eaf5f3;
+ color:#177c75; font-size:0.7rem; }
+.ow-actions { display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.7rem; }
+.ow-schedule-editor { display:grid; gap:0.85rem; margin-top:0.9rem; }
+.ow-schedule-editor form { border:1px solid #d9e6ea; padding:0.8rem;
+ background:#fbfdfd; border-radius:0.8rem; }
+.ow-checkbox { display:flex; align-items:center; gap:0.5rem; font-size:0.78rem; margin:0.5rem 0; }
+.ow-checkbox input { accent-color:var(--report-teal); width:1rem; height:1rem; }
+.ow-worker-selector { width:min(22rem,100%); }
+.ow-week-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:0.4rem; margin-top:0.9rem; }
+.ow-week-grid article { min-width:0; padding:0.6rem 0.35rem; border-radius:0.65rem;
+ background:#eef6f8; text-align:center; display:grid; gap:0.18rem; }
+.ow-week-grid strong { color:var(--report-navy); font-size:0.72rem; }
+.ow-week-grid small { color:var(--report-muted); font-size:0.65rem; }
+.ow-week-grid b { color:var(--report-teal); font-size:0.76rem; }
+@media(max-width:900px) {
+ .ow-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .ow-fields--four { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .ow-week-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+}
+@media(max-width:640px) {
+ .ow-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .ow-tab { font-size:0.76rem; padding:0.58rem 0.35rem; }
+ .ow-summary article { padding:0.56rem; }
+ .ow-summary article b { font-size:1.08rem; }
+ .ow-fields--two,.ow-fields--three,.ow-fields--four { grid-template-columns:1fr; gap:0.45rem; }
+ .ow-workspace .report-panel { padding:0.7rem; }
+ .ow-week-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .ow-actions .report-btn { flex:1 1 8rem; }
+}
