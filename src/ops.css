@@ -1,0 +1,100 @@
+
+.ops-root {
+  font-family: 'ModamFaNumCondensed', inherit;
+}
+.ops-root * { box-sizing: border-box; }
+.ops-root .report-login-card { max-width: 29rem; }
+.ops-login-password { margin-top: 0.8rem; }
+.ops-root .report-field input[dir="ltr"] { text-align: left; }
+.ops-kpis {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 0.72rem;
+  margin: 0.85rem 0;
+}
+.ops-kpis article {
+  padding: 0.9rem 1.05rem;
+  border: 1px solid var(--report-border);
+  border-radius: 0.9rem;
+  background: white;
+}
+.ops-kpis span { display: block; color: var(--report-muted); font-size: 0.79rem; }
+.ops-kpis strong { color: var(--report-navy); display: block; font-size: 1.5rem; }
+.ops-filter { width: min(17rem,100%); }
+.ops-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0.78rem; }
+.ops-candidate {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--report-border);
+  border-radius: 0.92rem;
+  background: #fafdfe;
+}
+.ops-candidate__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.8rem; }
+.ops-candidate__head strong { display: block; color: var(--report-navy); font-size: 0.98rem; }
+.ops-candidate__head small { display: block; font-size: 0.75rem; color: var(--report-muted); margin-top: 0.2rem; }
+.ops-candidate__head small[dir="ltr"] { text-align: right; }
+.ops-status {
+  flex: 0 0 auto;
+  padding: 0.24rem 0.48rem;
+  border-radius: 99px;
+  background: #edf2f5;
+  color: #516772;
+  font-size: 0.65rem;
+}
+.ops-status--active { color: #166e69; background: #e4f5f1; }
+.ops-field-row { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0.65rem; margin-top: 0.9rem; }
+.ops-small-action { margin-top: 0.6rem; }
+.ops-provision { padding-top: 0.8rem; margin-top: 0.75rem; border-top: 1px dashed #cbdce2; }
+.ops-provision small { display: block; margin-top: 0.45rem; color: var(--report-muted); }
+.ops-provision .report-btn { margin-top: 0.65rem; }
+.ops-worker-state { color: var(--report-muted); font-size: 0.75rem; margin: 0.75rem 0 0; }
+.ops-muted { color: var(--report-muted); padding: 0.8rem; }
+.ops-empty { text-align: center; padding: 2rem 1rem; }
+.ops-empty h2 { color: var(--report-navy); }
+.ops-empty p { color: var(--report-muted); line-height: 1.8; }
+.ops-alert-success { padding: 0.7rem; background: #e5f5f1; color: #135d54; border-radius: 0.7rem; margin-bottom: 0.85rem; }
+.ops-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(11,39,58,0.65);
+  display: grid;
+  place-items: center;
+  padding: 0.8rem;
+}
+.ops-modal__card {
+  width: min(28rem,100%);
+  background: white;
+  border-radius: 1.1rem;
+  padding: 1.3rem;
+  box-shadow: 0 20px 80px rgba(0,0,0,0.22);
+}
+.ops-modal__card h2 { color: var(--report-navy); margin: 0; }
+.ops-modal__card p { font-size: 0.8rem; line-height: 1.8; color: var(--report-muted); }
+.ops-modal__card .report-field { margin-top: 0.7rem; }
+.ops-modal__card .report-btn { margin: 0.9rem 0.4rem 0 0; }
+@media(max-width: 900px) {
+  .ops-list { grid-template-columns: 1fr; }
+}
+@media(max-width: 640px) {
+  .ops-root { padding: 0.55rem; }
+  .ops-kpis { gap: 0.42rem; }
+  .ops-kpis article { padding: 0.58rem; }
+  .ops-kpis span { font-size: 0.65rem; }
+  .ops-kpis strong { font-size: 1.15rem; }
+  .ops-root .report-header { padding: 0.85rem; flex-wrap: wrap; }
+  .ops-root .report-header h1 { font-size: 1.35rem; }
+  .ops-root .report-panel { padding: 0.75rem; }
+  .ops-root .report-panel-heading { align-items: stretch; flex-direction: column; }
+  .ops-filter { width: 100%; }
+  .ops-candidate { padding: 0.75rem; }
+  .ops-field-row { grid-template-columns: 1fr; gap: 0.45rem; }
+  .ops-candidate__head { flex-wrap: wrap; }
+  .ops-modal__card { padding: 1rem; max-height: 90dvh; overflow: auto; }
+}
+
+.ops-password-panel { max-width: 33rem; }
+.ops-password-panel h2 { margin: 0; color: var(--report-navy); font-size: 1.12rem; }
+.ops-password-panel > p { color: var(--report-muted); font-size: 0.82rem; }
+.ops-password-panel form { display: grid; gap: 0.75rem; }
+.ops-password-panel .report-btn { justify-self: start; }
