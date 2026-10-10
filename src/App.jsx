@@ -13,6 +13,7 @@ const initialForm = {
   studentNumber: '',
   phone: '',
   socialPhone: '',
+  email: '',
   major: '',
   majorOther: '',
   entryYear: '',
@@ -179,6 +180,7 @@ export default function App() {
     const rawEntryYear = form.entryYear === 'سایر' ? form.entryYearOther : form.entryYear
     const entryYear = Number(rawEntryYear)
     const portfolioUrl = form.portfolioUrl.trim()
+    const email = form.email.trim().toLowerCase()
 
     if (!/^\d+$/.test(studentNumber)) {
       setSubmissionError('شماره دانشجویی باید فقط شامل عدد باشد.')
@@ -189,6 +191,13 @@ export default function App() {
 
     if (!Number.isInteger(entryYear) || entryYear < 1300 || entryYear > 1500) {
       setSubmissionError('سال ورود را به‌صورت یک سال معتبر وارد کنید.')
+      setSubmissionStatus('error')
+      setIsSubmissionModalOpen(true)
+      return
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+      setSubmissionError('یک آدرس ایمیل معتبر وارد کنید.')
       setSubmissionStatus('error')
       setIsSubmissionModalOpen(true)
       return
@@ -221,6 +230,7 @@ export default function App() {
         student_number: studentNumber,
         phone: form.phone.trim(),
         social_phone: form.socialPhone.trim() || null,
+        email,
         major,
         entry_year: entryYear,
         current_semester: Number(form.currentSemester),
@@ -379,12 +389,13 @@ export default function App() {
       step={5}
       total={TOTAL_STEPS}
       title="راه ارتباطی شما"
-      description="یک شماره برای تماس لازم است. اگر شماره‌ای که در ایتا یا شبکه‌های اجتماعی استفاده می‌کنید متفاوت است، آن را هم وارد کنید."
+      description="شماره همراه و ایمیل معتبر را وارد کنید. ایمیل فقط در صورت پذیرش، برای فعال‌سازی حساب دانشجوکاری استفاده می‌شود."
       onBack={back}
       onNext={next}
       nextDisabled={
         !/^09\d{9}$/.test(form.phone)
         || (form.socialPhone && !/^09\d{9}$/.test(form.socialPhone))
+        || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
       }
     >
       <div className="contact-fields">
@@ -403,6 +414,20 @@ export default function App() {
           <small>اگر برای هماهنگی لازم باشد از این شماره با شما تماس می‌گیریم.</small>
         </label>
 
+        <label className="input-shell">
+          <span className="input-shell__label">ایمیل معتبر <em>لازم</em></span>
+          <input
+            type="email"
+            dir="ltr"
+            className="text-input ltr"
+            value={form.email}
+            onChange={event => set('email', event.target.value.slice(0,254))}
+            placeholder="student@example.com"
+            autoComplete="email"
+            maxLength={254}
+          />
+          <small>در صورت پذیرش و فعال‌سازی حساب، لینک اختصاصی ورود به این ایمیل ارسال خواهد شد.</small>
+        </label>
         <label className="input-shell input-shell--social">
           <span className="input-shell__label">شماره ایتا / شبکه اجتماعی <em>اختیاری</em></span>
           <input
@@ -806,7 +831,7 @@ export default function App() {
       total={TOTAL_STEPS}
       eyebrow="حریم خصوصی"
       title="انتخاب شما درباره استفاده از اطلاعات"
-      description="فقط اطلاعات لازم برای بررسی همکاری را می‌گیریم. نگهداری اطلاعات برای فرصت‌های آینده کاملاً اختیاری است."
+      description="اطلاعات تماس، از جمله ایمیل، برای بررسی همین درخواست و در صورت پذیرش برای ایجاد دسترسی استفاده می‌شود. نگهداری اطلاعات برای فرصت‌های آینده اختیاری است."
       onBack={back}
       onNext={next}
       nextDisabled={!form.consentCurrent}
@@ -862,6 +887,7 @@ export default function App() {
         <div><span>رشته / ورودی</span><strong>{form.major === 'سایر' ? form.majorOther : form.major} / {form.entryYear === 'سایر' ? form.entryYearOther : form.entryYear}</strong></div>
         <div><span>شماره تماس</span><strong dir="ltr">{form.phone}</strong></div>
         <div><span>ایتا / شبکه اجتماعی</span><strong dir="ltr">{form.socialPhone || form.phone}</strong></div>
+        <div><span>ایمیل</span><strong dir="ltr">{form.email.trim()}</strong></div>
         <div><span>اولویت همکاری</span><strong>{unitLabel(form.primaryUnit)}</strong></div>
         <div><span>سایر حوزه‌ها</span><strong>{form.secondaryUnits.length ? form.secondaryUnits.map(unitLabel).join('، ') : '—'}</strong></div>
         <div><span>مهارت‌ها</span><strong>{form.selectedSkills.length} مورد</strong></div>
