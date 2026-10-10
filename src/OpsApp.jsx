@@ -13,6 +13,9 @@ import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import './report.css'
 import './ops.css'
 
+// Enable only after the SMTP provider and Edge delivery switch are tested.
+const emailInvitesAvailable = import.meta.env.VITE_OPS_EMAIL_INVITES_AVAILABLE === 'true'
+
 const unitLabels = {
   library: 'کتابخانه',
   public_relations: 'روابط عمومی',
@@ -266,7 +269,11 @@ function CandidateCard({ candidate, saving, onSave, onSaveEmail, onProvision, on
                 <select value={onboardingMode} onChange={e => setOnboardingMode(e.target.value)}>
                   <option value="secure_link">ساخت لینک امن برای تعیین رمز شخصی (پیشنهادی)</option>
                   <option value="password">نمایش رمز موقت (روش قبلی)</option>
-                  <option value="email_link" disabled>ارسال ایمیل خودکار (پس از راه‌اندازی SMTP)</option>
+                  <option value="email_link" disabled={!emailInvitesAvailable}>
+                    {emailInvitesAvailable
+                      ? 'فعال‌سازی حساب و ارسال لینک امن با ایمیل'
+                      : 'ارسال ایمیل خودکار (پس از راه‌اندازی SMTP)'}
+                  </option>
                 </select>
               </label>
               <button className="report-btn report-btn--primary" type="submit" disabled={saving}>
@@ -343,7 +350,11 @@ function AdminView({ onLogout }) {
     try {
       const result = await provisionWorker(id, unit, email, onboardingMode)
       setIssuedCredentials(result)
-      setFlash('حساب دانشجوکار فعال شد.')
+      setFlash(onboardingMode === 'email_link'
+        ? result.email_send_requested
+          ? 'حساب فعال شد و درخواست ارسال ایمیل ثبت شد. تحویل ایمیل را نیز بررسی کنید.'
+          : 'حساب فعال شد ولی درخواست ارسال ایمیل ناموفق بود؛ لینک امن را جداگانه صادر کنید.'
+        : 'حساب دانشجوکار فعال شد.')
       await refresh()
     } catch (e) { setError(getMessage(e)) }
     finally { setBusyId('') }
