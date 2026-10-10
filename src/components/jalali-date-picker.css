@@ -1,0 +1,39 @@
+
+.jd-field { position:relative; min-width:0; width:100%; }
+.jd-control {
+ width:100%; border:1px solid #cadde4; border-radius:0.75rem;
+ padding:0.64rem 0.8rem; min-height:2.9rem; background:#fff;
+ display:flex; align-items:center; justify-content:space-between;
+ color:#173e5b; text-align:right; cursor:pointer; font:inherit;
+}
+.jd-control:focus-visible,.jd-day:focus-visible,.jd-arrow:focus-visible {
+ outline:3px solid #72b9b3; outline-offset:2px;
+}
+.jd-control:disabled { opacity:.55; cursor:not-allowed; }
+.jd-popup {
+ position:absolute; z-index:60; top:calc(100% + .3rem); right:0;
+ width:min(20.5rem, calc(100vw - 2rem)); max-width:100%;
+ background:#fff; padding:.65rem; border:1px solid #c8dce3;
+ box-shadow:0 12px 38px rgba(11,48,69,.19); border-radius:.9rem;
+}
+.jd-heading {display:flex; align-items:center; justify-content:space-between; gap:.3rem; margin-bottom:.4rem;}
+.jd-heading strong {font-size:.95rem; color:#153e5c;}
+.jd-arrow {font:inherit; font-size:1.5rem; color:#153e5c; border:0;
+ border-radius:.5rem; background:#eff6f7; width:2.1rem; height:2.1rem; cursor:pointer;}
+.jd-grid {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.12rem;}
+.jd-weekday {font-size:.74rem; color:#758b99; text-align:center; padding:.3rem 0;}
+.jd-day {min-width:0;aspect-ratio:1;border:0;border-radius:.52rem;
+ background:transparent;color:#294a5e;cursor:pointer;font:inherit;font-size:.86rem;}
+.jd-day:hover:not(:disabled) {background:#e8f6f4;}
+.jd-day:disabled {color:#aebac1;cursor:not-allowed;}
+.jd-day.jd-outside {opacity:.48;}
+.jd-day.jd-today {box-shadow:inset 0 0 0 1px #1e8b84;}
+.jd-day.jd-selected {background:#1e8b84;color:white;font-weight:700;}
+.jd-footer {display:flex;justify-content:space-between;margin-top:.4rem;padding-top:.35rem;
+ border-top:1px solid #e3edf0;}
+.jd-footer button {font:inherit;border:0; background:transparent;color:#1c7776;
+ font-size:.76rem;padding:.3rem .45rem;cursor:pointer;}
+@media(max-width:640px) {
+ .jd-popup {width:min(19rem,calc(100vw - 3.2rem));}
+ .jd-day {font-size:.86rem;}
+}
