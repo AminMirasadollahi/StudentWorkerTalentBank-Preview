@@ -55,6 +55,13 @@ export async function setCandidateScreening(id, interview, clearance) {
   }))
 }
 
+export async function setCandidateEmail(id, email) {
+  return assertResult(await opsClient.rpc('ops_set_candidate_email', {
+    p_application_id: id,
+    p_email: email.trim().toLowerCase(),
+  }))
+}
+
 export async function provisionWorker(applicationId, unitCode, email, onboardingMode = 'password') {
   const { data, error } = await opsClient.functions.invoke('ops-provision-worker', {
     body: {
