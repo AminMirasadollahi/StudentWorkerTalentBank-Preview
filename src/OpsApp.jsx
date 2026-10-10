@@ -104,8 +104,8 @@ function WorkerView({ profile, onLogout, initialPasswordRequired = false }) {
     event.preventDefault()
     setMessage('')
     setPasswordError('')
-    if (password.length < 12 || password !== confirmation) {
-      setPasswordError('رمز جدید باید حداقل ۱۲ نویسه باشد و تکرار آن یکسان وارد شود.')
+    if (password.length < 8 || password !== confirmation) {
+      setPasswordError('رمز جدید باید حداقل ۸ نویسه باشد و تکرار آن یکسان وارد شود.')
       return
     }
     setSaving(true)
@@ -149,17 +149,17 @@ function WorkerView({ profile, onLogout, initialPasswordRequired = false }) {
         <h2>{passwordEstablished ? 'تغییر رمز عبور' : 'در اولین ورود، رمز اختصاصی خودتان را تعیین کنید'}</h2>
         <p>{passwordEstablished
           ? 'در صورت تمایل می‌توانید رمز عبور خود را تغییر دهید.'
-          : 'حساب شما با لینک اختصاصی باز شده است. برای ادامه، یک رمز جدید حداقل ۱۲ نویسه‌ای تعیین کنید.'}</p>
+          : 'حساب شما با لینک اختصاصی باز شده است. برای ادامه، یک رمز جدید حداقل ۸ نویسه‌ای تعیین کنید.'}</p>
         <form onSubmit={changePassword}>
           <label className="report-field">
-            <span>رمز جدید (حداقل ۱۲ نویسه)</span>
-            <input type="password" minLength={12} required
+            <span>رمز جدید (حداقل ۸ نویسه)</span>
+            <input type="password" minLength={8} required
               autoComplete="new-password" dir="ltr"
               value={password} onChange={event => setPassword(event.target.value)}/>
           </label>
           <label className="report-field">
             <span>تکرار رمز جدید</span>
-            <input type="password" minLength={12} required
+            <input type="password" minLength={8} required
               autoComplete="new-password" dir="ltr"
               value={confirmation} onChange={event => setConfirmation(event.target.value)}/>
           </label>
