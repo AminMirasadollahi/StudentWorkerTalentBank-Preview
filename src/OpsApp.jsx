@@ -92,12 +92,13 @@ function Login({ onLogin, busy, error, defaultMode }) {
   )
 }
 
-function WorkerView({ profile, onLogout }) {
+function WorkerView({ profile, onLogout, initialPasswordRequired = false }) {
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [passwordError, setPasswordError] = useState('')
+  const [passwordEstablished, setPasswordEstablished] = useState(!initialPasswordRequired)
 
   const changePassword = async event => {
     event.preventDefault()
@@ -108,13 +109,25 @@ function WorkerView({ profile, onLogout }) {
       return
     }
     setSaving(true)
-    const { error } = await opsClient.auth.updateUser({ password })
-    setSaving(false)
-    if (error) {
-      setPasswordError('تغییر رمز انجام نشد؛ لطفاً دوباره وارد حساب شوید و تلاش کنید.')
+    try {
+      if (!passwordEstablished) {
+        const { data, error } = await opsClient.functions.invoke(
+          'ops-complete-worker-onboarding',
+          { body: { password } },
+        )
+        if (error || data?.ok !== true) throw error || new Error(data?.error || 'password_setup_failed')
+      } else {
+        const { error } = await opsClient.auth.updateUser({ password })
+        if (error) throw error
+      }
+    } catch {
+      setSaving(false)
+      setPasswordError('ثبت رمز انجام نشد. لطفاً رمز دیگری انتخاب کنید و دوباره تلاش کنید.')
       return
     }
-    setMessage('رمز حساب شما تغییر کرد.')
+    setSaving(false)
+    setMessage('رمز اختصاصی حساب شما ثبت شد.')
+    setPasswordEstablished(true)
     setPassword('')
     setConfirmation('')
   }
@@ -131,10 +144,12 @@ function WorkerView({ profile, onLogout }) {
           خروج
         </button>
       </header>
-      <WorkerOperations profile={profile} />
-      <section className="report-panel ops-password-panel">
-        <h2>تغییر رمز عبور</h2>
-        <p>اگر با رمز موقت وارد شده‌اید، بهتر است رمز شخصی تازه‌ای انتخاب کنید.</p>
+      {passwordEstablished && <WorkerOperations profile={profile} />}
+      <section className={`report-panel ops-password-panel ${!passwordEstablished ? 'ops-password-panel--required' : ''}`}>
+        <h2>{passwordEstablished ? 'تغییر رمز عبور' : 'در اولین ورود، رمز اختصاصی خودتان را تعیین کنید'}</h2>
+        <p>{passwordEstablished
+          ? 'در صورت تمایل می‌توانید رمز عبور خود را تغییر دهید.'
+          : 'حساب شما با لینک اختصاصی باز شده است. برای ادامه، یک رمز جدید حداقل ۱۲ نویسه‌ای تعیین کنید.'}</p>
         <form onSubmit={changePassword}>
           <label className="report-field">
             <span>رمز جدید (حداقل ۱۲ نویسه)</span>
@@ -160,11 +175,12 @@ function WorkerView({ profile, onLogout }) {
   )
 }
 
-function CandidateCard({ candidate, saving, onSave, onProvision }) {
+function CandidateCard({ candidate, saving, onSave, onProvision, onReissue }) {
   const [interview, setInterview] = useState(candidate.interview_status || 'pending')
   const [clearance, setClearance] = useState(candidate.clearance_status || 'pending')
   const [email, setEmail] = useState('')
   const [unit, setUnit] = useState(candidate.primary_unit)
+  const [onboardingMode, setOnboardingMode] = useState('secure_link')
   const hasWorker = Boolean(candidate.worker_id)
   const accepted = candidate.interview_status === 'approved'
     && candidate.clearance_status === 'cleared'
@@ -208,7 +224,7 @@ function CandidateCard({ candidate, saving, onSave, onProvision }) {
           {eligible && (
             <form className="ops-provision" onSubmit={event => {
               event.preventDefault()
-              onProvision(candidate.id, unit, email)
+              onProvision(candidate.id, unit, email, onboardingMode)
             }}>
               <div className="ops-field-row">
                 <label className="report-field">
@@ -226,15 +242,33 @@ function CandidateCard({ candidate, saving, onSave, onProvision }) {
                   </select>
                 </label>
               </div>
+              <label className="report-field ops-onboarding-select">
+                <span>روش تحویل دسترسی</span>
+                <select value={onboardingMode} onChange={e => setOnboardingMode(e.target.value)}>
+                  <option value="secure_link">ساخت لینک امن برای تعیین رمز شخصی (پیشنهادی)</option>
+                  <option value="password">نمایش رمز موقت (روش قبلی)</option>
+                  <option value="email_link" disabled>ارسال ایمیل خودکار (پس از راه‌اندازی SMTP)</option>
+                </select>
+              </label>
               <button className="report-btn report-btn--primary" type="submit" disabled={saving}>
                 ایجاد حساب و فعال‌سازی
               </button>
-              <small>رمز موقت فقط یک‌بار نمایش داده می‌شود؛ آن را از مسیر امن به دانشجو تحویل دهید.</small>
+              <small>{onboardingMode === 'secure_link'
+                ? 'لینک اختصاصی فقط یک‌بار نمایش داده می‌شود و باید خصوصی تحویل داده شود. تنظیم Redirect URL در Supabase ضروری است.'
+                : 'رمز موقت فقط یک‌بار نمایش داده می‌شود؛ آن را از مسیر امن تحویل دهید.'}</small>
             </form>
           )}
         </>
       )}
-      {hasWorker && <p className="ops-worker-state">واحد فعال: {unitLabels[candidate.worker_unit]} · وضعیت: {candidate.worker_state}</p>}
+      {hasWorker && <>
+        <p className="ops-worker-state">واحد فعال: {unitLabels[candidate.worker_unit]} · وضعیت: {candidate.worker_state}</p>
+        <button className="report-btn report-btn--light ops-small-action"
+          type="button" disabled={saving}
+          onClick={() => onReissue(candidate.worker_id)}>
+          صدور لینک امن تعیین رمز
+        </button>
+        <small>لینک جدید به معنای الزام تعیین مجدد رمز در ورود بعدی است. فقط با درخواست دانشجو یا برای آزمون از این گزینه استفاده کنید.</small>
+      </>}
     </article>
   )
 }
@@ -274,13 +308,28 @@ function AdminView({ onLogout }) {
     finally { setBusyId('') }
   }
 
-  const activate = async (id, unit, email) => {
+  const activate = async (id, unit, email, onboardingMode) => {
     setBusyId(id); setError(''); setFlash('')
     try {
-      const result = await provisionWorker(id, unit, email)
+      const result = await provisionWorker(id, unit, email, onboardingMode)
       setIssuedCredentials(result)
       setFlash('حساب دانشجوکار فعال شد.')
       await refresh()
+    } catch (e) { setError(getMessage(e)) }
+    finally { setBusyId('') }
+  }
+
+  const reissueLink = async (workerId) => {
+    setBusyId(workerId); setError(''); setFlash('')
+    try {
+      const { data, error } = await opsClient.functions.invoke('ops-issue-worker-link', {
+        body: { worker_id: workerId },
+      })
+      if (error || !data?.ok || !data.invitation_link) {
+        throw error || new Error(data?.error || 'secure_link_generation_failed')
+      }
+      setIssuedCredentials(data)
+      setFlash('لینک اختصاصی آماده شد؛ آن را فقط در مسیر خصوصی ارسال کنید.')
     } catch (e) { setError(getMessage(e)) }
     finally { setBusyId('') }
   }
@@ -346,9 +395,10 @@ function AdminView({ onLogout }) {
                 <CandidateCard
                   key={row.id + ':' + row.interview_status + ':' + row.clearance_status + ':' + (row.worker_id || '')}
                   candidate={row}
-                  saving={busyId === row.id}
+                  saving={busyId === row.id || busyId === row.worker_id}
                   onSave={saveScreening}
                   onProvision={activate}
+                  onReissue={reissueLink}
                 />
               ))}
             </div>
@@ -360,20 +410,29 @@ function AdminView({ onLogout }) {
         <div className="ops-modal" role="dialog" aria-modal="true" aria-labelledby="ops-credentials-title">
           <div className="ops-modal__card">
             <h2 id="ops-credentials-title">حساب دانشجوکار ساخته شد</h2>
-            <p>این اطلاعات فقط همین یک‌بار نمایش داده می‌شود. از مسیر امن به دانشجوکار تحویل دهید.</p>
+            <p>این اطلاعات فقط همین یک‌بار نمایش داده می‌شود. برای دانشجوکار از مسیر خصوصی بفرستید؛ در کانال عمومی یا اسکرین‌شات منتشر نکنید.</p>
             <label className="report-field">
               <span>ایمیل ورود</span>
               <input readOnly dir="ltr" value={issuedCredentials.email}/>
             </label>
-            <label className="report-field">
-              <span>رمز موقت</span>
-              <input readOnly dir="ltr" value={issuedCredentials.temporary_password}/>
-            </label>
+            {issuedCredentials.invitation_link ? (
+              <label className="report-field">
+                <span>لینک امن تعیین رمز (محرمانه، با اعتبار محدود)</span>
+                <textarea readOnly rows={4} dir="ltr" value={issuedCredentials.invitation_link} />
+              </label>
+            ) : (
+              <label className="report-field">
+                <span>رمز موقت</span>
+                <input readOnly dir="ltr" value={issuedCredentials.temporary_password || ''}/>
+              </label>
+            )}
             <button type="button" className="report-btn report-btn--light"
               onClick={() => navigator.clipboard?.writeText(
-                `ایمیل: ${issuedCredentials.email}\nرمز موقت: ${issuedCredentials.temporary_password}`
+                issuedCredentials.invitation_link
+                  ? `لینک فعال‌سازی: ${issuedCredentials.invitation_link}`
+                  : `ایمیل: ${issuedCredentials.email}\nرمز موقت: ${issuedCredentials.temporary_password}`
               )}>
-              کپی اطلاعات ورود
+              کپی اطلاعات محرمانه ورود
             </button>
             <button type="button" className="report-btn report-btn--primary"
               onClick={() => setIssuedCredentials(null)}>متوجه شدم، بستن</button>
@@ -431,5 +490,11 @@ export default function OpsApp({ mode = 'admin' }) {
 
   if (!identity) return <Login onLogin={login} busy={busy} error={error} defaultMode={mode}/>
   if (identity.role === 'admin') return <AdminView onLogout={logout}/>
-  return <WorkerView profile={identity.profile} onLogout={logout}/>
+  return <WorkerView
+    profile={identity.profile}
+    onLogout={logout}
+    initialPasswordRequired={
+      identity.profile?.onboarding_state === 'password_required'
+    }
+  />
 }
