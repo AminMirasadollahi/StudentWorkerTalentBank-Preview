@@ -4,6 +4,7 @@ import {
   assignWorkerTask, startMyTask, submitMyTime, reviewWorkerTime,
 } from './lib/operations'
 import './operations-workspace.css'
+import JalaliDatePicker from './components/JalaliDatePicker'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -132,8 +133,8 @@ function ScheduleEditor({workerId,onSaved}) {
         <label className="report-field"><span>ساعت پایان</span>
           <input type="time" value={end} disabled={noHours} onChange={e=>setEnd(e.target.value)}/>
         </label>
-        <label className="report-field"><span>اعمال از تاریخ (میلادی)</span>
-          <input type="date" min={today()} value={effective} onChange={e=>setEffective(e.target.value)}/>
+        <label className="report-field"><span>اعمال از تاریخ (شمسی)</span>
+          <JalaliDatePicker min={today()} value={effective} onChange={setEffective} ariaLabel="تاریخ شروع برنامه هفتگی"/>
         </label>
       </div>
       <label className="ow-checkbox">
@@ -149,8 +150,8 @@ function ScheduleEditor({workerId,onSaved}) {
     ))}}>
       <h3>تغییر موقت یک روز</h3>
       <div className="ow-fields ow-fields--four">
-        <label className="report-field"><span>تاریخ (میلادی)</span>
-          <input type="date" min={today()} value={exceptionDate} onChange={e=>setExceptionDate(e.target.value)}/>
+        <label className="report-field"><span>تاریخ (شمسی)</span>
+          <JalaliDatePicker min={today()} value={exceptionDate} onChange={setExceptionDate} ariaLabel="تاریخ تغییر موقت حضور"/>
         </label>
         <label className="report-field"><span>نوع تغییر</span>
           <select value={exceptionKind} onChange={e=>setExceptionKind(e.target.value)}>
@@ -169,7 +170,7 @@ function ScheduleEditor({workerId,onSaved}) {
       <button className="report-btn report-btn--primary" disabled={busy} type="submit">ثبت تغییر این روز</button>
     </form>
     <Message error={error} notice={notice}/>
-    <p className="ow-muted">تاریخ ورودی مطابق تقویم میلادی است؛ نمایش گزارش‌ها با تاریخ شمسی انجام می‌شود. تغییرات گذشته قابل بازنویسی نیستند.</p>
+    <p className="ow-muted">تاریخ‌ها در تقویم شمسی انتخاب می‌شوند و تغییرات گذشته قابل بازنویسی نیستند.</p>
   </div>
 }
 function ApprovalCard({entry,task,worker,onDone}) {
@@ -316,8 +317,8 @@ export function AdminOperations() {
                 {active.map(w=><option key={w.id} value={w.id}>{w.name} · {unitLabels[w.unit]}</option>)}
               </select>
             </label>
-            <label className="report-field"><span>تاریخ اجرا (میلادی)</span>
-              <input type="date" required min={today()} value={date} onChange={e=>setDate(e.target.value)}/>
+            <label className="report-field"><span>تاریخ اجرا (شمسی)</span>
+              <JalaliDatePicker min={today()} value={date} onChange={setDate} ariaLabel="تاریخ اجرای کار"/>
             </label>
             <label className="report-field"><span>زمان استاندارد (دقیقه)</span>
               <input type="number" required min="1" max="1440" value={estimate} onChange={e=>setEstimate(e.target.value)}/>
@@ -430,9 +431,9 @@ function WorkerTaskCard({task,onSaved}) {
       keyRef.current=crypto.randomUUID()
     })}}>
       <div className="ow-fields ow-fields--three">
-        <label className="report-field"><span>تاریخ اجرای واقعی (میلادی)</span>
-          <input type="date" value={date} max={today()} min={shift(today(),-90)}
-            required onChange={e=>setDate(e.target.value)}/>
+        <label className="report-field"><span>تاریخ اجرای واقعی (شمسی)</span>
+          <JalaliDatePicker value={date} max={today()} min={shift(today(),-90)}
+            onChange={setDate} ariaLabel="تاریخ اجرای واقعی کار"/>
         </label>
         <label className="report-field"><span>دقایق صرف‌شده</span>
           <input type="number" min="1" max="1440" required value={worked} onChange={e=>setWorked(e.target.value)}/>
