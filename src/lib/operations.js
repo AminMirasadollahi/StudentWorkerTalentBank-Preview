@@ -55,16 +55,19 @@ export async function setCandidateScreening(id, interview, clearance) {
   }))
 }
 
-export async function provisionWorker(applicationId, unitCode, email) {
+export async function provisionWorker(applicationId, unitCode, email, onboardingMode = 'password') {
   const { data, error } = await opsClient.functions.invoke('ops-provision-worker', {
     body: {
       application_id: applicationId,
       unit_code: unitCode,
       email: email.trim().toLowerCase(),
+      onboarding_mode: onboardingMode,
     },
   })
   if (error) throw error
-  if (!data?.ok || !data.worker_id || !data.temporary_password) {
+  if (!data?.ok || !data.worker_id
+      || (onboardingMode === 'password' && !data.temporary_password)
+      || (onboardingMode === 'secure_link' && !data.invitation_link)) {
     throw new Error(data?.error || 'فعال‌سازی تکمیل نشد.')
   }
   return data
