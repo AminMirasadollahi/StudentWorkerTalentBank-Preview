@@ -4,6 +4,7 @@ import {
   getOperationsCandidates,
   provisionWorker,
   setCandidateScreening,
+  setCandidateEmail,
   signInOperations,
   signOutOperations,
 } from './lib/operations'
@@ -175,10 +176,10 @@ function WorkerView({ profile, onLogout, initialPasswordRequired = false }) {
   )
 }
 
-function CandidateCard({ candidate, saving, onSave, onProvision, onReissue }) {
+function CandidateCard({ candidate, saving, onSave, onSaveEmail, onProvision, onReissue }) {
   const [interview, setInterview] = useState(candidate.interview_status || 'pending')
   const [clearance, setClearance] = useState(candidate.clearance_status || 'pending')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(candidate.email || '')
   const [unit, setUnit] = useState(candidate.primary_unit)
   const [onboardingMode, setOnboardingMode] = useState('secure_link')
   const hasWorker = Boolean(candidate.worker_id)
@@ -186,7 +187,11 @@ function CandidateCard({ candidate, saving, onSave, onProvision, onReissue }) {
     && candidate.clearance_status === 'cleared'
   const isChanged = interview !== candidate.interview_status
     || clearance !== candidate.clearance_status
-  const eligible = accepted && !isChanged && !hasWorker
+  const normalizedEmail = email.trim().toLowerCase()
+  const savedEmail = candidate.email || ''
+  const emailChanged = normalizedEmail !== savedEmail
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) && normalizedEmail.length <= 254
+  const eligible = accepted && !isChanged && !hasWorker && !!savedEmail && !emailChanged
 
   return (
     <article className="ops-candidate">
@@ -202,6 +207,19 @@ function CandidateCard({ candidate, saving, onSave, onProvision, onReissue }) {
       </div>
       {!hasWorker && (
         <>
+          <div className="ops-field-row ops-email-row">
+            <label className="report-field">
+              <span>ایمیل داوطلب {savedEmail ? '(قابل اصلاح پیش از فعال‌سازی)' : '(برای ثبت‌نام‌های قبلی تکمیل کنید)'}</span>
+              <input type="email" dir="ltr" autoComplete="off" maxLength={254}
+                value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="student@example.com" disabled={saving}/>
+            </label>
+            <button className="report-btn report-btn--light ops-small-action" type="button"
+              disabled={saving || !emailChanged || !emailValid}
+              onClick={() => onSaveEmail(candidate.id, normalizedEmail)}>
+              ذخیره ایمیل
+            </button>
+          </div>
           <div className="ops-field-row">
             <label className="report-field">
               <span>نتیجه مصاحبه</span>
@@ -221,6 +239,9 @@ function CandidateCard({ candidate, saving, onSave, onProvision, onReissue }) {
             onClick={() => onSave(candidate.id, interview, clearance)}>
             ثبت نتیجه بررسی
           </button>
+          {accepted && !hasWorker && (!savedEmail || emailChanged) && (
+            <p className="ops-muted">برای فعال‌سازی حساب، ابتدا یک ایمیل معتبر را ذخیره کنید.</p>
+          )}
           {eligible && (
             <form className="ops-provision" onSubmit={event => {
               event.preventDefault()
@@ -228,10 +249,8 @@ function CandidateCard({ candidate, saving, onSave, onProvision, onReissue }) {
             }}>
               <div className="ops-field-row">
                 <label className="report-field">
-                  <span>ایمیل معتبر دانشجوکار پذیرفته‌شده</span>
-                  <input type="email" required dir="ltr" autoComplete="off"
-                    value={email} onChange={e => setEmail(e.target.value)}
-                    placeholder="student@example.com" disabled={saving}/>
+                  <span>ایمیل ذخیره‌شده برای دعوت‌نامه</span>
+                  <input type="email" readOnly dir="ltr" value={savedEmail}/>
                 </label>
                 <label className="report-field">
                   <span>واحد همکاری</span>
@@ -261,6 +280,7 @@ function CandidateCard({ candidate, saving, onSave, onProvision, onReissue }) {
         </>
       )}
       {hasWorker && <>
+        <p className="ops-worker-state">ایمیل حساب: <span dir="ltr">{candidate.email || '—'}</span></p>
         <p className="ops-worker-state">واحد فعال: {unitLabels[candidate.worker_unit]} · وضعیت: {candidate.worker_state}</p>
         <button className="report-btn report-btn--light ops-small-action"
           type="button" disabled={saving}
@@ -303,6 +323,16 @@ function AdminView({ onLogout }) {
     try {
       await setCandidateScreening(id, interview, clearance)
       setFlash('وضعیت بررسی ثبت شد.')
+      await refresh()
+    } catch (e) { setError(getMessage(e)) }
+    finally { setBusyId('') }
+  }
+
+  const saveEmail = async (id, email) => {
+    setBusyId(id);setError('');setFlash('')
+    try {
+      await setCandidateEmail(id,email)
+      setFlash('ایمیل داوطلب در پرونده ذخیره شد.')
       await refresh()
     } catch (e) { setError(getMessage(e)) }
     finally { setBusyId('') }
@@ -397,6 +427,7 @@ function AdminView({ onLogout }) {
                   candidate={row}
                   saving={busyId === row.id || busyId === row.worker_id}
                   onSave={saveScreening}
+                  onSaveEmail={saveEmail}
                   onProvision={activate}
                   onReissue={reissueLink}
                 />
