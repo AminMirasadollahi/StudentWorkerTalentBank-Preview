@@ -9,6 +9,7 @@ import {
   signOutOperations,
 } from './lib/operations'
 import { opsClient } from './lib/operations'
+import { normalizeCandidateEmail, isValidCandidateEmail } from './lib/candidateEmail'
 import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import './report.css'
 import './ops.css'
@@ -190,10 +191,10 @@ function CandidateCard({ candidate, saving, onSave, onSaveEmail, onProvision, on
     && candidate.clearance_status === 'cleared'
   const isChanged = interview !== candidate.interview_status
     || clearance !== candidate.clearance_status
-  const normalizedEmail = email.trim().toLowerCase()
+  const normalizedEmail = normalizeCandidateEmail(email)
   const savedEmail = candidate.email || ''
   const emailChanged = normalizedEmail !== savedEmail
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) && normalizedEmail.length <= 254
+  const emailValid = isValidCandidateEmail(normalizedEmail)
   const eligible = accepted && !isChanged && !hasWorker && !!savedEmail && !emailChanged
 
   return (
