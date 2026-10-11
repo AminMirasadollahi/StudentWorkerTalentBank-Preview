@@ -5,6 +5,7 @@ import {
 } from './lib/operations'
 import './operations-workspace.css'
 import JalaliDatePicker from './components/JalaliDatePicker'
+import { scopeWorkerHistory, summarizeWorkerHistory } from './lib/workerHistory'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -15,6 +16,7 @@ const dateParts = new Intl.DateTimeFormat('en-US',{
 })
 const dayLabels = [[6,'شنبه'],[7,'یکشنبه'],[1,'دوشنبه'],[2,'سه‌شنبه'],[3,'چهارشنبه'],[4,'پنجشنبه'],[5,'جمعه']]
 const unitLabels = {library:'کتابخانه',public_relations:'روابط عمومی',research:'پژوهش'}
+const workerStateLabels = {active:'فعال',paused:'متوقف موقت',inactive:'غیرفعال'}
 const stateLabels = {
   assigned:'واگذار شده',in_progress:'در حال انجام',submitted:'منتظر تأیید',
   completed:'تکمیل‌شده',needs_changes:'نیازمند اصلاح',cancelled:'لغوشده',
@@ -242,7 +244,7 @@ function ApprovalCard({entry,task,worker,onDone}) {
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
   </article>
 }
-async function exportOpsExcel(data) {
+async function exportOpsExcel(data, filteredToOneWorker=false) {
   const ExcelJS=await import('exceljs')
   const wb=new ExcelJS.Workbook()
   const sh=wb.addWorksheet('کارها و ساعات',{views:[{rightToLeft:true}]})
@@ -281,13 +283,14 @@ async function exportOpsExcel(data) {
     {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
   const url=URL.createObjectURL(blob)
   const a=document.createElement('a')
-  a.href=url;a.download='student-worker-operations.xlsx';a.click()
+  a.href=url;a.download=filteredToOneWorker?'student-worker-selected-history.xlsx':'student-worker-operations.xlsx';a.click()
   setTimeout(()=>URL.revokeObjectURL(url),1000)
 }
 export function AdminOperations() {
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const [view,setView]=useState('tasks')
   const [workerId,setWorkerId]=useState('')
+  const [historyWorkerId,setHistoryWorkerId]=useState('')
   const [title,setTitle]=useState('')
   const [instructions,setInstructions]=useState('')
   const [date,setDate]=useState(today())
@@ -311,6 +314,9 @@ export function AdminOperations() {
   const workers=data.workers||[]
   const active=workers.filter(w=>w.state==='active')
   const chosen=workers.find(w=>w.id===workerId)
+  const selectedHistoryWorker=workers.find(w=>w.id===historyWorkerId)
+  const historyData=scopeWorkerHistory(data,historyWorkerId)
+  const historySummary=summarizeWorkerHistory(historyData)
   const todayTasks=(data.tasks||[]).filter(t=>t.planned_date===today()&&t.state!=='cancelled')
   const pending=(data.time_entries||[]).filter(e=>e.review_state==='submitted')
   const approvedMinutes=(data.time_entries||[])
@@ -428,19 +434,65 @@ export function AdminOperations() {
     {view==='history'&&<section className="report-panel">
       <div className="report-panel-heading">
         <h2>سابقه ساعات و خروجی</h2>
-        <button className="report-btn report-btn--primary" onClick={()=>exportOpsExcel(data)} type="button">خروجی Excel</button>
+        <button className="report-btn report-btn--primary" type="button"
+          disabled={loading||!historyData.tasks.length}
+          onClick={()=>exportOpsExcel(historyData,Boolean(historyWorkerId))}>
+          {historyWorkerId?'خروجی Excel این دانشجوکار':'خروجی Excel همه'}
+        </button>
+      </div>
+      <div className="ow-history-filter">
+        <label className="report-field ow-worker-selector"><span>فیلتر بر اساس دانشجوکار</span>
+          <select value={historyWorkerId} onChange={e=>setHistoryWorkerId(e.target.value)}>
+            <option value="">همه دانشجوکارها</option>
+            {workers.map(w=><option key={w.id} value={w.id}>
+              {w.name} · {unitLabels[w.unit]||w.unit}
+            </option>)}
+          </select>
+        </label>
+        <p className="ow-muted">
+          {historyWorkerId?'سوابق و فایل Excel فقط به دانشجوکار انتخاب‌شده محدود می‌شوند.':'سوابق و خروجی همه دانشجوکارها نمایش داده می‌شود.'}
+        </p>
+      </div>
+      {selectedHistoryWorker&&<section className="ow-worker-profile" aria-label="پروفایل عملکرد دانشجوکار">
+        <div className="ow-profile-heading">
+          <div>
+            <h3>پرونده عملکرد: {selectedHistoryWorker.name}</h3>
+            <p className="ow-muted">
+              {unitLabels[selectedHistoryWorker.unit]||selectedHistoryWorker.unit||'واحد نامشخص'}
+              {selectedHistoryWorker.major&&<> · {selectedHistoryWorker.major}</>}
+              {selectedHistoryWorker.entry_year&&<> · ورودی {n(selectedHistoryWorker.entry_year)}</>}
+            </p>
+          </div>
+          <span className="ow-status">{workerStateLabels[selectedHistoryWorker.state]||selectedHistoryWorker.state}</span>
+        </div>
+        <div className="ow-profile-metrics">
+          <div><span>کل کارهای واگذارشده</span><b>{n(historySummary.taskCount)}</b></div>
+          <div><span>کارهای باز</span><b>{n(historySummary.openCount)}</b></div>
+          <div><span>گزارش منتظر تأیید</span><b>{n(historySummary.pendingCount)}</b></div>
+          <div><span>مجموع ساعات تأییدشده</span><b>{exactDuration(historySummary.approvedMinutes)}</b></div>
+        </div>
+      </section>}
+      <div className="report-panel-heading">
+        <h3>{historyWorkerId?'سوابق فعالیت این دانشجوکار':'سوابق فعالیت همه دانشجوکارها'}</h3>
+        <small>{n(historySummary.reportCount)} گزارش</small>
       </div>
       <div className="ow-list">
-        {(data.time_entries||[]).filter(e=>e.review_state!=='submitted').slice(0,200).map(e=>(
+        {historyData.time_entries.slice(0,200).map(e=>(
           <article className="ow-item" key={e.id}>
             <strong>{label(e.worker_id,workers)} · {data.tasks?.find(t=>t.id===e.task_id)?.title||'کار'}</strong>
             <small>{pretty(e.work_date)} · {reviewLabels[e.review_state]||e.review_state}</small>
             <p>درخواست: {minutes(e.reported_minutes)} · تأیید:
               {e.review_state==='approved'?minutes(e.approved_minutes):'تأیید نشده'}
             </p>
+            {e.extra_time_reason_code&&<small>دلیل درخواست اضافه: {extraTimeReasons[e.extra_time_reason_code]||e.extra_time_reason_code}
+              {e.extra_time_reason_text&&<> · {e.extra_time_reason_text}</>}
+            </small>}
+            {e.review_note&&<small>توضیح مدیر: {e.review_note}</small>}
           </article>
         ))}
-        {!data.time_entries?.length&&<p className="ow-muted">هنوز سابقه‌ای وجود ندارد.</p>}
+        {!historyData.time_entries.length&&<p className="ow-muted">
+          {historyWorkerId?'برای این دانشجوکار هنوز گزارش کاری ثبت نشده است.':'هنوز سابقه‌ای وجود ندارد.'}
+        </p>}
       </div>
     </section>}
   </div>
