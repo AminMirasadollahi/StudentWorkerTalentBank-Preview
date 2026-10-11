@@ -426,7 +426,7 @@ export default function App() {
             autoComplete="email"
             maxLength={254}
           />
-          <small>در صورت پذیرش و فعال‌سازی حساب، لینک اختصاصی ورود به این ایمیل ارسال خواهد شد.</small>
+          <small>در صورت پذیرش، برای فعال‌سازی حساب دانشجوکاری از این ایمیل استفاده می‌شود.</small>
         </label>
         <label className="input-shell input-shell--social">
           <span className="input-shell__label">شماره ایتا / شبکه اجتماعی <em>اختیاری</em></span>
