@@ -23,6 +23,13 @@ const reviewLabels = {
   submitted:'منتظر تأیید',approved:'تأییدشده',
   changes_requested:'نیازمند اصلاح',rejected:'ردشده',
 }
+const extraTimeReasons = {
+  equipment_issue:'اختلال تجهیزات یا محیط',
+  unexpected_complexity:'حجم یا پیچیدگی پیش‌بینی‌نشده',
+  instructions_changed:'تغییر یا ابهام دستورالعمل',
+  skill_gap:'نیاز به آموزش یا تسلط بیشتر',
+  other:'سایر موارد',
+}
 const label = (id,items) => items.find(x=>x.id===id)?.name || '—'
 const n = value=>fa.format(value||0)
 const minutes = value=>`${n(value)} دقیقه`
@@ -76,7 +83,9 @@ function readableError(e) {
     invalid_time_submission:'تاریخ یا مدت اجرای واردشده معتبر نیست.',
     invalid_task_transition:'وضعیت فعلی این کار اجازه شروع مجدد نمی‌دهد.',
     already_reviewed:'این گزارش قبلاً بررسی شده است.',
-    review_reason_required:'برای اصلاح ساعت یا درخواست اصلاح، علت لازم است.',
+    review_reason_required:'برای اختلاف زمان یا تأیید زمان اضافه، توضیح تصمیم لازم است.',
+    extra_time_reason_required:'برای درخواست زمان اضافه، نوع علت و توضیح کافی را وارد کنید.',
+    invalid_extra_time_request:'زمان یا علت درخواست اضافه معتبر نیست.',
     overlapping_or_invalid_slots:'زمان‌های حضور هم‌پوشانی دارند یا نامعتبرند.',
     invalid_availability:'تنظیمات زمان حضور معتبر نیست.',
     invalid_exception:'تاریخ یا بازه تغییر حضور معتبر نیست.',
@@ -178,10 +187,14 @@ function ScheduleEditor({workerId,onSaved}) {
   </div>
 }
 function ApprovalCard({entry,task,worker,onDone}) {
-  const [approved,setApproved]=useState(String(entry.reported_minutes))
+  const standard=Number(task?.estimate_minutes ?? entry.reported_minutes)
+  const requested=Number(entry.reported_minutes)
+  const asksExtra=requested>standard
+  const [approved,setApproved]=useState(String(Math.min(standard,requested)))
   const [note,setNote]=useState('')
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
+  const approvalNeedsReason=Number(approved)!==requested || Number(approved)>standard
   const act=async decision=>{
     setBusy(true);setError('')
     try{
@@ -193,18 +206,25 @@ function ApprovalCard({entry,task,worker,onDone}) {
   return <article className="ow-item">
     <strong>{task?.title||'کار'}</strong>
     <small>{worker?.name||'—'} · {pretty(entry.work_date)}</small>
-    <p>زمان گزارش‌شده: <b>{minutes(entry.reported_minutes)}</b> · توضیح دانشجو: {entry.worker_note||'—'}</p>
+    <p>زمان استاندارد: <b>{minutes(standard)}</b> · زمان درخواستی: <b>{minutes(requested)}</b>
+      {asksExtra&&<> · اضافه درخواستی: <b>{minutes(requested-standard)}</b></>}
+    </p>
+    {asksExtra&&<p className="ow-overtime-review">
+      <b>علت درخواست اضافه:</b> {extraTimeReasons[entry.extra_time_reason_code]||'در گزارش قدیمی ثبت نشده'}
+      {entry.extra_time_reason_text&&<> · {entry.extra_time_reason_text}</>}
+    </p>}
+    {entry.worker_note&&<p>توضیح تکمیلی دانشجو: {entry.worker_note}</p>}
     <div className="ow-fields ow-fields--two">
       <label className="report-field"><span>مدت تأییدشده (دقیقه)</span>
-        <input type="number" min="0" max="1440" value={approved} onChange={e=>setApproved(e.target.value)}/>
+        <input type="number" min="0" max={requested} value={approved} onChange={e=>setApproved(e.target.value)}/>
       </label>
-      <label className="report-field"><span>توضیح بررسی (در صورت اختلاف لازم)</span>
+      <label className="report-field"><span>توضیح تصمیم {approvalNeedsReason?'(الزامی)':'(اختیاری)'}</span>
         <input maxLength={1000} value={note} onChange={e=>setNote(e.target.value)}/>
       </label>
     </div>
     <div className="ow-actions">
       <button className="report-btn report-btn--primary" type="button"
-        disabled={busy||approved===''||Number(approved)<0||Number(approved)>1440}
+        disabled={busy||approved===''||!Number.isInteger(Number(approved))||Number(approved)<0||Number(approved)>requested||(approvalNeedsReason&&!note.trim())}
         onClick={()=>act('approved')}>تأیید ساعت</button>
       <button className="report-btn report-btn--light" type="button"
         disabled={busy||!note.trim()} onClick={()=>act('changes_requested')}>نیازمند اصلاح</button>
@@ -222,9 +242,12 @@ async function exportOpsExcel(data) {
     {header:'دانشجوکار',key:'name',width:25},{header:'واحد',key:'unit',width:20},
     {header:'عنوان کار',key:'task',width:34},{header:'تاریخ برنامه',key:'date',width:21},
     {header:'زمان برآوردی (دقیقه)',key:'estimate',width:24},
-    {header:'زمان گزارش‌شده (دقیقه)',key:'reported',width:25},
+    {header:'زمان درخواستی (دقیقه)',key:'reported',width:25},
     {header:'زمان تأییدشده (دقیقه)',key:'approved',width:25},
     {header:'وضعیت گزارش',key:'review',width:22},
+    {header:'علت زمان اضافه',key:'extraReason',width:30},
+    {header:'توضیح درخواست اضافه',key:'extraText',width:42},
+    {header:'توضیح تأیید مدیر',key:'approvalNote',width:42},
   ]
   for(const task of data.tasks||[]){
     const worker=data.workers?.find(w=>w.id===task.worker_id)
@@ -237,11 +260,14 @@ async function exportOpsExcel(data) {
       reported:entry.reported_minutes,
       approved:entry.review_state==='approved'?entry.approved_minutes:'',
       review:reviewLabels[entry.review_state] || entry.review_state,
+      extraReason:extraTimeReasons[entry.extra_time_reason_code]||'',
+      extraText:entry.extra_time_reason_text||'',
+      approvalNote:entry.review_note||'',
     })
   }
   sh.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}}
   sh.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF153E5C'}}
-  sh.autoFilter={from:{row:1,column:1},to:{row:sh.rowCount,column:8}}
+  sh.autoFilter={from:{row:1,column:1},to:{row:sh.rowCount,column:11}}
   sh.views=[{state:'frozen',ySplit:1,rightToLeft:true}]
   const blob=new Blob([await wb.xlsx.writeBuffer()],
     {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
@@ -400,8 +426,8 @@ export function AdminOperations() {
         {(data.time_entries||[]).filter(e=>e.review_state!=='submitted').slice(0,200).map(e=>(
           <article className="ow-item" key={e.id}>
             <strong>{label(e.worker_id,workers)} · {data.tasks?.find(t=>t.id===e.task_id)?.title||'کار'}</strong>
-            <small>{pretty(e.work_date)} · {e.review_state}</small>
-            <p>گزارش: {minutes(e.reported_minutes)} · تأیید:
+            <small>{pretty(e.work_date)} · {reviewLabels[e.review_state]||e.review_state}</small>
+            <p>درخواست: {minutes(e.reported_minutes)} · تأیید:
               {e.review_state==='approved'?minutes(e.approved_minutes):'تأیید نشده'}
             </p>
           </article>
@@ -413,12 +439,22 @@ export function AdminOperations() {
 }
 function WorkerTaskCard({task,onSaved}) {
   const [date,setDate]=useState(today())
-  const [worked,setWorked]=useState(String(task.estimate_minutes))
+  const [requestExtra,setRequestExtra]=useState(false)
+  const [requested,setRequested]=useState(String(task.estimate_minutes))
+  const [reasonCode,setReasonCode]=useState('')
+  const [reasonText,setReasonText]=useState('')
+  const [completionConfirmed,setCompletionConfirmed]=useState(false)
   const [note,setNote]=useState('')
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
   const keyRef=useRef(crypto.randomUUID())
   const ready=['assigned','in_progress','needs_changes'].includes(task.state)
+  const standard=Number(task.estimate_minutes)
+  const requestedMinutes=requestExtra?Number(requested):standard
+  const extraValid=!requestExtra || (
+    Number.isInteger(requestedMinutes)&&requestedMinutes>standard&&requestedMinutes<=1440
+    && Boolean(reasonCode)&&reasonText.trim().length>=10&&reasonText.trim().length<=600
+  )
   const perform=async fn=>{
     setBusy(true);setError('')
     try{await fn();await onSaved()}
@@ -427,29 +463,71 @@ function WorkerTaskCard({task,onSaved}) {
   }
   return <article className="ow-item">
     <div className="ow-item-header"><strong>{task.title}</strong><span className="ow-status">{stateLabels[task.state]}</span></div>
-    <small>{pretty(task.planned_date)} · زمان برآوردی: {minutes(task.estimate_minutes)}</small>
+    <small>{pretty(task.planned_date)} · زمان استاندارد قابل ثبت: {minutes(standard)}</small>
     {task.instructions&&<p>{task.instructions}</p>}
-    {ready&&<form onSubmit={e=>{e.preventDefault();perform(async()=>{
-      await submitMyTime({taskId:task.id,date,minutes:worked,note,
-        clientSubmissionId:keyRef.current})
+    {ready&&<form onSubmit={e=>{e.preventDefault();if(!completionConfirmed||!extraValid)return;perform(async()=>{
+      await submitMyTime({taskId:task.id,date,minutes:requestedMinutes,note,
+        clientSubmissionId:keyRef.current,
+        extraReasonCode:requestExtra?reasonCode:null,
+        extraReasonText:requestExtra?reasonText.trim():null})
       keyRef.current=crypto.randomUUID()
     })}}>
-      <div className="ow-fields ow-fields--three">
-        <label className="report-field"><span>تاریخ اجرای واقعی (شمسی)</span>
+      <div className="ow-fields ow-fields--two">
+        <label className="report-field"><span>تاریخ انجام کار (شمسی)</span>
           <JalaliDatePicker value={date} max={today()} min={shift(today(),-90)}
-            onChange={setDate} ariaLabel="تاریخ اجرای واقعی کار"/>
+            onChange={setDate} ariaLabel="تاریخ انجام کار"/>
         </label>
-        <label className="report-field"><span>دقایق صرف‌شده</span>
-          <input type="number" min="1" max="1440" required value={worked} onChange={e=>setWorked(e.target.value)}/>
-        </label>
-        <label className="report-field"><span>خلاصه کار انجام‌شده</span>
-          <input maxLength={2000} value={note} onChange={e=>setNote(e.target.value)}/>
-        </label>
+        <div className="ow-standard-credit">
+          <span>زمان استاندارد این کار</span><b>{minutes(standard)}</b>
+          <small>با تأیید انجام کار، همین زمان برای بررسی مدیر ارسال می‌شود؛ حتی اگر زودتر تمام کرده باشید.</small>
+        </div>
       </div>
+      <label className="ow-checkbox">
+        <input type="checkbox" checked={completionConfirmed} onChange={e=>setCompletionConfirmed(e.target.checked)}/>
+        کار محول‌شده را انجام داده‌ام و گزارش من برای بررسی مدیر آماده است.
+      </label>
+      <label className="report-field"><span>خلاصه نتیجه کار (اختیاری)</span>
+        <input maxLength={2000} value={note} onChange={e=>setNote(e.target.value)}
+          placeholder="مثلاً تعداد منابع ثبت‌شده یا نتیجه کار"/>
+      </label>
+      <label className="ow-checkbox ow-extra-toggle">
+        <input type="checkbox" checked={requestExtra} onChange={e=>{
+          const checked=e.target.checked
+          setRequestExtra(checked)
+          if(!checked){setRequested(String(standard));setReasonCode('');setReasonText('')}
+        }}/>
+        درخواست ثبت زمان بیشتر از زمان استاندارد دارم
+      </label>
+      {requestExtra&&<div className="ow-extra-panel">
+        <p>زمان اضافه فقط پس از بررسی و تأیید مدیر قابل ثبت است. دلیل دقیق افزایش زمان را وارد کنید.</p>
+        <div className="ow-fields ow-fields--two">
+          <label className="report-field"><span>زمان درخواستی کل (دقیقه)</span>
+            <input type="number" min={standard+1} max="1440" required
+              value={requested} onChange={e=>setRequested(e.target.value)}/>
+          </label>
+          <label className="report-field"><span>علت اصلی افزایش زمان</span>
+            <select required value={reasonCode} onChange={e=>setReasonCode(e.target.value)}>
+              <option value="">انتخاب کنید</option>
+              {Object.entries(extraTimeReasons).map(([code,title])=><option key={code} value={code}>{title}</option>)}
+            </select>
+          </label>
+        </div>
+        <label className="report-field"><span>توضیح دلیل افزایش زمان (الزامی؛ حداقل ۱۰ نویسه)</span>
+          <textarea required minLength={10} maxLength={600} rows={2}
+            value={reasonText} onChange={e=>setReasonText(e.target.value)}
+            placeholder="چه مشکلی رخ داد و چرا زمان استاندارد کافی نبود؟"/>
+        </label>
+        {Number.isFinite(requestedMinutes)&&requestedMinutes>standard&&<p className="ow-muted">
+          زمان اضافه درخواستی: {minutes(requestedMinutes-standard)}
+        </p>}
+      </div>}
       <div className="ow-actions">
         {task.state!=='in_progress'&&<button type="button" className="report-btn report-btn--light"
           onClick={()=>perform(()=>startMyTask(task.id))} disabled={busy}>شروع کار</button>}
-        <button type="submit" className="report-btn report-btn--primary" disabled={busy}>ارسال گزارش زمان</button>
+        <button type="submit" className="report-btn report-btn--primary"
+          disabled={busy||!completionConfirmed||!extraValid}>
+          {requestExtra?'ارسال درخواست زمان بیشتر برای بررسی':'ثبت انجام کار با زمان استاندارد'}
+        </button>
       </div>
     </form>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
@@ -507,9 +585,10 @@ export function WorkerOperations({profile}) {
       <div className="ow-list">
         {records.map(e=><article className="ow-item" key={e.id}>
           <strong>{tasks.find(t=>t.id===e.task_id)?.title||'کار'}</strong>
-          <small>{pretty(e.work_date)} · {e.review_state}</small>
-          <p>ثبت‌شده: {minutes(e.reported_minutes)} · تأیید:
+          <small>{pretty(e.work_date)} · {reviewLabels[e.review_state]||e.review_state}</small>
+          <p>درخواست‌شده: {minutes(e.reported_minutes)} · تأیید:
             {e.review_state==='approved'?minutes(e.approved_minutes):'هنوز تأیید نشده'}</p>
+          {e.extra_time_reason_code&&<small>دلیل زمان اضافه: {extraTimeReasons[e.extra_time_reason_code]} · {e.extra_time_reason_text}</small>}
           {e.review_note&&<small>نظر مدیر: {e.review_note}</small>}
         </article>)}
         {!records.length&&<p className="ow-muted">هنوز گزارشی ثبت نکرده‌اید.</p>}
