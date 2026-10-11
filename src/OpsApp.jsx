@@ -14,11 +14,8 @@ import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import './report.css'
 import './ops.css'
 
-// TEMPORARY Phase K QA: only this single synthetic applicant can select
-// automated email onboarding. Global invitations stay OFF; the Edge Function
-// performs independent DB-backed checks before provisioning any Auth identity.
-// Remove this allowlist after QA is completed.
-const phaseKQaEmailApplicationId = '40956782-3561-4d04-ad06-df15e0f40e15'
+// Enable only after the SMTP provider and Edge delivery switch are tested.
+const emailInvitesAvailable = import.meta.env.VITE_OPS_EMAIL_INVITES_AVAILABLE === 'true'
 
 const unitLabels = {
   library: 'کتابخانه',
@@ -199,7 +196,6 @@ function CandidateCard({ candidate, saving, onSave, onSaveEmail, onProvision, on
   const emailChanged = normalizedEmail !== savedEmail
   const emailValid = isValidCandidateEmail(normalizedEmail)
   const eligible = accepted && !isChanged && !hasWorker && !!savedEmail && !emailChanged
-  const qaEmailInviteAvailable = candidate.id === phaseKQaEmailApplicationId
 
   return (
     <article className="ops-candidate">
@@ -274,10 +270,10 @@ function CandidateCard({ candidate, saving, onSave, onSaveEmail, onProvision, on
                 <select value={onboardingMode} onChange={e => setOnboardingMode(e.target.value)}>
                   <option value="secure_link">ساخت لینک امن برای تعیین رمز شخصی (پیشنهادی)</option>
                   <option value="password">نمایش رمز موقت (روش قبلی)</option>
-                  <option value="email_link" disabled={!qaEmailInviteAvailable}>
-                    {qaEmailInviteAvailable
-                      ? 'آزمون محدود: فعال‌سازی و ارسال لینک امن با ایمیل'
-                      : 'ارسال ایمیل خودکار (هنوز غیرفعال)'}
+                  <option value="email_link" disabled={!emailInvitesAvailable}>
+                    {emailInvitesAvailable
+                      ? 'فعال‌سازی حساب و ارسال لینک امن با ایمیل'
+                      : 'ارسال ایمیل خودکار (پس از راه‌اندازی SMTP)'}
                   </option>
                 </select>
               </label>
