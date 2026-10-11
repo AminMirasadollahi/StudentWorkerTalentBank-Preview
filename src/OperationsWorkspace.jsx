@@ -33,6 +33,14 @@ const extraTimeReasons = {
 const label = (id,items) => items.find(x=>x.id===id)?.name || '—'
 const n = value=>fa.format(value||0)
 const minutes = value=>`${n(value)} دقیقه`
+function exactDuration(totalMinutes) {
+  const total=Math.max(0,Math.trunc(Number(totalMinutes)||0))
+  const hours=Math.floor(total/60)
+  const remainder=total%60
+  if(!hours)return `${n(remainder)} دقیقه`
+  if(!remainder)return `${n(hours)} ساعت`
+  return `${n(hours)} ساعت و ${n(remainder)} دقیقه`
+}
 function today() {
   const p = Object.fromEntries(dateParts.formatToParts(new Date()).map(x=>[x.type,x.value]))
   return `${p.year}-${p.month}-${p.day}`
@@ -324,7 +332,7 @@ export function AdminOperations() {
       <article><span>دانشجوکار فعال</span><b>{n(active.length)}</b></article>
       <article><span>کار برنامه‌ریزی‌شده امروز</span><b>{n(todayTasks.length)}</b></article>
       <article><span>گزارش منتظر تأیید</span><b>{n(pending.length)}</b></article>
-      <article><span>کل ساعات تأییدشده</span><b>{n((approvedMinutes/60).toFixed(1))} ساعت</b></article>
+      <article><span>کل ساعات تأییدشده</span><b>{exactDuration(approvedMinutes)}</b></article>
     </div>
     <SectionTabs value={view} onChange={setView} options={[
       ['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],
@@ -555,7 +563,7 @@ export function WorkerOperations({profile}) {
     <div className="ow-summary">
       <article><span>کارهای باز</span><b>{n(tasks.filter(t=>!['completed','cancelled'].includes(t.state)).length)}</b></article>
       <article><span>گزارش منتظر بررسی</span><b>{n(records.filter(e=>e.review_state==='submitted').length)}</b></article>
-      <article><span>ساعات تأییدشده</span><b>{n((total/60).toFixed(1))} ساعت</b></article>
+      <article><span>ساعات تأییدشده</span><b>{exactDuration(total)}</b></article>
     </div>
     <SectionTabs value={view} onChange={setView} options={[
       ['today','امروز'],['week','این هفته'],['availability','زمان حضور'],['history','سابقه من'],
