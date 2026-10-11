@@ -4,6 +4,7 @@ import ChoiceCard from './components/ChoiceCard'
 import InfoIcon from './components/InfoIcon'
 import { availabilitySlots, entryYears, majors, skills, units, weekDays } from './data'
 import { getOpenCampaign, submitStudentWorkerApplication } from './lib/supabase'
+import { normalizeCandidateEmail, isValidCandidateEmail } from './lib/candidateEmail'
 
 const STORAGE_KEY = 'student-worker-form-v2'
 const TOTAL_STEPS = 18
@@ -180,7 +181,7 @@ export default function App() {
     const rawEntryYear = form.entryYear === 'سایر' ? form.entryYearOther : form.entryYear
     const entryYear = Number(rawEntryYear)
     const portfolioUrl = form.portfolioUrl.trim()
-    const email = form.email.trim().toLowerCase()
+    const email = normalizeCandidateEmail(form.email)
 
     if (!/^\d+$/.test(studentNumber)) {
       setSubmissionError('شماره دانشجویی باید فقط شامل عدد باشد.')
@@ -196,7 +197,7 @@ export default function App() {
       return
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    if (!isValidCandidateEmail(email)) {
       setSubmissionError('یک آدرس ایمیل معتبر وارد کنید.')
       setSubmissionStatus('error')
       setIsSubmissionModalOpen(true)
@@ -395,7 +396,7 @@ export default function App() {
       nextDisabled={
         !/^09\d{9}$/.test(form.phone)
         || (form.socialPhone && !/^09\d{9}$/.test(form.socialPhone))
-        || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
+        || !isValidCandidateEmail(form.email)
       }
     >
       <div className="contact-fields">
