@@ -110,10 +110,12 @@ export async function assignWorkerTask({workerId,unit,title,instructions,date,mi
 export async function startMyTask(taskId) {
   return assertResult(await opsClient.rpc('ops_start_task',{p_task_id:taskId}))
 }
-export async function submitMyTime({taskId,date,minutes,note,clientSubmissionId}) {
-  return assertResult(await opsClient.rpc('ops_submit_time', {
+export async function submitMyTime({taskId,date,minutes,note,clientSubmissionId,extraReasonCode=null,extraReasonText=null}) {
+  // Only server-side v2 enforces reason, task ownership and default standard credit.
+  return assertResult(await opsClient.rpc('ops_submit_time_v2', {
     p_task_id:taskId,p_work_date:date,p_reported_minutes:Number(minutes),
     p_worker_note:note || '',p_client_submission_id:clientSubmissionId,
+    p_extra_reason_code:extraReasonCode,p_extra_reason_text:extraReasonText,
   }))
 }
 export async function reviewWorkerTime({entryId,decision,approvedMinutes,note}) {
