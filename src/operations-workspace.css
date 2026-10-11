@@ -76,3 +76,32 @@
  padding:0.65rem; border:1px solid var(--report-border); border-radius:0.55rem; }
 .ow-overtime-review { border-right:3px solid #d6a14c; padding:0.35rem 0.65rem;
  background:#fffbf3; overflow-wrap:anywhere; }
+
+
+/* Staff history filter and concise per-worker profile; no separate module. */
+.ow-history-filter { display:flex; align-items:end; flex-wrap:wrap; gap:0.5rem 1rem;
+ margin:0.75rem 0; }
+.ow-history-filter .ow-worker-selector { flex:1 1 15rem; max-width:25rem; }
+.ow-history-filter .ow-muted { margin:0 0 0.2rem; flex:1 1 13rem; }
+.ow-worker-profile { padding:0.82rem; border:1px solid #d5e8e5;
+ border-radius:0.8rem; background:#f5fbfa; margin:0.65rem 0 1rem; }
+.ow-profile-heading { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:start; gap:0.6rem; }
+.ow-profile-heading h3 { margin:0; color:var(--report-navy); }
+.ow-profile-heading .ow-muted { margin:0.15rem 0 0; }
+.ow-profile-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+ gap:0.48rem; margin-top:0.7rem; }
+.ow-profile-metrics div { min-width:0; padding:0.65rem; background:#fff;
+ border:1px solid var(--report-border); border-radius:0.6rem; }
+.ow-profile-metrics span { display:block; font-size:0.72rem; color:var(--report-muted); }
+.ow-profile-metrics b { display:block; font-size:0.96rem; margin-top:0.2rem;
+ color:var(--report-navy); overflow-wrap:anywhere; }
+@media(max-width:900px) {
+ .ow-profile-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:640px) {
+ .ow-history-filter { display:grid; gap:0.35rem; }
+ .ow-history-filter .ow-worker-selector { max-width:none; }
+ .ow-profile-metrics { gap:0.38rem; }
+ .ow-profile-metrics div { padding:0.5rem; }
+ .ow-profile-metrics b { font-size:0.86rem; }
+}
