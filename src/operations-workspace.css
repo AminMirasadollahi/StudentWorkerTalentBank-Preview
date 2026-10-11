@@ -60,3 +60,19 @@
  .ow-week-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
  .ow-actions .report-btn { flex:1 1 8rem; }
 }
+
+/* Conditional extra-time request: compact by default, explicit when expanded. */
+.ow-standard-credit { display:grid; gap:0.16rem; padding:0.62rem 0.8rem;
+ border:1px solid var(--report-border); background:#eef7f7; border-radius:0.65rem; }
+.ow-standard-credit span { color:var(--report-muted); font-size:0.76rem; }
+.ow-standard-credit b { color:var(--report-navy); font-size:1.07rem; }
+.ow-standard-credit small { color:var(--report-muted); font-size:0.72rem; line-height:1.7; }
+.ow-extra-toggle { padding:0.58rem 0.72rem; border:1px dashed #77b6b0;
+ background:#f3faf9; border-radius:0.65rem; cursor:pointer; }
+.ow-extra-panel { padding:0.7rem 0.8rem; border:1px solid #bedbd6; border-radius:0.7rem;
+ background:#f6fbfa; }
+.ow-extra-panel .ow-fields { margin:0.6rem 0; }
+.ow-extra-panel textarea { width:100%; min-width:0; resize:vertical; font:inherit;
+ padding:0.65rem; border:1px solid var(--report-border); border-radius:0.55rem; }
+.ow-overtime-review { border-right:3px solid #d6a14c; padding:0.35rem 0.65rem;
+ background:#fffbf3; overflow-wrap:anywhere; }
