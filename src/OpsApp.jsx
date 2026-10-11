@@ -451,8 +451,12 @@ function AdminView({ onLogout }) {
       {issuedCredentials && (
         <div className="ops-modal" role="dialog" aria-modal="true" aria-labelledby="ops-credentials-title">
           <div className="ops-modal__card">
-            <h2 id="ops-credentials-title">حساب دانشجوکار ساخته شد</h2>
-            <p>این اطلاعات فقط همین یک‌بار نمایش داده می‌شود. برای دانشجوکار از مسیر خصوصی بفرستید؛ در کانال عمومی یا اسکرین‌شات منتشر نکنید.</p>
+            <h2 id="ops-credentials-title">{issuedCredentials.onboarding_mode === 'email_link' ? 'حساب دانشجوکار فعال شد' : 'اطلاعات فعال‌سازی دانشجوکار'}</h2>
+            <p>{issuedCredentials.onboarding_mode === 'email_link'
+              ? issuedCredentials.email_send_requested
+                ? 'درخواست ارسال دعوت‌نامه ثبت شد؛ دریافت ایمیل را با دانشجو بررسی کنید. ثبت درخواست به‌معنای تحویل قطعی نیست.'
+                : 'دعوت‌نامه ایمیلی ارسال نشد. از روش امن دیگری برای تحویل دسترسی استفاده کنید.'
+              : 'اطلاعات لینک یا رمز فقط همین یک‌بار نمایش داده می‌شود. آن را محرمانه و خصوصی تحویل دهید.'}</p>
             <label className="report-field">
               <span>ایمیل ورود</span>
               <input readOnly dir="ltr" value={issuedCredentials.email}/>
@@ -462,20 +466,22 @@ function AdminView({ onLogout }) {
                 <span>لینک امن تعیین رمز (محرمانه، با اعتبار محدود)</span>
                 <textarea readOnly rows={4} dir="ltr" value={issuedCredentials.invitation_link} />
               </label>
-            ) : (
+            ) : issuedCredentials.temporary_password ? (
               <label className="report-field">
                 <span>رمز موقت</span>
-                <input readOnly dir="ltr" value={issuedCredentials.temporary_password || ''}/>
+                <input readOnly dir="ltr" value={issuedCredentials.temporary_password}/>
               </label>
+            ) : null}
+            {(issuedCredentials.invitation_link || issuedCredentials.temporary_password) && (
+              <button type="button" className="report-btn report-btn--light"
+                onClick={() => navigator.clipboard?.writeText(
+                  issuedCredentials.invitation_link
+                    ? `لینک فعال‌سازی: ${issuedCredentials.invitation_link}`
+                    : `ایمیل: ${issuedCredentials.email}\nرمز موقت: ${issuedCredentials.temporary_password}`
+                )}>
+                کپی اطلاعات محرمانه ورود
+              </button>
             )}
-            <button type="button" className="report-btn report-btn--light"
-              onClick={() => navigator.clipboard?.writeText(
-                issuedCredentials.invitation_link
-                  ? `لینک فعال‌سازی: ${issuedCredentials.invitation_link}`
-                  : `ایمیل: ${issuedCredentials.email}\nرمز موقت: ${issuedCredentials.temporary_password}`
-              )}>
-              کپی اطلاعات محرمانه ورود
-            </button>
             <button type="button" className="report-btn report-btn--primary"
               onClick={() => setIssuedCredentials(null)}>متوجه شدم، بستن</button>
           </div>
