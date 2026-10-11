@@ -19,6 +19,10 @@ const stateLabels = {
   assigned:'واگذار شده',in_progress:'در حال انجام',submitted:'منتظر تأیید',
   completed:'تکمیل‌شده',needs_changes:'نیازمند اصلاح',cancelled:'لغوشده',
 }
+const reviewLabels = {
+  submitted:'منتظر تأیید',approved:'تأییدشده',
+  changes_requested:'نیازمند اصلاح',rejected:'ردشده',
+}
 const label = (id,items) => items.find(x=>x.id===id)?.name || '—'
 const n = value=>fa.format(value||0)
 const minutes = value=>`${n(value)} دقیقه`
@@ -232,12 +236,12 @@ async function exportOpsExcel(data) {
       date:pretty(task.planned_date),estimate:task.estimate_minutes,
       reported:entry.reported_minutes,
       approved:entry.review_state==='approved'?entry.approved_minutes:'',
-      review:entry.review_state,
+      review:reviewLabels[entry.review_state] || entry.review_state,
     })
   }
   sh.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}}
   sh.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF153E5C'}}
-  sh.autoFilter={from:{row:1,column:1},to:{row:1,column:8}}
+  sh.autoFilter={from:{row:1,column:1},to:{row:sh.rowCount,column:8}}
   sh.views=[{state:'frozen',ySplit:1,rightToLeft:true}]
   const blob=new Blob([await wb.xlsx.writeBuffer()],
     {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
