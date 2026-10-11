@@ -11,6 +11,12 @@ import {
 import { opsClient } from './lib/operations'
 import { normalizeCandidateEmail, isValidCandidateEmail } from './lib/candidateEmail'
 import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
+import {
+  WORKER_PASSWORD_RECOVERY_REDIRECT,
+  PASSWORD_RECOVERY_PENDING_KEY,
+  isRecoveryCallbackHash,
+  validNewPasswordPair,
+} from './lib/passwordRecovery.mjs'
 import './report.css'
 import './ops.css'
 
@@ -50,19 +56,57 @@ function getMessage(error) {
   return 'عملیات تکمیل نشد. دوباره تلاش کنید و در صورت تکرار مشکل، دسترسی‌ها را بررسی کنید.'
 }
 
-function Login({ onLogin, busy, error, defaultMode }) {
+function Login({ onLogin, busy, error, defaultMode, notice }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [forgotMode, setForgotMode] = useState(false)
+  const [sendingRecovery, setSendingRecovery] = useState(false)
+  const [recoverySent, setRecoverySent] = useState(false)
+  const [recoveryError, setRecoveryError] = useState('')
+
+  const requestRecovery = async event => {
+    event.preventDefault()
+    if (sendingRecovery || recoverySent) return
+    setRecoveryError('')
+    setSendingRecovery(true)
+    try {
+      const { error: sendError } = await opsClient.auth.resetPasswordForEmail(
+        email.trim().toLowerCase(),
+        { redirectTo: WORKER_PASSWORD_RECOVERY_REDIRECT },
+      )
+      if (sendError) throw sendError
+      // Deliberately avoid disclosing whether the address has an Auth account.
+      setRecoverySent(true)
+    } catch {
+      setRecoveryError('درخواست در حال حاضر ارسال نشد. کمی بعد دوباره تلاش کنید.')
+    } finally {
+      setSendingRecovery(false)
+    }
+  }
+
+  const toggleForgotMode = () => {
+    setForgotMode(value => !value)
+    setRecoveryError('')
+    setRecoverySent(false)
+    setPassword('')
+  }
+
   return (
     <main className="report-shell report-shell--login ops-root" dir="rtl">
       <form
         className="report-login-card"
-        onSubmit={event => { event.preventDefault(); onLogin(email.trim(), password) }}
+        onSubmit={forgotMode
+          ? requestRecovery
+          : event => { event.preventDefault(); onLogin(email.trim(), password) }}
       >
         <span className="report-eyebrow">دانشکده علوم انسانی شهید رجایی بابل</span>
         <div className="report-login-mark" aria-hidden="true">▦</div>
-        <h1>ورود به {defaultMode === 'worker' ? 'پنل دانشجوکار' : 'مدیریت دانشجوکارها'}</h1>
-        <p>این بخش فقط برای دانشجوکارهای پذیرفته‌شده و مدیر مجاز است.</p>
+        <h1>{forgotMode
+          ? 'بازیابی رمز عبور'
+          : `ورود به ${defaultMode === 'worker' ? 'پنل دانشجوکار' : 'مدیریت دانشجوکارها'}`}</h1>
+        <p>{forgotMode
+          ? 'ایمیل همان حساب فعال را وارد کنید. در صورت امکان، لینک تعیین رمز تازه به صندوق شما فرستاده می‌شود.'
+          : 'این بخش فقط برای دانشجوکارهای پذیرفته‌شده و مدیر مجاز است.'}</p>
         <label className="report-field">
           <span>ایمیل حساب</span>
           <input
@@ -71,11 +115,11 @@ function Login({ onLogin, busy, error, defaultMode }) {
             required
             dir="ltr"
             value={email}
-            onChange={event => setEmail(event.target.value)}
+            onChange={event => { setEmail(event.target.value); setRecoverySent(false) }}
             placeholder="example@email.com"
           />
         </label>
-        <label className="report-field ops-login-password">
+        {!forgotMode && <label className="report-field ops-login-password">
           <span>رمز عبور</span>
           <input
             type="password"
@@ -86,13 +130,97 @@ function Login({ onLogin, busy, error, defaultMode }) {
             value={password}
             onChange={event => setPassword(event.target.value)}
           />
-        </label>
-        {error && <div role="alert" className="report-alert report-alert--error">{error}</div>}
-        <button type="submit" className="report-btn report-btn--primary" disabled={busy}>
-          {busy ? 'در حال بررسی…' : 'ورود'}
+        </label>}
+        {!forgotMode && notice && <p role="status" className="ops-alert-success">{notice}</p>}
+        {!forgotMode && error && <div role="alert" className="report-alert report-alert--error">{error}</div>}
+        {forgotMode && recoverySent && <p role="status" className="ops-alert-success">
+          اگر این ایمیل به حسابی در سامانه متصل باشد، لینک بازیابی برای آن ارسال شده است.
+          صندوق ورودی و هرزنامه را بررسی کنید. لطفاً درخواست را پیاپی تکرار نکنید.
+        </p>}
+        {forgotMode && recoveryError && <p role="alert" className="report-alert report-alert--error">{recoveryError}</p>}
+        <button type="submit" className="report-btn report-btn--primary"
+          disabled={busy || sendingRecovery || (forgotMode && recoverySent)}>
+          {forgotMode
+            ? (sendingRecovery ? 'در حال ارسال درخواست…' : 'ارسال لینک بازیابی')
+            : (busy ? 'در حال بررسی…' : 'ورود')}
+        </button>
+        <button type="button" className="ops-recovery-toggle" onClick={toggleForgotMode}>
+          {forgotMode ? 'بازگشت به ورود با رمز' : 'رمز عبورم را فراموش کرده‌ام'}
         </button>
         <a className="report-back-link" href={window.location.pathname}>بازگشت به فرم عمومی</a>
       </form>
+    </main>
+  )
+}
+
+function RecoveryPasswordView({ onComplete, onCancel }) {
+  const [password, setPassword] = useState('')
+  const [confirmation, setConfirmation] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [updated, setUpdated] = useState(false)
+  const [error, setError] = useState('')
+
+  const save = async event => {
+    event.preventDefault()
+    if (saving) return
+    if (!updated && !validNewPasswordPair(password, confirmation)) {
+      setError('رمز جدید باید ۸ تا ۱۲۸ نویسه باشد و تکرار آن یکسان وارد شود.')
+      return
+    }
+    setSaving(true)
+    setError('')
+    let passwordWasUpdated = updated
+    try {
+      if (!updated) {
+        const { error: updateError } = await opsClient.auth.updateUser({ password })
+        if (updateError) throw updateError
+        passwordWasUpdated = true
+        setUpdated(true)
+        setPassword('')
+        setConfirmation('')
+      }
+      // Require a clean password login after successful recovery.
+      await onComplete()
+    } catch {
+      setError(passwordWasUpdated
+        ? 'رمز تغییر کرده، اما خروج خودکار کامل نشده است. دوباره «خروج و بازگشت» را بزنید.'
+        : 'ثبت رمز جدید تکمیل نشد. از معتبر بودن لینک مطمئن شوید و دوباره تلاش کنید.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <main className="report-shell report-shell--login ops-root" dir="rtl">
+      <section className="report-login-card">
+        <span className="report-eyebrow">دانشکده علوم انسانی شهید رجایی بابل</span>
+        <h1>تعیین رمز جدید حساب</h1>
+        <p>لینک بازیابی تأیید شده است. یک رمز جدید و اختصاصی انتخاب کنید. پس از ثبت، برای ورود باید از همین رمز استفاده کنید.</p>
+        <form onSubmit={save} className="ops-recovery-form">
+          {!updated && <>
+            <label className="report-field">
+              <span>رمز جدید (حداقل ۸ نویسه)</span>
+              <input type="password" required minLength={8} maxLength={128}
+                dir="ltr" autoComplete="new-password"
+                value={password} onChange={event => setPassword(event.target.value)}/>
+            </label>
+            <label className="report-field">
+              <span>تکرار رمز جدید</span>
+              <input type="password" required minLength={8} maxLength={128}
+                dir="ltr" autoComplete="new-password"
+                value={confirmation} onChange={event => setConfirmation(event.target.value)}/>
+            </label>
+          </>}
+          {error && <p role="alert" className="report-alert report-alert--error">{error}</p>}
+          <button type="submit" className="report-btn report-btn--primary"
+            disabled={saving || (!updated && (!password || !confirmation))}>
+            {saving ? 'در حال انجام…' : updated ? 'خروج و بازگشت به ورود' : 'ثبت رمز جدید'}
+          </button>
+        </form>
+        <button type="button" className="ops-recovery-toggle" onClick={onCancel} disabled={saving}>
+          انصراف و خروج از حساب
+        </button>
+      </section>
     </main>
   )
 }
@@ -496,6 +624,24 @@ export default function OpsApp({ mode = 'admin' }) {
   const [identity, setIdentity] = useState(null)
   const [busy, setBusy] = useState(true)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [recoveryMode, setRecoveryMode] = useState(() => {
+    const isCallback = isRecoveryCallbackHash(window.location.hash)
+    try {
+      if (isCallback) window.sessionStorage.setItem(PASSWORD_RECOVERY_PENDING_KEY, '1')
+      return isCallback || window.sessionStorage.getItem(PASSWORD_RECOVERY_PENDING_KEY) === '1'
+    } catch { return isCallback }
+  })
+
+  useEffect(() => {
+    const { data: { subscription } } = opsClient.auth.onAuthStateChange(event => {
+      if (event === 'PASSWORD_RECOVERY') {
+        try { window.sessionStorage.setItem(PASSWORD_RECOVERY_PENDING_KEY, '1') } catch {}
+        setRecoveryMode(true)
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -511,8 +657,13 @@ export default function OpsApp({ mode = 'admin' }) {
     return () => { mounted = false }
   }, [mode])
 
+  const clearRecoveryIntent = () => {
+    try { window.sessionStorage.removeItem(PASSWORD_RECOVERY_PENDING_KEY) } catch {}
+    setRecoveryMode(false)
+  }
+
   const login = async (email, password) => {
-    setBusy(true); setError('')
+    setBusy(true); setError(''); setNotice('')
     try {
       await signInOperations(email, password)
       const who = await currentOperationsIdentity()
@@ -528,7 +679,15 @@ export default function OpsApp({ mode = 'admin' }) {
   const logout = async () => {
     setBusy(true)
     try { await signOutOperations() }
-    finally { setIdentity(null); setBusy(false) }
+    finally { clearRecoveryIntent(); setIdentity(null); setBusy(false) }
+  }
+
+  const finishRecovery = async () => {
+    await signOutOperations()
+    clearRecoveryIntent()
+    setIdentity(null)
+    setError('')
+    setNotice('رمز جدید ثبت شد. اکنون با ایمیل حساب و رمز جدید وارد شوید.')
   }
 
   if (busy && !identity) return (
@@ -537,7 +696,19 @@ export default function OpsApp({ mode = 'admin' }) {
     </main>
   )
 
-  if (!identity) return <Login onLogin={login} busy={busy} error={error} defaultMode={mode}/>
+  if (recoveryMode && !identity) return (
+    <main className="report-shell report-shell--login ops-root" dir="rtl">
+      <section className="report-login-card">
+        <h1>لینک بازیابی قابل استفاده نیست</h1>
+        <p>اگر لینک منقضی شده یا نشست ایجاد نشده است، از فرم ورود دوباره درخواست بازیابی بدهید.</p>
+        <button type="button" className="report-btn report-btn--primary" onClick={logout}>
+          بازگشت به صفحه ورود
+        </button>
+      </section>
+    </main>
+  )
+  if (recoveryMode) return <RecoveryPasswordView onComplete={finishRecovery} onCancel={logout}/>
+  if (!identity) return <Login onLogin={login} busy={busy} error={error} defaultMode={mode} notice={notice}/>
   if (identity.role === 'admin') return <AdminView onLogout={logout}/>
   return <WorkerView
     profile={identity.profile}
