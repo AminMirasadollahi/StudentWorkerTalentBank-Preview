@@ -311,7 +311,7 @@ function WorkerView({ profile, onLogout, initialPasswordRequired = false }) {
 
 // A suspended worker may see only their own status. No task, schedule, time,
  // password-management, candidate or manager operations are mounted here.
-function WorkerDisabledView({ profile, onLogout }) {
+export function WorkerDisabledView({ profile, onLogout }) {
   const copy = disabledWorkerCopy(profile.state)
   if (!copy) return null
 
