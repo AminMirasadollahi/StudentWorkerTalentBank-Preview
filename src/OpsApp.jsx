@@ -10,6 +10,7 @@ import {
 } from './lib/operations'
 import { opsClient } from './lib/operations'
 import { normalizeCandidateEmail, isValidCandidateEmail } from './lib/candidateEmail'
+import { disabledWorkerCopy } from './lib/workerAccess.mjs'
 import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import {
   WORKER_PASSWORD_RECOVERY_REDIRECT,
@@ -303,6 +304,32 @@ function WorkerView({ profile, onLogout, initialPasswordRequired = false }) {
             {saving ? 'در حال ذخیره…' : 'تغییر رمز'}
           </button>
         </form>
+      </section>
+    </main>
+  )
+}
+
+// A suspended worker may see only their own status. No task, schedule, time,
+ // password-management, candidate or manager operations are mounted here.
+function WorkerDisabledView({ profile, onLogout }) {
+  const copy = disabledWorkerCopy(profile.state)
+  if (!copy) return null
+
+  return (
+    <main className="report-shell report-shell--login ops-root" dir="rtl">
+      <section className="report-login-card ops-disabled-card" aria-labelledby="ops-disabled-title">
+        <span className="report-eyebrow">پنل اختصاصی دانشجوکار</span>
+        <div className="report-login-mark" aria-hidden="true">▦</div>
+        <h1 id="ops-disabled-title">{copy.title}</h1>
+        <p role="status" className="ops-disabled-state">وضعیت حساب: {copy.status}</p>
+        <p>{copy.description}</p>
+        <dl className="ops-disabled-details">
+          <div><dt>دانشجوکار</dt><dd>{profile.name}</dd></div>
+          <div><dt>واحد همکاری</dt><dd>{unitLabels[profile.unit] || profile.unit}</dd></div>
+        </dl>
+        <button type="button" className="report-btn report-btn--primary" onClick={onLogout}>
+          خروج از حساب
+        </button>
       </section>
     </main>
   )
@@ -710,6 +737,7 @@ export default function OpsApp({ mode = 'admin' }) {
   if (recoveryMode) return <RecoveryPasswordView onComplete={finishRecovery} onCancel={logout}/>
   if (!identity) return <Login onLogin={login} busy={busy} error={error} defaultMode={mode} notice={notice}/>
   if (identity.role === 'admin') return <AdminView onLogout={logout}/>
+  if (identity.role === 'worker_disabled') return <WorkerDisabledView profile={identity.profile} onLogout={logout}/>
   return <WorkerView
     profile={identity.profile}
     onLogout={logout}
