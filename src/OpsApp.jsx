@@ -11,6 +11,7 @@ import {
 import { opsClient } from './lib/operations'
 import { normalizeCandidateEmail, isValidCandidateEmail } from './lib/candidateEmail'
 import { disabledWorkerCopy } from './lib/workerAccess.mjs'
+import { watchOperationsResume } from './lib/operationsResume.mjs'
 import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import {
   WORKER_PASSWORD_RECOVERY_REDIRECT,
@@ -650,6 +651,7 @@ function AdminView({ onLogout }) {
 export default function OpsApp({ mode = 'admin' }) {
   const [identity, setIdentity] = useState(null)
   const [busy, setBusy] = useState(true)
+  const [recheckingAccess, setRecheckingAccess] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [recoveryMode, setRecoveryMode] = useState(() => {
@@ -665,6 +667,10 @@ export default function OpsApp({ mode = 'admin' }) {
       if (event === 'PASSWORD_RECOVERY') {
         try { window.sessionStorage.setItem(PASSWORD_RECOVERY_PENDING_KEY, '1') } catch {}
         setRecoveryMode(true)
+      }
+      if (event === 'SIGNED_OUT') {
+        setIdentity(null)
+        setRecheckingAccess(false)
       }
     })
     return () => subscription.unsubscribe()
@@ -684,12 +690,39 @@ export default function OpsApp({ mode = 'admin' }) {
     return () => { mounted = false }
   }, [mode])
 
+  // A previously open worker/admin dashboard is not proof that its role is still valid.
+  // Recheck on tab resume; block stale operational components while verifying.
+  useEffect(() => {
+    if (!identity || recoveryMode) return
+    return watchOperationsResume({
+      windowTarget: window,
+      documentTarget: document,
+      readIdentity: currentOperationsIdentity,
+      onStart: () => setRecheckingAccess(true),
+      onIdentity: fresh => {
+        if (!fresh || fresh.role === 'no_access') {
+          setError('دسترسی این نشست دیگر معتبر نیست. لطفاً مجدداً وارد شوید.')
+          setIdentity(null)
+        } else {
+          setError('')
+          setIdentity(fresh)
+        }
+      },
+      onFailure: () => {
+        setIdentity(null)
+        setError('بررسی مجدد دسترسی ممکن نشد. اتصال را بررسی و صفحه را دوباره بارگذاری کنید.')
+      },
+      onFinish: () => setRecheckingAccess(false),
+    })
+  }, [Boolean(identity), recoveryMode])
+
   const clearRecoveryIntent = () => {
     try { window.sessionStorage.removeItem(PASSWORD_RECOVERY_PENDING_KEY) } catch {}
     setRecoveryMode(false)
   }
 
   const login = async (email, password) => {
+    setRecheckingAccess(false)
     setBusy(true); setError(''); setNotice('')
     try {
       await signInOperations(email, password)
@@ -704,6 +737,7 @@ export default function OpsApp({ mode = 'admin' }) {
   }
 
   const logout = async () => {
+    setRecheckingAccess(false)
     setBusy(true)
     try { await signOutOperations() }
     finally { clearRecoveryIntent(); setIdentity(null); setBusy(false) }
@@ -716,6 +750,12 @@ export default function OpsApp({ mode = 'admin' }) {
     setError('')
     setNotice('رمز جدید ثبت شد. اکنون با ایمیل حساب و رمز جدید وارد شوید.')
   }
+
+  if (recheckingAccess && identity && !recoveryMode) return (
+    <main className="report-shell report-shell--login ops-root" dir="rtl">
+      <div className="report-login-card" role="status">در حال بررسی مجدد مجوز حساب…</div>
+    </main>
+  )
 
   if (busy && !identity) return (
     <main className="report-shell report-shell--login ops-root" dir="rtl">
