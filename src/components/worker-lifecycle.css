@@ -1,0 +1,47 @@
+/* Phase N: compact reversible account management, within the existing worker profile. */
+.wl-panel { margin-top:0.85rem; padding:0.85rem; border:1px solid #b9d9d4;
+  border-radius:0.75rem; background:#fff; color:var(--report-navy); }
+.wl-head { display:flex; gap:0.65rem; justify-content:space-between; align-items:center; flex-wrap:wrap; }
+.wl-head h4 { margin:0; font-size:0.95rem; }
+.wl-head p { margin:0.3rem 0 0; font-size:0.8rem; color:var(--report-muted); }
+.wl-state { display:inline-flex; align-items:center; font-size:0.78rem; font-weight:700;
+  padding:0.25rem 0.65rem; border-radius:1rem; background:#e6f5ef; color:#12684c; }
+.wl-state--paused { background:#fff2d9; color:#82551d; }
+.wl-state--inactive { background:#f0eeee; color:#6b4950; }
+.wl-caption { color:var(--report-muted); line-height:1.85; font-size:0.79rem; margin:0.65rem 0; }
+.wl-actions { display:flex; flex-wrap:wrap; gap:0.55rem; align-items:center; margin:0.7rem 0; }
+.wl-actions .report-btn { font-size:0.8rem; }
+.wl-locked { border-inline-start:3px solid #dcab57; margin:0.7rem 0 0;
+  padding:0.55rem 0.65rem; border-radius:0.5rem; background:#fff8e9;
+  color:#82551d; font-size:0.78rem; line-height:1.85; }
+.wl-history { border-top:1px solid var(--report-border); margin-top:0.9rem; padding-top:0.75rem; }
+.wl-history h5 { margin:0; font-size:0.87rem; }
+.wl-history ol { display:grid; gap:0.5rem; padding:0; list-style:none; margin:0.6rem 0; }
+.wl-history li { padding:0.65rem 0.75rem; border:1px solid var(--report-border);
+  background:#f9fcfc; border-radius:0.6rem; overflow-wrap:anywhere; }
+.wl-history li strong { font-size:0.82rem; }
+.wl-history li small { display:block; margin:0.2rem 0; color:var(--report-muted); font-size:0.74rem; }
+.wl-history li p { margin:0.3rem 0; font-size:0.8rem; line-height:1.85; }
+.wl-modal { position:fixed; inset:0; z-index:500; display:grid; place-items:center;
+  padding:1rem; background:rgba(9,30,46,0.75); }
+.wl-dialog { width:min(100%,35rem); max-height:92vh; overflow-y:auto;
+  background:#fff; padding:1.1rem; border-radius:1rem;
+  box-shadow:0 16px 48px rgba(7,37,51,0.25); }
+.wl-dialog h3 { margin:0; color:var(--report-navy); font-size:1.12rem; }
+.wl-dialog > p { line-height:1.85; font-size:0.85rem; }
+.wl-review { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0.5rem; }
+.wl-review div { background:#f1f7f8; padding:0.65rem; border-radius:0.55rem; min-width:0; }
+.wl-review dt { font-size:0.7rem; color:var(--report-muted); }
+.wl-review dd { margin:0.2rem 0 0; font-weight:700; overflow-wrap:anywhere; font-size:0.83rem; }
+.wl-warning,.wl-notice { background:#fff5e7; color:#82551d;
+  border-radius:0.55rem; padding:0.7rem 0.8rem; }
+.wl-notice { background:#eaf6f2; color:#176653; }
+.wl-dialog .report-field textarea { width:100%; min-height:6rem; resize:vertical;
+  padding:0.7rem; border:1px solid var(--report-border); border-radius:0.55rem;
+  font:inherit; color:var(--report-navy); }
+@media (max-width:640px) {
+  .wl-panel { padding:0.65rem; }
+  .wl-dialog { padding:0.8rem; }
+  .wl-review { grid-template-columns:1fr; }
+  .wl-actions .report-btn { flex:1 1 10rem; }
+}
