@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { classifyOperationsIdentity } from './workerAccess.mjs'
 
 // Separate identity/session from the public, intentionally sessionless intake client.
 // Only the publishable key enters the browser. Never use the service-role key here.
@@ -33,14 +34,10 @@ export async function currentOperationsIdentity() {
   if (error || !data?.user) return null
 
   const isAdmin = assertResult(await opsClient.rpc('ops_is_admin'))
-  if (isAdmin) return { role: 'admin', user: data.user }
+  if (isAdmin) return classifyOperationsIdentity({ user: data.user, isAdmin: true })
 
   const profile = assertResult(await opsClient.rpc('ops_get_my_worker_profile'))
-  if (profile?.worker_id && profile.state === 'active') {
-    return { role: 'worker', user: data.user, profile }
-  }
-
-  return { role: 'no_access', user: data.user }
+  return classifyOperationsIdentity({ user: data.user, isAdmin: false, profile })
 }
 
 export async function getOperationsCandidates() {
