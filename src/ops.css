@@ -122,3 +122,37 @@
 .ops-recovery-toggle:disabled { opacity: 0.55; cursor: not-allowed; }
 .ops-recovery-form { display: grid; gap: 0.75rem; }
 .ops-recovery-form .report-btn { justify-self: start; }
+
+
+/* Suspended workers see only a minimal self-status card; operational UI is never mounted. */
+.ops-root .ops-disabled-card { max-width: 31rem; }
+.ops-disabled-card .ops-disabled-state {
+  display: inline-block;
+  margin: 0.85rem auto 0.55rem;
+  padding: 0.28rem 0.85rem;
+  border-radius: 99px;
+  background: #e7f2f0;
+  color: #146962;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.ops-disabled-details {
+  margin: 1.25rem 0 1rem;
+  padding: 0.75rem 0.95rem;
+  text-align: right;
+  background: #f7fafb;
+  border: 1px solid var(--report-border);
+  border-radius: 0.8rem;
+}
+.ops-disabled-details div {
+  display: grid;
+  grid-template-columns: 6rem minmax(0,1fr);
+  align-items: baseline;
+  gap: 0.65rem;
+  padding: 0.4rem 0;
+}
+.ops-disabled-details dt { color: var(--report-muted); font-size: 0.78rem; }
+.ops-disabled-details dd { margin: 0; color: var(--report-navy); font-weight: 700; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .ops-disabled-details div { grid-template-columns: 1fr; gap: 0.15rem; }
+}
