@@ -6,6 +6,7 @@ import {
 import './operations-workspace.css'
 import JalaliDatePicker from './components/JalaliDatePicker'
 import { scopeWorkerHistory, summarizeWorkerHistory } from './lib/workerHistory'
+import WorkerLifecycleReadOnlyPreview from './components/WorkerLifecycleReadOnlyPreview'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -471,6 +472,7 @@ export function AdminOperations() {
           <div><span>گزارش منتظر تأیید</span><b>{n(historySummary.pendingCount)}</b></div>
           <div><span>مجموع ساعات تأییدشده</span><b>{exactDuration(historySummary.approvedMinutes)}</b></div>
         </div>
+        <WorkerLifecycleReadOnlyPreview worker={selectedHistoryWorker}/>
       </section>}
       <div className="report-panel-heading">
         <h3>{historyWorkerId?'سوابق فعالیت این دانشجوکار':'سوابق فعالیت همه دانشجوکارها'}</h3>
