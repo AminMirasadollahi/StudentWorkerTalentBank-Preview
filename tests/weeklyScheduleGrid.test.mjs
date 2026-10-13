@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
  MAX_DAILY_WINDOWS,clockToMinutes,minutesToClock,
- selectedWeeklyWindows,validateDailyWindows
+ selectedWeeklyWindows,validateDailyWindows,persianWeekBounds
 } from '../src/lib/weeklyScheduleGrid.mjs'
 
 const entries=[
@@ -59,4 +59,12 @@ test('project only schedule effective on target date and for authorized worker i
  assert.deepEqual(selectedWeeklyWindows(slots,'A',6,'2026-10-17'),[{start:'08:00',end:'09:00'}])
  assert.deepEqual(selectedWeeklyWindows(slots,'A',6,'2026-10-24'),[{start:'11:00',end:'12:00'}])
  assert.deepEqual(selectedWeeklyWindows(slots,'A',1,'2026-10-26'),[])
+})
+
+test('Iranian week runs Saturday-Friday, including cross-month boundaries',()=>{
+ assert.deepEqual(persianWeekBounds('2026-10-17'),{start:'2026-10-17',end:'2026-10-23'})
+ assert.deepEqual(persianWeekBounds('2026-10-20'),{start:'2026-10-17',end:'2026-10-23'})
+ assert.deepEqual(persianWeekBounds('2026-10-23'),{start:'2026-10-17',end:'2026-10-23'})
+ assert.deepEqual(persianWeekBounds('2026-10-24'),{start:'2026-10-24',end:'2026-10-30'})
+ assert.throws(()=>persianWeekBounds('2026-02-31'))
 })
