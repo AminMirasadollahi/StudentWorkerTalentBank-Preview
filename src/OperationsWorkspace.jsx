@@ -10,7 +10,7 @@ import { assessAssignmentCapacity, assessAvailabilityOverride, firstMatchingWeek
 import { describeTaskWorkflow,selectManagerTasks,summarizeTaskWorkflow,selectPendingApprovals } from './lib/operationsTaskOverview.mjs'
 import WorkerLifecycleReadOnlyPreview from './components/WorkerLifecycleReadOnlyPreview'
 import { workerStateLabels } from './lib/workerLifecycle.mjs'
-import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows } from './lib/weeklyScheduleGrid.mjs'
+import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persianWeekBounds } from './lib/weeklyScheduleGrid.mjs'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -951,8 +951,9 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
   const approved=records.filter(x=>x.review_state==='approved')
   const total=approved.reduce((sum,e)=>sum+Number(e.approved_minutes||0),0)
   const tasks=data.tasks||[]
+  const week=persianWeekBounds(today())
   const visible=taskRange==='today'?tasks.filter(t=>t.planned_date===today()):
-    taskRange==='week'?tasks.filter(t=>t.planned_date>=shift(today(),-2)&&t.planned_date<=shift(today(),7)):tasks
+    taskRange==='week'?tasks.filter(t=>t.planned_date>=week.start&&t.planned_date<=week.end):tasks
   return <div className="ow-workspace ow-worker-workspace">
     <div className="ow-summary">
       <article><span>کارهای باز</span><b>{n(tasks.filter(t=>!['completed','cancelled'].includes(t.state)).length)}</b></article>
