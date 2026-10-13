@@ -12,6 +12,7 @@ import WorkerLifecycleReadOnlyPreview from './components/WorkerLifecycleReadOnly
 import { workerStateLabels } from './lib/workerLifecycle.mjs'
 import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persianWeekBounds, suggestNextWindow } from './lib/weeklyScheduleGrid.mjs'
 import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonthBounds } from './lib/persianMonthCalendar.mjs'
+import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -287,27 +288,28 @@ function ScheduleEditor({workerId,onSaved,data}) {
       <div className="ow-month-grid" role="group" aria-label={month.title}>
         {month.days.map((day,index)=>{
           if(!day)return <span className="ow-month-blank" key={'blank-'+index}/>
-          const exceptions=(calendarData.exceptions||[]).filter(x=>
-            x.worker_id===workerId&&x.local_date===day.date)
-          const hasException=exceptions.length>0
-          const forecast=assessAssignmentCapacity(calendarData,
-            {workerId,date:day.date,estimateMinutes:0})
+          const daily=projectDayPresence(calendarData,workerId,day.date)
+          const hasException=['replacement','unavailable'].includes(daily.kind)
           const tasks=(calendarData.tasks||[]).filter(t=>t.worker_id===workerId
             &&t.planned_date===day.date&&t.state!=='cancelled')
-          const slotCount=selectedWeeklyWindows(calendarData.weekly_slots||[],
-            workerId,isoWeekday(day.date),day.date).length
+          const timings=daily.windows.map(w=>w.start+'–'+w.end).join('، ')
+          const heading=daily.kind==='unavailable'?'عدم حضور':
+            daily.kind==='replacement'?'تغییر موقت':'برنامه ثابت'
           return <button type="button" key={day.date}
             className={'ow-month-day'+(selectedDate===day.date?' is-selected':'')
               +(day.date===today()?' is-today':'')
               +(hasException?' has-exception':'')}
             onClick={()=>chooseMonthDay(day.date)} disabled={busy}
             aria-pressed={selectedDate===day.date}
-            aria-label={`${pretty(day.date)}؛ ${hasException?'استثنای ثبت‌شده':slotCount+' نوبت ثابت'}؛ ${n(tasks.length)} کار`}>
+            title={`${pretty(day.date)}: ${daily.kind==='unknown'?'برنامه نامشخص':heading+' '+timings}`}
+            aria-label={`${pretty(day.date)}؛ ${daily.kind==='unknown'?'برنامه نامشخص':heading+' '+timings}؛ ${n(tasks.length)} کار`}>
             <b>{n(day.day)}</b>
-            {hasException?<small>{exceptions[0]?.kind==='unavailable'?'عدم حضور':'تغییر ساعت'}</small>
-              :tasks.length>0?<small>{n(tasks.length)} کار</small>
-              :forecast.availableMinutes!==null&&forecast.availableMinutes>0
-                ?<small>{exactDuration(forecast.availableMinutes)}</small>:null}
+            {daily.kind==='unavailable'?<small>عدم حضور</small>:
+              daily.windows.length?<small className="ow-day-times" dir="ltr">
+                {daily.windows.length===1?timings:`${daily.windows.length} بازه · ${daily.windows[0].start}`}
+              </small>:null}
+            {hasException&&daily.kind!=='unavailable'&&<i className="ow-exception-mark">تغییر</i>}
+            {tasks.length>0&&<small className="ow-task-count">{n(tasks.length)} کار</small>}
           </button>
         })}
       </div>
@@ -316,6 +318,14 @@ function ScheduleEditor({workerId,onSaved,data}) {
           <h4>تغییر موقت · {pretty(selectedDate)}</h4>
           <button type="button" className="ow-mini-btn" onClick={()=>setSelectedDate('')}>بستن</button>
         </div>
+        <p className="ow-muted ow-selected-current">
+          {(()=>{
+            const current=projectDayPresence(calendarData,workerId,selectedDate)
+            return current.kind==='unknown'?'برنامه فعلی: نامشخص':
+              current.kind==='unavailable'?'وضعیت فعلی: عدم حضور ثبت‌شده':
+              'برنامه فعلی: '+current.windows.map(w=>w.start+'–'+w.end).join('، ')
+          })()}
+        </p>
         <div className="ow-exception-kind" role="group" aria-label="نوع تغییر این تاریخ">
           <label><input type="radio" name="exception-kind" checked={exceptionKind==='replacement_intervals'}
             onChange={()=>setExceptionKind('replacement_intervals')}/> ساعات جایگزین</label>
