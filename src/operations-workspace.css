@@ -105,3 +105,66 @@
  .ow-profile-metrics div { padding:0.5rem; }
  .ow-profile-metrics b { font-size:0.86rem; }
 }
+
+/* Manager history — extra filters reuse the existing Jalali picker and field UI. */
+.ow-history-extra { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:0.6rem; align-items:start; margin:0.5rem 0; }
+.ow-history-extra > .report-field { min-width:0; }
+.ow-history-extra select, .ow-history-extra .jd-field { width:100%; min-width:0; }
+.ow-clear-date { display:inline-flex; border:0; background:transparent; padding:0.25rem 0; margin-top:0.2rem; color:var(--report-navy); text-decoration:underline; font:inherit; font-size:0.74rem; cursor:pointer; }
+.ow-history-filter-footer { display:flex; gap:0.55rem; justify-content:space-between; align-items:center; flex-wrap:wrap; margin:0 0 0.6rem; }
+.ow-history-filter-footer .ow-muted { margin:0; }
+.ow-history-load-more { display:flex; flex-wrap:wrap; gap:0.7rem; align-items:center; justify-content:space-between; padding:0.7rem; }
+@media (max-width:900px) { .ow-history-extra { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:640px) { .ow-history-extra { grid-template-columns:minmax(0,1fr); } }
+
+.ow-history-unreported { margin-top:0.9rem; padding-top:0.75rem; border-top:1px solid var(--report-border); }
+
+/* Read-only capacity planning advice; never presents a client-side warning as a server write guard. */
+.ow-capacity-summary,.ow-capacity-warning {
+  border-radius:0.7rem; padding:0.65rem 0.8rem; margin:0.6rem 0;
+  font-size:0.79rem; line-height:1.9; overflow-wrap:anywhere;
+}
+.ow-capacity-summary { background:#f1f9f8; border:1px solid #bdded8; color:#1f5656; }
+.ow-capacity-warning { background:#fff8eb; border:1px solid #e9cf97; color:#79521c; }
+.ow-capacity-summary p,.ow-capacity-warning p { margin:0.15rem 0; }
+.ow-capacity-summary small,.ow-capacity-warning small { display:block; opacity:0.85; }
+
+.ow-week-grid article.ow-week-alert { background:#fff8ed; border:1px solid #e9d3a6; }
+.ow-week-grid article.ow-week-alert b { color:#806022; }
+
+/* Manager task-stage and approval-queue improvements; no new permissions. */
+.ow-task-metrics { display:flex; flex-wrap:wrap; gap:0.4rem; margin:0.5rem 0 0.8rem; }
+.ow-task-metrics span { background:#f2f8f9; border:1px solid var(--report-border); color:var(--report-navy);
+  border-radius:0.55rem; padding:0.4rem 0.6rem; font-size:0.77rem; }
+.ow-list-filters { display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:0.6rem; align-items:start; margin:0.75rem 0; }
+.ow-approval-filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:0.6rem; max-width:48rem; margin:0.6rem 0; }
+.ow-list-filters .report-field,.ow-approval-filters .report-field { min-width:0; }
+.ow-list-filters select,.ow-list-filters input,.ow-approval-filters select { width:100%; min-width:0; }
+.ow-task-progress { display:flex; gap:0.35rem 0.6rem; flex-wrap:wrap; margin-top:0.5rem; }
+.ow-task-progress span { font-size:0.74rem; background:#f3f8f7; color:#366166;
+  border:1px solid #e0eeec; border-radius:0.5rem; padding:0.24rem 0.48rem; }
+.ow-paged-more { display:flex; flex-wrap:wrap; gap:0.7rem; align-items:center; justify-content:space-between;
+  padding:0.8rem 0.25rem; }
+@media (max-width:900px) { .ow-list-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:640px) { .ow-list-filters,.ow-approval-filters { grid-template-columns:1fr; } }
+
+/* Visual attention budget: prioritize actionable titles and exceptional states.
+   Secondary metadata and approval controls remain keyboard-accessible in details. */
+.ow-approval-item { padding:0.72rem 0.9rem; }
+.ow-approval-detail { margin-top:0.35rem; border-top:1px solid #e3ebee; }
+.ow-approval-detail > summary { padding:0.45rem 0; color:#1b726f; font-size:0.79rem;
+  font-weight:700; cursor:pointer; }
+.ow-approval-detail[open] > summary { margin-bottom:0.4rem; }
+.ow-task-detail { margin-top:0.15rem; }
+.ow-task-detail > summary,.ow-context-help > summary { display:list-item; width:fit-content;
+  cursor:pointer; color:var(--report-muted); font-size:0.72rem; }
+.ow-task-detail > summary:hover,.ow-context-help > summary:hover { color:var(--report-teal); }
+.ow-context-help { margin:0.35rem 0; }
+.ow-context-help p { margin:0.35rem 0; }
+.ow-task-results .ow-item { padding:0.62rem 0.8rem; }
+.ow-task-results .ow-item-header strong { line-height:1.6; }
+.ow-task-results .ow-item small { margin-top:0.1rem; }
+.ow-task-results .ow-task-progress { margin-top:0.25rem; }
+.ow-task-results .ow-task-progress span { padding:0.12rem 0.38rem; }
