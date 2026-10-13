@@ -395,3 +395,17 @@
  .ow-month-day small { font-size:0.56rem; }
  .ow-month-navigation { width:100%; }
 }
+
+/* Readable effective windows without filling each Persian month cell with text. */
+.ow-month-day .ow-day-times { max-width:100%; direction:ltr; text-align:left;
+  unicode-bidi:isolate; font-size:0.62rem; letter-spacing:-0.01em; }
+.ow-month-day .ow-exception-mark { color:#995d1e; background:#fff0d7;
+  border-radius:0.22rem; font-size:0.59rem; font-style:normal; padding:0 0.2rem; }
+.ow-month-day .ow-task-count { color:#176d68; font-size:0.61rem; }
+.ow-selected-current { margin:0; padding:0.3rem 0.5rem;
+  border:1px solid #cde4e0; background:#f2faf9; border-radius:0.4rem; }
+.ow-workspace .ow-history-results > .ow-item,
+.ow-workspace .ow-history-unreported > .ow-list > .ow-item {
+  width:min(100%,62rem); justify-self:start;
+}
+.ow-workspace .ow-history-results .ow-item { padding:0.5rem 0.65rem; }
