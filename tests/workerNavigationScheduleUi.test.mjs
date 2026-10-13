@@ -29,7 +29,7 @@ const plugin={
   if(id==='\0qa-worker-no-network')return [
     'export const getMyWork=async()=>globalThis.__workerFocusFixture;',
     'export const setWeeklyDay=async(...args)=>{globalThis.__workerFocusCalls.push(args);};',
-    'export const setDateException=async()=>{throw Error("QA_NO_EXCEPTION_WRITES")};',
+    'export const setDateException=async(...args)=>{globalThis.__workerExceptionCalls.push(args);};',
     ...['getAdminWork','assignWorkerTask','startMyTask','submitMyTime',
       'reviewWorkerTime'].map(name=>
       `export const ${name}=async()=>{throw Error("QA_WRITES_DENIED")};`),
@@ -47,6 +47,7 @@ before(async()=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true
  globalThis.__workerFocusFixture=fixture()
  globalThis.__workerFocusCalls=[]
+ globalThis.__workerExceptionCalls=[]
  ;({createRoot}=await import('react-dom/client'))
  server=await createServer({plugins:[plugin],server:{middlewareMode:true},
   appType:'custom',logLevel:'error'})
@@ -56,7 +57,7 @@ after(async()=>{
  await server?.close()
  dom?.window.close()
  for(const p of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT',
-  '__workerFocusFixture','__workerFocusCalls'])delete globalThis[p]
+  '__workerFocusFixture','__workerFocusCalls','__workerExceptionCalls'])delete globalThis[p]
 })
 function Harness(){
  const [nav,setNav]=useState({section:'tasks',taskRange:'today'})
@@ -135,6 +136,25 @@ test('worker exposes This Month and personal profile without permanent password 
   assert.ok(ui.host.querySelector('.ow-self-profile'))
   assert.ok(ui.host.textContent.includes('سابقه گزارش‌ها و ساعات'))
   assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,3)
+ }finally{await ui.dispose()}
+})
+test('month view edits one dated exception through injected fake RPC only',async()=>{
+ const ui=await setup()
+ try{
+  await ui.clickText('زمان حضور')
+  assert.ok(ui.host.querySelector('.ow-month-grid'))
+  await ui.click('.ow-month-day.is-today')
+  assert.ok(ui.host.querySelector('.ow-exception-inline'))
+  await ui.click('.ow-exception-kind label:last-child input')
+  await ui.clickText('ذخیره استثنای این تاریخ')
+  assert.equal(globalThis.__workerExceptionCalls.length,1)
+  const [who,date,kind,windows]=globalThis.__workerExceptionCalls[0]
+  assert.equal(who,worker)
+  assert.match(date,/^\\d{4}-\\d{2}-\\d{2}$/)
+  assert.equal(kind,'unavailable')
+  assert.deepEqual(windows,[])
+  assert.equal(globalThis.__workerFocusCalls.length,1,
+    'prior weekly fake invocation remains separate from date exception fake')
  }finally{await ui.dispose()}
 })
 test('sources preserve fail-closed auth and critical applicant/protected operational wiring',()=>{
