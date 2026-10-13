@@ -156,3 +156,44 @@
 @media (max-width: 480px) {
   .ops-disabled-details div { grid-template-columns: 1fr; gap: 0.15rem; }
 }
+
+/* Global intake-management density: first glance = person, state and one disclosure. */
+.ops-root .ops-kpis { display:flex; align-items:stretch; justify-content:flex-start;
+  flex-wrap:wrap; gap:0.38rem; margin:0.5rem 0; }
+.ops-root .ops-kpis article { flex:0 1 auto; min-width:8.5rem; padding:0.45rem 0.72rem; }
+.ops-root .ops-kpis span { font-size:0.7rem; }
+.ops-root .ops-kpis strong { font-size:1.04rem; }
+.ops-root .ops-list { grid-template-columns:minmax(0,1fr); gap:0.42rem; }
+.ops-root .ops-candidate { width:min(100%,70rem); padding:0.56rem 0.72rem;
+  border-radius:0.66rem; }
+.ops-root .ops-candidate__head { align-items:center; }
+.ops-root .ops-candidate__head strong { font-size:0.89rem; }
+.ops-root .ops-candidate__head small { font-size:0.7rem; line-height:1.4; }
+.ops-root .ops-candidate-controls { margin-top:0.24rem; }
+.ops-root .ops-candidate-controls > summary { display:list-item; cursor:pointer;
+  width:fit-content; padding:0.28rem 0; font-size:0.75rem;
+  color:#1f6f6b; font-weight:700; }
+.ops-root .ops-candidate-controls[open] > summary {
+  border-bottom:1px solid #e2ecee; margin-bottom:0.45rem; }
+.ops-root .ops-candidate-controls .ops-field-row { max-width:42rem;
+  grid-template-columns:repeat(2,minmax(0,1fr)); gap:0.55rem;
+  margin-top:0.5rem; }
+.ops-root .ops-candidate-controls .ops-email-row { grid-template-columns:minmax(12rem,24rem) auto;
+  align-items:end; }
+.ops-root .ops-candidate-controls .ops-email-row .ops-small-action { margin:0; }
+.ops-root .ops-candidate-controls .ops-provision { max-width:44rem; }
+.ops-root .ops-candidate-controls > .ops-small-action { margin-top:0.48rem; }
+.ops-root .ops-candidate-controls .ops-worker-state { margin:0.35rem 0; }
+.ops-root .ops-candidate-controls small { font-size:0.71rem; }
+.ops-root .ops-account-settings-panel { width:min(100%,31rem); margin:0.5rem 0 0 auto;
+  padding:0.7rem; }
+.ops-root .ops-settings-title { display:flex; justify-content:space-between;
+  align-items:center; flex-wrap:wrap; gap:0.6rem; margin-bottom:0.65rem; }
+.ops-root .report-header-actions { display:flex; gap:0.35rem; flex-wrap:wrap; }
+@media(max-width:700px) {
+ .ops-root .ops-candidate-controls .ops-field-row,
+ .ops-root .ops-candidate-controls .ops-email-row { grid-template-columns:1fr; }
+ .ops-root .ops-kpis { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .ops-root .ops-kpis article { min-width:0; }
+ .ops-root .ops-account-settings-panel { width:100%; }
+}
