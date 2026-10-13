@@ -105,8 +105,8 @@ test('mounted React filters by worker, unit and review; summaries & Excel share 
     assert.equal(ui.list().length,2)
     await ui.choose('.ow-worker-selector select','worker-A')
     assert.equal(ui.list().length,1)
-    assert.match(ui.host.textContent,/پرونده عملکرد: نمونه یک/)
-    assert.match(ui.host.textContent,/کارهای باز/)
+    assert.doesNotMatch(ui.host.textContent,/پروفایل دانشجوکارها/)
+    assert.match(ui.host.textContent,/سوابق منطبق با فیلتر/)
     await ui.choose('.ow-history-extra select:nth-of-type(1)','research').catch(async()=>{
       await ui.choose('.ow-history-extra .report-field:first-child select','research')
     })
@@ -120,12 +120,28 @@ test('mounted React filters by worker, unit and review; summaries & Excel share 
     await ui.choose('.ow-history-extra .report-field:nth-child(2) select','approved')
     assert.equal(ui.list().length,1)
     assert.match(ui.host.textContent,/۱ گزارش/)
-    assert.match(ui.host.textContent,/مجموع ساعات تأییدشده/)
+    assert.match(ui.host.textContent,/۱ ساعت و ۳۰ دقیقه تأییدشده/)
     const excel=Array.from(ui.host.querySelectorAll('button')).find(x=>x.textContent.includes('خروجی Excel'))
     assert.equal(excel.disabled,false)
   }finally{await ui.cleanup()}
 })
 
+test('worker profile is separate from history filter and preserves read-only lifecycle',async()=>{
+ const ui=await setup()
+ try {
+  await ui.click('پروفایل‌ها')
+  assert.ok(ui.host.querySelector('.ow-profile-section'))
+  assert.match(ui.host.textContent,/پروفایل دانشجوکارها/)
+  await ui.choose('.ow-profile-section select','worker-A')
+  assert.match(ui.host.textContent,/نمونه یک/)
+  assert.match(ui.host.textContent,/۱ ساعت و ۳۰ دقیقه/)
+  const status=ui.host.querySelector('.ow-profile-fold')
+  assert.ok(status,'profile provides task state details')
+  assert.equal(ui.host.querySelectorAll('.ow-history-results .ow-item').length,0)
+  await ui.click('سابقه و خروجی')
+  assert.equal(ui.list().length,2,'history has independent filter state')
+ }finally{await ui.cleanup()}
+})
 test('clear all restores combined records while preserving a standalone manager operations panel',async()=>{
   const ui=await setup()
   try{
