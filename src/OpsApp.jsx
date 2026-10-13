@@ -33,7 +33,17 @@ const initialAdminNavigation = () => ({
   candidateFilter: 'all',
   workView: 'tasks',
   workerId: '',
+  taskWorkerId: '',
+  taskState: '',
+  taskSearch: '',
+  taskOrder: 'latest',
+  approvalWorkerId: '',
+  approvalKind: '',
   historyWorkerId: '',
+  historyUnit: '',
+  historyReview: '',
+  historyFrom: '',
+  historyTo: '',
 })
 
 const unitLabels = {
