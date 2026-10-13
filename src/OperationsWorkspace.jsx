@@ -11,6 +11,7 @@ import { describeTaskWorkflow,selectManagerTasks,summarizeTaskWorkflow,selectPen
 import WorkerLifecycleReadOnlyPreview from './components/WorkerLifecycleReadOnlyPreview'
 import { workerStateLabels } from './lib/workerLifecycle.mjs'
 import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persianWeekBounds, suggestNextWindow } from './lib/weeklyScheduleGrid.mjs'
+import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonthBounds } from './lib/persianMonthCalendar.mjs'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -106,172 +107,244 @@ function ScheduleEditor({workerId,onSaved,data}) {
   const [effective,setEffective]=useState(today())
   const [editingDay,setEditingDay]=useState(null)
   const [draftWindows,setDraftWindows]=useState([])
-  const [exceptionDate,setExceptionDate]=useState(today())
-  const [exceptionKind,setExceptionKind]=useState('unavailable')
-  const [exceptionStart,setExceptionStart]=useState('08:00')
-  const [exceptionEnd,setExceptionEnd]=useState('12:00')
+  const [monthAnchor,setMonthAnchor]=useState(today())
+  const [selectedDate,setSelectedDate]=useState('')
+  const [exceptionKind,setExceptionKind]=useState('replacement_intervals')
+  const [exceptionWindows,setExceptionWindows]=useState([])
   const [note,setNote]=useState('')
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
-  const [saveDayState,setSaveDayState]=useState('')
-  useEffect(()=>{setEditingDay(null);setDraftWindows([]);setError('');setNotice('')},[workerId,effective])
-
-  const selectedDayDate=editingDay===null?null:firstMatchingWeekday(effective,editingDay)
+  const [saveState,setSaveState]=useState('')
+  const month=persianMonthCells(monthAnchor)
+  const calendarData=data||{}
   const weeklyValidation=validateDailyWindows(draftWindows)
-  const weeklyPreview=editingDay===null||!weeklyValidation.ok ? null :
-    assessAvailabilityOverride(data,workerId,selectedDayDate,weeklyValidation.intervals,
-      {unavailable:false})
-  const exceptionValid=exceptionKind==='unavailable'||(
-    Number.isInteger(toMin(exceptionStart))&&Number.isInteger(toMin(exceptionEnd))
-    &&toMin(exceptionStart)>=0&&toMin(exceptionEnd)<=1440&&toMin(exceptionEnd)>toMin(exceptionStart)
-  )
-  const exceptionPreview=assessAvailabilityOverride(data,workerId,exceptionDate,
-    exceptionKind==='unavailable'?[]:[{start:toMin(exceptionStart),end:toMin(exceptionEnd)}],
-    {unavailable:exceptionKind==='unavailable'})
+  const exceptionValidation=exceptionKind==='unavailable'
+    ? {ok:true,intervals:[],minutes:0}
+    : validateDailyWindows(exceptionWindows)
+  const selectedWeekDate=editingDay===null?'':firstMatchingWeekday(effective,editingDay)
+  const weekPreview=editingDay===null||!weeklyValidation.ok?null:
+    assessAvailabilityOverride(calendarData,workerId,selectedWeekDate,weeklyValidation.intervals)
+  const exceptionPreview=!selectedDate||!exceptionValidation.ok?null:
+    assessAvailabilityOverride(calendarData,workerId,selectedDate,exceptionValidation.intervals,
+      {unavailable:exceptionKind==='unavailable'})
 
-  const openDay=id=>{
+  useEffect(()=>{
+    setEditingDay(null);setDraftWindows([]);setSelectedDate('')
+    setError('');setNotice('');setSaveState('')
+  },[workerId])
+  useEffect(()=>{
+    setEditingDay(null);setDraftWindows([]);setSaveState('')
+  },[effective])
+
+  const openWeekday=id=>{
     if(busy)return
     if(editingDay===id){setEditingDay(null);return}
-    const target=firstMatchingWeekday(effective,id)
-    setDraftWindows(selectedWeeklyWindows(data?.weekly_slots||[],workerId,id,target))
-    setSaveDayState('')
-    setError('')
-    setNotice('')
+    const date=firstMatchingWeekday(effective,id)
     setEditingDay(id)
+    setDraftWindows(selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,id,date))
+    setError('');setNotice('');setSaveState('')
   }
-  const save=async (fn,onSuccess)=>{
-    setBusy(true);setError('');setNotice('')
+  const chooseMonthDay=date=>{
+    if(busy)return
+    if(selectedDate===date){setSelectedDate('');return}
+    const exception=(calendarData.exceptions||[]).find(ex=>ex.worker_id===workerId&&ex.local_date===date)
+    const kind=exception?.kind==='unavailable'?'unavailable':'replacement_intervals'
+    let windows=(exception?.kind==='replacement_intervals'&&Array.isArray(exception.intervals))
+      ? exception.intervals.map(x=>({
+          start:minutesToClock(Number(x.start??x.start_minute)),
+          end:minutesToClock(Number(x.end??x.end_minute)),
+        }))
+      : selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,isoWeekday(date),date)
+    setSelectedDate(date)
+    setExceptionKind(kind)
+    setExceptionWindows(windows.length?windows:[suggestNextWindow([])])
+    setNote(exception?.note||'')
+    setError('');setNotice('');setSaveState('')
+  }
+  const save=async(command,kind)=>{
+    if(busy)return
+    setBusy(true);setError('');setNotice('');setSaveState('')
     try{
-      await fn()
+      await command()
       await onSaved?.()
-      onSuccess?.()
-      setNotice('ذخیره این بخش با موفقیت انجام شد.')
-    } catch(e){setError(readableError(e));if(onSuccess)setSaveDayState('ذخیره نشد؛ دوباره تلاش کنید.')}
-    finally{setBusy(false)}
+      setSaveState(kind==='weekly'?'برنامه همین روز ذخیره شد.':'استثنای این تاریخ ذخیره شد.')
+      if(kind==='weekly')setEditingDay(null)
+      else setSelectedDate('')
+    }catch(e){
+      setError(readableError(e))
+      setSaveState('ذخیره انجام نشد؛ اطلاعات واردشده حفظ شده‌اند.')
+    }finally{setBusy(false)}
   }
-  const submitDay=event=>{
+  const submitWeek=event=>{
     event.preventDefault()
-    if(busy||editingDay===null||!weeklyValidation.ok)return
-    if(draftWindows.length===0&&!window.confirm('برنامه ثابت این روز حذف می‌شود و ظرفیت آن نامشخص خواهد بود. ادامه می‌دهید؟'))return
-    const weekday=editingDay
-    setSaveDayState('در حال ذخیره همین روز…')
-    void save(()=>setWeeklyDay(workerId,weekday,weeklyValidation.intervals,effective),()=>{
-      setSaveDayState('ذخیره شد')
-      setEditingDay(null)
-    })
+    if(!workerId||editingDay===null||!weeklyValidation.ok||busy)return
+    if(!draftWindows.length&&!window.confirm(
+      'برنامه ثابت این روز حذف می‌شود. نبود برنامه به معنی عدم حضور قطعی نیست. ادامه می‌دهید؟'))return
+    void save(()=>setWeeklyDay(workerId,editingDay,weeklyValidation.intervals,effective),'weekly')
   }
-
-  if(!workerId)return <p className="ow-muted">یک دانشجوکار انتخاب کنید.</p>
-  return <div className="ow-schedule-editor">
-    <section className="ow-week-editor" aria-label="برنامه ثابت هفتگی">
-      <div className="ow-week-heading">
-        <h3>برنامه ثابت هفتگی</h3>
-        <label className="report-field">
-          <span>اعمال تغییرات از تاریخ (شمسی)</span>
-          <JalaliDatePicker min={today()} value={effective} onChange={setEffective} ariaLabel="تاریخ شروع برنامه هفتگی"/>
-        </label>
+  const submitDate=event=>{
+    event.preventDefault()
+    if(!workerId||!selectedDate||selectedDate<today()||!exceptionValidation.ok||busy)return
+    if(exceptionKind==='replacement_intervals'&&!exceptionWindows.length)return
+    void save(()=>setDateException(workerId,selectedDate,exceptionKind,
+      exceptionValidation.intervals,note),'exception')
+  }
+  const setMonth=direction=>{
+    setMonthAnchor(previous=>direction==='previous'
+      ?previousPersianMonth(previous):nextPersianMonth(previous))
+    setSelectedDate('');setError('');setSaveState('')
+  }
+  const editWindow=(setter,index,field,value)=>
+    setter(current=>current.map((w,i)=>i===index?{...w,[field]:value}:w))
+  const renderWindows=(windows,setter,prefix)=>(
+    <div className="ow-inline-windows">
+      {windows.map((slot,i)=><div className="ow-inline-window" key={i}>
+        <span className="ow-inline-window-label">نوبت {n(i+1)}</span>
+        <label className="report-field"><span>از</span><input type="text" inputMode="numeric"
+          dir="ltr" required maxLength={5} placeholder="08:00"
+          value={slot.start} onChange={e=>editWindow(setter,i,'start',e.target.value)}/></label>
+        <label className="report-field"><span>تا</span><input type="text" inputMode="numeric"
+          dir="ltr" required maxLength={5} placeholder="09:00"
+          value={slot.end} onChange={e=>editWindow(setter,i,'end',e.target.value)}/></label>
+        <button type="button" className="ow-mini-btn" disabled={busy}
+          aria-label={`حذف نوبت ${i+1} ${prefix}`}
+          onClick={()=>setter(current=>current.filter((_,j)=>j!==i))}>حذف</button>
+      </div>)}
+      <div className="ow-inline-tools">
+        <button type="button" className="ow-mini-btn" disabled={busy||windows.length>=MAX_DAILY_WINDOWS}
+          onClick={()=>setter(current=>[...current,suggestNextWindow(current)])}>
+          + نوبت ({n(windows.length)} از {n(MAX_DAILY_WINDOWS)})
+        </button>
       </div>
-      <p className="ow-muted">برای ویرایش، یک روز را انتخاب کنید. هر روز تا چهار بازه مستقل دارد؛ ذخیره هر روز جداگانه انجام می‌شود.</p>
+    </div>
+  )
+  if(!workerId)return <p className="ow-muted">یک دانشجوکار انتخاب کنید.</p>
+  return <div className="ow-presence-hub">
+    <section className="ow-presence-week" aria-label="برنامه ثابت هفتگی">
+      <div className="ow-presence-section-title">
+        <h3>برنامه ثابت هفتگی</h3>
+        <details className="ow-quiet-details"><summary>تاریخ اعمال</summary>
+          <div className="report-field">
+            <span>از تاریخ (شمسی)</span>
+            <JalaliDatePicker min={today()} value={effective} onChange={setEffective}
+              ariaLabel="تاریخ شروع اعمال برنامه ثابت"/>
+          </div>
+        </details>
+      </div>
       <div className="ow-week-grid-header" aria-hidden="true">
         <span>روز</span>{[1,2,3,4].map(i=><span key={i}>نوبت {n(i)}</span>)}
       </div>
       <div className="ow-week-grid">
         {dayLabels.map(([id,name])=>{
           const date=firstMatchingWeekday(effective,id)
-          const slots=selectedWeeklyWindows(data?.weekly_slots||[],workerId,id,date)
-          return <button type="button" key={id}
-            className={editingDay===id?'ow-week-row is-editing':'ow-week-row'}
-            aria-expanded={editingDay===id}
-            onClick={()=>openDay(id)} disabled={busy}
-            aria-label={`ویرایش برنامه ${name}؛ ${slots.length ? n(slots.length)+' بازه' : 'برنامه نامشخص'}`}>
-            <span className="ow-week-day"><strong>{name}</strong><small>{pretty(date)}</small></span>
-            {[0,1,2,3].map(i=><span key={i} className={slots[i]?'ow-week-slot':'ow-week-slot is-empty'}>
-              {slots[i] ? <span dir="ltr">{slots[i].start}–{slots[i].end}</span> : <span aria-hidden="true">＋</span>}
-            </span>)}
+          const slots=selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,id,date)
+          return <div className="ow-week-row-shell" key={id}>
+            <button type="button" className={editingDay===id?'ow-week-row is-editing':'ow-week-row'}
+              onClick={()=>openWeekday(id)} aria-expanded={editingDay===id} disabled={busy}
+              aria-label={`ویرایش برنامه ${name}؛ ${slots.length?n(slots.length)+' بازه':'برنامه نامشخص'}`}>
+              <span className="ow-week-day"><strong>{name}</strong></span>
+              {[0,1,2,3].map(i=><span key={i}
+                className={slots[i]?'ow-week-slot':'ow-week-slot is-empty'}>
+                {slots[i]?<span dir="ltr">{slots[i].start}–{slots[i].end}</span>:<span aria-hidden="true">＋</span>}
+              </span>)}
+            </button>
+            {editingDay===id&&<form className="ow-week-day-form" onSubmit={submitWeek}>
+              {renderWindows(draftWindows,setDraftWindows,'ثابت')}
+              {!weeklyValidation.ok&&<p role="alert" className="ow-warning">{weeklyValidation.error}</p>}
+              {weeklyValidation.ok&&<small className="ow-muted">
+                مجموع: {exactDuration(weeklyValidation.minutes)} · ذخیره فقط برای {name}
+              </small>}
+              {weekPreview?.code==='conflict'&&<p role="status" className="ow-warning">
+                برای این روز {minutes(weekPreview.allocatedMinutes)} کار ثبت شده؛ ظرفیت پیشنهادی
+                {' '}{minutes(weekPreview.proposedCapacity)} است. کارهای قبلی حذف نمی‌شوند.
+              </p>}
+              <div className="ow-inline-save"><button className="report-btn report-btn--primary"
+                type="submit" disabled={busy||!weeklyValidation.ok}>
+                {draftWindows.length?'ذخیره همین روز':'حذف برنامه این روز'}
+              </button></div>
+            </form>}
+          </div>
+        })}
+      </div>
+      <small className="ow-muted">هر روز مستقل ذخیره می‌شود. خانه خالی یعنی برنامه نامشخص، نه غیبت قطعی.</small>
+    </section>
+    <section className="ow-presence-month" aria-label="تقویم حضور و استثناهای روزانه">
+      <div className="ow-presence-section-title ow-month-heading">
+        <h3>تقویم ماهانه · {month.title}</h3>
+        <div className="ow-month-navigation">
+          <button className="ow-mini-btn" type="button" onClick={()=>setMonth('previous')}
+            aria-label="ماه پیشین">ماه قبل</button>
+          <button className="ow-mini-btn" type="button" onClick={()=>setMonthAnchor(today())}
+            aria-label="بازگشت به ماه جاری">امروز</button>
+          <button className="ow-mini-btn" type="button" onClick={()=>setMonth('next')}
+            aria-label="ماه بعد">ماه بعد</button>
+        </div>
+      </div>
+      <div className="ow-month-weekdays" aria-hidden="true">
+        {['ش','ی','د','س','چ','پ','ج'].map((name,i)=><span key={i}>{name}</span>)}
+      </div>
+      <div className="ow-month-grid" role="group" aria-label={month.title}>
+        {month.days.map((day,index)=>{
+          if(!day)return <span className="ow-month-blank" key={'blank-'+index}/>
+          const exceptions=(calendarData.exceptions||[]).filter(x=>
+            x.worker_id===workerId&&x.local_date===day.date)
+          const hasException=exceptions.length>0
+          const forecast=assessAssignmentCapacity(calendarData,
+            {workerId,date:day.date,estimateMinutes:0})
+          const tasks=(calendarData.tasks||[]).filter(t=>t.worker_id===workerId
+            &&t.planned_date===day.date&&t.state!=='cancelled')
+          const slotCount=selectedWeeklyWindows(calendarData.weekly_slots||[],
+            workerId,isoWeekday(day.date),day.date).length
+          return <button type="button" key={day.date}
+            className={'ow-month-day'+(selectedDate===day.date?' is-selected':'')
+              +(day.date===today()?' is-today':'')
+              +(hasException?' has-exception':'')}
+            onClick={()=>chooseMonthDay(day.date)} disabled={busy}
+            aria-pressed={selectedDate===day.date}
+            aria-label={`${pretty(day.date)}؛ ${hasException?'استثنای ثبت‌شده':slotCount+' نوبت ثابت'}؛ ${n(tasks.length)} کار`}>
+            <b>{n(day.day)}</b>
+            {hasException?<small>{exceptions[0]?.kind==='unavailable'?'عدم حضور':'تغییر ساعت'}</small>
+              :tasks.length>0?<small>{n(tasks.length)} کار</small>
+              :forecast.availableMinutes!==null&&forecast.availableMinutes>0
+                ?<small>{exactDuration(forecast.availableMinutes)}</small>:null}
           </button>
         })}
       </div>
-      {editingDay!==null&&<form className="ow-week-day-form" onSubmit={submitDay}>
-        <h4>{dayLabels.find(([id])=>id===editingDay)?.[1]} · {pretty(selectedDayDate)}</h4>
-        <div className="ow-day-windows">
-          {draftWindows.map((slot,index)=><div className="ow-day-window" key={index}>
-            <strong>نوبت {n(index+1)}</strong>
-            <label className="report-field"><span>از (HH:MM)</span>
-              <input type="text" inputMode="numeric" dir="ltr" placeholder="08:00" required
-                value={slot.start} maxLength={5}
-                onChange={e=>setDraftWindows(old=>old.map((x,i)=>i===index?{...x,start:e.target.value}:x))}/>
-            </label>
-            <label className="report-field"><span>تا (HH:MM)</span>
-              <input type="text" inputMode="numeric" dir="ltr" placeholder="09:00" required
-                value={slot.end} maxLength={5}
-                onChange={e=>setDraftWindows(old=>old.map((x,i)=>i===index?{...x,end:e.target.value}:x))}/>
-            </label>
-            <button type="button" className="report-btn report-btn--light" disabled={busy}
-              onClick={()=>setDraftWindows(old=>old.filter((_,i)=>i!==index))}
-              aria-label={`حذف نوبت ${index+1}`}>حذف</button>
-          </div>)}
+      {selectedDate&&<form className="ow-exception-inline" onSubmit={submitDate}>
+        <div className="ow-presence-section-title">
+          <h4>تغییر موقت · {pretty(selectedDate)}</h4>
+          <button type="button" className="ow-mini-btn" onClick={()=>setSelectedDate('')}>بستن</button>
         </div>
-        <div className="ow-actions">
-          <button type="button" className="report-btn report-btn--light"
-            disabled={busy||draftWindows.length>=MAX_DAILY_WINDOWS}
-            onClick={()=>setDraftWindows(old=>[...old,suggestNextWindow(old)])}>
-            + افزودن نوبت ({n(draftWindows.length)} از {n(MAX_DAILY_WINDOWS)})
-          </button>
-          <button type="submit" className="report-btn report-btn--primary"
-            disabled={busy||!weeklyValidation.ok}>
-            {busy?'در حال ثبت…':draftWindows.length?'ذخیره همین روز':'حذف برنامه ثابت این روز'}
-          </button>
+        <div className="ow-exception-kind" role="group" aria-label="نوع تغییر این تاریخ">
+          <label><input type="radio" name="exception-kind" checked={exceptionKind==='replacement_intervals'}
+            onChange={()=>setExceptionKind('replacement_intervals')}/> ساعات جایگزین</label>
+          <label><input type="radio" name="exception-kind" checked={exceptionKind==='unavailable'}
+            onChange={()=>setExceptionKind('unavailable')}/> عدم حضور</label>
         </div>
-        {!weeklyValidation.ok&&<p role="alert" className="ow-warning">{weeklyValidation.error}</p>}
-        {weeklyValidation.ok&&<p className="ow-muted">مجموع حضور این روز: {exactDuration(weeklyValidation.minutes)}.
-          {draftWindows.length===0?' حذف برنامه به معنی عدم حضور قطعی نیست؛ ظرفیت نامشخص می‌شود.':''}
+        {exceptionKind==='replacement_intervals'&&
+          renderWindows(exceptionWindows,setExceptionWindows,'استثنا')}
+        <label className="report-field"><span>توضیح (اختیاری)</span>
+          <input maxLength={300} value={note} onChange={e=>setNote(e.target.value)}/>
+        </label>
+        {selectedDate<today()&&<p role="status" className="ow-muted">تاریخ گذشته فقط برای مشاهده است.</p>}
+        {!exceptionValidation.ok&&<p role="alert" className="ow-warning">{exceptionValidation.error}</p>}
+        {exceptionPreview?.code==='conflict'&&<p role="status" className="ow-warning">
+          ظرفیت این روز با {minutes(exceptionPreview.allocatedMinutes)} کار موجود تداخل دارد.
+          تغییر زمان کارها را خودکار لغو نمی‌کند.
         </p>}
-        {weeklyPreview?.code==='conflict'&&<div role="status" className="ow-capacity-warning">
-          <strong>هشدار تداخل با کارهای موجود: </strong>
-          {minutes(weeklyPreview.allocatedMinutes)} کار برای این روز ثبت شده و ظرفیت پیشنهادی
-          {' '}{minutes(weeklyPreview.proposedCapacity)} است. تغییر برنامه کارهای قبلی را لغو نمی‌کند.
-        </div>}
-        {saveDayState&&<p role="status" className="ow-muted">{saveDayState}</p>}
+        <button className="report-btn report-btn--primary" type="submit"
+          disabled={busy||selectedDate<today()||!exceptionValidation.ok
+            ||(exceptionKind==='replacement_intervals'&&!exceptionWindows.length)}>
+          ذخیره استثنای این تاریخ
+        </button>
       </form>}
+      <small className="ow-muted">هر تاریخ قابل انتخاب است؛ تغییر موقت تنها روی همان روز اثر دارد.</small>
     </section>
-    <form onSubmit={event=>{event.preventDefault();if(!exceptionValid||busy)return;void save(()=>setDateException(
-      workerId,exceptionDate,exceptionKind,
-      exceptionKind==='unavailable'?[]:[{start:toMin(exceptionStart),end:toMin(exceptionEnd)}],
-      note
-    ))}}>
-      <h3>تغییر موقت یک روز</h3>
-      <div className="ow-fields ow-fields--four">
-        <label className="report-field"><span>تاریخ (شمسی)</span>
-          <JalaliDatePicker min={today()} value={exceptionDate} onChange={setExceptionDate} ariaLabel="تاریخ تغییر موقت حضور"/>
-        </label>
-        <label className="report-field"><span>نوع تغییر</span>
-          <select value={exceptionKind} onChange={e=>setExceptionKind(e.target.value)}>
-            <option value="unavailable">عدم حضور</option>
-            <option value="replacement_intervals">ساعات جایگزین</option>
-          </select>
-        </label>
-        {exceptionKind==='replacement_intervals'&&<>
-          <label className="report-field"><span>از</span><input type="time" value={exceptionStart} onChange={e=>setExceptionStart(e.target.value)}/></label>
-          <label className="report-field"><span>تا</span><input type="time" value={exceptionEnd} onChange={e=>setExceptionEnd(e.target.value)}/></label>
-        </>}
-      </div>
-      <label className="report-field"><span>توضیح کوتاه (اختیاری)</span>
-        <input maxLength={300} value={note} onChange={e=>setNote(e.target.value)}/>
-      </label>
-      {!exceptionValid&&<p className="ow-warning" role="alert">ساعت پایان باید بعد از شروع و در همان روز باشد.</p>}
-      {exceptionPreview.code==='conflict'&&<div className="ow-capacity-warning" role="status">
-        <strong>هشدار: برای این روز قبلاً کار ثبت شده است.</strong>
-        {' '}{minutes(exceptionPreview.allocatedMinutes)} کار واگذار شده در برابر
-        {' '}{minutes(exceptionPreview.proposedCapacity)} ظرفیت پیشنهادی.
-        تغییر برنامه، کارهای قبلی را لغو نمی‌کند.
-      </div>}
-      <button className="report-btn report-btn--primary" disabled={busy||!exceptionValid} type="submit">ثبت تغییر این روز</button>
-    </form>
-    <Message error={error} notice={notice}/>
-    <details className="ow-context-help"><summary>راهنمای برنامه</summary>
-      <p className="ow-muted">تغییرات گذشته بازنویسی نمی‌شوند. بازه‌های هر روز بدون هم‌پوشانی و به‌ترتیب زمانی ذخیره می‌شوند؛ نبود برنامه به معنی عدم حضور قطعی نیست.</p>
-    </details>
+    <div className="ow-presence-feedback">
+      <Message error={error} notice={notice}/>
+      {saveState&&<p role="status" className="ow-muted">{saveState}</p>}
+    </div>
   </div>
 }
 function ApprovalCard({entry,task,worker,onDone}) {
