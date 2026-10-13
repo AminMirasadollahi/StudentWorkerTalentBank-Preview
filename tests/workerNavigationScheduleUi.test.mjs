@@ -109,11 +109,12 @@ test('seven weekday rows render four independent slots and safe per-day single R
   await ui.clickText('زمان حضور')
   assert.equal(ui.host.querySelectorAll('.ow-week-row').length,7)
   assert.equal(ui.host.querySelectorAll('.ow-week-slot').length,28)
-  assert.equal(ui.host.querySelectorAll('.ow-day-windows input').length,0)
+  assert.equal(ui.host.querySelectorAll('.ow-inline-window input').length,0)
+  assert.ok(ui.host.querySelector('.ow-month-grid'),'real monthly view is integrated into presence hub')
   await ui.click('button[aria-label^="ویرایش برنامه شنبه"]')
-  assert.equal(ui.host.querySelectorAll('.ow-day-window').length,0)
-  await ui.clickText('+ افزودن نوبت (۰ از ۴)')
-  assert.equal(ui.host.querySelectorAll('.ow-day-window').length,1)
+  assert.equal(ui.host.querySelectorAll('.ow-inline-window').length,0)
+  await ui.clickText('+ نوبت (۰ از ۴)')
+  assert.equal(ui.host.querySelectorAll('.ow-inline-window').length,1)
   await ui.clickText('ذخیره همین روز')
   assert.equal(globalThis.__workerFocusCalls.length,1)
   const [who,weekday,slots,effective]=globalThis.__workerFocusCalls[0]
@@ -123,6 +124,19 @@ test('seven weekday rows render four independent slots and safe per-day single R
   assert.match(effective,/^\d{4}-\d{2}-\d{2}$/)
  }finally{await ui.dispose()}
 })
+test('worker exposes This Month and personal profile without permanent password controls',async()=>{
+ const ui=await setup()
+ try{
+  await ui.clickText('این هفته')
+  assert.ok(ui.host.querySelector('.ow-range-switch'))
+  await ui.clickText('این ماه')
+  assert.equal(ui.host.querySelector('[aria-pressed="true"]').textContent,'این ماه')
+  await ui.clickText('پروفایل من')
+  assert.ok(ui.host.querySelector('.ow-self-profile'))
+  assert.ok(ui.host.textContent.includes('سابقه گزارش‌ها و ساعات'))
+  assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,3)
+ }finally{await ui.dispose()}
+})
 test('sources preserve fail-closed auth and critical applicant/protected operational wiring',()=>{
  const app=readFileSync('src/OpsApp.jsx','utf8')
  const ops=readFileSync('src/OperationsWorkspace.jsx','utf8')
@@ -130,7 +144,8 @@ test('sources preserve fail-closed auth and critical applicant/protected operati
  assert.match(app,/watchOperationsResume/)
  assert.match(app,/if \(recheckingAccess && identity && !recoveryMode\)/)
  assert.match(app,/navigation=\{workerNavigation\}/)
- assert.match(app,/PasswordContainer = passwordEstablished \? 'details' : 'section'/)
+ assert.match(app,/setSettingsOpen/)
+ assert.match(app,/ops-account-settings-panel/)
  assert.doesNotMatch(ops,/WorkerLifecycleControls|VITE_WORKER_LIFECYCLE_ADMIN_ENABLED|ops_set_worker_state/)
  const css=readFileSync('src/operations-workspace.css','utf8')
  assert.match(css,/\.ow-worker-tasks,.ow-worker-history/)
