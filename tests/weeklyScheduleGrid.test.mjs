@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
  MAX_DAILY_WINDOWS,clockToMinutes,minutesToClock,
- selectedWeeklyWindows,validateDailyWindows,persianWeekBounds
+ selectedWeeklyWindows,validateDailyWindows,persianWeekBounds,suggestNextWindow
 } from '../src/lib/weeklyScheduleGrid.mjs'
 
 const entries=[
@@ -67,4 +67,20 @@ test('Iranian week runs Saturday-Friday, including cross-month boundaries',()=>{
  assert.deepEqual(persianWeekBounds('2026-10-23'),{start:'2026-10-17',end:'2026-10-23'})
  assert.deepEqual(persianWeekBounds('2026-10-24'),{start:'2026-10-24',end:'2026-10-30'})
  assert.throws(()=>persianWeekBounds('2026-02-31'))
+})
+
+test('adding up to four intervals proposes editable conflict-free hours',()=>{
+ let slots=[]
+ for(let i=0;i<4;i++){
+   // Suggestions remain editable; they are not imposed by the backend.
+   slots.push(suggestNextWindow(slots))
+ }
+ assert.deepEqual(slots,[
+  {start:'08:00',end:'09:00'},
+  {start:'10:00',end:'11:00'},
+  {start:'12:00',end:'13:00'},
+  {start:'14:00',end:'15:00'},
+ ])
+ assert.equal(validateDailyWindows(slots).ok,true)
+ assert.deepEqual(suggestNextWindow([{start:'23:00',end:'24:00'}]),{start:'',end:''})
 })
