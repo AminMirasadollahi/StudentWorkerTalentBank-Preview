@@ -74,3 +74,21 @@ Passed:
 This is **CI-validated REVIEW BRANCH, NOT CREATED PR, NOT DEPLOYED**. The original `main` was checked unchanged at `3ac65b54...` after the non-deploy CI.
 
 **Remaining gate:** A Draft PR would still need to be created *only when the connector's safety restriction is legitimately cleared*. Do not change PR routes, API transport or use other means to work around the block. On resumption, verify this manifest and CI again after any new changes. A subsequent main/Pages release requires fresh, separate user approval and rollback readiness.
+
+
+## CURRENT STATUS — owner-created Draft PR #1 (supersedes historical "not created" note)
+
+The previous section's statement that no PR existed was accurate at that earlier checkpoint only. On **2026-10-13** the repository owner independently used the official GitHub UI to create [**Draft PR #1 — Management UI — Safe Release Candidate**](https://github.com/AminMirasadollahi/StudentWorkerTalentBank-Preview/pull/1) from `review/operations-ui-readonly-lifecycle-2026-10-13` into `main`. The prior connector create-PR block was **not bypassed by the assistant**.
+
+**Independently confirmed via GitHub after owner submission:**
+- PR **OPEN / DRAFT / NOT MERGED**, `mergeable=true`, clean merge state;
+- PR HEAD `adc956554559fc41b21ddd15f68bd92a3fa1ddf9`;
+- public `main` still `3ac65b54b6130ad1a98a0be341441d5c8678692c`;
+- [PR-triggered non-deploy safety CI run **38405426615**](https://github.com/AminMirasadollahi/StudentWorkerTalentBank-Preview/actions/runs/38405426615) **completed SUCCESS** on the exact PR HEAD, in addition to the earlier branch push CI success;
+- **15 changed files**: precisely four existing source/CSS files modified and eleven files added (review CI, docs, pure helpers and regression tests). No files deleted and no protected applicant/Auth/deployment assets changed;
+- public worker lifecycle remains **read-only**. This PR must **not** enable actual account pause/disable/reactivate, copy `WorkerLifecycleControls`, or change backend permissions;
+- no public Pages deployment; the published signup route is still based on `main`.
+
+**Next release gate, NOT AUTHORIZED YET:** obtain separate, explicit owner consent for turning the draft into a mergeable review/release and publishing it. Before touching `main`, recheck current CI HEAD, protected file hashes, the live site/backup and restoration plan. Then, *only if consent is given*, handle the GitHub review state and merge, verify Pages deployment, and run one grouped signed-in QA of manager/worker roles, font rendering, main intake flow and mobile. Fail closed/rollback on any serious defect; real account status transitions stay out of scope. The existing green mocked React tests do not by themselves prove live signed-in role UX.
+
+**Authoritative status:** DRAFT PR CREATED / PR CI PASS / NO MERGE / NO PUBLIC RELEASE.
