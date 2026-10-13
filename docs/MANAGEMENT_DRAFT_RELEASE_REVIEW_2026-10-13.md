@@ -45,3 +45,32 @@ After CI, manually review PR diff and list for accidental changes. Before any pu
 - **GO to draft review:** Only after verifying safe changed files, protected baseline and PR status `draft=true`, `merged=false`.
 - **GO to approval request:** Only after public PR CI passes and a fresh review finds no protected asset changes.
 - **NO-GO to merge now:** user has not authorized release to public `main`. Draft PR is not permission to go live.
+
+
+## Verified public-branch release gate — 2026-10-13
+
+The connector's `create_pull_request` operation was **blocked by its safety review**. This was not bypassed, and there is **no Draft PR at this point**. The GitHub API pull-request list returned no matching PR. The owner authorization remains limited to a Draft PR; there is still **NO permission to merge, deploy or make real account state changes**.
+
+To test the exact branch without requiring PR creation, the dedicated non-deploy `.github/workflows/operations-release-review.yml` was narrowly configured for `push` on **only** `review/operations-ui-readonly-lifecycle-2026-10-13`. It retains `permissions: contents: read` and contains no deploy or write job. The real public workflow `pages.yml` remains unchanged and main-only.
+
+**SUCCESS**: [public branch CI 38402628855](https://github.com/AminMirasadollahi/StudentWorkerTalentBank-Preview/actions/runs/38402628855), source commit `96f7c121ef54f1fcb24fb74d43d654366d401ccd`.
+Passed:
+- `node --test tests/*.test.mjs` including protected original Git-blob SHA locks, pure task/schedule/history semantics and synthetic mounted real React operations UI;
+- `npm run build` with original public Vite base path;
+- original normal HTML entry excludes standalone QA fixtures;
+- job finished `success`, without public Pages deployment.
+
+**Independent full Git tree comparison** (non-truncated, main `3ac65b54b6130ad1a98a0be341441d5c8678692c` vs review `96f7c121ef54f1fcb24fb74d43d654366d401ccd`):
+- Modified existing files **exactly 4**:
+  `src/OperationsWorkspace.jsx`, `src/OpsApp.jsx`, `src/lib/workerHistory.js`, `src/operations-workspace.css`.
+- Added files **exactly 11**: non-deploy review workflow, this manifest, two pure helpers, seven `tests/*.test.mjs` regressions.
+- Deleted files **zero**.
+- **Zero differences** among additionally independently checked sensitive paths:
+  `src/App.jsx`, `src/report.css`, `src/lib/operations.js`,
+  `src/components/WorkerLifecycleReadOnlyPreview.jsx`, `vite.config.js`,
+  `.github/workflows/pages.yml`, `src/main.jsx`, `index.html`.
+- In the transferred operations component, there is one public read-only lifecycle import/mount and **no** `WorkerLifecycleControls`, `setWorkerState`, `ops_set_worker_state` or lifecycle enablement flag.
+
+This is **CI-validated REVIEW BRANCH, NOT CREATED PR, NOT DEPLOYED**. The original `main` was checked unchanged at `3ac65b54...` after the non-deploy CI.
+
+**Remaining gate:** A Draft PR would still need to be created *only when the connector's safety restriction is legitimately cleared*. Do not change PR routes, API transport or use other means to work around the block. On resumption, verify this manifest and CI again after any new changes. A subsequent main/Pages release requires fresh, separate user approval and rollback readiness.
