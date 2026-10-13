@@ -591,9 +591,7 @@ export function AdminOperations({ navigation, setNavigation }) {
   const workers=data.workers||[]
   const active=workers.filter(w=>w.state==='active')
   const chosen=workers.find(w=>w.id===workerId)
-  const selectedHistoryWorker=workers.find(w=>w.id===historyWorkerId)
   const allWorkerHistory=scopeWorkerHistory(data,historyWorkerId)
-  const overallWorkerSummary=summarizeWorkerHistory(allWorkerHistory)
   const historyData=filterWorkerHistory(allWorkerHistory,{
     unit:historyUnit,from:historyFrom,to:historyTo,review:historyReview,
   })
@@ -895,42 +893,24 @@ export function AdminOperations({ navigation, setNavigation }) {
       {invalidHistoryRange&&<div className="report-alert report-alert--error" role="alert">
         تاریخ شروع نباید بعد از تاریخ پایان باشد؛ بازه را اصلاح کنید.
       </div>}
-      {selectedHistoryWorker&&<section className="ow-worker-profile" aria-label="پروفایل عملکرد دانشجوکار">
-        <div className="ow-profile-heading">
-          <div>
-            <h3>پرونده عملکرد: {selectedHistoryWorker.name}</h3>
-            <p className="ow-muted">
-              {unitLabels[selectedHistoryWorker.unit]||selectedHistoryWorker.unit||'واحد نامشخص'}
-              {selectedHistoryWorker.major&&<> · {selectedHistoryWorker.major}</>}
-              {selectedHistoryWorker.entry_year&&<> · ورودی {n(selectedHistoryWorker.entry_year)}</>}
-            </p>
-          </div>
-          <span className="ow-status">{workerStateLabels[selectedHistoryWorker.state]||selectedHistoryWorker.state}</span>
-        </div>
-        <div className="ow-profile-metrics">
-          <div><span>کل کارهای واگذارشده</span><b>{n(overallWorkerSummary.taskCount)}</b></div>
-          <div><span>کارهای باز</span><b>{n(overallWorkerSummary.openCount)}</b></div>
-          <div><span>گزارش منتظر تأیید</span><b>{n(overallWorkerSummary.pendingCount)}</b></div>
-          <div><span>مجموع ساعات تأییدشده</span><b>{exactDuration(overallWorkerSummary.approvedMinutes)}</b></div>
-        </div>
-        <WorkerLifecycleReadOnlyPreview worker={selectedHistoryWorker}/>
-      </section>}
       <div className="report-panel-heading">
         <h3>{historyFiltersActive?'سوابق منطبق با فیلتر':'سوابق فعالیت همه دانشجوکارها'}</h3>
         <small>{n(historySummary.reportCount)} گزارش · {exactDuration(historySummary.approvedMinutes)} تأییدشده</small>
       </div>
-      <div className="ow-list">
+      <div className="ow-list ow-history-results">
         {historyData.time_entries.slice(0,historyShown).map(e=>(
           <article className="ow-item" key={e.id}>
             <strong>{label(e.worker_id,workers)} · {data.tasks?.find(t=>t.id===e.task_id)?.title||'کار'}</strong>
             <small>{pretty(e.work_date)} · {reviewLabels[e.review_state]||e.review_state}</small>
-            <p>درخواست: {minutes(e.reported_minutes)} · تأیید:
-              {e.review_state==='approved'?minutes(e.approved_minutes):'تأیید نشده'}
-            </p>
-            {e.extra_time_reason_code&&<small>دلیل درخواست اضافه: {extraTimeReasons[e.extra_time_reason_code]||e.extra_time_reason_code}
-              {e.extra_time_reason_text&&<> · {e.extra_time_reason_text}</>}
-            </small>}
-            {e.review_note&&<small>توضیح مدیر: {e.review_note}</small>}
+            <small>درخواست: {minutes(e.reported_minutes)} · تأیید:
+              {e.review_state==='approved'?minutes(e.approved_minutes):'در انتظار بررسی'}</small>
+            {(e.extra_time_reason_code||e.review_note)&&<details className="ow-task-detail">
+              <summary>جزئیات گزارش</summary>
+              {e.extra_time_reason_code&&<small>دلیل درخواست اضافه:
+                {' '}{extraTimeReasons[e.extra_time_reason_code]||e.extra_time_reason_code}
+                {e.extra_time_reason_text&&<> · {e.extra_time_reason_text}</>}</small>}
+              {e.review_note&&<small>توضیح مدیر: {e.review_note}</small>}
+            </details>}
           </article>
         ))}
         {historyData.time_entries.length>historyShown&&<div className="ow-history-load-more">
