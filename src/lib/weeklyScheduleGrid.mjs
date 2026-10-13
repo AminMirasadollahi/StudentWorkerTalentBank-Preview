@@ -58,3 +58,11 @@ export function persianWeekBounds(date) {
   }
   return {start:day(-offset),end:day(6-offset)}
 }
+
+export function suggestNextWindow(current) {
+  const latest=Math.max(0,...(Array.isArray(current)?current:[]).map(slot=>
+    clockToMinutes(slot.end,{end:true})).filter(Number.isFinite))
+  const start=latest?latest+60:480
+  if(start+60>1440) return {start:'',end:''}
+  return {start:minutesToClock(start),end:minutesToClock(start+60)}
+}
