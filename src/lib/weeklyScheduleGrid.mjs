@@ -41,3 +41,20 @@ export function selectedWeeklyWindows(slots,workerId,isoWeekday,onDate) {
     .slice(0,MAX_DAILY_WINDOWS)
     .map(s=>({start:minutesToClock(s.start_minute),end:minutesToClock(s.end_minute)}))
 }
+
+export function persianWeekBounds(date) {
+  if(typeof date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(date))
+    throw new Error('invalid_date')
+  const d=new Date(date+'T12:00:00Z')
+  if(!Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==date)
+    throw new Error('invalid_date')
+  // Gregorian date interpreted in the institution's Iran-local calendar day:
+  // Saturday is day 0 of the displayed week, Friday is day 6.
+  const offset=(d.getUTCDay()+1)%7
+  const day=n=>{
+    const clone=new Date(d)
+    clone.setUTCDate(clone.getUTCDate()+n)
+    return clone.toISOString().slice(0,10)
+  }
+  return {start:day(-offset),end:day(6-offset)}
+}
