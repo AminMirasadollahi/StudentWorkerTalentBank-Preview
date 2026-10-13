@@ -287,11 +287,14 @@ async function exportOpsExcel(data, filteredToOneWorker=false) {
   a.href=url;a.download=filteredToOneWorker?'student-worker-selected-history.xlsx':'student-worker-operations.xlsx';a.click()
   setTimeout(()=>URL.revokeObjectURL(url),1000)
 }
-export function AdminOperations() {
+export function AdminOperations({ navigation, setNavigation }) {
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
-  const [view,setView]=useState('tasks')
-  const [workerId,setWorkerId]=useState('')
-  const [historyWorkerId,setHistoryWorkerId]=useState('')
+  const view=navigation.workView
+  const workerId=navigation.workerId
+  const historyWorkerId=navigation.historyWorkerId
+  const setView=value=>setNavigation(previous=>({...previous,workView:value}))
+  const setWorkerId=value=>setNavigation(previous=>({...previous,workerId:value}))
+  const setHistoryWorkerId=value=>setNavigation(previous=>({...previous,historyWorkerId:value}))
   const [title,setTitle]=useState('')
   const [instructions,setInstructions]=useState('')
   const [date,setDate]=useState(today())
