@@ -5,8 +5,11 @@ import {
 } from './lib/operations'
 import './operations-workspace.css'
 import JalaliDatePicker from './components/JalaliDatePicker'
-import { scopeWorkerHistory, summarizeWorkerHistory } from './lib/workerHistory'
+import { scopeWorkerHistory, filterWorkerHistory, summarizeWorkerHistory } from './lib/workerHistory'
+import { assessAssignmentCapacity, assessAvailabilityOverride, firstMatchingWeekday, isoWeekday } from './lib/assignmentCapacity.mjs'
+import { describeTaskWorkflow,selectManagerTasks,summarizeTaskWorkflow,selectPendingApprovals } from './lib/operationsTaskOverview.mjs'
 import WorkerLifecycleReadOnlyPreview from './components/WorkerLifecycleReadOnlyPreview'
+import { workerStateLabels } from './lib/workerLifecycle.mjs'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -17,7 +20,6 @@ const dateParts = new Intl.DateTimeFormat('en-US',{
 })
 const dayLabels = [[6,'شنبه'],[7,'یکشنبه'],[1,'دوشنبه'],[2,'سه‌شنبه'],[3,'چهارشنبه'],[4,'پنجشنبه'],[5,'جمعه']]
 const unitLabels = {library:'کتابخانه',public_relations:'روابط عمومی',research:'پژوهش'}
-const workerStateLabels = {active:'فعال',paused:'متوقف موقت',inactive:'غیرفعال'}
 const stateLabels = {
   assigned:'واگذار شده',in_progress:'در حال انجام',submitted:'منتظر تأیید',
   completed:'تکمیل‌شده',needs_changes:'نیازمند اصلاح',cancelled:'لغوشده',
@@ -53,9 +55,6 @@ function shift(date,delta) {
   d.setUTCDate(d.getUTCDate()+delta)
   return d.toISOString().slice(0,10)
 }
-function isoDay(date) {
-  return new Date(date+'T00:00:00Z').getUTCDay()||7
-}
 function pretty(date) {
   if(!date) return '—'
   return dLabel.format(new Date(date+'T00:00:00Z'))
@@ -66,23 +65,6 @@ function toMin(time) {
 }
 function asTime(value) {
   return `${String(Math.floor(value/60)).padStart(2,'0')}:${String(value%60).padStart(2,'0')}`
-}
-function totalSlots(list) {
-  return list.reduce((sum,s)=>sum+Number(s.end-s.start),0)
-}
-function availableOn(data,workerId,date) {
-  const ex=(data.exceptions||[]).find(x=>x.worker_id===workerId && x.local_date===date)
-  if(ex) return ex.kind==='unavailable'?0:totalSlots(ex.intervals)
-  const slots=(data.weekly_slots||[]).filter(x=>
-    x.worker_id===workerId && Number(x.weekday_iso)===isoDay(date)
-    && x.valid_from<=date && (!x.valid_until || x.valid_until>=date)
-  )
-  return slots.reduce((sum,x)=>sum+Number(x.end_minute)-Number(x.start_minute),0)
-}
-function estimatedOn(data,workerId,date) {
-  return (data.tasks||[]).filter(x=>
-    x.worker_id===workerId && x.planned_date===date && x.state!=='cancelled'
-  ).reduce((sum,x)=>sum+Number(x.estimate_minutes),0)
 }
 function readableError(e) {
   const raw=String(e?.message||'')
@@ -119,7 +101,7 @@ function SectionTabs({value,onChange,options}) {
       onClick={()=>onChange(id)}>{title}</button>)}
   </nav>
 }
-function ScheduleEditor({workerId,onSaved}) {
+function ScheduleEditor({workerId,onSaved,data}) {
   const [weekday,setWeekday]=useState('6')
   const [start,setStart]=useState('08:00')
   const [end,setEnd]=useState('12:00')
@@ -133,6 +115,16 @@ function ScheduleEditor({workerId,onSaved}) {
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
+  const timesValid=(a,b)=>Number.isInteger(toMin(a))&&Number.isInteger(toMin(b))
+    &&toMin(a)>=0&&toMin(b)<=1440&&toMin(b)>toMin(a)
+  const weeklyValid=noHours||timesValid(start,end)
+  const exceptionValid=exceptionKind==='unavailable'||timesValid(exceptionStart,exceptionEnd)
+  const nextWeekdayDate=firstMatchingWeekday(effective,Number(weekday))
+  const weeklyPreview=assessAvailabilityOverride(data,workerId,nextWeekdayDate,
+    noHours?[]:[{start:toMin(start),end:toMin(end)}],{unavailable:noHours})
+  const exceptionPreview=assessAvailabilityOverride(data,workerId,exceptionDate,
+    exceptionKind==='unavailable'?[]:[{start:toMin(exceptionStart),end:toMin(exceptionEnd)}],
+    {unavailable:exceptionKind==='unavailable'})
   const save=async (fn)=>{
     setBusy(true);setError('');setNotice('')
     try{await fn();setNotice('برنامه حضور ذخیره شد.');await onSaved?.()}
@@ -141,7 +133,7 @@ function ScheduleEditor({workerId,onSaved}) {
   }
   if(!workerId)return <p className="ow-muted">یک دانشجوکار انتخاب کنید.</p>
   return <div className="ow-schedule-editor">
-    <form onSubmit={event=>{event.preventDefault();save(()=>setWeeklyDay(
+    <form onSubmit={event=>{event.preventDefault();if(!weeklyValid||busy)return;save(()=>setWeeklyDay(
       workerId,Number(weekday),noHours?[]:[{start:toMin(start),end:toMin(end)}],effective
     ))}}>
       <h3>برنامه ثابت هفتگی</h3>
@@ -165,9 +157,16 @@ function ScheduleEditor({workerId,onSaved}) {
         <input type="checkbox" checked={noHours} onChange={e=>setNoHours(e.target.checked)}/>
         در این روز حضور پیش‌فرض ندارم
       </label>
-      <button className="report-btn report-btn--primary" disabled={busy} type="submit">ثبت برنامه هفتگی</button>
+      {!weeklyValid&&<p className="ow-warning" role="alert">ساعت پایان باید بعد از شروع و در همان روز باشد.</p>}
+      {weeklyPreview.code==='conflict'&&<div className="ow-capacity-warning" role="status">
+        <strong>هشدار تداخل با کارهای قبلی:</strong>
+        {' '}برای {pretty(nextWeekdayDate)}، {minutes(weeklyPreview.allocatedMinutes)}
+        {' '}کار واگذار شده اما برنامه پیشنهادی فقط {minutes(weeklyPreview.proposedCapacity)} ظرفیت دارد.
+        این محاسبه صرفاً هشدار است و کارهای قبلی را تغییر نمی‌دهد.
+      </div>}
+      <button className="report-btn report-btn--primary" disabled={busy||!weeklyValid} type="submit">ثبت برنامه هفتگی</button>
     </form>
-    <form onSubmit={event=>{event.preventDefault();save(()=>setDateException(
+    <form onSubmit={event=>{event.preventDefault();if(!exceptionValid||busy)return;save(()=>setDateException(
       workerId,exceptionDate,exceptionKind,
       exceptionKind==='unavailable'?[]:[{start:toMin(exceptionStart),end:toMin(exceptionEnd)}],
       note
@@ -191,7 +190,14 @@ function ScheduleEditor({workerId,onSaved}) {
       <label className="report-field"><span>توضیح کوتاه (اختیاری)</span>
         <input maxLength={300} value={note} onChange={e=>setNote(e.target.value)}/>
       </label>
-      <button className="report-btn report-btn--primary" disabled={busy} type="submit">ثبت تغییر این روز</button>
+      {!exceptionValid&&<p className="ow-warning" role="alert">ساعت پایان باید بعد از شروع و در همان روز باشد.</p>}
+      {exceptionPreview.code==='conflict'&&<div className="ow-capacity-warning" role="status">
+        <strong>هشدار: برای این روز قبلاً کار ثبت شده است.</strong>
+        {' '}{minutes(exceptionPreview.allocatedMinutes)} کار واگذار شده در برابر
+        {' '}{minutes(exceptionPreview.proposedCapacity)} ظرفیت پیشنهادی.
+        تغییر برنامه، کارهای قبلی را لغو نمی‌کند.
+      </div>}
+      <button className="report-btn report-btn--primary" disabled={busy||!exceptionValid} type="submit">ثبت تغییر این روز</button>
     </form>
     <Message error={error} notice={notice}/>
     <p className="ow-muted">تاریخ‌ها در تقویم شمسی انتخاب می‌شوند و تغییرات گذشته قابل بازنویسی نیستند.</p>
@@ -199,6 +205,7 @@ function ScheduleEditor({workerId,onSaved}) {
 }
 function ApprovalCard({entry,task,worker,onDone}) {
   const standard=Number(task?.estimate_minutes ?? entry.reported_minutes)
+  const missingTask=!task
   const requested=Number(entry.reported_minutes)
   const asksExtra=requested>standard
   const [approved,setApproved]=useState(String(Math.min(standard,requested)))
@@ -215,11 +222,17 @@ function ApprovalCard({entry,task,worker,onDone}) {
     finally{setBusy(false)}
   }
   return <article className="ow-item">
-    <strong>{task?.title||'کار'}</strong>
-    <small>{worker?.name||'—'} · {pretty(entry.work_date)}</small>
-    <p>زمان استاندارد: <b>{minutes(standard)}</b> · زمان درخواستی: <b>{minutes(requested)}</b>
-      {asksExtra&&<> · اضافه درخواستی: <b>{minutes(requested-standard)}</b></>}
-    </p>
+    <div className="ow-item-header">
+      <strong>{task?.title||'کار مرتبط نامشخص'}</strong>
+      <span className="ow-status">{missingTask?'نیازمند بررسی پرونده':asksExtra?'درخواست زمان اضافه':'گزارش عادی'}</span>
+    </div>
+    <small>{worker?.name||'—'} · {pretty(entry.work_date)} · درخواست: {minutes(requested)}
+      {asksExtra&&<> · اضافه: {minutes(requested-standard)}</>}
+    </small>
+    {missingTask&&<p className="ow-warning" role="alert">کار مرتبط در اطلاعات فعلی موجود نیست؛ تصمیم‌گیری تا بررسی پرونده غیرفعال است.</p>}
+    <details className="ow-approval-detail">
+      <summary>بررسی جزئیات و ثبت تصمیم</summary>
+      <p>زمان استاندارد: <b>{missingTask?'نامشخص':minutes(standard)}</b> · زمان درخواستی: <b>{minutes(requested)}</b></p>
     {asksExtra&&<p className="ow-overtime-review">
       <b>علت درخواست اضافه:</b> {extraTimeReasons[entry.extra_time_reason_code]||'در گزارش قدیمی ثبت نشده'}
       {entry.extra_time_reason_text&&<> · {entry.extra_time_reason_text}</>}
@@ -235,14 +248,15 @@ function ApprovalCard({entry,task,worker,onDone}) {
     </div>
     <div className="ow-actions">
       <button className="report-btn report-btn--primary" type="button"
-        disabled={busy||approved===''||!Number.isInteger(Number(approved))||Number(approved)<0||Number(approved)>requested||(approvalNeedsReason&&!note.trim())}
+        disabled={busy||missingTask||approved===''||!Number.isInteger(Number(approved))||Number(approved)<0||Number(approved)>requested||(approvalNeedsReason&&!note.trim())}
         onClick={()=>act('approved')}>تأیید ساعت</button>
       <button className="report-btn report-btn--light" type="button"
-        disabled={busy||!note.trim()} onClick={()=>act('changes_requested')}>نیازمند اصلاح</button>
+        disabled={busy||missingTask||!note.trim()} onClick={()=>act('changes_requested')}>نیازمند اصلاح</button>
       <button className="report-btn report-btn--light" type="button"
-        disabled={busy||!note.trim()} onClick={()=>act('rejected')}>رد گزارش</button>
+        disabled={busy||missingTask||!note.trim()} onClick={()=>act('rejected')}>رد گزارش</button>
     </div>
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
+    </details>
   </article>
 }
 async function exportOpsExcel(data, filteredToOneWorker=false) {
@@ -251,7 +265,7 @@ async function exportOpsExcel(data, filteredToOneWorker=false) {
   const sh=wb.addWorksheet('کارها و ساعات',{views:[{rightToLeft:true}]})
   sh.columns=[
     {header:'دانشجوکار',key:'name',width:25},{header:'واحد',key:'unit',width:20},
-    {header:'عنوان کار',key:'task',width:34},{header:'تاریخ برنامه',key:'date',width:21},
+    {header:'عنوان کار',key:'task',width:34},{header:'تاریخ فعالیت',key:'date',width:21},
     {header:'زمان برآوردی (دقیقه)',key:'estimate',width:24},
     {header:'زمان درخواستی (دقیقه)',key:'reported',width:25},
     {header:'زمان تأییدشده (دقیقه)',key:'approved',width:25},
@@ -267,10 +281,27 @@ async function exportOpsExcel(data, filteredToOneWorker=false) {
       task:task.title,date:pretty(task.planned_date),estimate:task.estimate_minutes,review:'بدون گزارش'})
     for(const entry of entries) sh.addRow({
       name:worker?.name||'',unit:unitLabels[task.unit],task:task.title,
-      date:pretty(task.planned_date),estimate:task.estimate_minutes,
+      date:pretty(entry.work_date||task.planned_date),estimate:task.estimate_minutes,
       reported:entry.reported_minutes,
       approved:entry.review_state==='approved'?entry.approved_minutes:'',
       review:reviewLabels[entry.review_state] || entry.review_state,
+      extraReason:extraTimeReasons[entry.extra_time_reason_code]||'',
+      extraText:entry.extra_time_reason_text||'',
+      approvalNote:entry.review_note||'',
+    })
+  }
+  // Preserve already-authorized time reports even if a legacy record's
+  // linked task is missing from the authorized read projection.
+  const includedTaskIds=new Set((data.tasks||[]).map(task=>task.id))
+  for(const entry of data.time_entries||[]){
+    if(includedTaskIds.has(entry.task_id)) continue
+    const worker=data.workers?.find(w=>w.id===entry.worker_id)
+    sh.addRow({
+      name:worker?.name||'',unit:unitLabels[worker?.unit]||'',
+      task:'کار مرتبط در خروجی موجود نیست',date:pretty(entry.work_date),
+      reported:entry.reported_minutes,
+      approved:entry.review_state==='approved'?entry.approved_minutes:'',
+      review:reviewLabels[entry.review_state]||entry.review_state,
       extraReason:extraTimeReasons[entry.extra_time_reason_code]||'',
       extraText:entry.extra_time_reason_text||'',
       approvalNote:entry.review_note||'',
@@ -292,6 +323,20 @@ export function AdminOperations({ navigation, setNavigation }) {
   const view=navigation.workView
   const workerId=navigation.workerId
   const historyWorkerId=navigation.historyWorkerId
+  const historyUnit=navigation.historyUnit||''
+  const historyFrom=navigation.historyFrom||''
+  const historyTo=navigation.historyTo||''
+  const historyReview=navigation.historyReview||''
+  const taskWorkerId=navigation.taskWorkerId||''
+  const taskState=navigation.taskState||''
+  const taskSearch=navigation.taskSearch||''
+  const taskOrder=navigation.taskOrder||'latest'
+  const approvalWorkerId=navigation.approvalWorkerId||''
+  const approvalKind=navigation.approvalKind||''
+  const setListingFilter=(name,value)=>setNavigation(previous=>({...previous,[name]:value}))
+  const historyFiltersActive=Boolean(historyWorkerId||historyUnit||historyFrom||historyTo||historyReview)
+  const invalidHistoryRange=Boolean(historyFrom&&historyTo&&historyFrom>historyTo)
+  const setHistoryFilter=(name,value)=>setNavigation(previous=>({...previous,[name]:value}))
   const setView=value=>setNavigation(previous=>({...previous,workView:value}))
   const setWorkerId=value=>setNavigation(previous=>({...previous,workerId:value}))
   const setHistoryWorkerId=value=>setNavigation(previous=>({...previous,historyWorkerId:value}))
@@ -304,14 +349,24 @@ export function AdminOperations({ navigation, setNavigation }) {
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
+  const [historyShown,setHistoryShown]=useState(100)
+  const [tasksShown,setTasksShown]=useState(100)
+  const [approvalsShown,setApprovalsShown]=useState(25)
+  useEffect(()=>setTasksShown(100),[taskWorkerId,taskState,taskSearch,taskOrder])
+  useEffect(()=>setApprovalsShown(25),[approvalWorkerId,approvalKind])
+  useEffect(()=>{setHistoryShown(100)},[historyWorkerId,historyUnit,historyFrom,historyTo,historyReview])
 
   const refresh=async ()=>{
     setLoading(true)
     try{
       const result=await getAdminWork()
       setData(result||{workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
-    }catch(e){setError(readableError(e))}
-    finally{setLoading(false)}
+      setError('')
+      return true
+    }catch(e){
+      setError(readableError(e))
+      return false
+    }finally{setLoading(false)}
   }
   useEffect(()=>{void refresh()},[])
 
@@ -319,14 +374,37 @@ export function AdminOperations({ navigation, setNavigation }) {
   const active=workers.filter(w=>w.state==='active')
   const chosen=workers.find(w=>w.id===workerId)
   const selectedHistoryWorker=workers.find(w=>w.id===historyWorkerId)
-  const historyData=scopeWorkerHistory(data,historyWorkerId)
+  const allWorkerHistory=scopeWorkerHistory(data,historyWorkerId)
+  const overallWorkerSummary=summarizeWorkerHistory(allWorkerHistory)
+  const historyData=filterWorkerHistory(allWorkerHistory,{
+    unit:historyUnit,from:historyFrom,to:historyTo,review:historyReview,
+  })
   const historySummary=summarizeWorkerHistory(historyData)
+  const reportTaskIds=new Set(historyData.time_entries.map(entry=>entry.task_id))
+  const historyWithoutReport=historyData.tasks.filter(task=>!reportTaskIds.has(task.id))
+  const allTasks=data.tasks||[]
+  const taskCounts=summarizeTaskWorkflow(allTasks)
+  const matchingTasks=selectManagerTasks(data,{
+    workerId:taskWorkerId,state:taskState,search:taskSearch,order:taskOrder,
+  })
+  const visibleApprovals=selectPendingApprovals(data,{
+    workerId:approvalWorkerId,kind:approvalKind,
+  })
+  const reportByTask=new Map()
+  for(const entry of data.time_entries||[]){
+    if(!reportByTask.has(entry.task_id))reportByTask.set(entry.task_id,[])
+    reportByTask.get(entry.task_id).push(entry)
+  }
+  const taskById=new Map(allTasks.map(task=>[task.id,task]))
   const todayTasks=(data.tasks||[]).filter(t=>t.planned_date===today()&&t.state!=='cancelled')
   const pending=(data.time_entries||[]).filter(e=>e.review_state==='submitted')
   const approvedMinutes=(data.time_entries||[])
     .filter(e=>e.review_state==='approved')
     .reduce((sum,e)=>sum+Number(e.approved_minutes||0),0)
   const isShort=date<shift(today(),2)
+  const assignmentCapacity=workerId?assessAssignmentCapacity(data,{
+    workerId,date,estimateMinutes:Number(estimate),
+  }):null
 
   const run=async callback=>{
     setBusy(true);setError('');setNotice('')
@@ -385,34 +463,146 @@ export function AdminOperations({ navigation, setNavigation }) {
             <input required maxLength={300} value={reason} onChange={e=>setReason(e.target.value)}
               placeholder="این کار برای امروز یا فردا برنامه‌ریزی شده است"/>
           </label>}
-          {workerId&&<p className="ow-muted">
-            ظرفیت این روز: {minutes(availableOn(data,workerId,date))} ·
-            کارهای برنامه‌ریزی‌شده: {minutes(estimatedOn(data,workerId,date))}
-          </p>}
+          {workerId&&assignmentCapacity&&<div className={
+            ['overbooked','unavailable','not_configured','unknown'].includes(assignmentCapacity.code)
+              ?'ow-capacity-warning':'ow-capacity-summary'
+          } role="status" aria-live="polite">
+            {assignmentCapacity.code==='unknown'
+              ?<p><strong>ظرفیت قابل محاسبه نیست.</strong> برنامه یا زمان واردشده نیازمند بررسی است.</p>
+              :assignmentCapacity.code==='not_configured'
+                ?<p><strong>برنامه حضور برای این روز ثبت نشده است.</strong> این به معنی عدم حضور قطعی نیست؛ پیش از واگذاری هماهنگ کنید.</p>
+                :<>
+                  <p>ظرفیت ثبت‌شده: <b>{minutes(assignmentCapacity.availableMinutes)}</b>
+                    {' · '}کارهای قبلی: <b>{minutes(assignmentCapacity.assignedMinutes)}</b>
+                    {' · '}کار جدید: <b>{minutes(assignmentCapacity.proposedMinutes)}</b></p>
+                  {assignmentCapacity.code==='unavailable'
+                    ?<p><strong>هشدار عدم حضور:</strong> برای این روز ظرفیت صفر ثبت شده است.</p>
+                    :assignmentCapacity.code==='overbooked'
+                      ?<p><strong>هشدار بیش‌ازظرفیت:</strong> مجموع کارها
+                         {' '}{minutes(-assignmentCapacity.remainingMinutes)} بیشتر از زمان حضور است.</p>
+                      :<p>ظرفیت باقی‌مانده پس از واگذاری:
+                         {' '}<b>{minutes(assignmentCapacity.remainingMinutes)}</b>
+                         {assignmentCapacity.code==='full'?' · ظرفیت دقیقاً تکمیل می‌شود.':''}</p>}
+                  {assignmentCapacity.exception&&<small>محاسبه بر اساس تغییر موقت همین روز است.</small>}
+                </>}
+            <details className="ow-context-help"><summary>توضیح محاسبه</summary>
+              <small>ظرفیت، یک برآورد بر اساس اطلاعات فعلی است. ثبت کار در سرور با مجوزها و قواعد مستقل انجام می‌شود.</small>
+            </details>
+          </div>}
           <button className="report-btn report-btn--primary" type="submit" disabled={busy||!workerId}>واگذاری کار</button>
         </form>
       </section>
       <section className="report-panel">
-        <div className="report-panel-heading"><h2>کارهای ثبت‌شده</h2><small>{n((data.tasks||[]).length)} کار</small></div>
-        <div className="ow-list">
-          {(data.tasks||[]).slice(0,100).map(t=><article className="ow-item" key={t.id}>
-            <div className="ow-item-header"><strong>{t.title}</strong><span className="ow-status">{stateLabels[t.state]}</span></div>
-            <small>{label(t.worker_id,workers)} · {pretty(t.planned_date)} · {minutes(t.estimate_minutes)}</small>
-            {t.short_notice&&<p className="ow-warning">واگذاری کوتاه‌مدت: {t.short_notice_reason}</p>}
-          </article>)}
-          {!data.tasks?.length&&<p className="ow-muted">هنوز کاری واگذار نشده است.</p>}
+        <div className="report-panel-heading">
+          <h2>کارهای ثبت‌شده</h2>
+          <small>{n(matchingTasks.length)} از {n(taskCounts.total)} کار</small>
         </div>
+        <div className="ow-task-metrics" aria-label="خلاصه وضعیت کارهای ثبت‌شده">
+          <span>باز: <b>{n(taskCounts.open)}</b></span>
+          <span>منتظر بررسی: <b>{n(taskCounts.waiting)}</b></span>
+          <span>نیازمند اصلاح: <b>{n(taskCounts.needsChanges)}</b></span>
+          <span>تکمیل‌شده: <b>{n(taskCounts.completed)}</b></span>
+        </div>
+        <div className="ow-list-filters">
+          <label className="report-field"><span>دانشجوکار</span>
+            <select aria-label="فیلتر کار بر اساس دانشجوکار" value={taskWorkerId}
+              onChange={e=>setListingFilter('taskWorkerId',e.target.value)}>
+              <option value="">همه دانشجوکارها</option>
+              {workers.map(w=><option value={w.id} key={w.id}>{w.name}</option>)}
+            </select>
+          </label>
+          <label className="report-field"><span>وضعیت کار</span>
+            <select aria-label="فیلتر وضعیت کار" value={taskState}
+              onChange={e=>setListingFilter('taskState',e.target.value)}>
+              <option value="">همه وضعیت‌ها</option>
+              {Object.entries(stateLabels).map(([id,title])=><option key={id} value={id}>{title}</option>)}
+            </select>
+          </label>
+          <label className="report-field"><span>جست‌وجوی عنوان</span>
+            <input aria-label="جست‌وجوی عنوان کار" type="search" value={taskSearch}
+              onChange={e=>setListingFilter('taskSearch',e.target.value)}
+              placeholder="عنوان کار را بنویسید"/>
+          </label>
+          <label className="report-field"><span>ترتیب تاریخ برنامه</span>
+            <select aria-label="ترتیب نمایش کارها" value={taskOrder}
+              onChange={e=>setListingFilter('taskOrder',e.target.value)}>
+              <option value="latest">جدیدترها ابتدا</option>
+              <option value="oldest">قدیمی‌ترها ابتدا</option>
+            </select>
+          </label>
+        </div>
+        <details className="ow-context-help"><summary>راهنمای وضعیت کارها</summary>
+          <p className="ow-muted">مراحل کار بر اساس وضعیت ثبت‌شده‌اند و زمان تأییدشده، درصد پیشرفت نیست.</p>
+        </details>
+        <div className="ow-list ow-task-results">
+          {matchingTasks.slice(0,tasksShown).map(t=>{
+            const detail=describeTaskWorkflow(t,reportByTask.get(t.id)||[])
+            return <article className="ow-item" key={t.id}>
+              <div className="ow-item-header"><strong>{t.title}</strong>
+                <span className="ow-status">{detail.label}</span>
+              </div>
+              <small>{label(t.worker_id,workers)} · {pretty(t.planned_date)} · زمان استاندارد: {minutes(t.estimate_minutes)}</small>
+              {(detail.waitingCount>0||detail.approvedMinutes>0)&&<div className="ow-task-progress">
+                {detail.waitingCount>0&&<span>{n(detail.waitingCount)} گزارش منتظر تأیید</span>}
+                {detail.approvedMinutes>0&&<span>زمان تأییدشده: {exactDuration(detail.approvedMinutes)}</span>}
+              </div>}
+              <details className="ow-task-detail">
+                <summary>جزئیات</summary>
+                <p className="ow-muted">{detail.step===null?'وضعیت لغوشده یا نامشخص':`مرحله ${n(detail.step)} از ۴ · ${detail.label}`}
+                  {' · '}{n(detail.reportCount)} گزارش ثبت‌شده</p>
+              </details>
+              {t.short_notice&&<p className="ow-warning">واگذاری کوتاه‌مدت: {t.short_notice_reason}</p>}
+            </article>
+          })}
+          {!matchingTasks.length&&<p className="ow-muted">{taskCounts.total?'کاری با فیلترهای انتخاب‌شده پیدا نشد.':'هنوز کاری واگذار نشده است.'}</p>}
+        </div>
+        {matchingTasks.length>tasksShown&&<div className="ow-paged-more">
+          <span className="ow-muted">نمایش {n(tasksShown)} کار از {n(matchingTasks.length)}</span>
+          <button type="button" className="report-btn report-btn--light"
+            onClick={()=>setTasksShown(count=>count+100)}>نمایش ۱۰۰ کار بیشتر</button>
+        </div>}
       </section>
     </>}
 
     {view==='approvals'&&<section className="report-panel">
-      <div className="report-panel-heading"><h2>گزارش‌های منتظر تأیید</h2><small>{n(pending.length)} گزارش</small></div>
-      <div className="ow-list">
-        {pending.map(e=><ApprovalCard key={e.id} entry={e}
-          task={data.tasks?.find(t=>t.id===e.task_id)}
-          worker={workers.find(w=>w.id===e.worker_id)} onDone={refresh}/>)}
-        {!pending.length&&<p className="ow-muted">گزارشی در صف بررسی وجود ندارد.</p>}
+      <div className="report-panel-heading">
+        <h2>گزارش‌های منتظر تأیید</h2>
+        <small>{n(visibleApprovals.length)} از {n(pending.length)} گزارش</small>
       </div>
+      <details className="ow-context-help"><summary>راهنمای صف بررسی</summary>
+        <p className="ow-muted">گزارش‌های قدیمی‌تر در ابتدا نمایش داده می‌شوند؛ فیلترها مجوزها را تغییر نمی‌دهند.</p>
+      </details>
+      <div className="ow-approval-filters">
+        <label className="report-field"><span>دانشجوکار</span>
+          <select aria-label="فیلتر صف تأیید بر اساس دانشجوکار" value={approvalWorkerId}
+            onChange={e=>setListingFilter('approvalWorkerId',e.target.value)}>
+            <option value="">همه دانشجوکارها</option>
+            {workers.map(w=><option value={w.id} key={w.id}>{w.name}</option>)}
+          </select>
+        </label>
+        <label className="report-field"><span>نوع درخواست زمان</span>
+          <select aria-label="فیلتر نوع درخواست زمان" value={approvalKind}
+            onChange={e=>setListingFilter('approvalKind',e.target.value)}>
+            <option value="">همه درخواست‌ها</option>
+            <option value="extra">با درخواست زمان اضافه</option>
+            <option value="standard">بدون زمان اضافه</option>
+            <option value="unknown">بدون زمان استاندارد قابل تشخیص</option>
+          </select>
+        </label>
+      </div>
+      <div className="ow-list ow-approval-results">
+        {visibleApprovals.slice(0,approvalsShown).map(e=><ApprovalCard key={e.id} entry={e}
+          task={taskById.get(e.task_id)}
+          worker={workers.find(w=>w.id===e.worker_id)} onDone={refresh}/>)}
+        {!visibleApprovals.length&&<p className="ow-muted">
+          {pending.length?'گزارشی با فیلتر انتخاب‌شده در صف وجود ندارد.':'گزارشی در صف بررسی وجود ندارد.'}
+        </p>}
+      </div>
+      {visibleApprovals.length>approvalsShown&&<div className="ow-paged-more">
+        <span className="ow-muted">نمایش {n(approvalsShown)} گزارش از {n(visibleApprovals.length)}</span>
+        <button type="button" className="report-btn report-btn--light"
+          onClick={()=>setApprovalsShown(count=>count+25)}>نمایش ۲۵ گزارش بیشتر</button>
+      </div>}
     </section>}
 
     {view==='availability'&&<section className="report-panel">
@@ -425,13 +615,20 @@ export function AdminOperations({ navigation, setNavigation }) {
       </label>
       {workerId&&<>
         <div className="ow-week-grid">
-          {week.map(d=><article key={d}><strong>{dayLabels.find(x=>x[0]===isoDay(d))?.[1]}</strong>
-            <small>{pretty(d)}</small>
-            <b>{minutes(availableOn(data,workerId,d))}</b>
-            <small>برنامه: {minutes(estimatedOn(data,workerId,d))}</small>
-          </article>)}
+          {week.map(d=>{
+            const forecast=assessAssignmentCapacity(data,{workerId,date:d,estimateMinutes:0})
+            const warning=['overbooked','unavailable','not_configured','unknown'].includes(forecast.code)
+            return <article key={d} className={warning?'ow-week-alert':undefined}>
+              <strong>{dayLabels.find(x=>x[0]===isoWeekday(d))?.[1]}</strong>
+              <small>{pretty(d)}</small>
+              <b>{forecast.availableMinutes===null?'برنامه نامشخص':minutes(forecast.availableMinutes)}</b>
+              <small>کارهای قبلی: {forecast.assignedMinutes===null?'—':minutes(forecast.assignedMinutes)}</small>
+              {forecast.code==='overbooked'&&<small>بیش از ظرفیت</small>}
+              {forecast.code==='unavailable'&&<small>عدم حضور ثبت‌شده</small>}
+            </article>
+          })}
         </div>
-        <ScheduleEditor key={workerId} workerId={workerId} onSaved={refresh}/>
+        <ScheduleEditor key={workerId} workerId={workerId} data={data} onSaved={refresh}/>
       </>}
     </section>}
 
@@ -439,9 +636,9 @@ export function AdminOperations({ navigation, setNavigation }) {
       <div className="report-panel-heading">
         <h2>سابقه ساعات و خروجی</h2>
         <button className="report-btn report-btn--primary" type="button"
-          disabled={loading||!historyData.tasks.length}
-          onClick={()=>exportOpsExcel(historyData,Boolean(historyWorkerId))}>
-          {historyWorkerId?'خروجی Excel این دانشجوکار':'خروجی Excel همه'}
+          disabled={loading||invalidHistoryRange||(!historyData.tasks.length&&!historyData.time_entries.length)}
+          onClick={()=>exportOpsExcel(historyData,historyFiltersActive)}>
+          {historyFiltersActive?'خروجی Excel نتایج فیلتر':'خروجی Excel همه'}
         </button>
       </div>
       <div className="ow-history-filter">
@@ -453,10 +650,49 @@ export function AdminOperations({ navigation, setNavigation }) {
             </option>)}
           </select>
         </label>
-        <p className="ow-muted">
-          {historyWorkerId?'سوابق و فایل Excel فقط به دانشجوکار انتخاب‌شده محدود می‌شوند.':'سوابق و خروجی همه دانشجوکارها نمایش داده می‌شود.'}
-        </p>
+        <details className="ow-context-help"><summary>درباره فیلترها</summary>
+          <p className="ow-muted">فیلترها فقط سوابق و Excel را محدود می‌کنند و وضعیت حساب یا آمار کلی پرونده را تغییر نمی‌دهند.</p>
+        </details>
       </div>
+      <div className="ow-history-extra" aria-label="فیلترهای گزارش مدیریتی">
+        <label className="report-field"><span>واحد همکاری</span>
+          <select value={historyUnit} onChange={e=>setHistoryFilter('historyUnit',e.target.value)}>
+            <option value="">همه واحدها</option>
+            {Object.entries(unitLabels).map(([id,label])=><option key={id} value={id}>{label}</option>)}
+          </select>
+        </label>
+        <label className="report-field"><span>وضعیت گزارش</span>
+          <select value={historyReview} onChange={e=>setHistoryFilter('historyReview',e.target.value)}>
+            <option value="">همه وضعیت‌ها</option>
+            {Object.entries(reviewLabels).map(([id,label])=><option key={id} value={id}>{label}</option>)}
+            <option value="without_report">کار بدون گزارش</option>
+          </select>
+        </label>
+        <div className="report-field"><span>از تاریخ انجام (شمسی)</span>
+          <JalaliDatePicker value={historyFrom}
+            onChange={date=>setHistoryFilter('historyFrom',date)} ariaLabel="شروع بازه سابقه"/>
+          {historyFrom&&<button className="ow-clear-date" type="button"
+            onClick={()=>setHistoryFilter('historyFrom','')}>حذف تاریخ شروع</button>}
+        </div>
+        <div className="report-field"><span>تا تاریخ انجام (شمسی)</span>
+          <JalaliDatePicker value={historyTo}
+            onChange={date=>setHistoryFilter('historyTo',date)} ariaLabel="پایان بازه سابقه"/>
+          {historyTo&&<button className="ow-clear-date" type="button"
+            onClick={()=>setHistoryFilter('historyTo','')}>حذف تاریخ پایان</button>}
+        </div>
+      </div>
+      <div className="ow-history-filter-footer">
+        <p className="ow-muted">
+          {historyFiltersActive&&<>{n(historySummary.taskCount)} کار · {n(historySummary.reportCount)} گزارش</>}
+        </p>
+        {historyFiltersActive&&<button type="button" className="report-btn report-btn--light"
+          onClick={()=>setNavigation(previous=>({...previous,
+            historyWorkerId:'',historyUnit:'',historyFrom:'',historyTo:'',historyReview:'',
+          }))}>پاک‌کردن همه فیلترها</button>}
+      </div>
+      {invalidHistoryRange&&<div className="report-alert report-alert--error" role="alert">
+        تاریخ شروع نباید بعد از تاریخ پایان باشد؛ بازه را اصلاح کنید.
+      </div>}
       {selectedHistoryWorker&&<section className="ow-worker-profile" aria-label="پروفایل عملکرد دانشجوکار">
         <div className="ow-profile-heading">
           <div>
@@ -470,19 +706,19 @@ export function AdminOperations({ navigation, setNavigation }) {
           <span className="ow-status">{workerStateLabels[selectedHistoryWorker.state]||selectedHistoryWorker.state}</span>
         </div>
         <div className="ow-profile-metrics">
-          <div><span>کل کارهای واگذارشده</span><b>{n(historySummary.taskCount)}</b></div>
-          <div><span>کارهای باز</span><b>{n(historySummary.openCount)}</b></div>
-          <div><span>گزارش منتظر تأیید</span><b>{n(historySummary.pendingCount)}</b></div>
-          <div><span>مجموع ساعات تأییدشده</span><b>{exactDuration(historySummary.approvedMinutes)}</b></div>
+          <div><span>کل کارهای واگذارشده</span><b>{n(overallWorkerSummary.taskCount)}</b></div>
+          <div><span>کارهای باز</span><b>{n(overallWorkerSummary.openCount)}</b></div>
+          <div><span>گزارش منتظر تأیید</span><b>{n(overallWorkerSummary.pendingCount)}</b></div>
+          <div><span>مجموع ساعات تأییدشده</span><b>{exactDuration(overallWorkerSummary.approvedMinutes)}</b></div>
         </div>
         <WorkerLifecycleReadOnlyPreview worker={selectedHistoryWorker}/>
       </section>}
       <div className="report-panel-heading">
-        <h3>{historyWorkerId?'سوابق فعالیت این دانشجوکار':'سوابق فعالیت همه دانشجوکارها'}</h3>
-        <small>{n(historySummary.reportCount)} گزارش</small>
+        <h3>{historyFiltersActive?'سوابق منطبق با فیلتر':'سوابق فعالیت همه دانشجوکارها'}</h3>
+        <small>{n(historySummary.reportCount)} گزارش · {exactDuration(historySummary.approvedMinutes)} تأییدشده</small>
       </div>
       <div className="ow-list">
-        {historyData.time_entries.slice(0,200).map(e=>(
+        {historyData.time_entries.slice(0,historyShown).map(e=>(
           <article className="ow-item" key={e.id}>
             <strong>{label(e.worker_id,workers)} · {data.tasks?.find(t=>t.id===e.task_id)?.title||'کار'}</strong>
             <small>{pretty(e.work_date)} · {reviewLabels[e.review_state]||e.review_state}</small>
@@ -495,10 +731,31 @@ export function AdminOperations({ navigation, setNavigation }) {
             {e.review_note&&<small>توضیح مدیر: {e.review_note}</small>}
           </article>
         ))}
+        {historyData.time_entries.length>historyShown&&<div className="ow-history-load-more">
+          <span className="ow-muted">نمایش {n(historyShown)} گزارش از {n(historyData.time_entries.length)} گزارش فیلترشده؛ خروجی Excel شامل همه نتایج است.</span>
+          <button type="button" className="report-btn report-btn--light"
+            onClick={()=>setHistoryShown(count=>count+100)}>نمایش ۱۰۰ گزارش بیشتر</button>
+        </div>}
         {!historyData.time_entries.length&&<p className="ow-muted">
-          {historyWorkerId?'برای این دانشجوکار هنوز گزارش کاری ثبت نشده است.':'هنوز سابقه‌ای وجود ندارد.'}
+          {historyWithoutReport.length?'در این فیلتر گزارشی وجود ندارد؛ کارهای بدون گزارش را در بخش زیر ببینید.':
+            historyFiltersActive?'نتیجه‌ای برای فیلترهای انتخاب‌شده پیدا نشد.':'هنوز سابقه‌ای وجود ندارد.'}
         </p>}
       </div>
+      {historyWithoutReport.length>0&&<div className="ow-history-unreported">
+        <div className="report-panel-heading">
+          <h3>کارهای بدون گزارش</h3><small>{n(historyWithoutReport.length)} کار</small>
+        </div>
+        <div className="ow-list">
+          {historyWithoutReport.map(task=><article className="ow-item" key={task.id}>
+            <div className="ow-item-header">
+              <strong>{task.title}</strong>
+              <span className="ow-status">{stateLabels[task.state]||task.state}</span>
+            </div>
+            <small>{label(task.worker_id,workers)} · {unitLabels[task.unit]||task.unit||'واحد نامشخص'}
+              {' · '}برنامه: {pretty(task.planned_date)} · برآورد: {minutes(task.estimate_minutes)}</small>
+          </article>)}
+        </div>
+      </div>}
     </section>}
   </div>
 }
@@ -636,7 +893,7 @@ export function WorkerOperations({profile}) {
     </section>}
     {view==='availability'&&<section className="report-panel">
       <h2>برنامه حضور</h2>
-      <ScheduleEditor workerId={profile.worker_id} onSaved={refresh}/>
+      <ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
       <div className="ow-list">
         {(data.weekly_slots||[]).filter(s=>!s.valid_until || s.valid_until>=today())
           .map(s=><article className="ow-item" key={s.id}>
