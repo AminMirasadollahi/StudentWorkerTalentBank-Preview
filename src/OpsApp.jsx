@@ -46,6 +46,9 @@ const initialAdminNavigation = () => ({
   historyTo: '',
 })
 
+// Navigation is non-sensitive and survives secure auth revalidation/unmounts.
+const initialWorkerNavigation = () => ({ section:'tasks', taskRange:'today' })
+
 const unitLabels = {
   library: 'کتابخانه',
   public_relations: 'روابط عمومی',
@@ -248,13 +251,14 @@ function RecoveryPasswordView({ onComplete, onCancel }) {
   )
 }
 
-function WorkerView({ profile, onLogout, initialPasswordRequired = false }) {
+function WorkerView({ profile, onLogout, initialPasswordRequired = false, navigation, setNavigation }) {
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [passwordEstablished, setPasswordEstablished] = useState(!initialPasswordRequired)
+  const PasswordContainer = passwordEstablished ? 'details' : 'section'
 
   const changePassword = async event => {
     event.preventDefault()
@@ -300,12 +304,13 @@ function WorkerView({ profile, onLogout, initialPasswordRequired = false }) {
           خروج
         </button>
       </header>
-      {passwordEstablished && <WorkerOperations profile={profile} />}
-      <section className={`report-panel ops-password-panel ${!passwordEstablished ? 'ops-password-panel--required' : ''}`}>
-        <h2>{passwordEstablished ? 'تغییر رمز عبور' : 'در اولین ورود، رمز اختصاصی خودتان را تعیین کنید'}</h2>
-        <p>{passwordEstablished
-          ? 'در صورت تمایل می‌توانید رمز عبور خود را تغییر دهید.'
-          : 'حساب شما با لینک اختصاصی باز شده است. برای ادامه، یک رمز جدید حداقل ۸ نویسه‌ای تعیین کنید.'}</p>
+      {passwordEstablished && <WorkerOperations profile={profile} navigation={navigation} setNavigation={setNavigation}/>}
+      <PasswordContainer key={passwordEstablished ? 'settings' : 'onboarding'}
+        className={`report-panel ops-password-panel ${!passwordEstablished ? 'ops-password-panel--required' : 'ops-password-settings'}`}>
+        {passwordEstablished
+          ? <summary>تنظیمات حساب · تغییر رمز عبور</summary>
+          : <><h2>در اولین ورود، رمز اختصاصی خودتان را تعیین کنید</h2>
+              <p>حساب شما با لینک اختصاصی باز شده است. برای ادامه، یک رمز جدید حداقل ۸ نویسه‌ای تعیین کنید.</p></>}
         <form onSubmit={changePassword}>
           <label className="report-field">
             <span>رمز جدید (حداقل ۸ نویسه)</span>
@@ -326,7 +331,7 @@ function WorkerView({ profile, onLogout, initialPasswordRequired = false }) {
             {saving ? 'در حال ذخیره…' : 'تغییر رمز'}
           </button>
         </form>
-      </section>
+      </PasswordContainer>
     </main>
   )
 }
@@ -674,6 +679,7 @@ function AdminView({ onLogout, navigation, setNavigation }) {
 export default function OpsApp({ mode = 'admin' }) {
   const [identity, setIdentity] = useState(null)
   const [adminNavigation, setAdminNavigation] = useState(initialAdminNavigation)
+  const [workerNavigation, setWorkerNavigation] = useState(initialWorkerNavigation)
   const [busy, setBusy] = useState(true)
   const [recheckingAccess, setRecheckingAccess] = useState(false)
   const [error, setError] = useState('')
@@ -695,6 +701,7 @@ export default function OpsApp({ mode = 'admin' }) {
       if (event === 'SIGNED_OUT') {
         setIdentity(null)
         setAdminNavigation(initialAdminNavigation)
+        setWorkerNavigation(initialWorkerNavigation)
         setRecheckingAccess(false)
       }
     })
@@ -728,11 +735,13 @@ export default function OpsApp({ mode = 'admin' }) {
         if (!fresh || fresh.role === 'no_access') {
           setError('دسترسی این نشست دیگر معتبر نیست. لطفاً مجدداً وارد شوید.')
           setAdminNavigation(initialAdminNavigation)
+          setWorkerNavigation(initialWorkerNavigation)
           setIdentity(null)
         } else {
           // Never carry a former administrator's selection across identities.
           if (fresh.role !== identity.role || fresh.user?.id !== identity.user?.id) {
             setAdminNavigation(initialAdminNavigation)
+            setWorkerNavigation(initialWorkerNavigation)
           }
           setError('')
           setIdentity(fresh)
@@ -740,6 +749,7 @@ export default function OpsApp({ mode = 'admin' }) {
       },
       onFailure: () => {
         setAdminNavigation(initialAdminNavigation)
+        setWorkerNavigation(initialWorkerNavigation)
         setIdentity(null)
         setError('بررسی مجدد دسترسی ممکن نشد. اتصال را بررسی و صفحه را دوباره بارگذاری کنید.')
       },
@@ -763,6 +773,7 @@ export default function OpsApp({ mode = 'admin' }) {
         throw new Error('operations_access_denied')
       }
       setAdminNavigation(initialAdminNavigation)
+      setWorkerNavigation(initialWorkerNavigation)
       setIdentity(who)
     } catch (e) { setError(getMessage(e)) }
     finally { setBusy(false) }
@@ -771,6 +782,7 @@ export default function OpsApp({ mode = 'admin' }) {
   const logout = async () => {
     setRecheckingAccess(false)
     setAdminNavigation(initialAdminNavigation)
+    setWorkerNavigation(initialWorkerNavigation)
     setBusy(true)
     try { await signOutOperations() }
     finally { clearRecoveryIntent(); setIdentity(null); setBusy(false) }
@@ -780,6 +792,7 @@ export default function OpsApp({ mode = 'admin' }) {
     await signOutOperations()
     clearRecoveryIntent()
     setAdminNavigation(initialAdminNavigation)
+    setWorkerNavigation(initialWorkerNavigation)
     setIdentity(null)
     setError('')
     setNotice('رمز جدید ثبت شد. اکنون با ایمیل حساب و رمز جدید وارد شوید.')
@@ -814,6 +827,8 @@ export default function OpsApp({ mode = 'admin' }) {
   if (identity.role === 'worker_disabled') return <WorkerDisabledView profile={identity.profile} onLogout={logout}/>
   return <WorkerView
     profile={identity.profile}
+    navigation={workerNavigation}
+    setNavigation={setWorkerNavigation}
     onLogout={logout}
     initialPasswordRequired={
       identity.profile?.onboarding_state === 'password_required'
