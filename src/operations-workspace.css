@@ -244,3 +244,8 @@
   .ow-range-switch { width:100%; justify-content:space-evenly; }
   .ow-range-switch button { flex:1; }
 }
+
+/* Manager task cards also use available desktop space without full-width 1-line rows. */
+@media (min-width:1050px) {
+  .ow-task-results { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
