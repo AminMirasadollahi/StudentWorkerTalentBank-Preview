@@ -25,6 +25,17 @@ import './ops.css'
 // Enable only after the SMTP provider and Edge delivery switch are tested.
 const emailInvitesAvailable = import.meta.env.VITE_OPS_EMAIL_INVITES_AVAILABLE === 'true'
 
+// Navigation-only state stays above the authorization-check placeholder, so
+// secure unmounting cannot reset the selected manager tab or worker filter.
+// No credentials, worker records or unsaved form inputs are cached here.
+const initialAdminNavigation = () => ({
+  section: 'candidates',
+  candidateFilter: 'all',
+  workView: 'tasks',
+  workerId: '',
+  historyWorkerId: '',
+})
+
 const unitLabels = {
   library: 'کتابخانه',
   public_relations: 'روابط عمومی',
@@ -457,15 +468,17 @@ function CandidateCard({ candidate, saving, onSave, onSaveEmail, onProvision, on
   )
 }
 
-function AdminView({ onLogout }) {
+function AdminView({ onLogout, navigation, setNavigation }) {
   const [rows, setRows] = useState([])
   const [busyId, setBusyId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [flash, setFlash] = useState('')
   const [issuedCredentials, setIssuedCredentials] = useState(null)
-  const [filter, setFilter] = useState('all')
-  const [adminSection, setAdminSection] = useState('candidates')
+  const filter = navigation.candidateFilter
+  const adminSection = navigation.section
+  const setFilter = value => setNavigation(previous => ({ ...previous, candidateFilter: value }))
+  const setAdminSection = value => setNavigation(previous => ({ ...previous, section: value }))
 
   const refresh = async () => {
     setLoading(true)
@@ -604,7 +617,7 @@ function AdminView({ onLogout }) {
           ) : <p className="ops-muted">موردی برای نمایش وجود ندارد.</p>}
       </section>
       </>}
-      {adminSection === 'work' && <AdminOperations />}
+      {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation} />}
       {issuedCredentials && (
         <div className="ops-modal" role="dialog" aria-modal="true" aria-labelledby="ops-credentials-title">
           <div className="ops-modal__card">
@@ -650,6 +663,7 @@ function AdminView({ onLogout }) {
 
 export default function OpsApp({ mode = 'admin' }) {
   const [identity, setIdentity] = useState(null)
+  const [adminNavigation, setAdminNavigation] = useState(initialAdminNavigation)
   const [busy, setBusy] = useState(true)
   const [recheckingAccess, setRecheckingAccess] = useState(false)
   const [error, setError] = useState('')
@@ -670,6 +684,7 @@ export default function OpsApp({ mode = 'admin' }) {
       }
       if (event === 'SIGNED_OUT') {
         setIdentity(null)
+        setAdminNavigation(initialAdminNavigation)
         setRecheckingAccess(false)
       }
     })
@@ -702,13 +717,19 @@ export default function OpsApp({ mode = 'admin' }) {
       onIdentity: fresh => {
         if (!fresh || fresh.role === 'no_access') {
           setError('دسترسی این نشست دیگر معتبر نیست. لطفاً مجدداً وارد شوید.')
+          setAdminNavigation(initialAdminNavigation)
           setIdentity(null)
         } else {
+          // Never carry a former administrator's selection across identities.
+          if (fresh.role !== identity.role || fresh.user?.id !== identity.user?.id) {
+            setAdminNavigation(initialAdminNavigation)
+          }
           setError('')
           setIdentity(fresh)
         }
       },
       onFailure: () => {
+        setAdminNavigation(initialAdminNavigation)
         setIdentity(null)
         setError('بررسی مجدد دسترسی ممکن نشد. اتصال را بررسی و صفحه را دوباره بارگذاری کنید.')
       },
@@ -731,6 +752,7 @@ export default function OpsApp({ mode = 'admin' }) {
         await signOutOperations()
         throw new Error('operations_access_denied')
       }
+      setAdminNavigation(initialAdminNavigation)
       setIdentity(who)
     } catch (e) { setError(getMessage(e)) }
     finally { setBusy(false) }
@@ -738,6 +760,7 @@ export default function OpsApp({ mode = 'admin' }) {
 
   const logout = async () => {
     setRecheckingAccess(false)
+    setAdminNavigation(initialAdminNavigation)
     setBusy(true)
     try { await signOutOperations() }
     finally { clearRecoveryIntent(); setIdentity(null); setBusy(false) }
@@ -746,6 +769,7 @@ export default function OpsApp({ mode = 'admin' }) {
   const finishRecovery = async () => {
     await signOutOperations()
     clearRecoveryIntent()
+    setAdminNavigation(initialAdminNavigation)
     setIdentity(null)
     setError('')
     setNotice('رمز جدید ثبت شد. اکنون با ایمیل حساب و رمز جدید وارد شوید.')
@@ -776,7 +800,7 @@ export default function OpsApp({ mode = 'admin' }) {
   )
   if (recoveryMode) return <RecoveryPasswordView onComplete={finishRecovery} onCancel={logout}/>
   if (!identity) return <Login onLogin={login} busy={busy} error={error} defaultMode={mode} notice={notice}/>
-  if (identity.role === 'admin') return <AdminView onLogout={logout}/>
+  if (identity.role === 'admin') return <AdminView onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}/>
   if (identity.role === 'worker_disabled') return <WorkerDisabledView profile={identity.profile} onLogout={logout}/>
   return <WorkerView
     profile={identity.profile}
