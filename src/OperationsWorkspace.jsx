@@ -1049,6 +1049,55 @@ function WorkerTaskCard({task,onSaved}) {
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
   </article>
 }
+function WorkerSelfProfile({tasks,records}) {
+  const completed=tasks.filter(t=>t.state==='completed')
+  const upcoming=tasks.filter(t=>t.planned_date>today()
+    &&!['completed','cancelled'].includes(t.state))
+  const ongoing=tasks.filter(t=>t.planned_date<=today()
+    &&!['completed','cancelled'].includes(t.state))
+  const approved=records.filter(e=>e.review_state==='approved')
+  const approvedTime=approved.reduce((sum,e)=>sum+Number(e.approved_minutes||0),0)
+  const panels=[
+    {id:'ongoing',title:'در جریان',tasks:ongoing},
+    {id:'upcoming',title:'پیش‌رو',tasks:upcoming},
+    {id:'completed',title:'انجام‌شده',tasks:completed},
+  ]
+  return <section className="report-panel ow-self-profile">
+    <div className="ow-presence-section-title"><h2>پروفایل من</h2>
+      <span className="ow-status">زمان تأییدشده: {exactDuration(approvedTime)}</span></div>
+    <div className="ow-profile-kpi-line" aria-label="خلاصه عملکرد">
+      <span>{n(ongoing.length)} در جریان</span><span>{n(upcoming.length)} پیش‌رو</span>
+      <span>{n(completed.length)} انجام‌شده</span><span>{n(records.length)} گزارش</span>
+    </div>
+    {panels.map(group=><details key={group.id} className="ow-profile-fold">
+      <summary>{group.title} · {n(group.tasks.length)}</summary>
+      <div className="ow-profile-mini-list">
+        {group.tasks.map(task=><div key={task.id}>
+          <b>{task.title}</b><small>{pretty(task.planned_date)} · {stateLabels[task.state]||task.state}</small>
+        </div>)}
+        {!group.tasks.length&&<p className="ow-muted">موردی ثبت نشده است.</p>}
+      </div>
+    </details>)}
+    <details className="ow-profile-fold">
+      <summary>سابقه گزارش‌ها و ساعات · {n(records.length)}</summary>
+      <div className="ow-profile-mini-list">
+        {records.map(e=><div key={e.id}>
+          <b>{tasks.find(t=>t.id===e.task_id)?.title||'گزارش کار'}</b>
+          <small>{pretty(e.work_date)} · {reviewLabels[e.review_state]||e.review_state}
+            {' · '}درخواست: {minutes(e.reported_minutes)}
+            {e.review_state==='approved'&&<> · تأیید: {minutes(e.approved_minutes)}</>}
+          </small>
+          {(e.review_note||e.extra_time_reason_text)&&<details className="ow-context-help">
+            <summary>جزئیات</summary>
+            {e.review_note&&<p>نظر مدیر: {e.review_note}</p>}
+            {e.extra_time_reason_text&&<p>علت زمان اضافه: {e.extra_time_reason_text}</p>}
+          </details>}
+        </div>)}
+        {!records.length&&<p className="ow-muted">هنوز گزارشی ثبت نشده است.</p>}
+      </div>
+    </details>
+  </section>
+}
 export function WorkerOperations({profile,navigation,setNavigation}) {
   const [data,setData]=useState({tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const [localNavigation,setLocalNavigation]=useState({section:'tasks',taskRange:'today'})
@@ -1057,8 +1106,8 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
     const fn=previous=>({...previous,...patch})
     ;(setNavigation||setLocalNavigation)(fn)
   }
-  const section=['tasks','availability','history'].includes(selected.section)?selected.section:'tasks'
-  const taskRange=['today','week','all'].includes(selected.taskRange)?selected.taskRange:'today'
+  const section=['tasks','availability','profile'].includes(selected.section)?selected.section:'tasks'
+  const taskRange=['today','week','month'].includes(selected.taskRange)?selected.taskRange:'today'
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const refresh=async()=>{
@@ -1073,8 +1122,10 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
   const total=approved.reduce((sum,e)=>sum+Number(e.approved_minutes||0),0)
   const tasks=data.tasks||[]
   const week=persianWeekBounds(today())
+  const month=persianMonthBounds(today())
   const visible=taskRange==='today'?tasks.filter(t=>t.planned_date===today()):
-    taskRange==='week'?tasks.filter(t=>t.planned_date>=week.start&&t.planned_date<=week.end):tasks
+    taskRange==='week'?tasks.filter(t=>t.planned_date>=week.start&&t.planned_date<=week.end):
+    tasks.filter(t=>t.planned_date>=month.start&&t.planned_date<=month.end)
   return <div className="ow-workspace ow-worker-workspace">
     <div className="ow-summary">
       <article><span>کارهای باز</span><b>{n(tasks.filter(t=>!['completed','cancelled'].includes(t.state)).length)}</b></article>
@@ -1082,7 +1133,7 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
       <article><span>ساعات تأییدشده</span><b>{exactDuration(total)}</b></article>
     </div>
     <SectionTabs value={section} onChange={next=>updateNavigation({section:next})} options={[
-      ['tasks','کارها'],['availability','زمان حضور'],['history','سابقه من'],
+      ['tasks','کارها'],['availability','زمان حضور'],['profile','پروفایل من'],
     ]}/>
     {loading&&<p className="ow-muted" role="status">در حال دریافت برنامه…</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
@@ -1090,7 +1141,7 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
       <div className="ow-worker-list-heading">
         <h2>کارها</h2>
         <div className="ow-range-switch" role="group" aria-label="بازه نمایش کارها">
-          {[['today','امروز'],['week','این هفته'],['all','همه']].map(([id,title])=>
+          {[['today','امروز'],['week','این هفته'],['month','این ماه']].map(([id,title])=>
             <button type="button" key={id} aria-pressed={taskRange===id}
               className={taskRange===id?'is-selected':''}
               onClick={()=>updateNavigation({taskRange:id})}>{title}</button>)}
@@ -1105,21 +1156,6 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
       <h2>برنامه حضور</h2>
       <ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
     </section>}
-    {section==='history'&&<section className="report-panel">
-      <h2>سابقه عملکرد من</h2>
-      <div className="ow-list ow-worker-history">
-        {records.map(e=><article className="ow-item" key={e.id}>
-          <strong>{tasks.find(t=>t.id===e.task_id)?.title||'کار'}</strong>
-          <small>{pretty(e.work_date)} · {reviewLabels[e.review_state]||e.review_state}</small>
-          <details className="ow-context-help"><summary>جزئیات گزارش</summary>
-            <p>درخواست‌شده: {minutes(e.reported_minutes)} · تأیید:
-              {e.review_state==='approved'?minutes(e.approved_minutes):'هنوز تأیید نشده'}</p>
-            {e.extra_time_reason_code&&<small>دلیل زمان اضافه: {extraTimeReasons[e.extra_time_reason_code]} · {e.extra_time_reason_text}</small>}
-            {e.review_note&&<small>نظر مدیر: {e.review_note}</small>}
-          </details>
-        </article>)}
-        {!records.length&&<p className="ow-muted">هنوز گزارشی ثبت نکرده‌اید.</p>}
-      </div>
-    </section>}
+    {section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records}/>}
   </div>
 }
