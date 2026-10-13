@@ -823,9 +823,10 @@ export default function OpsApp({ mode = 'admin' }) {
   )
   if (recoveryMode) return <RecoveryPasswordView onComplete={finishRecovery} onCancel={logout}/>
   if (!identity) return <Login onLogin={login} busy={busy} error={error} defaultMode={mode} notice={notice}/>
-  if (identity.role === 'admin') return <AdminView onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}/>
+  if (identity.role === 'admin') return <AdminView key={identity.user?.id} onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}/>
   if (identity.role === 'worker_disabled') return <WorkerDisabledView profile={identity.profile} onLogout={logout}/>
   return <WorkerView
+    key={identity.user?.id||identity.profile?.worker_id}
     profile={identity.profile}
     navigation={workerNavigation}
     setNavigation={setWorkerNavigation}
