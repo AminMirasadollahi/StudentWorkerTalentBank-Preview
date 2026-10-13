@@ -140,6 +140,7 @@ test('worker exposes This Month and personal profile without permanent password 
 })
 test('month view edits one dated exception through injected fake RPC only',async()=>{
  const ui=await setup()
+ const previousWeeklyCalls=globalThis.__workerFocusCalls.length
  try{
   await ui.clickText('زمان حضور')
   assert.ok(ui.host.querySelector('.ow-month-grid'))
@@ -150,11 +151,11 @@ test('month view edits one dated exception through injected fake RPC only',async
   assert.equal(globalThis.__workerExceptionCalls.length,1)
   const [who,date,kind,windows]=globalThis.__workerExceptionCalls[0]
   assert.equal(who,worker)
-  assert.match(date,/^\\d{4}-\\d{2}-\\d{2}$/)
+  assert.match(date,/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)
   assert.equal(kind,'unavailable')
   assert.deepEqual(windows,[])
-  assert.equal(globalThis.__workerFocusCalls.length,1,
-    'prior weekly fake invocation remains separate from date exception fake')
+  assert.equal(globalThis.__workerFocusCalls.length,previousWeeklyCalls,
+    'date exception must not accidentally invoke weekly schedule writes')
  }finally{await ui.dispose()}
 })
 test('sources preserve fail-closed auth and critical applicant/protected operational wiring',()=>{
