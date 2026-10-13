@@ -462,9 +462,73 @@ async function exportOpsExcel(data, filteredToOneWorker=false) {
   a.href=url;a.download=filteredToOneWorker?'student-worker-selected-history.xlsx':'student-worker-operations.xlsx';a.click()
   setTimeout(()=>URL.revokeObjectURL(url),1000)
 }
+function ManagerWorkerProfile({data,selectedId,onChange}) {
+  const workers=data.workers||[]
+  const selected=workers.find(w=>w.id===selectedId)
+  const scoped=selected?scopeWorkerHistory(data,selectedId):null
+  const summary=scoped?summarizeWorkerHistory(scoped):null
+  const tasks=scoped?.tasks||[]
+  const entries=scoped?.time_entries||[]
+  const ongoing=tasks.filter(t=>['assigned','in_progress','submitted','needs_changes'].includes(t.state))
+  const completed=tasks.filter(t=>t.state==='completed')
+  return <section className="report-panel ow-profile-section">
+    <div className="ow-presence-section-title">
+      <h2>پروفایل دانشجوکارها</h2>
+      <label className="report-field ow-worker-selector"><span>انتخاب دانشجوکار</span>
+        <select value={selectedId} onChange={e=>onChange(e.target.value)}>
+          <option value="">انتخاب کنید</option>
+          {workers.map(w=><option key={w.id} value={w.id}>{w.name} · {unitLabels[w.unit]||w.unit}</option>)}
+        </select>
+      </label>
+    </div>
+    {!selected&&<p className="ow-muted">برای دیدن پرونده تجمیعی، یک دانشجوکار انتخاب کنید.</p>}
+    {selected&&<>
+      <div className="ow-profile-heading">
+        <div><h3>{selected.name}</h3>
+          <small className="ow-muted">{unitLabels[selected.unit]||selected.unit||'—'}
+            {selected.major&&<> · {selected.major}</>}</small></div>
+        <span className="ow-status">{workerStateLabels[selected.state]||selected.state}</span>
+      </div>
+      <div className="ow-profile-metrics">
+        <div><span>کارهای واگذارشده</span><b>{n(summary.taskCount)}</b></div>
+        <div><span>در جریان</span><b>{n(summary.openCount)}</b></div>
+        <div><span>گزارش منتظر</span><b>{n(summary.pendingCount)}</b></div>
+        <div><span>زمان تأییدشده</span><b>{exactDuration(summary.approvedMinutes)}</b></div>
+      </div>
+      <details className="ow-profile-fold"><summary>کارهای در جریان · {n(ongoing.length)}</summary>
+        <div className="ow-profile-mini-list">
+          {ongoing.map(t=><div key={t.id}><b>{t.title}</b><small>{pretty(t.planned_date)} · {stateLabels[t.state]||t.state}</small></div>)}
+          {!ongoing.length&&<p className="ow-muted">کاری در جریان نیست.</p>}
+        </div>
+      </details>
+      <details className="ow-profile-fold"><summary>کارهای تکمیل‌شده · {n(completed.length)}</summary>
+        <div className="ow-profile-mini-list">
+          {completed.map(t=><div key={t.id}><b>{t.title}</b><small>{pretty(t.planned_date)}</small></div>)}
+          {!completed.length&&<p className="ow-muted">کاری تکمیل نشده است.</p>}
+        </div>
+      </details>
+      <details className="ow-profile-fold"><summary>سوابق ساعات و گزارش‌ها · {n(entries.length)}</summary>
+        <div className="ow-profile-mini-list">
+          {entries.map(e=><div key={e.id}>
+            <b>{tasks.find(t=>t.id===e.task_id)?.title||'گزارش کار'}</b>
+            <small>{pretty(e.work_date)} · {reviewLabels[e.review_state]||e.review_state}
+              {' · '}{e.review_state==='approved'
+                ?exactDuration(e.approved_minutes):minutes(e.reported_minutes)}</small>
+          </div>)}
+          {!entries.length&&<p className="ow-muted">گزارشی وجود ندارد.</p>}
+        </div>
+      </details>
+      <details className="ow-profile-fold"><summary>وضعیت حساب · فقط مشاهده</summary>
+        <WorkerLifecycleReadOnlyPreview worker={selected}/>
+      </details>
+    </>}
+  </section>
+}
 export function AdminOperations({ navigation, setNavigation }) {
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const view=navigation.workView
+  const profileWorkerId=navigation.profileWorkerId||''
+  const setProfileWorkerId=value=>setNavigation(previous=>({...previous,profileWorkerId:value}))
   const workerId=navigation.workerId
   const historyWorkerId=navigation.historyWorkerId
   const historyUnit=navigation.historyUnit||''
@@ -556,8 +620,6 @@ export function AdminOperations({ navigation, setNavigation }) {
     catch(e){setError(readableError(e))}
     finally{setBusy(false)}
   }
-  const weekStart=shift(today(),-((new Date(today()+'T00:00:00Z').getUTCDay()+1)%7))
-  const week=Array.from({length:7},(_,i)=>shift(weekStart,i))
 
   return <div className="ow-workspace">
     <div className="ow-summary">
@@ -567,7 +629,7 @@ export function AdminOperations({ navigation, setNavigation }) {
       <article><span>کل ساعات تأییدشده</span><b>{exactDuration(approvedMinutes)}</b></article>
     </div>
     <SectionTabs value={view} onChange={setView} options={[
-      ['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],
+      ['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],['profiles','پروفایل‌ها'],
     ]}/>
     {loading&&<p className="ow-muted">در حال دریافت اطلاعات…</p>}
     <Message error={error} notice={notice}/>
@@ -757,25 +819,11 @@ export function AdminOperations({ navigation, setNavigation }) {
           {active.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
       </label>
-      {workerId&&<>
-        <div className="ow-week-grid">
-          {week.map(d=>{
-            const forecast=assessAssignmentCapacity(data,{workerId,date:d,estimateMinutes:0})
-            const warning=['overbooked','unavailable','not_configured','unknown'].includes(forecast.code)
-            return <article key={d} className={warning?'ow-week-alert':undefined}>
-              <strong>{dayLabels.find(x=>x[0]===isoWeekday(d))?.[1]}</strong>
-              <small>{pretty(d)}</small>
-              <b>{forecast.availableMinutes===null?'برنامه نامشخص':minutes(forecast.availableMinutes)}</b>
-              <small>کارهای قبلی: {forecast.assignedMinutes===null?'—':minutes(forecast.assignedMinutes)}</small>
-              {forecast.code==='overbooked'&&<small>بیش از ظرفیت</small>}
-              {forecast.code==='unavailable'&&<small>عدم حضور ثبت‌شده</small>}
-            </article>
-          })}
-        </div>
-        <ScheduleEditor key={workerId} workerId={workerId} data={data} onSaved={refresh}/>
-      </>}
+      {workerId&&<ScheduleEditor key={workerId} workerId={workerId} data={data} onSaved={refresh}/>}
+
     </section>}
 
+    {view==='profiles'&&<ManagerWorkerProfile data={data} selectedId={profileWorkerId} onChange={setProfileWorkerId}/>}
     {view==='history'&&<section className="report-panel">
       <div className="report-panel-heading">
         <h2>سابقه ساعات و خروجی</h2>
