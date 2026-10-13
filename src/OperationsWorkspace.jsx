@@ -10,7 +10,7 @@ import { assessAssignmentCapacity, assessAvailabilityOverride, firstMatchingWeek
 import { describeTaskWorkflow,selectManagerTasks,summarizeTaskWorkflow,selectPendingApprovals } from './lib/operationsTaskOverview.mjs'
 import WorkerLifecycleReadOnlyPreview from './components/WorkerLifecycleReadOnlyPreview'
 import { workerStateLabels } from './lib/workerLifecycle.mjs'
-import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persianWeekBounds } from './lib/weeklyScheduleGrid.mjs'
+import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persianWeekBounds, suggestNextWindow } from './lib/weeklyScheduleGrid.mjs'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -215,7 +215,7 @@ function ScheduleEditor({workerId,onSaved,data}) {
         <div className="ow-actions">
           <button type="button" className="report-btn report-btn--light"
             disabled={busy||draftWindows.length>=MAX_DAILY_WINDOWS}
-            onClick={()=>setDraftWindows(old=>[...old,{start:'08:00',end:'09:00'}])}>
+            onClick={()=>setDraftWindows(old=>[...old,suggestNextWindow(old)])}>
             + افزودن نوبت ({n(draftWindows.length)} از {n(MAX_DAILY_WINDOWS)})
           </button>
           <button type="submit" className="report-btn report-btn--primary"
