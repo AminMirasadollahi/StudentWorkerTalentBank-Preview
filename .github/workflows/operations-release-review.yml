@@ -1,0 +1,43 @@
+name: Management Draft PR Safety Gate (NO DEPLOY)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'index.html'
+      - 'vite.config.js'
+      - 'package.json'
+      - '.github/workflows/operations-release-review.yml'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  non_deploy_release_review:
+    name: Production intake lock, synthetic React tests and Vite build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install existing preview app dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install jsdom only for synthetic mounted React tests (not app dependency)
+        run: npm install --no-save --no-package-lock --no-audit --no-fund jsdom@26.1.0
+      - name: Verify protected public baselines and synthetic task/history/React tests
+        run: node --test tests/*.test.mjs
+      - name: Build EXACT public Vite entrypoint — without any deployment
+        run: npm run build
+      - name: Confirm normal HTML entry does not load synthetic QA
+        run: |
+          if grep -Eiq 'operations-qa|lifecycle-qa|/src/qa/' dist/index.html; then
+            echo "STOP: QA entry in public HTML" >&2
+            exit 1
+          fi
+          echo "PASS: release review built without deploying and without QA entrypoints"
