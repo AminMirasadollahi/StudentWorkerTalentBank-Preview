@@ -147,7 +147,7 @@ function ScheduleEditor({workerId,onSaved,data}) {
       await onSaved?.()
       onSuccess?.()
       setNotice('ذخیره این بخش با موفقیت انجام شد.')
-    } catch(e){setError(readableError(e))}
+    } catch(e){setError(readableError(e));if(onSuccess)setSaveDayState('ذخیره نشد؛ دوباره تلاش کنید.')}
     finally{setBusy(false)}
   }
   const submitDay=event=>{
