@@ -46,7 +46,7 @@ const plugin={
   },
   load(id){
     if(id==='\0qa-v2-no-network')return [
-      'export const getAdminWorkV2=async()=>globalThis.__taskReviewFixture;',
+      'export const getAdminWorkV2=async()=>{if(globalThis.__managerReadDenied)throw Error("operations_access_denied");return globalThis.__taskReviewFixture;};',
       'export const getMyWorkV2=async()=>globalThis.__taskReviewFixture;',
       'export const getMyWorkerProfileV2=async()=>({worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"});',
       'export const getMyProfileChangeRequests=async()=>[];',
@@ -154,4 +154,22 @@ test('missing linked task is never silently treated as normal approval',async()=
     assert.equal(buttons.length,3)
     assert.equal(buttons.every(x=>x.disabled),true)
   }finally{await ui.dispose()}
+})
+
+
+test('manager denies old privileged records when initial V2 read fails and recovers on retry',async()=>{
+ globalThis.__managerReadDenied=true
+ const ui=await setup('tasks')
+ try{
+  assert.ok(ui.host.querySelector('.ow-access-recheck'))
+  assert.equal(ui.host.querySelector('.ow-task-results'),null)
+  assert.doesNotMatch(ui.host.textContent,/مرتب‌سازی نسخه‌ها/)
+  globalThis.__managerReadDenied=false
+  const retry=Array.from(ui.host.querySelectorAll('button'))
+    .find(b=>b.textContent==='تلاش مجدد برای دریافت اطلاعات')
+  assert.ok(retry)
+  await act(async()=>retry.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.equal(ui.host.querySelector('.ow-access-recheck'),null)
+  assert.equal(ui.host.querySelectorAll('.ow-task-results .ow-item').length,3)
+ }finally{globalThis.__managerReadDenied=false;await ui.dispose()}
 })
