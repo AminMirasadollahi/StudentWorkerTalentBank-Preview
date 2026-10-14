@@ -655,7 +655,8 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone}) {
         <div><span>کارهای واگذارشده</span><b>{n(summary.taskCount)}</b></div>
         <div><span>در جریان</span><b>{n(summary.openCount)}</b></div>
         <div><span>گزارش منتظر</span><b>{n(summary.pendingCount)}</b></div>
-        <div><span>زمان تأییدشده</span><b>{exactDuration(summary.approvedMinutes)}</b></div>
+        <div><span>زمان تأییدشده</span><b>{exactDuration(
+          selected.approved_minutes_total??summary.approvedMinutes)}</b></div>
       </div>
       <details className="ow-profile-fold"><summary>کارهای در جریان · {n(ongoing.length)}</summary>
         <div className="ow-profile-mini-list">
@@ -798,7 +799,8 @@ export function AdminOperations({ navigation, setNavigation }) {
   const todayTasks=(data.tasks||[]).filter(t=>t.planned_date===today()&&t.state!=='cancelled')
   const pending=(data.time_entries||[]).filter(e=>e.review_state==='submitted')
   const pendingProfileChanges=(data.profile_requests||[]).filter(r=>r.review_state==='pending')
-  const approvedMinutes=(data.time_entries||[])
+  // All-time approved minutes use the authorized, uncapped backend aggregate.
+  const approvedMinutes=data.approved_minutes_total??(data.time_entries||[])
     .filter(e=>e.review_state==='approved')
     .reduce((sum,e)=>sum+Number(e.approved_minutes||0),0)
   const isShort=date<shift(today(),2)
@@ -1257,7 +1259,7 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
   </article>
 }
-function WorkerSelfProfile({tasks,records,profile,requestLedger}) {
+function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal}) {
  const [identity,setIdentity]=useState(null)
  const [requests,setRequests]=useState([])
  const [requestsLoading,setRequestsLoading]=useState(true)
@@ -1337,7 +1339,10 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger}) {
   const ongoing=tasks.filter(t=>t.planned_date<=today()
     &&!['completed','cancelled'].includes(t.state))
   const approved=records.filter(e=>e.review_state==='approved')
-  const approvedTime=approved.reduce((sum,e)=>sum+Number(e.approved_minutes||0),0)
+  // The visible records may be only the newest 1,000; lifetime credit
+  // comes from the server aggregate, never a capped list of report details.
+  const approvedTime=approvedMinutesTotal??approved.reduce(
+    (sum,e)=>sum+Number(e.approved_minutes||0),0)
   const panels=[
     {id:'ongoing',title:'در جریان',tasks:ongoing},
     {id:'upcoming',title:'پیش‌رو',tasks:upcoming},
@@ -1472,7 +1477,8 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
   useEffect(()=>{void refresh()},[profile.worker_id])
   const records=data.time_entries||[]
   const approved=records.filter(x=>x.review_state==='approved')
-  const total=approved.reduce((sum,e)=>sum+Number(e.approved_minutes||0),0)
+  const total=data.approved_minutes_total??approved.reduce(
+    (sum,e)=>sum+Number(e.approved_minutes||0),0)
   const tasks=data.tasks||[]
   const week=persianWeekBounds(today())
   const month=persianMonthBounds(today())
@@ -1522,6 +1528,7 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
       <ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
     </section>}
     {section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}
-      requestLedger={acknowledgedActions.current.profileRequests}/>}
+      requestLedger={acknowledgedActions.current.profileRequests}
+      approvedMinutesTotal={data.approved_minutes_total}/>}
   </div>
 }
