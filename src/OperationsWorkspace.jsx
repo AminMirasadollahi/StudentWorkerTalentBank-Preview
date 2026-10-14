@@ -1257,7 +1257,7 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
   </article>
 }
-function WorkerSelfProfile({tasks,records,profile}) {
+function WorkerSelfProfile({tasks,records,profile,requestLedger}) {
  const [identity,setIdentity]=useState(null)
  const [requests,setRequests]=useState([])
  const [requestsLoading,setRequestsLoading]=useState(true)
@@ -1269,6 +1269,10 @@ function WorkerSelfProfile({tasks,records,profile}) {
  const [value,setValue]=useState('')
  const [reason,setReason]=useState('')
  const [saving,setSaving]=useState(false)
+ const [submitNotice,setSubmitNotice]=useState('')
+ const submitLock=useRef(false)
+ const hasPendingField=fieldCode=>requestLedger.has(fieldCode)
+   ||requests.some(r=>r.field_code===fieldCode&&r.review_state==='pending')
  const refreshProfile=async()=>{
    const sequence=++profileReadSequence.current
    setRequestsLoading(true)
@@ -1277,6 +1281,12 @@ function WorkerSelfProfile({tasks,records,profile}) {
      if(sequence!==profileReadSequence.current)return false
      if(!personal||typeof personal!=='object'||!Array.isArray(items))
        throw Error('INVALID_PROFILE_PROJECTION')
+     // Release the local receipt ONLY when its exact server request appears
+     // in a completed state. A stale queue with no row cannot unlock it.
+     for(const [code,receipt] of requestLedger){
+       const item=items.find(r=>r.id===receipt.requestId)
+       if(item&&item.review_state!=='pending')requestLedger.delete(code)
+     }
      setIdentity(personal)
      setRequests(items)
      setProfileReadFailed(false)
@@ -1298,17 +1308,27 @@ function WorkerSelfProfile({tasks,records,profile}) {
  },[profile.worker_id])
  const submitChange=async event=>{
    event.preventDefault()
-   if(saving||value.trim().length<2||reason.trim().length<10)return
-   setSaving(true);setRequestsError('')
+   // A ref guards against same-tick double-submits before React updates.
+   if(submitLock.current||saving||hasPendingField(field)
+      ||value.trim().length<2||reason.trim().length<10)return
+   submitLock.current=true
+   setSaving(true);setRequestsError('');setSubmitNotice('')
    try{
-     await requestProfileChange({field,value:value.trim(),reason:reason.trim()})
+     const receipt=await requestProfileChange({field,value:value.trim(),reason:reason.trim()})
+     if(receipt?.ok!==true||!receipt.request_id)
+       throw Error('invalid_profile_change_receipt')
+     // An acknowledged request remains locked across tab remounts, even if
+     // the subsequent read returns a stale queue or an access error.
+     requestLedger.set(field,{requestId:receipt.request_id})
      setEditing(false);setValue('');setReason('')
-     await refreshProfile()
+     setSubmitNotice('درخواست اصلاح ثبت شد و برای رسیدگی مدیر ارسال شده است.')
+     const refreshed=await refreshProfile()
+     if(!refreshed)setSubmitNotice('درخواست ثبت شده است؛ تنها دریافت وضعیت تازه ناموفق بود.')
    }catch(e){
-     setRequestsError(String(e?.message||'').includes('profile_change_already_pending')
-       ?'برای این مشخصه درخواست رسیدگی‌نشده وجود دارد.'
-       :'درخواست ثبت نشد؛ اطلاعات واردشده حفظ شده‌اند.')
-   }finally{setSaving(false)}
+     const alreadyPending=String(e?.message||'').includes('profile_change_already_pending')
+     setRequestsError(alreadyPending?'برای این مشخصه درخواست رسیدگی‌نشده وجود دارد؛ ابتدا وضعیت درخواست را دوباره دریافت کنید.'
+       :'ثبت درخواست تأیید نشد. برای جلوگیری از تکرار، ابتدا وضعیت درخواست‌های قبلی را بررسی کنید.')
+   }finally{submitLock.current=false;setSaving(false)}
  }
 
   const completed=tasks.filter(t=>t.state==='completed')
@@ -1326,6 +1346,7 @@ function WorkerSelfProfile({tasks,records,profile}) {
   if(profileReadFailed)return <section className="report-panel ow-self-profile ow-profile-access-recheck" role="alert">
     <p>مشخصات شخصی در دسترس نیستند. اطلاعات قبلی تا تأیید دوبارهٔ دسترسی پنهان می‌مانند.</p>
     {requestsError&&<p className="report-alert report-alert--error">{requestsError}</p>}
+    {submitNotice&&<p role="status" className="ow-muted">{submitNotice}</p>}
     <button type="button" className="report-btn report-btn--light" disabled={requestsLoading}
       onClick={()=>{void refreshProfile()}}>تلاش مجدد برای دریافت مشخصات</button>
   </section>
@@ -1360,11 +1381,14 @@ function WorkerSelfProfile({tasks,records,profile}) {
             onChange={e=>setReason(e.target.value)}/>
         </label>
         <small>تا تأیید مدیر، مشخصات فعلی تغییر نمی‌کنند.</small>
+        {hasPendingField(field)&&<small role="status">برای این مشخصه درخواست ثبت‌شده یا منتظر بررسی وجود دارد؛ ثبت دوباره غیرفعال است.</small>}
+        {submitNotice&&<small role="status">{submitNotice}</small>}
         <button type="submit" className="report-btn report-btn--primary"
-          disabled={saving||value.trim().length<2||reason.trim().length<10}>
+          disabled={saving||hasPendingField(field)||value.trim().length<2||reason.trim().length<10}>
           ارسال درخواست</button>
       </form>}
     </details>
+    {submitNotice&&<p className="ow-muted" role="status">{submitNotice}</p>}
     {requestsError&&<div role="alert" className="report-alert report-alert--error">{requestsError}</div>}
     {requestsLoading&&<p role="status" className="ow-muted">در حال دریافت وضعیت درخواست‌ها…</p>}
     {requests.length>0&&<details className="ow-profile-fold"><summary>درخواست‌های اصلاح · {n(requests.length)}</summary>
@@ -1414,9 +1438,9 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
   const [data,setData]=useState({tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   // Task acknowledgements survive switching work/profile/presence tabs, but
   // are strictly scoped to this authenticated worker and this React session.
-  const acknowledgedActions=useRef({workerId:profile.worker_id,items:new Map()})
+  const acknowledgedActions=useRef({workerId:profile.worker_id,items:new Map(),profileRequests:new Map()})
   if(acknowledgedActions.current.workerId!==profile.worker_id)
-    acknowledgedActions.current={workerId:profile.worker_id,items:new Map()}
+    acknowledgedActions.current={workerId:profile.worker_id,items:new Map(),profileRequests:new Map()}
   const [localNavigation,setLocalNavigation]=useState({section:'tasks',taskRange:'today'})
   const selected=navigation||localNavigation
   const updateNavigation=patch=>{
@@ -1497,6 +1521,7 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
       <h2>برنامه حضور</h2>
       <ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
     </section>}
-    {section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}/>}
+    {section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}
+      requestLedger={acknowledgedActions.current.profileRequests}/>}
   </div>
 }
