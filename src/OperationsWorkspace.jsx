@@ -994,6 +994,9 @@ function WorkerTaskCard({task,onSaved}) {
   return <article className="ow-item">
     <div className="ow-item-header"><strong>{task.title}</strong><span className="ow-status">{stateLabels[task.state]}</span></div>
     <small>{pretty(task.planned_date)} · زمان استاندارد قابل ثبت: {minutes(standard)}</small>
+    {task.collaborators?.length>0&&<small className="ow-task-collaborators">
+      با همکاری: {task.collaborators.map(x=>x.name).join('، ')}
+    </small>}
     {ready&&<details className="ow-worker-action-detail"><summary>ثبت انجام و گزارش کار</summary>
       {task.instructions&&<p>{task.instructions}</p>}
       <form onSubmit={e=>{e.preventDefault();if(!completionConfirmed||!extraValid)return;perform(async()=>{
@@ -1065,7 +1068,41 @@ function WorkerTaskCard({task,onSaved}) {
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
   </article>
 }
-function WorkerSelfProfile({tasks,records}) {
+function WorkerSelfProfile({tasks,records,profile}) {
+ const [identity,setIdentity]=useState(profile)
+ const [requests,setRequests]=useState([])
+ const [requestsLoading,setRequestsLoading]=useState(true)
+ const [requestsError,setRequestsError]=useState('')
+ const [editing,setEditing]=useState(false)
+ const [field,setField]=useState('major')
+ const [value,setValue]=useState('')
+ const [reason,setReason]=useState('')
+ const [saving,setSaving]=useState(false)
+ const refreshProfile=async()=>{
+   try{
+     const [personal,items]=await Promise.all([getMyWorkerProfileV2(),getMyProfileChangeRequests()])
+     if(personal)setIdentity(personal)
+     setRequests(Array.isArray(items)?items:[])
+     setRequestsError('')
+   }catch{setRequestsError('مشخصات یا درخواست‌ها دریافت نشد؛ دوباره بررسی کنید.')}
+   finally{setRequestsLoading(false)}
+ }
+ useEffect(()=>{void refreshProfile()},[profile.worker_id])
+ const submitChange=async event=>{
+   event.preventDefault()
+   if(saving||value.trim().length<2||reason.trim().length<10)return
+   setSaving(true);setRequestsError('')
+   try{
+     await requestProfileChange({field,value:value.trim(),reason:reason.trim()})
+     setEditing(false);setValue('');setReason('')
+     await refreshProfile()
+   }catch(e){
+     setRequestsError(String(e?.message||'').includes('profile_change_already_pending')
+       ?'برای این مشخصه درخواست رسیدگی‌نشده وجود دارد.'
+       :'درخواست ثبت نشد؛ اطلاعات واردشده حفظ شده‌اند.')
+   }finally{setSaving(false)}
+ }
+
   const completed=tasks.filter(t=>t.state==='completed')
   const upcoming=tasks.filter(t=>t.planned_date>today()
     &&!['completed','cancelled'].includes(t.state))
@@ -1081,6 +1118,48 @@ function WorkerSelfProfile({tasks,records}) {
   return <section className="report-panel ow-self-profile">
     <div className="ow-presence-section-title"><h2>پروفایل من</h2>
       <span className="ow-status">زمان تأییدشده: {exactDuration(approvedTime)}</span></div>
+    <div className="ow-self-identity">
+      <div><small>نام و نام خانوادگی</small><strong>{identity?.name||'نامشخص'}</strong></div>
+      <div><small>رشته تحصیلی</small><strong>{identity?.major||'ثبت نشده'}</strong></div>
+      <div><small>سال ورود</small><strong>{identity?.entry_year||'ثبت نشده'}</strong></div>
+      <div><small>واحد همکاری</small><strong>{unitLabels[identity?.unit]||identity?.unit||'نامشخص'}</strong></div>
+    </div>
+    <details className="ow-profile-fold ow-profile-change" open={editing} onToggle={e=>{
+       if(!e.currentTarget.open&&editing)setEditing(false)
+     }}>
+      <summary onClick={e=>{e.preventDefault();setEditing(open=>!open)}}>درخواست اصلاح مشخصات</summary>
+      {editing&&<form onSubmit={submitChange} className="ow-profile-change-form">
+        <label className="report-field"><span>مشخصه موردنظر</span>
+          <select value={field} onChange={e=>setField(e.target.value)}>
+            <option value="major">رشته تحصیلی</option><option value="full_name">نام و نام خانوادگی</option>
+          </select>
+        </label>
+        <label className="report-field"><span>مقدار پیشنهادی</span>
+          <input required minLength={2} maxLength={120} value={value}
+            onChange={e=>setValue(e.target.value)}/>
+        </label>
+        <label className="report-field"><span>دلیل اصلاح (۱۰ تا ۶۰۰ نویسه)</span>
+          <textarea required minLength={10} maxLength={600} rows={2} value={reason}
+            onChange={e=>setReason(e.target.value)}/>
+        </label>
+        <small>تا تأیید مدیر، مشخصات فعلی تغییر نمی‌کنند.</small>
+        <button type="submit" className="report-btn report-btn--primary"
+          disabled={saving||value.trim().length<2||reason.trim().length<10}>
+          ارسال درخواست</button>
+      </form>}
+    </details>
+    {requestsError&&<div role="alert" className="report-alert report-alert--error">{requestsError}</div>}
+    {requestsLoading&&<p role="status" className="ow-muted">در حال دریافت وضعیت درخواست‌ها…</p>}
+    {requests.length>0&&<details className="ow-profile-fold"><summary>درخواست‌های اصلاح · {n(requests.length)}</summary>
+      <div className="ow-profile-mini-list">
+        {requests.map(r=><div key={r.id}>
+          <b>{r.field_code==='major'?'رشته تحصیلی':'نام'}: {r.proposed_value}</b>
+          <small>{r.review_state==='pending'?'منتظر تأیید':
+             r.review_state==='approved'?'تأیید شد':'رد شد'}</small>
+          {r.review_note&&<small>نظر مدیر: {r.review_note}</small>}
+        </div>)}
+      </div>
+    </details>}
     <div className="ow-profile-kpi-line" aria-label="خلاصه عملکرد">
       <span>{n(ongoing.length)} در جریان</span><span>{n(upcoming.length)} پیش‌رو</span>
       <span>{n(completed.length)} انجام‌شده</span><span>{n(records.length)} گزارش</span>
@@ -1128,7 +1207,7 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
   const [error,setError]=useState('')
   const refresh=async()=>{
     setLoading(true);setError('')
-    try{setData(await getMyWork()||{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})}
+    try{setData(await getMyWorkV2()||{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})}
     catch(e){setError(readableError(e))}
     finally{setLoading(false)}
   }
@@ -1174,6 +1253,6 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
       <h2>برنامه حضور</h2>
       <ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
     </section>}
-    {section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records}/>}
+    {section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}/>}
   </div>
 }
