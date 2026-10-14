@@ -651,3 +651,21 @@ test('only a verified closed server request releases an acknowledged field lock'
   await ui.dispose()
  }
 })
+
+test('worker lifetime approved minutes come from server total beyond clipped report history',async()=>{
+ globalThis.__workerFocusFixture={...fixture(),approved_minutes_total:16500}
+ const ui=await setup()
+ try{
+  const summary=ui.host.querySelectorAll('.ow-summary article')
+  assert.equal(summary.length,3)
+  assert.match(summary[2].textContent,/۲۷۵ ساعت/)
+  await ui.clickText('پروفایل من')
+  assert.match(ui.host.querySelector('.ow-self-profile').textContent,
+    /زمان تأییدشده: ۲۷۵ ساعت/)
+  assert.equal(globalThis.__workerFocusFixture.time_entries.length,0,
+    'history payload intentionally omits past approved detail rows')
+ }finally{
+  globalThis.__workerFocusFixture=fixture()
+  await ui.dispose()
+ }
+})
