@@ -1,5 +1,14 @@
 # Operations V2 — public-safe handoff, 2026-10-14 (NO DEPLOY)
 
+## SWTB4 manager decision reliability — latest review-only result (2026-10-14)
+
+- Time review (`ApprovalCard`) and worker profile correction review (`ProfileChangeReview`) now **separate an acknowledged server mutation from later read/refresh errors**. Synchronous decision locks stop rapid double clicks and keep the same mounted card locked even if the backend projection is stale; badges update to «تصمیم ثبت‌شده». A genuine RPC rejection remains a retryable error. A failed read still invokes the previous fail-closed manager panel gate.
+- Real React UI tests with fully mocked no-network RPCs added four cases: repeated time approval, repeated correction approval, acknowledged review then denied refresh, and retryable server-side rejection. A temporary CI failure was traced to a test-only fixture resetting an explicit denied state; corrected and rerun.
+- Latest tested code HEAD **`4d23dfc1da04d00a980ec5566a891a4943b8ee88`**. [GitHub Actions run 38532439379](https://github.com/AminMirasadollahi/StudentWorkerTalentBank-Preview/actions/runs/38532439379): **71/71 React and utility tests PASS, 0 fail, Vite build PASS, NO PUBLIC PAGES DEPLOY**.
+- Cross-repo private detailed report: `docs/OPERATIONS_V2_SWTB4_MANAGER_DECISION_IDEMPOTENCY_2026-10-14.md` (private Draft PR #6 branch). No real applicant data, private SQL, tokens or proprietary font in this public handoff.
+- **Still HOLD:** Both PRs Draft/unmerged, live main/applicant form remains untouched. Live V2 SQL unapplied. No backup/recovery attestation, live role/JWT verification or independent release authorization.
+
+
 ## SWTB4 latest safety continuation — 2026-10-14
 
 - A read/auth refresh denial in real manager or worker React now **clears previous operational data**, hides sensitive panels and presents retry rather than continuing to show old tasks/reviews/profiles.
