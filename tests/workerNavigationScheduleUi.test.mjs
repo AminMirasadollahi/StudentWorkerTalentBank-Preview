@@ -36,8 +36,9 @@ const plugin={
       'export const getAdminWorkV2=async()=>globalThis.__workerFocusFixture;',
       'export const getMyWorkV2=async()=>globalThis.__workerFocusFixture;',
       'export const getMyWorkerProfileV2=async()=>({worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"});',
-      'export const getMyProfileChangeRequests=async()=>[];',
-      ...['requestProfileChange','reviewProfileChange','assignGroupTask'].map(name=>
+      'export const getMyProfileChangeRequests=async()=>globalThis.__profileChangeRequests;',
+      'export const requestProfileChange=async args=>{globalThis.__profileChangeCalls.push(args);globalThis.__profileChangeRequests.push({id:"FAKE-REQUEST",field_code:args.field,proposed_value:args.value,review_state:"pending"});return {ok:true};};',
+      ...['reviewProfileChange','assignGroupTask'].map(name=>
        `export const ${name}=async()=>{throw Error("QA_NO_REAL_BACKEND")};`),
     ].join('\n')
     
@@ -63,6 +64,8 @@ before(async()=>{
  globalThis.__workerFocusFixture=fixture()
  globalThis.__workerFocusCalls=[]
  globalThis.__workerExceptionCalls=[]
+ globalThis.__profileChangeCalls=[]
+ globalThis.__profileChangeRequests=[]
  ;({createRoot}=await import('react-dom/client'))
  server=await createServer({plugins:[plugin],server:{middlewareMode:true},
   appType:'custom',logLevel:'error'})
@@ -72,7 +75,8 @@ after(async()=>{
  await server?.close()
  dom?.window.close()
  for(const p of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT',
-  '__workerFocusFixture','__workerFocusCalls','__workerExceptionCalls'])delete globalThis[p]
+  '__workerFocusFixture','__workerFocusCalls','__workerExceptionCalls',
+  '__profileChangeCalls','__profileChangeRequests'])delete globalThis[p]
 })
 function Harness(){
  const [nav,setNav]=useState({section:'tasks',taskRange:'today'})
@@ -170,6 +174,51 @@ test('month view edits one dated exception through injected fake RPC only',async
   assert.deepEqual(windows,[])
   assert.equal(globalThis.__workerFocusCalls.length,previousWeeklyCalls,
     'date exception must not accidentally invoke weekly schedule writes')
+ }finally{await ui.dispose()}
+})
+test('overdue unfinished task remains actionable when Today is selected',async()=>{
+ const old='2026-08-10'
+ const extra={id:'FAKE-OVERDUE',worker_id:worker,title:'کار قدیمی ناتمام و نیازمند گزارش',
+  planned_date:old,state:'needs_changes',estimate_minutes:60}
+ globalThis.__workerFocusFixture=fixture()
+ globalThis.__workerFocusFixture.tasks.push(extra)
+ const ui=await setup()
+ try{
+  assert.match(ui.host.textContent,/کار قدیمی ناتمام و نیازمند گزارش/)
+  const card=Array.from(ui.host.querySelectorAll('.ow-worker-tasks .ow-item'))
+    .find(x=>x.textContent.includes('کار قدیمی ناتمام'))
+  assert.ok(card)
+  assert.match(card.textContent,/ثبت انجام و گزارش کار/)
+ }finally{
+  await ui.dispose()
+  globalThis.__workerFocusFixture=fixture()
+ }
+})
+test('personal profile change only queues a synthetic manager-reviewed proposal',async()=>{
+ const ui=await setup()
+ try{
+  await ui.clickText('پروفایل من')
+  assert.match(ui.host.textContent,/رشته تحصیلی/)
+  assert.match(ui.host.textContent,/پژوهش/)
+  const summary=ui.host.querySelector('.ow-profile-change > summary')
+  assert.ok(summary)
+  await act(async()=>summary.dispatchEvent(new window.MouseEvent('click',{bubbles:true,cancelable:true})))
+  assert.ok(ui.host.querySelector('.ow-profile-change-form'))
+  const fields=ui.host.querySelectorAll('.ow-profile-change-form input,.ow-profile-change-form textarea')
+  assert.equal(fields.length,2)
+  const setText=async(el,value)=>{
+   const setter=Object.getOwnPropertyDescriptor(el.tagName==='TEXTAREA'?
+     window.HTMLTextAreaElement.prototype:window.HTMLInputElement.prototype,'value').set
+   await act(async()=>{setter.call(el,value);el.dispatchEvent(new window.Event('input',{bubbles:true}))})
+  }
+  await setText(fields[0],'رشته آموزشی آزمایشی')
+  await setText(fields[1],'درخواست اصلاح اطلاعات ثبت‌شده به صورت آزمایشی')
+  const form=ui.host.querySelector('.ow-profile-change-form')
+  await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__profileChangeCalls.length,1)
+  assert.equal(globalThis.__profileChangeCalls[0].field,'major')
+  assert.match(ui.host.textContent,/منتظر تأیید/)
+  assert.match(ui.host.textContent,/پژوهش/,'approved value must not be silently replaced')
  }finally{await ui.dispose()}
 })
 test('sources preserve fail-closed auth and critical applicant/protected operational wiring',()=>{
