@@ -104,9 +104,10 @@ function SectionTabs({value,onChange,options}) {
       onClick={()=>onChange(id)}>{title}</button>)}
   </nav>
 }
-function ScheduleEditor({workerId,onSaved,data}) {
+function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
   const [effective,setEffective]=useState(today())
   const [editingDay,setEditingDay]=useState(null)
+  const [editingSlot,setEditingSlot]=useState(null)
   const [draftWindows,setDraftWindows]=useState([])
   const [monthAnchor,setMonthAnchor]=useState(today())
   const [selectedDate,setSelectedDate]=useState('')
@@ -131,20 +132,27 @@ function ScheduleEditor({workerId,onSaved,data}) {
       {unavailable:exceptionKind==='unavailable'})
 
   useEffect(()=>{
-    setEditingDay(null);setDraftWindows([]);setSelectedDate('')
+    setEditingDay(null);setEditingSlot(null);setDraftWindows([]);setSelectedDate('')
     setError('');setNotice('');setSaveState('')
   },[workerId])
   useEffect(()=>{
-    setEditingDay(null);setDraftWindows([]);setSaveState('')
+    setEditingDay(null);setEditingSlot(null);setDraftWindows([]);setSaveState('')
   },[effective])
 
-  const openWeekday=id=>{
+  const openSlot=(id,index)=>{
     if(busy)return
-    if(editingDay===id){setEditingDay(null);return}
     const date=firstMatchingWeekday(effective,id)
-    setEditingDay(id)
-    setDraftWindows(selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,id,date))
+    const windows=selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,id,date)
+    if(index>windows.length)return
+    if(editingDay===id&&editingSlot===index){setEditingDay(null);setEditingSlot(null);return}
+    const next=index===windows.length?[...windows,suggestNextWindow(windows)]:windows
+    setEditingDay(id);setEditingSlot(index);setDraftWindows(next)
     setError('');setNotice('');setSaveState('')
+  }
+  const deleteSlot=()=>{
+    if(editingSlot===null)return
+    setDraftWindows(current=>current.filter((_,i)=>i!==editingSlot))
+    setEditingSlot(null)
   }
   const chooseMonthDay=date=>{
     if(busy)return
@@ -170,7 +178,7 @@ function ScheduleEditor({workerId,onSaved,data}) {
       await command()
       await onSaved?.()
       setSaveState(kind==='weekly'?'برنامه همین روز ذخیره شد.':'استثنای این تاریخ ذخیره شد.')
-      if(kind==='weekly')setEditingDay(null)
+      if(kind==='weekly'){setEditingDay(null);setEditingSlot(null)}
       else setSelectedDate('')
     }catch(e){
       setError(readableError(e))
@@ -241,30 +249,51 @@ function ScheduleEditor({workerId,onSaved,data}) {
           const date=firstMatchingWeekday(effective,id)
           const slots=selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,id,date)
           return <div className="ow-week-row-shell" key={id}>
-            <button type="button" className={editingDay===id?'ow-week-row is-editing':'ow-week-row'}
-              onClick={()=>openWeekday(id)} aria-expanded={editingDay===id} disabled={busy}
-              aria-label={`ویرایش برنامه ${name}؛ ${slots.length?n(slots.length)+' بازه':'برنامه نامشخص'}`}>
+            <div className="ow-week-row">
               <span className="ow-week-day"><strong>{name}</strong></span>
-              {[0,1,2,3].map(i=><span key={i}
-                className={slots[i]?'ow-week-slot':'ow-week-slot is-empty'}>
-                {slots[i]?<span dir="ltr">{slots[i].start}–{slots[i].end}</span>:<span aria-hidden="true">＋</span>}
-              </span>)}
-            </button>
-            {editingDay===id&&<form className="ow-week-day-form" onSubmit={submitWeek}>
-              {renderWindows(draftWindows,setDraftWindows,'ثابت')}
-              {!weeklyValidation.ok&&<p role="alert" className="ow-warning">{weeklyValidation.error}</p>}
-              {weeklyValidation.ok&&<small className="ow-muted">
-                مجموع: {exactDuration(weeklyValidation.minutes)} · ذخیره فقط برای {name}
-              </small>}
-              {weekPreview?.code==='conflict'&&<p role="status" className="ow-warning">
-                برای این روز {minutes(weekPreview.allocatedMinutes)} کار ثبت شده؛ ظرفیت پیشنهادی
-                {' '}{minutes(weekPreview.proposedCapacity)} است. کارهای قبلی حذف نمی‌شوند.
-              </p>}
-              <div className="ow-inline-save"><button className="report-btn report-btn--primary"
-                type="submit" disabled={busy||!weeklyValidation.ok}>
-                {draftWindows.length?'ذخیره همین روز':'حذف برنامه این روز'}
-              </button></div>
-            </form>}
+              {[0,1,2,3].map(index=>{
+                const slot=slots[index]
+                const isEditing=editingDay===id&&editingSlot===index
+                return <div key={index} className={'ow-week-cell'+(isEditing?' is-editing':'')}>
+                  {isEditing?<form className="ow-slot-editor" onSubmit={submitWeek}
+                    aria-label={`ثبت نوبت ${index+1} ${name}`}>
+                    <label><span className="ow-sr-only">شروع</span><input type="text"
+                      inputMode="numeric" dir="ltr" required maxLength={5}
+                      value={draftWindows[index]?.start||''} placeholder="08:00"
+                      onChange={e=>editWindow(setDraftWindows,index,'start',e.target.value)}/></label>
+                    <label><span className="ow-sr-only">پایان</span><input type="text"
+                      inputMode="numeric" dir="ltr" required maxLength={5}
+                      value={draftWindows[index]?.end||''} placeholder="09:00"
+                      onChange={e=>editWindow(setDraftWindows,index,'end',e.target.value)}/></label>
+                    <div className="ow-slot-actions">
+                      <button type="submit" title="ذخیره نوبت" aria-label="ذخیره همین روز"
+                        disabled={busy||!weeklyValidation.ok}>✓</button>
+                      {slot&&<button type="button" title="حذف نوبت" aria-label="حذف نوبت"
+                        onClick={deleteSlot} disabled={busy}>×</button>}
+                      <button type="button" title="انصراف" aria-label="انصراف"
+                        onClick={()=>{setEditingDay(null);setEditingSlot(null)}}>↩</button>
+                    </div>
+                    {!weeklyValidation.ok&&<small role="alert">{weeklyValidation.error}</small>}
+                    {weekPreview?.code==='conflict'&&<small role="status">
+                      تعارض با کارهای قبلی؛ آن‌ها حذف نمی‌شوند.</small>}
+                  </form>:<button type="button"
+                    aria-label={`ویرایش برنامه ${name} نوبت ${index+1}`}
+                    className={'ow-week-slot'+(slot?'':' is-empty')}
+                    title={slot?'ویرایش نوبت':'افزودن نوبت'}
+                    disabled={busy||index>slots.length} onClick={()=>openSlot(id,index)}>
+                    {slot?<span dir="ltr">{slot.start}–{slot.end}</span>:
+                      <span aria-hidden="true">＋</span>}
+                  </button>}
+                </div>
+              })}
+            </div>
+            {editingDay===id&&editingSlot===null&&<div className="ow-slot-delete-confirm">
+              <span>نوبت حذف شد؛ برای ثبت برنامه جدید این روز، تغییر را ذخیره کنید.</span>
+              <button type="button" className="ow-mini-btn"
+                onClick={()=>{setEditingDay(null);setEditingSlot(null)}}>انصراف</button>
+              <button type="button" className="ow-mini-btn" disabled={busy||!weeklyValidation.ok}
+                onClick={()=>submitWeek({preventDefault:()=>{}})}>ذخیره حذف</button>
+            </div>}
           </div>
         })}
       </div>
@@ -309,7 +338,8 @@ function ScheduleEditor({workerId,onSaved,data}) {
                 {daily.windows.length===1?timings:`${daily.windows.length} بازه · ${daily.windows[0].start}`}
               </small>:null}
             {hasException&&daily.kind!=='unavailable'&&<i className="ow-exception-mark">تغییر</i>}
-            {tasks.length>0&&<small className="ow-task-count">{n(tasks.length)} کار</small>}
+            {tasks.slice(0,2).map(t=><small className="ow-day-task" key={t.id} title={t.title}>{t.title}</small>)}
+            {tasks.length>2&&<small className="ow-task-count">+{n(tasks.length-2)} کار</small>}
           </button>
         })}
       </div>
@@ -326,11 +356,19 @@ function ScheduleEditor({workerId,onSaved,data}) {
               'برنامه فعلی: '+current.windows.map(w=>w.start+'–'+w.end).join('، ')
           })()}
         </p>
+        {(calendarData.tasks||[]).some(t=>t.worker_id===workerId&&t.planned_date===selectedDate)&&
+          <div className="ow-selected-day-tasks"><b>کارهای این تاریخ</b>
+            {(calendarData.tasks||[]).filter(t=>t.worker_id===workerId&&t.planned_date===selectedDate)
+              .map(t=><div key={t.id}><strong>{t.title}</strong>
+                <small>{stateLabels[t.state]||t.state} · {minutes(t.estimate_minutes)}</small></div>)}
+          </div>}
+        {onPlanAssignment&&<button type="button" className="ow-mini-btn"
+          onClick={()=>onPlanAssignment(selectedDate)}>+ تعریف کار در این تاریخ</button>}
         <div className="ow-exception-kind" role="group" aria-label="نوع تغییر این تاریخ">
           <label><input type="radio" name="exception-kind" checked={exceptionKind==='replacement_intervals'}
-            onChange={()=>setExceptionKind('replacement_intervals')}/> ساعات جایگزین</label>
+            onChange={()=>setExceptionKind('replacement_intervals')}/> ثبت ساعات جایگزین</label>
           <label><input type="radio" name="exception-kind" checked={exceptionKind==='unavailable'}
-            onChange={()=>setExceptionKind('unavailable')}/> عدم حضور</label>
+            onChange={()=>setExceptionKind('unavailable')}/> ثبت عدم حضور</label>
         </div>
         {exceptionKind==='replacement_intervals'&&
           renderWindows(exceptionWindows,setExceptionWindows,'استثنا')}
@@ -968,7 +1006,7 @@ function WorkerTaskCard({task,onSaved}) {
   return <article className="ow-item">
     <div className="ow-item-header"><strong>{task.title}</strong><span className="ow-status">{stateLabels[task.state]}</span></div>
     <small>{pretty(task.planned_date)} · زمان استاندارد قابل ثبت: {minutes(standard)}</small>
-    {ready&&<details className="ow-worker-action-detail"><summary>ثبت نتیجه و گزارش کار</summary>
+    {ready&&<details className="ow-worker-action-detail"><summary>ثبت انجام و گزارش کار</summary>
       {task.instructions&&<p>{task.instructions}</p>}
       <form onSubmit={e=>{e.preventDefault();if(!completionConfirmed||!extraValid)return;perform(async()=>{
       await submitMyTime({taskId:task.id,date,minutes:requestedMinutes,note,
@@ -1113,9 +1151,11 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
   const tasks=data.tasks||[]
   const week=persianWeekBounds(today())
   const month=persianMonthBounds(today())
-  const visible=taskRange==='today'?tasks.filter(t=>t.planned_date===today()):
+  const ranged=taskRange==='today'?tasks.filter(t=>t.planned_date===today()):
     taskRange==='week'?tasks.filter(t=>t.planned_date>=week.start&&t.planned_date<=week.end):
     tasks.filter(t=>t.planned_date>=month.start&&t.planned_date<=month.end)
+  const overdue=tasks.filter(t=>t.planned_date<today()&&['assigned','in_progress','needs_changes'].includes(t.state))
+  const visible=[...overdue,...ranged.filter(t=>!overdue.some(p=>p.id===t.id))]
   return <div className="ow-workspace ow-worker-workspace">
     <div className="ow-summary">
       <article><span>کارهای باز</span><b>{n(tasks.filter(t=>!['completed','cancelled'].includes(t.state)).length)}</b></article>
@@ -1129,7 +1169,7 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
     {section==='tasks'&&<section className="report-panel">
       <div className="ow-worker-list-heading">
-        <h2>کارها</h2>
+        <h2>کارها {overdue.length>0&&<small className="ow-overdue-count">· {n(overdue.length)} نیازمند اقدام از روزهای قبل</small>}</h2>
         <div className="ow-range-switch" role="group" aria-label="بازه نمایش کارها">
           {[['today','امروز'],['week','این هفته'],['month','این ماه']].map(([id,title])=>
             <button type="button" key={id} aria-pressed={taskRange===id}
