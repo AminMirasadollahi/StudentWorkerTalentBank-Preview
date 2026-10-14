@@ -669,3 +669,27 @@ test('worker lifetime approved minutes come from server total beyond clipped rep
   await ui.dispose()
  }
 })
+
+test('worker V1 RPC weekly rows without worker_id are visible and unlock next slot',async()=>{
+ const previous=globalThis.__workerFocusFixture
+ globalThis.__workerFocusFixture={...fixture(),weekly_slots:[{
+   weekday_iso:6,start_minute:480,end_minute:540,
+   valid_from:'2026-10-01',valid_until:null,
+ }]}
+ let browser
+ try{
+   browser=await setup()
+   await browser.clickText('زمان حضور')
+   const first=browser.host.querySelector('button[aria-label="ویرایش برنامه شنبه نوبت 1"]')
+   const second=browser.host.querySelector('button[aria-label="ویرایش برنامه شنبه نوبت 2"]')
+   assert.ok(first)
+   assert.ok(second)
+   assert.match(first.textContent,/08:00.*09:00/)
+   assert.equal(second.disabled,false,'slot 2 must become editable when a saved first slot exists')
+   await browser.click('button[aria-label="ویرایش برنامه شنبه نوبت 2"]')
+   assert.ok(browser.host.querySelector('form[aria-label="ثبت نوبت 2 شنبه"]'))
+ }finally{
+   if(browser)await browser.dispose()
+   globalThis.__workerFocusFixture=previous
+ }
+})
