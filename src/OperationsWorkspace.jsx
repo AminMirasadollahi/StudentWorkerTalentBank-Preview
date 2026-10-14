@@ -116,6 +116,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
   const [selectedDate,setSelectedDate]=useState('')
   const [exceptionKind,setExceptionKind]=useState('replacement_intervals')
   const [exceptionWindows,setExceptionWindows]=useState([])
+  const [exceptionSlot,setExceptionSlot]=useState(null)
   const [note,setNote]=useState('')
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
@@ -135,7 +136,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
       {unavailable:exceptionKind==='unavailable'})
 
   useEffect(()=>{
-    setEditingDay(null);setEditingSlot(null);setDraftWindows([]);setSelectedDate('')
+    setEditingDay(null);setEditingSlot(null);setDraftWindows([]);setSelectedDate('');setExceptionSlot(null)
     setError('');setNotice('');setSaveState('')
   },[workerId])
   useEffect(()=>{
@@ -174,6 +175,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
         }))
       : selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,isoWeekday(date),date)
     setSelectedDate(date)
+    setExceptionSlot(null)
     setExceptionKind(kind)
     setExceptionWindows(windows.length?windows:[suggestNextWindow([])])
     setNote(exception?.note||'')
@@ -215,25 +217,35 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
   const editWindow=(setter,index,field,value)=>
     setter(current=>current.map((w,i)=>i===index?{...w,[field]:value}:w))
   const renderWindows=(windows,setter,prefix)=>(
-    <div className="ow-inline-windows">
-      {windows.map((slot,i)=><div className="ow-inline-window" key={i}>
-        <span className="ow-inline-window-label">نوبت {n(i+1)}</span>
-        <label className="report-field"><span>از</span><input type="text" inputMode="numeric"
-          dir="ltr" required maxLength={5} placeholder="08:00"
-          value={slot.start} onChange={e=>editWindow(setter,i,'start',e.target.value)}/></label>
-        <label className="report-field"><span>تا</span><input type="text" inputMode="numeric"
-          dir="ltr" required maxLength={5} placeholder="09:00"
-          value={slot.end} onChange={e=>editWindow(setter,i,'end',e.target.value)}/></label>
-        <button type="button" className="ow-mini-btn" disabled={busy}
-          aria-label={`حذف نوبت ${i+1} ${prefix}`}
-          onClick={()=>setter(current=>current.filter((_,j)=>j!==i))}>حذف</button>
-      </div>)}
-      <div className="ow-inline-tools">
-        <button type="button" className="ow-mini-btn" disabled={busy||windows.length>=MAX_DAILY_WINDOWS}
-          onClick={()=>setter(current=>[...current,suggestNextWindow(current)])}>
-          + نوبت ({n(windows.length)} از {n(MAX_DAILY_WINDOWS)})
-        </button>
-      </div>
+    <div className="ow-date-slot-grid" aria-label="چهار نوبت حضور جایگزین">
+      {[0,1,2,3].map(index=>{
+        const slot=windows[index]
+        const editing=exceptionSlot===index
+        return <div key={index} className={'ow-date-slot'+(editing?' is-editing':'')}>
+          <small>نوبت {n(index+1)}</small>
+          {editing?<div className="ow-date-slot-fields">
+            <label><span className="ow-sr-only">شروع</span><input type="text"
+              dir="ltr" inputMode="numeric" maxLength={5} placeholder="08:00"
+              value={slot?.start||''} onChange={e=>editWindow(setter,index,'start',e.target.value)}/></label>
+            <label><span className="ow-sr-only">پایان</span><input type="text"
+              dir="ltr" inputMode="numeric" maxLength={5} placeholder="09:00"
+              value={slot?.end||''} onChange={e=>editWindow(setter,index,'end',e.target.value)}/></label>
+            <button type="button" title="تأیید ویرایش نوبت" aria-label="تأیید ویرایش نوبت"
+              disabled={!exceptionValidation.ok} onClick={()=>setExceptionSlot(null)}>✓</button>
+            <button type="button" title="حذف نوبت" aria-label="حذف نوبت"
+              onClick={()=>{setter(list=>list.filter((_,i)=>i!==index));setExceptionSlot(null)}}>×</button>
+          </div>:<button type="button" className="ow-date-slot-toggle"
+            disabled={busy||index>windows.length}
+            aria-label={slot?`ویرایش نوبت جایگزین ${index+1}`:`افزودن نوبت جایگزین ${index+1}`}
+            onClick={()=>{
+              if(!slot)setter(current=>[...current,suggestNextWindow(current)])
+              setExceptionSlot(index)
+            }}>
+            {slot?<span dir="ltr">{slot.start}–{slot.end}</span>:<span aria-hidden="true">＋</span>}
+          </button>}
+        </div>
+      })}
+      <small className="ow-muted">هر نوبت را در همان خانه تنظیم کنید؛ ثبت نهایی فقط برای تاریخ انتخاب‌شده است.</small>
     </div>
   )
   if(!workerId)return <p className="ow-muted">یک دانشجوکار انتخاب کنید.</p>
