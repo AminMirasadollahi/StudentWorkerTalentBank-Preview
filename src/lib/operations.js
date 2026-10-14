@@ -36,7 +36,7 @@ export async function currentOperationsIdentity() {
   const isAdmin = assertResult(await opsClient.rpc('ops_is_admin'))
   if (isAdmin) return classifyOperationsIdentity({ user: data.user, isAdmin: true })
 
-  const profile = assertResult(await opsClient.rpc('ops_get_my_worker_profile'))
+  const profile = assertResult(await opsClient.rpc('ops_get_my_worker_profile_v2'))
   return classifyOperationsIdentity({ user: data.user, isAdmin: false, profile })
 }
 
@@ -79,10 +79,10 @@ export async function provisionWorker(applicationId, unitCode, email, onboarding
 
 
 export async function getAdminWork() {
-  return assertResult(await opsClient.rpc('ops_get_operations'))
+  return assertResult(await opsClient.rpc('ops_get_operations_v3'))
 }
 export async function getMyWork() {
-  return assertResult(await opsClient.rpc('ops_get_my_work'))
+  return assertResult(await opsClient.rpc('ops_get_my_work_v2'))
 }
 export async function setWeeklyDay(workerId, weekday, intervals, effectiveDate) {
   return assertResult(await opsClient.rpc('ops_set_weekly_day', {
@@ -121,4 +121,26 @@ export async function reviewWorkerTime({entryId,decision,approvedMinutes,note}) 
     p_approved_minutes:decision==='approved'? Number(approvedMinutes):null,
     p_review_note:note || null,
   }))
+}
+
+/** Group assignment is one server transaction; each member receives independent report/credit. */
+export async function assignGroupTask({workerIds,title,instructions,date,minutes,shortNoticeReason}) {
+ return assertResult(await opsClient.rpc('ops_assign_group_task',{
+  p_worker_ids:workerIds,p_title:title,p_instructions:instructions,
+  p_planned_date:date,p_estimate_minutes:Number(minutes),
+  p_short_notice_reason:shortNoticeReason||null,
+ }))
+}
+export async function getMyProfileChangeRequests() {
+ return assertResult(await opsClient.rpc('ops_get_my_profile_change_requests'))
+}
+export async function requestProfileChange({field,value,reason}) {
+ return assertResult(await opsClient.rpc('ops_request_profile_change',{
+  p_field:field,p_value:value,p_reason:reason,
+ }))
+}
+export async function reviewProfileChange({requestId,decision,note}) {
+ return assertResult(await opsClient.rpc('ops_review_profile_change',{
+  p_request_id:requestId,p_decision:decision,p_note:note||null,
+ }))
 }
