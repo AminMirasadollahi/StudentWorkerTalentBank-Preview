@@ -437,3 +437,55 @@ test('failed correction-history scope also hides self identity until successful 
   await ui.dispose()
  }
 })
+
+test('report acknowledgement persists while worker switches presence and work tabs',async()=>{
+ globalThis.__workerFocusFixture=fixture()
+ globalThis.__qaAllowWorkerSubmit=true
+ globalThis.__qaSubmitCalls=[]
+ const ui=await setup()
+ try{
+  await submitSyntheticWorkerReport(ui)
+  assert.equal(globalThis.__qaSubmitCalls.length,1)
+  await ui.clickText('زمان حضور')
+  await ui.clickText('کارها')
+  const report=ui.host.querySelector('.ow-worker-action-detail button[type="submit"]')
+  assert.ok(report)
+  assert.equal(report.disabled,true,'tab remount must not clear accepted report receipt')
+  await act(async()=>ui.host.querySelector('.ow-worker-action-detail form')
+   .dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__qaSubmitCalls.length,1)
+ }finally{
+  globalThis.__qaAllowWorkerSubmit=false
+  globalThis.__qaSubmitCalls=[]
+  globalThis.__workerFocusFixture=fixture()
+  await ui.dispose()
+ }
+})
+test('fresh changes_requested review cycle reopens report with a new submission identity',async()=>{
+ globalThis.__workerFocusFixture=fixture()
+ globalThis.__qaAllowWorkerSubmit=true
+ globalThis.__qaSubmitCalls=[]
+ const ui=await setup()
+ try{
+  await submitSyntheticWorkerReport(ui)
+  assert.equal(globalThis.__qaSubmitCalls.length,1)
+  const previousId=globalThis.__qaSubmitCalls[0].clientSubmissionId
+  await ui.clickText('زمان حضور')
+  globalThis.__workerFocusFixture.tasks[0].state='needs_changes'
+  globalThis.__workerFocusFixture.time_entries.push({
+   id:'SYNTHETIC-REVIEW-CYCLE',task_id:'FAKE-TASK',
+   review_state:'changes_requested',work_date:day(),reported_minutes:60,
+  })
+  await ui.clickText('کارها')
+  const submit=ui.host.querySelector('.ow-worker-action-detail button[type="submit"]')
+  assert.ok(submit)
+  await submitSyntheticWorkerReport(ui)
+  assert.equal(globalThis.__qaSubmitCalls.length,2,'manager-requested correction is a new report')
+  assert.notEqual(previousId,globalThis.__qaSubmitCalls[1].clientSubmissionId)
+ }finally{
+  globalThis.__qaAllowWorkerSubmit=false
+  globalThis.__qaSubmitCalls=[]
+  globalThis.__workerFocusFixture=fixture()
+  await ui.dispose()
+ }
+})
