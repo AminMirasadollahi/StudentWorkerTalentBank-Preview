@@ -28,12 +28,27 @@ const plugin={
   name:'private-operations-filter-ui-stub',
   enforce:'pre',
   resolveId(source,importer){
+    if((importer?.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operationsV2')
+      ||(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operationsV2'))
+      return '\0qa-v2-no-network'
+    if(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operations')
+      return '\0qa-admin-operations'
+    
     if(importer?.includes('/src/OperationsWorkspace.jsx') && source==='./lib/operations')
       return '\0qa-admin-operations'
     if(importer?.includes('/src/components/WorkerLifecycleControls.jsx') &&
        source==='../lib/operations') return '\0qa-admin-lifecycle'
   },
   load(id){
+    if(id==='\0qa-v2-no-network')return [
+      'export const getAdminWorkV2=async()=>globalThis.__historyFixture;',
+      'export const getMyWorkV2=async()=>globalThis.__historyFixture;',
+      'export const getMyWorkerProfileV2=async()=>({worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"});',
+      'export const getMyProfileChangeRequests=async()=>[];',
+      ...['requestProfileChange','reviewProfileChange','assignGroupTask'].map(name=>
+       `export const ${name}=async()=>{throw Error("QA_NO_REAL_BACKEND")};`),
+    ].join('\n')
+    
     if(id==='\0qa-admin-operations')return [
       'export const getAdminWork=async()=>globalThis.__historyFixture;',
       ...['getMyWork','setWeeklyDay','setDateException','assignWorkerTask',
@@ -132,7 +147,9 @@ test('worker profile is separate from history filter and preserves read-only lif
   await ui.click('پروفایل‌ها')
   assert.ok(ui.host.querySelector('.ow-profile-section'))
   assert.match(ui.host.textContent,/پروفایل دانشجوکارها/)
-  await ui.choose('.ow-profile-section select','worker-A')
+  const first=ui.host.querySelector('.ow-people-directory button')
+  assert.ok(first,'right-side list is available without a dropdown')
+  await act(async()=>first.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
   assert.match(ui.host.textContent,/نمونه یک/)
   assert.match(ui.host.textContent,/۱ ساعت و ۳۰ دقیقه/)
   const status=ui.host.querySelector('.ow-profile-fold')

@@ -13,6 +13,9 @@ import { workerStateLabels } from './lib/workerLifecycle.mjs'
 import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persianWeekBounds, suggestNextWindow } from './lib/weeklyScheduleGrid.mjs'
 import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonthBounds } from './lib/persianMonthCalendar.mjs'
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
+import TaskAssignmentEditor from './components/TaskAssignmentEditor'
+import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
+ requestProfileChange,reviewProfileChange } from './lib/operationsV2'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -104,14 +107,16 @@ function SectionTabs({value,onChange,options}) {
       onClick={()=>onChange(id)}>{title}</button>)}
   </nav>
 }
-function ScheduleEditor({workerId,onSaved,data}) {
+function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
   const [effective,setEffective]=useState(today())
   const [editingDay,setEditingDay]=useState(null)
+  const [editingSlot,setEditingSlot]=useState(null)
   const [draftWindows,setDraftWindows]=useState([])
   const [monthAnchor,setMonthAnchor]=useState(today())
   const [selectedDate,setSelectedDate]=useState('')
   const [exceptionKind,setExceptionKind]=useState('replacement_intervals')
   const [exceptionWindows,setExceptionWindows]=useState([])
+  const [exceptionSlot,setExceptionSlot]=useState(null)
   const [note,setNote]=useState('')
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
@@ -131,20 +136,32 @@ function ScheduleEditor({workerId,onSaved,data}) {
       {unavailable:exceptionKind==='unavailable'})
 
   useEffect(()=>{
-    setEditingDay(null);setDraftWindows([]);setSelectedDate('')
+    setEditingDay(null);setEditingSlot(null);setDraftWindows([]);setSelectedDate('');setExceptionSlot(null)
     setError('');setNotice('');setSaveState('')
   },[workerId])
   useEffect(()=>{
-    setEditingDay(null);setDraftWindows([]);setSaveState('')
+    setEditingDay(null);setEditingSlot(null);setDraftWindows([]);setSaveState('')
   },[effective])
 
-  const openWeekday=id=>{
+  const openSlot=(id,index)=>{
     if(busy)return
-    if(editingDay===id){setEditingDay(null);return}
     const date=firstMatchingWeekday(effective,id)
-    setEditingDay(id)
-    setDraftWindows(selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,id,date))
+    const windows=selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,id,date)
+    if(index>windows.length)return
+    if(editingDay===id&&editingSlot===index){setEditingDay(null);setEditingSlot(null);return}
+    const next=index===windows.length?[...windows,suggestNextWindow(windows)]:windows
+    setEditingDay(id);setEditingSlot(index);setDraftWindows(next)
     setError('');setNotice('');setSaveState('')
+  }
+  const deleteSlot=()=>{
+    if(editingSlot===null||editingDay===null||busy)return
+    const remaining=draftWindows.filter((_,i)=>i!==editingSlot)
+    const check=validateDailyWindows(remaining)
+    if(!check.ok)return
+    if(!window.confirm(remaining.length
+      ?'نوبت انتخاب‌شده از برنامه این روز حذف شود؟'
+      :'تنها نوبت این روز حذف می‌شود؛ نبود برنامه به معنای غیبت قطعی نیست. ادامه می‌دهید؟'))return
+    void save(()=>setWeeklyDay(workerId,editingDay,check.intervals,effective),'weekly')
   }
   const chooseMonthDay=date=>{
     if(busy)return
@@ -158,6 +175,7 @@ function ScheduleEditor({workerId,onSaved,data}) {
         }))
       : selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,isoWeekday(date),date)
     setSelectedDate(date)
+    setExceptionSlot(null)
     setExceptionKind(kind)
     setExceptionWindows(windows.length?windows:[suggestNextWindow([])])
     setNote(exception?.note||'')
@@ -170,7 +188,7 @@ function ScheduleEditor({workerId,onSaved,data}) {
       await command()
       await onSaved?.()
       setSaveState(kind==='weekly'?'برنامه همین روز ذخیره شد.':'استثنای این تاریخ ذخیره شد.')
-      if(kind==='weekly')setEditingDay(null)
+      if(kind==='weekly'){setEditingDay(null);setEditingSlot(null)}
       else setSelectedDate('')
     }catch(e){
       setError(readableError(e))
@@ -199,25 +217,35 @@ function ScheduleEditor({workerId,onSaved,data}) {
   const editWindow=(setter,index,field,value)=>
     setter(current=>current.map((w,i)=>i===index?{...w,[field]:value}:w))
   const renderWindows=(windows,setter,prefix)=>(
-    <div className="ow-inline-windows">
-      {windows.map((slot,i)=><div className="ow-inline-window" key={i}>
-        <span className="ow-inline-window-label">نوبت {n(i+1)}</span>
-        <label className="report-field"><span>از</span><input type="text" inputMode="numeric"
-          dir="ltr" required maxLength={5} placeholder="08:00"
-          value={slot.start} onChange={e=>editWindow(setter,i,'start',e.target.value)}/></label>
-        <label className="report-field"><span>تا</span><input type="text" inputMode="numeric"
-          dir="ltr" required maxLength={5} placeholder="09:00"
-          value={slot.end} onChange={e=>editWindow(setter,i,'end',e.target.value)}/></label>
-        <button type="button" className="ow-mini-btn" disabled={busy}
-          aria-label={`حذف نوبت ${i+1} ${prefix}`}
-          onClick={()=>setter(current=>current.filter((_,j)=>j!==i))}>حذف</button>
-      </div>)}
-      <div className="ow-inline-tools">
-        <button type="button" className="ow-mini-btn" disabled={busy||windows.length>=MAX_DAILY_WINDOWS}
-          onClick={()=>setter(current=>[...current,suggestNextWindow(current)])}>
-          + نوبت ({n(windows.length)} از {n(MAX_DAILY_WINDOWS)})
-        </button>
-      </div>
+    <div className="ow-date-slot-grid" aria-label="چهار نوبت حضور جایگزین">
+      {[0,1,2,3].map(index=>{
+        const slot=windows[index]
+        const editing=exceptionSlot===index
+        return <div key={index} className={'ow-date-slot'+(editing?' is-editing':'')}>
+          <small>نوبت {n(index+1)}</small>
+          {editing?<div className="ow-date-slot-fields">
+            <label><span className="ow-sr-only">شروع</span><input type="text"
+              dir="ltr" inputMode="numeric" maxLength={5} placeholder="08:00"
+              value={slot?.start||''} onChange={e=>editWindow(setter,index,'start',e.target.value)}/></label>
+            <label><span className="ow-sr-only">پایان</span><input type="text"
+              dir="ltr" inputMode="numeric" maxLength={5} placeholder="09:00"
+              value={slot?.end||''} onChange={e=>editWindow(setter,index,'end',e.target.value)}/></label>
+            <button type="button" title="تأیید ویرایش نوبت" aria-label="تأیید ویرایش نوبت"
+              disabled={!exceptionValidation.ok} onClick={()=>setExceptionSlot(null)}>✓</button>
+            <button type="button" title="حذف نوبت" aria-label="حذف نوبت"
+              onClick={()=>{setter(list=>list.filter((_,i)=>i!==index));setExceptionSlot(null)}}>×</button>
+          </div>:<button type="button" className="ow-date-slot-toggle"
+            disabled={busy||index>windows.length}
+            aria-label={slot?`ویرایش نوبت جایگزین ${index+1}`:`افزودن نوبت جایگزین ${index+1}`}
+            onClick={()=>{
+              if(!slot)setter(current=>[...current,suggestNextWindow(current)])
+              setExceptionSlot(index)
+            }}>
+            {slot?<span dir="ltr">{slot.start}–{slot.end}</span>:<span aria-hidden="true">＋</span>}
+          </button>}
+        </div>
+      })}
+      <small className="ow-muted">هر نوبت را در همان خانه تنظیم کنید؛ ثبت نهایی فقط برای تاریخ انتخاب‌شده است.</small>
     </div>
   )
   if(!workerId)return <p className="ow-muted">یک دانشجوکار انتخاب کنید.</p>
@@ -241,30 +269,44 @@ function ScheduleEditor({workerId,onSaved,data}) {
           const date=firstMatchingWeekday(effective,id)
           const slots=selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,id,date)
           return <div className="ow-week-row-shell" key={id}>
-            <button type="button" className={editingDay===id?'ow-week-row is-editing':'ow-week-row'}
-              onClick={()=>openWeekday(id)} aria-expanded={editingDay===id} disabled={busy}
-              aria-label={`ویرایش برنامه ${name}؛ ${slots.length?n(slots.length)+' بازه':'برنامه نامشخص'}`}>
+            <div className="ow-week-row">
               <span className="ow-week-day"><strong>{name}</strong></span>
-              {[0,1,2,3].map(i=><span key={i}
-                className={slots[i]?'ow-week-slot':'ow-week-slot is-empty'}>
-                {slots[i]?<span dir="ltr">{slots[i].start}–{slots[i].end}</span>:<span aria-hidden="true">＋</span>}
-              </span>)}
-            </button>
-            {editingDay===id&&<form className="ow-week-day-form" onSubmit={submitWeek}>
-              {renderWindows(draftWindows,setDraftWindows,'ثابت')}
-              {!weeklyValidation.ok&&<p role="alert" className="ow-warning">{weeklyValidation.error}</p>}
-              {weeklyValidation.ok&&<small className="ow-muted">
-                مجموع: {exactDuration(weeklyValidation.minutes)} · ذخیره فقط برای {name}
-              </small>}
-              {weekPreview?.code==='conflict'&&<p role="status" className="ow-warning">
-                برای این روز {minutes(weekPreview.allocatedMinutes)} کار ثبت شده؛ ظرفیت پیشنهادی
-                {' '}{minutes(weekPreview.proposedCapacity)} است. کارهای قبلی حذف نمی‌شوند.
-              </p>}
-              <div className="ow-inline-save"><button className="report-btn report-btn--primary"
-                type="submit" disabled={busy||!weeklyValidation.ok}>
-                {draftWindows.length?'ذخیره همین روز':'حذف برنامه این روز'}
-              </button></div>
-            </form>}
+              {[0,1,2,3].map(index=>{
+                const slot=slots[index]
+                const isEditing=editingDay===id&&editingSlot===index
+                return <div key={index} className={'ow-week-cell'+(isEditing?' is-editing':'')}>
+                  {isEditing?<form className="ow-slot-editor" onSubmit={submitWeek}
+                    aria-label={`ثبت نوبت ${index+1} ${name}`}>
+                    <label><span className="ow-sr-only">شروع</span><input type="text"
+                      inputMode="numeric" dir="ltr" required maxLength={5}
+                      value={draftWindows[index]?.start||''} placeholder="08:00"
+                      onChange={e=>editWindow(setDraftWindows,index,'start',e.target.value)}/></label>
+                    <label><span className="ow-sr-only">پایان</span><input type="text"
+                      inputMode="numeric" dir="ltr" required maxLength={5}
+                      value={draftWindows[index]?.end||''} placeholder="09:00"
+                      onChange={e=>editWindow(setDraftWindows,index,'end',e.target.value)}/></label>
+                    <div className="ow-slot-actions">
+                      <button type="submit" title="ذخیره نوبت" aria-label="ذخیره همین روز"
+                        disabled={busy||!weeklyValidation.ok}>✓</button>
+                      {slot&&<button type="button" title="حذف نوبت" aria-label="حذف نوبت"
+                        onClick={deleteSlot} disabled={busy}>×</button>}
+                      <button type="button" title="انصراف" aria-label="انصراف"
+                        onClick={()=>{setEditingDay(null);setEditingSlot(null)}}>↩</button>
+                    </div>
+                    {!weeklyValidation.ok&&<small role="alert">{weeklyValidation.error}</small>}
+                    {weekPreview?.code==='conflict'&&<small role="status">
+                      تعارض با کارهای قبلی؛ آن‌ها حذف نمی‌شوند.</small>}
+                  </form>:<button type="button"
+                    aria-label={`ویرایش برنامه ${name} نوبت ${index+1}`}
+                    className={'ow-week-slot'+(slot?'':' is-empty')}
+                    title={slot?'ویرایش نوبت':'افزودن نوبت'}
+                    disabled={busy||index>slots.length} onClick={()=>openSlot(id,index)}>
+                    {slot?<span dir="ltr">{slot.start}–{slot.end}</span>:
+                      <span aria-hidden="true">＋</span>}
+                  </button>}
+                </div>
+              })}
+            </div>
           </div>
         })}
       </div>
@@ -309,7 +351,8 @@ function ScheduleEditor({workerId,onSaved,data}) {
                 {daily.windows.length===1?timings:`${daily.windows.length} بازه · ${daily.windows[0].start}`}
               </small>:null}
             {hasException&&daily.kind!=='unavailable'&&<i className="ow-exception-mark">تغییر</i>}
-            {tasks.length>0&&<small className="ow-task-count">{n(tasks.length)} کار</small>}
+            {tasks.slice(0,2).map(t=><small className="ow-day-task" key={t.id} title={t.title}>{t.title}</small>)}
+            {tasks.length>2&&<small className="ow-task-count">+{n(tasks.length-2)} کار</small>}
           </button>
         })}
       </div>
@@ -326,11 +369,19 @@ function ScheduleEditor({workerId,onSaved,data}) {
               'برنامه فعلی: '+current.windows.map(w=>w.start+'–'+w.end).join('، ')
           })()}
         </p>
+        {(calendarData.tasks||[]).some(t=>t.worker_id===workerId&&t.planned_date===selectedDate)&&
+          <div className="ow-selected-day-tasks"><b>کارهای این تاریخ</b>
+            {(calendarData.tasks||[]).filter(t=>t.worker_id===workerId&&t.planned_date===selectedDate)
+              .map(t=><div key={t.id}><strong>{t.title}</strong>
+                <small>{stateLabels[t.state]||t.state} · {minutes(t.estimate_minutes)}</small></div>)}
+          </div>}
+        {onPlanAssignment&&<button type="button" className="ow-mini-btn"
+          onClick={()=>onPlanAssignment(selectedDate)}>+ تعریف کار در این تاریخ</button>}
         <div className="ow-exception-kind" role="group" aria-label="نوع تغییر این تاریخ">
           <label><input type="radio" name="exception-kind" checked={exceptionKind==='replacement_intervals'}
-            onChange={()=>setExceptionKind('replacement_intervals')}/> ساعات جایگزین</label>
+            onChange={()=>setExceptionKind('replacement_intervals')}/> ثبت ساعات جایگزین</label>
           <label><input type="radio" name="exception-kind" checked={exceptionKind==='unavailable'}
-            onChange={()=>setExceptionKind('unavailable')}/> عدم حضور</label>
+            onChange={()=>setExceptionKind('unavailable')}/> ثبت عدم حضور</label>
         </div>
         {exceptionKind==='replacement_intervals'&&
           renderWindows(exceptionWindows,setExceptionWindows,'استثنا')}
@@ -357,6 +408,28 @@ function ScheduleEditor({workerId,onSaved,data}) {
     </div>
   </div>
 }
+function AllWorkerTimeline({data}) {
+ const workers=(data?.workers||[]).filter(w=>w.state==='active')
+ const slots=data?.weekly_slots||[]
+ return <div className="ow-all-workers-timeline" aria-label="نمای حضور هفتگی همه دانشجوکارها">
+   {dayLabels.map(([id,name])=>{
+     const date=firstMatchingWeekday(today(),id)
+     const entries=workers.flatMap(w=>selectedWeeklyWindows(slots,w.id,id,date)
+       .map(slot=>({key:w.id+'-'+slot.start,name:w.name,unit:w.unit,...slot})))
+       .sort((a,b)=>a.start.localeCompare(b.start)||a.name.localeCompare(b.name,'fa'))
+     return <div className="ow-team-day" key={id}>
+       <b>{name}</b>
+       <div className="ow-team-intervals">
+         {entries.map(e=><span className="ow-team-interval" key={e.key}>
+           <span dir="ltr">{e.start}–{e.end}</span>
+           <strong>{e.name}</strong>
+         </span>)}
+         {!entries.length&&<small>برنامه ثبت‌شده‌ای برای این روز موجود نیست.</small>}
+       </div>
+     </div>
+   })}
+ </div>
+}
 function ApprovalCard({entry,task,worker,onDone}) {
   const standard=Number(task?.estimate_minutes ?? entry.reported_minutes)
   const missingTask=!task
@@ -365,20 +438,36 @@ function ApprovalCard({entry,task,worker,onDone}) {
   const [approved,setApproved]=useState(String(Math.min(standard,requested)))
   const [note,setNote]=useState('')
   const [busy,setBusy]=useState(false)
+  const [committed,setCommitted]=useState(false)
+  const [notice,setNotice]=useState('')
+  const decisionLock=useRef(false)
   const [error,setError]=useState('')
   const approvalNeedsReason=Number(approved)!==requested || Number(approved)>standard
   const act=async decision=>{
-    setBusy(true);setError('')
+    // Prevent rapid double clicks before React can commit disabled=true.
+    if(decisionLock.current)return
+    decisionLock.current=true
+    setBusy(true);setError('');setNotice('')
     try{
       await reviewWorkerTime({entryId:entry.id,decision,approvedMinutes:approved,note})
-      await onDone()
-    }catch(e){setError(readableError(e))}
-    finally{setBusy(false)}
+      setCommitted(true)
+      setNotice('تصمیم در سرور ثبت شد؛ در حال دریافت فهرست تازه…')
+      // A post-commit refresh failure is NOT a failed server decision.
+      try{
+        const refreshed=await onDone?.()
+        if(refreshed===false)throw Error('REFRESH_ONLY_FAILURE')
+      }catch{
+        setNotice('تصمیم ثبت شده است، اما تازه‌سازی فهرست انجام نشد. دوباره اطلاعات را دریافت کنید.')
+      }
+    }catch(e){
+      decisionLock.current=false
+      setError(readableError(e))
+    }finally{setBusy(false)}
   }
   return <article className="ow-item">
     <div className="ow-item-header">
       <strong>{task?.title||'کار مرتبط نامشخص'}</strong>
-      <span className="ow-status">{missingTask?'نیازمند بررسی پرونده':asksExtra?'درخواست زمان اضافه':'گزارش عادی'}</span>
+      <span className="ow-status">{committed?'تصمیم ثبت‌شده':missingTask?'نیازمند بررسی پرونده':asksExtra?'درخواست زمان اضافه':'گزارش عادی'}</span>
     </div>
     <small>{worker?.name||'—'} · {pretty(entry.work_date)} · درخواست: {minutes(requested)}
       {asksExtra&&<> · اضافه: {minutes(requested-standard)}</>}
@@ -402,13 +491,14 @@ function ApprovalCard({entry,task,worker,onDone}) {
     </div>
     <div className="ow-actions">
       <button className="report-btn report-btn--primary" type="button"
-        disabled={busy||missingTask||approved===''||!Number.isInteger(Number(approved))||Number(approved)<0||Number(approved)>requested||(approvalNeedsReason&&!note.trim())}
+        disabled={busy||committed||missingTask||approved===''||!Number.isInteger(Number(approved))||Number(approved)<0||Number(approved)>requested||(approvalNeedsReason&&!note.trim())}
         onClick={()=>act('approved')}>تأیید ساعت</button>
       <button className="report-btn report-btn--light" type="button"
-        disabled={busy||missingTask||!note.trim()} onClick={()=>act('changes_requested')}>نیازمند اصلاح</button>
+        disabled={busy||committed||missingTask||!note.trim()} onClick={()=>act('changes_requested')}>نیازمند اصلاح</button>
       <button className="report-btn report-btn--light" type="button"
-        disabled={busy||missingTask||!note.trim()} onClick={()=>act('rejected')}>رد گزارش</button>
+        disabled={busy||committed||missingTask||!note.trim()} onClick={()=>act('rejected')}>رد گزارش</button>
     </div>
+    {notice&&<p role="status" className="ow-muted">{notice}</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
     </details>
   </article>
@@ -472,8 +562,60 @@ async function exportOpsExcel(data, filteredToOneWorker=false) {
   a.href=url;a.download=filteredToOneWorker?'student-worker-selected-history.xlsx':'student-worker-operations.xlsx';a.click()
   setTimeout(()=>URL.revokeObjectURL(url),1000)
 }
-function ManagerWorkerProfile({data,selectedId,onChange}) {
+function ProfileChangeReview({request,worker,onDone}) {
+ const [note,setNote]=useState('')
+ const [busy,setBusy]=useState(false)
+ const [committed,setCommitted]=useState(false)
+ const [notice,setNotice]=useState('')
+ const decisionLock=useRef(false)
+ const [error,setError]=useState('')
+ const act=async decision=>{
+   if(decisionLock.current)return
+   decisionLock.current=true
+   setBusy(true);setError('');setNotice('')
+   try{
+     await reviewProfileChange({requestId:request.id,decision,note:note.trim()})
+     setCommitted(true)
+     setNotice('تصمیم در سرور ثبت شد؛ در حال دریافت فهرست تازه…')
+     try{
+       const refreshed=await onDone?.()
+       if(refreshed===false)throw Error('REFRESH_ONLY_FAILURE')
+     }catch{
+       setNotice('درخواست بررسی شده است، اما تازه‌سازی فهرست انجام نشد. دوباره اطلاعات را دریافت کنید.')
+     }
+   }catch(e){
+     decisionLock.current=false
+     const raw=String(e?.message||'')
+     setError(raw.includes('already_reviewed')?'این درخواست قبلاً بررسی شده است.':
+       'بررسی انجام نشد؛ اطلاعات دوباره دریافت و بررسی شوند.')
+   }finally{setBusy(false)}
+ }
+ return <article className="ow-item ow-profile-request" data-request-id={request.id}>
+   <div className="ow-item-header">
+     <strong>{worker?.name||'دانشجوکار'} · اصلاح {request.field_code==='major'?'رشته':'نام'}</strong>
+     <span className="ow-status">{committed?'تصمیم ثبت‌شده':'نیازمند رسیدگی'}</span>
+   </div>
+   <p>مقدار پیشنهادی: <b>{request.proposed_value}</b></p>
+   <details className="ow-context-help"><summary>دلیل درخواست</summary>
+     <p>{request.reason}</p>
+   </details>
+   <label className="report-field"><span>یادداشت بررسی (اختیاری)</span>
+     <input maxLength={1000} value={note} onChange={e=>setNote(e.target.value)}/></label>
+   <div className="ow-actions">
+     <button className="report-btn report-btn--primary" type="button" disabled={busy||committed}
+       onClick={()=>act('approved')}>تأیید اصلاح</button>
+     <button className="report-btn report-btn--light" type="button" disabled={busy||committed}
+       onClick={()=>act('rejected')}>رد درخواست</button>
+   </div>
+   {notice&&<p role="status" className="ow-muted">{notice}</p>}
+   {error&&<p role="alert" className="report-alert report-alert--error">{error}</p>}
+ </article>
+}
+function ManagerWorkerProfile({data,selectedId,onChange,onDone}) {
   const workers=data.workers||[]
+  const [query,setQuery]=useState('')
+  const shownWorkers=workers.filter(w=>w.name?.toLocaleLowerCase('fa-IR')
+    .includes(query.trim().toLocaleLowerCase('fa-IR')))
   const selected=workers.find(w=>w.id===selectedId)
   const scoped=selected?scopeWorkerHistory(data,selectedId):null
   const summary=scoped?summarizeWorkerHistory(scoped):null
@@ -481,17 +623,27 @@ function ManagerWorkerProfile({data,selectedId,onChange}) {
   const entries=scoped?.time_entries||[]
   const ongoing=tasks.filter(t=>['assigned','in_progress','submitted','needs_changes'].includes(t.state))
   const completed=tasks.filter(t=>t.state==='completed')
+  const changeQueue=(data.profile_requests||[]).filter(r=>r.worker_id===selectedId
+    &&r.review_state==='pending')
+  const timeQueue=entries.filter(e=>e.review_state==='submitted')
+  const taskById=new Map(tasks.map(t=>[t.id,t]))
   return <section className="report-panel ow-profile-section">
-    <div className="ow-presence-section-title">
-      <h2>پروفایل دانشجوکارها</h2>
-      <label className="report-field ow-worker-selector"><span>انتخاب دانشجوکار</span>
-        <select value={selectedId} onChange={e=>onChange(e.target.value)}>
-          <option value="">انتخاب کنید</option>
-          {workers.map(w=><option key={w.id} value={w.id}>{w.name} · {unitLabels[w.unit]||w.unit}</option>)}
-        </select>
-      </label>
-    </div>
-    {!selected&&<p className="ow-muted">برای دیدن پرونده تجمیعی، یک دانشجوکار انتخاب کنید.</p>}
+    <h2>پروفایل دانشجوکارها</h2>
+    <div className="ow-profile-layout">
+      <aside className="ow-people-directory" aria-label="فهرست دانشجوکارها">
+        <input type="search" value={query} onChange={e=>setQuery(e.target.value)}
+          aria-label="جست‌وجوی دانشجوکار در پروفایل‌ها" placeholder="جست‌وجوی دانشجوکار"/>
+        {shownWorkers.map(w=><button type="button" key={w.id}
+          className={selectedId===w.id?'is-selected':''} onClick={()=>onChange(w.id)}>
+          <strong>{w.name}</strong>
+          <small>{unitLabels[w.unit]||w.unit}</small>
+          {(data.profile_requests||[]).some(r=>r.worker_id===w.id&&r.review_state==='pending')
+            &&<i aria-label="درخواست منتظر بررسی">•</i>}
+        </button>)}
+        {!shownWorkers.length&&<p className="ow-muted">موردی یافت نشد.</p>}
+      </aside>
+      <div className="ow-profile-body">
+      {!selected&&<p className="ow-muted">از فهرست، پرونده یک دانشجوکار را انتخاب کنید.</p>}
     {selected&&<>
       <div className="ow-profile-heading">
         <div><h3>{selected.name}</h3>
@@ -503,7 +655,8 @@ function ManagerWorkerProfile({data,selectedId,onChange}) {
         <div><span>کارهای واگذارشده</span><b>{n(summary.taskCount)}</b></div>
         <div><span>در جریان</span><b>{n(summary.openCount)}</b></div>
         <div><span>گزارش منتظر</span><b>{n(summary.pendingCount)}</b></div>
-        <div><span>زمان تأییدشده</span><b>{exactDuration(summary.approvedMinutes)}</b></div>
+        <div><span>زمان تأییدشده</span><b>{exactDuration(
+          selected.approved_minutes_total??summary.approvedMinutes)}</b></div>
       </div>
       <details className="ow-profile-fold"><summary>کارهای در جریان · {n(ongoing.length)}</summary>
         <div className="ow-profile-mini-list">
@@ -528,10 +681,21 @@ function ManagerWorkerProfile({data,selectedId,onChange}) {
           {!entries.length&&<p className="ow-muted">گزارشی وجود ندارد.</p>}
         </div>
       </details>
+      {(changeQueue.length>0||timeQueue.length>0)&&<details open className="ow-profile-fold">
+        <summary>نیازمند رسیدگی · {n(changeQueue.length+timeQueue.length)}</summary>
+        <div className="ow-profile-action-list">
+          {changeQueue.map(r=><ProfileChangeReview key={r.id} request={r}
+            worker={selected} onDone={onDone}/>)}
+          {timeQueue.map(e=><ApprovalCard key={e.id} entry={e}
+            worker={selected} task={taskById.get(e.task_id)} onDone={onDone}/>)}
+        </div>
+      </details>}
       <details className="ow-profile-fold"><summary>وضعیت حساب · فقط مشاهده</summary>
         <WorkerLifecycleReadOnlyPreview worker={selected}/>
       </details>
     </>}
+      </div>
+    </div>
   </section>
 }
 export function AdminOperations({ navigation, setNavigation }) {
@@ -564,8 +728,19 @@ export function AdminOperations({ navigation, setNavigation }) {
   const [estimate,setEstimate]=useState('60')
   const [reason,setReason]=useState('')
   const [busy,setBusy]=useState(false)
+  const [assignmentDialogDate,setAssignmentDialogDate]=useState('')
+  const assignmentDialogRef=useRef(null)
+  useEffect(()=>{
+    const dialog=assignmentDialogRef.current
+    if(!dialog||!assignmentDialogDate)return
+    if(typeof dialog.showModal==='function')dialog.showModal()
+    else dialog.setAttribute('open','')
+    return ()=>{if(typeof dialog.close==='function'&&dialog.open)dialog.close()}
+  },[assignmentDialogDate])
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
+  const [readFailed,setReadFailed]=useState(false)
+  const readSequence=useRef(0)
   const [notice,setNotice]=useState('')
   const [historyShown,setHistoryShown]=useState(100)
   const [tasksShown,setTasksShown]=useState(100)
@@ -575,16 +750,25 @@ export function AdminOperations({ navigation, setNavigation }) {
   useEffect(()=>{setHistoryShown(100)},[historyWorkerId,historyUnit,historyFrom,historyTo,historyReview])
 
   const refresh=async ()=>{
+    // Ignore older in-flight responses after a newer role check has completed.
+    const sequence=++readSequence.current
     setLoading(true)
     try{
-      const result=await getAdminWork()
+      const result=await getAdminWorkV2()
+      if(sequence!==readSequence.current)return false
       setData(result||{workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+      setReadFailed(false)
       setError('')
       return true
     }catch(e){
+      if(sequence!==readSequence.current)return false
+      // A previous successful read is not proof of CURRENT authorization.
+      setData({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+      setReadFailed(true)
+      setAssignmentDialogDate('')
       setError(readableError(e))
       return false
-    }finally{setLoading(false)}
+    }finally{if(sequence===readSequence.current)setLoading(false)}
   }
   useEffect(()=>{void refresh()},[])
 
@@ -614,7 +798,9 @@ export function AdminOperations({ navigation, setNavigation }) {
   const taskById=new Map(allTasks.map(task=>[task.id,task]))
   const todayTasks=(data.tasks||[]).filter(t=>t.planned_date===today()&&t.state!=='cancelled')
   const pending=(data.time_entries||[]).filter(e=>e.review_state==='submitted')
-  const approvedMinutes=(data.time_entries||[])
+  const pendingProfileChanges=(data.profile_requests||[]).filter(r=>r.review_state==='pending')
+  // All-time approved minutes use the authorized, uncapped backend aggregate.
+  const approvedMinutes=data.approved_minutes_total??(data.time_entries||[])
     .filter(e=>e.review_state==='approved')
     .reduce((sum,e)=>sum+Number(e.approved_minutes||0),0)
   const isShort=date<shift(today(),2)
@@ -629,6 +815,13 @@ export function AdminOperations({ navigation, setNavigation }) {
     finally{setBusy(false)}
   }
 
+  if(readFailed)return <div className="ow-workspace ow-access-recheck" role="alert">
+    <p>اطلاعات مدیریتی در دسترس نیست. تا بررسی دوبارهٔ مجوز، داده‌های قبلی نمایش داده نمی‌شوند.</p>
+    <Message error={error}/>
+    <button type="button" className="report-btn report-btn--light" disabled={loading}
+      onClick={()=>{void refresh()}}>تلاش مجدد برای دریافت اطلاعات</button>
+  </div>
+
   return <div className="ow-workspace">
     <div className="ow-summary">
       <article><span>دانشجوکار فعال</span><b>{n(active.length)}</b></article>
@@ -637,74 +830,31 @@ export function AdminOperations({ navigation, setNavigation }) {
       <article><span>کل ساعات تأییدشده</span><b>{exactDuration(approvedMinutes)}</b></article>
     </div>
     <SectionTabs value={view} onChange={setView} options={[
-      ['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],['profiles','پروفایل‌ها'],
+      ['inbox','کارتابل'],['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],['profiles','پروفایل‌ها'],
     ]}/>
     {loading&&<p className="ow-muted">در حال دریافت اطلاعات…</p>}
     <Message error={error} notice={notice}/>
 
+    {view==='inbox'&&<section className="report-panel">
+      <div className="ow-presence-section-title">
+        <h2>کارتابل رسیدگی</h2>
+        <small>{n(pending.length)} گزارش · {n(pendingProfileChanges.length)} درخواست اصلاح</small>
+      </div>
+      {pending.length===0&&pendingProfileChanges.length===0&&
+        <p className="ow-muted">درخواستی برای رسیدگی وجود ندارد.</p>}
+      <div className="ow-inbox-items">
+        {pendingProfileChanges.map(r=><ProfileChangeReview key={r.id} request={r}
+          worker={workers.find(w=>w.id===r.worker_id)} onDone={refresh}/>)}
+        {pending.map(e=><ApprovalCard key={e.id} entry={e}
+          task={taskById.get(e.task_id)} worker={workers.find(w=>w.id===e.worker_id)}
+          onDone={refresh}/>)}
+      </div>
+    </section>}
     {view==='tasks'&&<>
       <section className="report-panel">
-        <h2>کار جدید</h2>
-        <form onSubmit={e=>{e.preventDefault();run(async()=>{
-          await assignWorkerTask({workerId,unit:chosen?.unit,title,instructions,
-            date,minutes:estimate,shortNoticeReason:reason})
-          setTitle('');setInstructions('');setReason('')
-        })}}>
-          <div className="ow-fields ow-fields--three">
-            <label className="report-field"><span>دانشجوکار</span>
-              <select value={workerId} required onChange={e=>setWorkerId(e.target.value)}>
-                <option value="">انتخاب کنید</option>
-                {active.map(w=><option key={w.id} value={w.id}>{w.name} · {unitLabels[w.unit]}</option>)}
-              </select>
-            </label>
-            <label className="report-field"><span>تاریخ اجرا (شمسی)</span>
-              <JalaliDatePicker min={today()} value={date} onChange={setDate} ariaLabel="تاریخ اجرای کار"/>
-            </label>
-            <label className="report-field"><span>زمان استاندارد (دقیقه)</span>
-              <input type="number" required min="1" max="1440" value={estimate} onChange={e=>setEstimate(e.target.value)}/>
-            </label>
-          </div>
-          <div className="ow-fields ow-fields--two">
-            <label className="report-field"><span>عنوان کار</span>
-              <input required minLength={3} maxLength={160} value={title} onChange={e=>setTitle(e.target.value)} placeholder="مثلاً ثبت ۱۰ جلد کتاب"/>
-            </label>
-            <label className="report-field"><span>شرح کوتاه</span>
-              <input maxLength={3000} value={instructions} onChange={e=>setInstructions(e.target.value)} placeholder="خروجی مورد انتظار را توضیح دهید"/>
-            </label>
-          </div>
-          {isShort&&<label className="report-field ow-short-notice">
-            <span>علت واگذاری نزدیک به موعد (الزامی)</span>
-            <input required maxLength={300} value={reason} onChange={e=>setReason(e.target.value)}
-              placeholder="این کار برای امروز یا فردا برنامه‌ریزی شده است"/>
-          </label>}
-          {workerId&&assignmentCapacity&&<div className={
-            ['overbooked','unavailable','not_configured','unknown'].includes(assignmentCapacity.code)
-              ?'ow-capacity-warning':'ow-capacity-summary'
-          } role="status" aria-live="polite">
-            {assignmentCapacity.code==='unknown'
-              ?<p><strong>ظرفیت قابل محاسبه نیست.</strong> برنامه یا زمان واردشده نیازمند بررسی است.</p>
-              :assignmentCapacity.code==='not_configured'
-                ?<p><strong>برنامه حضور برای این روز ثبت نشده است.</strong> این به معنی عدم حضور قطعی نیست؛ پیش از واگذاری هماهنگ کنید.</p>
-                :<>
-                  <p>ظرفیت ثبت‌شده: <b>{minutes(assignmentCapacity.availableMinutes)}</b>
-                    {' · '}کارهای قبلی: <b>{minutes(assignmentCapacity.assignedMinutes)}</b>
-                    {' · '}کار جدید: <b>{minutes(assignmentCapacity.proposedMinutes)}</b></p>
-                  {assignmentCapacity.code==='unavailable'
-                    ?<p><strong>هشدار عدم حضور:</strong> برای این روز ظرفیت صفر ثبت شده است.</p>
-                    :assignmentCapacity.code==='overbooked'
-                      ?<p><strong>هشدار بیش‌ازظرفیت:</strong> مجموع کارها
-                         {' '}{minutes(-assignmentCapacity.remainingMinutes)} بیشتر از زمان حضور است.</p>
-                      :<p>ظرفیت باقی‌مانده پس از واگذاری:
-                         {' '}<b>{minutes(assignmentCapacity.remainingMinutes)}</b>
-                         {assignmentCapacity.code==='full'?' · ظرفیت دقیقاً تکمیل می‌شود.':''}</p>}
-                  {assignmentCapacity.exception&&<small>محاسبه بر اساس تغییر موقت همین روز است.</small>}
-                </>}
-            <details className="ow-context-help"><summary>توضیح محاسبه</summary>
-              <small>ظرفیت، یک برآورد بر اساس اطلاعات فعلی است. ثبت کار در سرور با مجوزها و قواعد مستقل انجام می‌شود.</small>
-            </details>
-          </div>}
-          <button className="report-btn report-btn--primary" type="submit" disabled={busy||!workerId}>واگذاری کار</button>
-        </form>
+        <h2>واگذاری کار</h2>
+        <TaskAssignmentEditor workers={active} data={data}
+          defaultWorkerId={workerId} defaultDate={date} onSaved={refresh}/>
       </section>
       <section className="report-panel">
         <div className="report-panel-heading">
@@ -823,15 +973,28 @@ export function AdminOperations({ navigation, setNavigation }) {
       <h2>ظرفیت و برنامه دانشجوکارها</h2>
       <label className="report-field ow-worker-selector"><span>دانشجوکار</span>
         <select value={workerId} onChange={e=>setWorkerId(e.target.value)}>
-          <option value="">انتخاب کنید</option>
+          <option value="">همه دانشجوکارها · تایم‌لاین هفتگی</option>
           {active.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
       </label>
-      {workerId&&<ScheduleEditor key={workerId} workerId={workerId} data={data} onSaved={refresh}/>}
+      {workerId?<ScheduleEditor key={workerId} workerId={workerId} data={data}
+        onSaved={refresh} onPlanAssignment={setAssignmentDialogDate}/>:<AllWorkerTimeline data={data}/>}
 
     </section>}
 
-    {view==='profiles'&&<ManagerWorkerProfile data={data} selectedId={profileWorkerId} onChange={setProfileWorkerId}/>}
+    {view==='profiles'&&<ManagerWorkerProfile data={data} selectedId={profileWorkerId}
+      onChange={setProfileWorkerId} onDone={refresh}/>}
+    {assignmentDialogDate&&<dialog ref={assignmentDialogRef} className="ow-assignment-dialog"
+      onCancel={e=>{e.preventDefault();setAssignmentDialogDate('')}} aria-label="تعریف کار جدید در تقویم">
+      <div className="ow-presence-section-title">
+        <h2>تعریف کار · {pretty(assignmentDialogDate)}</h2>
+        <button type="button" className="ow-mini-btn"
+          onClick={()=>setAssignmentDialogDate('')}>بستن</button>
+      </div>
+      <TaskAssignmentEditor key={assignmentDialogDate} workers={active} data={data}
+        defaultDate={assignmentDialogDate} defaultWorkerId={workerId}
+        onSaved={refresh} onClose={()=>setAssignmentDialogDate('')}/>
+    </dialog>}
     {view==='history'&&<section className="report-panel">
       <div className="report-panel-heading">
         <h2>سابقه ساعات و خروجی</h2>
@@ -941,7 +1104,9 @@ export function AdminOperations({ navigation, setNavigation }) {
     </section>}
   </div>
 }
-function WorkerTaskCard({task,onSaved}) {
+function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
+  const acknowledged=actionLedger.get(task.id)
+  const sameReviewCycle=acknowledged?.reviewCycle===reviewCycle
   const [date,setDate]=useState(today())
   const [requestExtra,setRequestExtra]=useState(false)
   const [requested,setRequested]=useState(String(task.estimate_minutes))
@@ -950,8 +1115,26 @@ function WorkerTaskCard({task,onSaved}) {
   const [completionConfirmed,setCompletionConfirmed]=useState(false)
   const [note,setNote]=useState('')
   const [busy,setBusy]=useState(false)
+  const [reportCommitted,setReportCommitted]=useState(Boolean(sameReviewCycle&&acknowledged.report))
+  const [startCommitted,setStartCommitted]=useState(Boolean(sameReviewCycle&&acknowledged.start))
+  const [notice,setNotice]=useState('')
   const [error,setError]=useState('')
-  const keyRef=useRef(crypto.randomUUID())
+  const actionLock=useRef(false)
+  // Preserve one submission identity across uncertain network failures.
+  const keyRef=useRef(sameReviewCycle&&acknowledged.clientSubmissionId
+    ?acknowledged.clientSubmissionId:crypto.randomUUID())
+  const priorReviewCycle=useRef(reviewCycle)
+  useEffect(()=>{
+    // A NEW manager-requested correction creates a distinct review cycle.
+    // Stale task state alone is never enough to re-enable acknowledged reports.
+    if(task.state==='needs_changes'&&priorReviewCycle.current!==reviewCycle){
+      actionLedger.delete(task.id)
+      setReportCommitted(false)
+      setCompletionConfirmed(false)
+      keyRef.current=crypto.randomUUID()
+    }
+    priorReviewCycle.current=reviewCycle
+  },[reviewCycle,task.state,actionLedger])
   const ready=['assigned','in_progress','needs_changes'].includes(task.state)
   const standard=Number(task.estimate_minutes)
   const requestedMinutes=requestExtra?Number(requested):standard
@@ -959,24 +1142,60 @@ function WorkerTaskCard({task,onSaved}) {
     Number.isInteger(requestedMinutes)&&requestedMinutes>standard&&requestedMinutes<=1440
     && Boolean(reasonCode)&&reasonText.trim().length>=10&&reasonText.trim().length<=600
   )
-  const perform=async fn=>{
-    setBusy(true);setError('')
-    try{await fn();await onSaved()}
-    catch(e){setError(readableError(e))}
-    finally{setBusy(false)}
+  const perform=async (fn,kind)=>{
+    const previous=actionLedger.get(task.id)
+    if(actionLock.current||(kind==='report'&&(reportCommitted||
+       (previous?.reviewCycle===reviewCycle&&previous?.report)))
+       ||(kind==='start'&&(startCommitted||
+       (previous?.reviewCycle===reviewCycle&&previous?.start))))return
+    actionLock.current=true
+    setBusy(true);setError('');setNotice('')
+    try{
+      await fn()
+      const prior=actionLedger.get(task.id)
+      actionLedger.set(task.id,{
+        ...(prior?.reviewCycle===reviewCycle?prior:{}),
+        reviewCycle,
+        ...(kind==='report'?{report:true,clientSubmissionId:keyRef.current}:{start:true}),
+      })
+      if(kind==='report')setReportCommitted(true)
+      if(kind==='start')setStartCommitted(true)
+      setNotice(kind==='report'?'گزارش در سرور ثبت شد؛ در حال دریافت وضعیت تازه…':
+        'شروع کار در سرور ثبت شد؛ در حال دریافت وضعیت تازه…')
+      try{
+        const refreshed=await onSaved?.()
+        if(refreshed===false)throw Error('REFRESH_ONLY_FAILURE')
+      }catch{
+        setNotice('عملیات ثبت شده است؛ فقط تازه‌سازی وضعیت ناموفق بود. از ارسال دوباره خودداری کنید.')
+      }
+    }catch(e){
+      // No acknowledgement: retain the SAME idempotency key for a cautious retry.
+      setError(readableError(e))
+    }finally{actionLock.current=false;setBusy(false)}
   }
   return <article className="ow-item">
     <div className="ow-item-header"><strong>{task.title}</strong><span className="ow-status">{stateLabels[task.state]}</span></div>
     <small>{pretty(task.planned_date)} · زمان استاندارد قابل ثبت: {minutes(standard)}</small>
-    {ready&&<details className="ow-worker-action-detail"><summary>ثبت نتیجه و گزارش کار</summary>
+    {task.collaborators?.length>0&&<small className="ow-task-collaborators">
+      با همکاری: {task.collaborators.map(x=>x.name).join('، ')}
+    </small>}
+    {ready&&<details className="ow-worker-action-detail"><summary>ثبت انجام و گزارش کار</summary>
       {task.instructions&&<p>{task.instructions}</p>}
-      <form onSubmit={e=>{e.preventDefault();if(!completionConfirmed||!extraValid)return;perform(async()=>{
-      await submitMyTime({taskId:task.id,date,minutes:requestedMinutes,note,
+      <form onSubmit={e=>{e.preventDefault();if(!completionConfirmed||!extraValid||reportCommitted)return;
+      // Keep the same client submission identity if the tab temporarily unmounts
+      // after a request with uncertain network outcome.
+      const prior=actionLedger.get(task.id)
+      if(prior?.reviewCycle!==reviewCycle){
+        actionLedger.set(task.id,{reviewCycle,clientSubmissionId:keyRef.current})
+      }else if(!prior.clientSubmissionId){
+        actionLedger.set(task.id,{...prior,clientSubmissionId:keyRef.current})
+      }
+      void perform(
+      ()=>submitMyTime({taskId:task.id,date,minutes:requestedMinutes,note,
         clientSubmissionId:keyRef.current,
         extraReasonCode:requestExtra?reasonCode:null,
-        extraReasonText:requestExtra?reasonText.trim():null})
-      keyRef.current=crypto.randomUUID()
-    })}}>
+        extraReasonText:requestExtra?reasonText.trim():null}),'report')
+    }}>
       <div className="ow-fields ow-fields--two">
         <label className="report-field"><span>تاریخ انجام کار (شمسی)</span>
           <JalaliDatePicker value={date} max={today()} min={shift(today(),-90)}
@@ -1028,33 +1247,165 @@ function WorkerTaskCard({task,onSaved}) {
       </div>}
       <div className="ow-actions">
         {task.state!=='in_progress'&&<button type="button" className="report-btn report-btn--light"
-          onClick={()=>perform(()=>startMyTask(task.id))} disabled={busy}>شروع کار</button>}
+          onClick={()=>{void perform(()=>startMyTask(task.id),'start')}} disabled={busy||startCommitted||reportCommitted}>شروع کار</button>}
         <button type="submit" className="report-btn report-btn--primary"
-          disabled={busy||!completionConfirmed||!extraValid}>
+          disabled={busy||reportCommitted||!completionConfirmed||!extraValid}>
           {requestExtra?'ارسال درخواست زمان بیشتر برای بررسی':'ثبت انجام کار با زمان استاندارد'}
         </button>
       </div>
       </form>
     </details>}
+    {notice&&<p className="ow-muted" role="status">{notice}</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
   </article>
 }
-function WorkerSelfProfile({tasks,records}) {
+function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal}) {
+ const [identity,setIdentity]=useState(null)
+ const [requests,setRequests]=useState([])
+ const [requestsLoading,setRequestsLoading]=useState(true)
+ const [requestsError,setRequestsError]=useState('')
+ const [profileReadFailed,setProfileReadFailed]=useState(false)
+ const profileReadSequence=useRef(0)
+ const [editing,setEditing]=useState(false)
+ const [field,setField]=useState('major')
+ const [value,setValue]=useState('')
+ const [reason,setReason]=useState('')
+ const [saving,setSaving]=useState(false)
+ const [submitNotice,setSubmitNotice]=useState('')
+ const submitLock=useRef(false)
+ const hasPendingField=fieldCode=>requestLedger.has(fieldCode)
+   ||requests.some(r=>r.field_code===fieldCode&&r.review_state==='pending')
+ const refreshProfile=async()=>{
+   const sequence=++profileReadSequence.current
+   setRequestsLoading(true)
+   try{
+     const [personal,items]=await Promise.all([getMyWorkerProfileV2(),getMyProfileChangeRequests()])
+     if(sequence!==profileReadSequence.current)return false
+     if(!personal||typeof personal!=='object'||!Array.isArray(items))
+       throw Error('INVALID_PROFILE_PROJECTION')
+     // Release the local receipt ONLY when its exact server request appears
+     // in a completed state. A stale queue with no row cannot unlock it.
+     for(const [code,receipt] of requestLedger){
+       const item=items.find(r=>r.id===receipt.requestId)
+       if(item&&item.review_state!=='pending')requestLedger.delete(code)
+     }
+     setIdentity(personal)
+     setRequests(items)
+     setProfileReadFailed(false)
+     setRequestsError('')
+     return true
+   }catch{
+     if(sequence!==profileReadSequence.current)return false
+     // Fail closed for the independently fetched self-profile and request history.
+     setIdentity(null)
+     setRequests([])
+     setProfileReadFailed(true)
+     setRequestsError('مشخصات یا درخواست‌ها دریافت نشدند. برای نمایش دوباره، دسترسی را بررسی کنید.')
+     return false
+   }finally{if(sequence===profileReadSequence.current)setRequestsLoading(false)}
+ }
+ useEffect(()=>{
+   setIdentity(null);setRequests([]);setRequestsLoading(true)
+   void refreshProfile()
+ },[profile.worker_id])
+ const submitChange=async event=>{
+   event.preventDefault()
+   // A ref guards against same-tick double-submits before React updates.
+   if(submitLock.current||saving||hasPendingField(field)
+      ||value.trim().length<2||reason.trim().length<10)return
+   submitLock.current=true
+   setSaving(true);setRequestsError('');setSubmitNotice('')
+   try{
+     const receipt=await requestProfileChange({field,value:value.trim(),reason:reason.trim()})
+     if(receipt?.ok!==true||!receipt.request_id)
+       throw Error('invalid_profile_change_receipt')
+     // An acknowledged request remains locked across tab remounts, even if
+     // the subsequent read returns a stale queue or an access error.
+     requestLedger.set(field,{requestId:receipt.request_id})
+     setEditing(false);setValue('');setReason('')
+     setSubmitNotice('درخواست اصلاح ثبت شد و برای رسیدگی مدیر ارسال شده است.')
+     const refreshed=await refreshProfile()
+     if(!refreshed)setSubmitNotice('درخواست ثبت شده است؛ تنها دریافت وضعیت تازه ناموفق بود.')
+   }catch(e){
+     const alreadyPending=String(e?.message||'').includes('profile_change_already_pending')
+     setRequestsError(alreadyPending?'برای این مشخصه درخواست رسیدگی‌نشده وجود دارد؛ ابتدا وضعیت درخواست را دوباره دریافت کنید.'
+       :'ثبت درخواست تأیید نشد. برای جلوگیری از تکرار، ابتدا وضعیت درخواست‌های قبلی را بررسی کنید.')
+   }finally{submitLock.current=false;setSaving(false)}
+ }
+
   const completed=tasks.filter(t=>t.state==='completed')
   const upcoming=tasks.filter(t=>t.planned_date>today()
     &&!['completed','cancelled'].includes(t.state))
   const ongoing=tasks.filter(t=>t.planned_date<=today()
     &&!['completed','cancelled'].includes(t.state))
   const approved=records.filter(e=>e.review_state==='approved')
-  const approvedTime=approved.reduce((sum,e)=>sum+Number(e.approved_minutes||0),0)
+  // The visible records may be only the newest 1,000; lifetime credit
+  // comes from the server aggregate, never a capped list of report details.
+  const approvedTime=approvedMinutesTotal??approved.reduce(
+    (sum,e)=>sum+Number(e.approved_minutes||0),0)
   const panels=[
     {id:'ongoing',title:'در جریان',tasks:ongoing},
     {id:'upcoming',title:'پیش‌رو',tasks:upcoming},
     {id:'completed',title:'انجام‌شده',tasks:completed},
   ]
+  if(profileReadFailed)return <section className="report-panel ow-self-profile ow-profile-access-recheck" role="alert">
+    <p>مشخصات شخصی در دسترس نیستند. اطلاعات قبلی تا تأیید دوبارهٔ دسترسی پنهان می‌مانند.</p>
+    {requestsError&&<p className="report-alert report-alert--error">{requestsError}</p>}
+    {submitNotice&&<p role="status" className="ow-muted">{submitNotice}</p>}
+    <button type="button" className="report-btn report-btn--light" disabled={requestsLoading}
+      onClick={()=>{void refreshProfile()}}>تلاش مجدد برای دریافت مشخصات</button>
+  </section>
+  if(!identity)return <section className="report-panel ow-self-profile" role="status">
+    <p className="ow-muted">در حال بررسی دسترسی به مشخصات…</p>
+  </section>
   return <section className="report-panel ow-self-profile">
     <div className="ow-presence-section-title"><h2>پروفایل من</h2>
       <span className="ow-status">زمان تأییدشده: {exactDuration(approvedTime)}</span></div>
+    <div className="ow-self-identity">
+      <div><small>نام و نام خانوادگی</small><strong>{identity?.name||'نامشخص'}</strong></div>
+      <div><small>رشته تحصیلی</small><strong>{identity?.major||'ثبت نشده'}</strong></div>
+      <div><small>سال ورود</small><strong>{identity?.entry_year||'ثبت نشده'}</strong></div>
+      <div><small>واحد همکاری</small><strong>{unitLabels[identity?.unit]||identity?.unit||'نامشخص'}</strong></div>
+    </div>
+    <details className="ow-profile-fold ow-profile-change" open={editing} onToggle={e=>{
+       if(!e.currentTarget.open&&editing)setEditing(false)
+     }}>
+      <summary onClick={e=>{e.preventDefault();setEditing(open=>!open)}}>درخواست اصلاح مشخصات</summary>
+      {editing&&<form onSubmit={submitChange} className="ow-profile-change-form">
+        <label className="report-field"><span>مشخصه موردنظر</span>
+          <select value={field} onChange={e=>setField(e.target.value)}>
+            <option value="major">رشته تحصیلی</option><option value="full_name">نام و نام خانوادگی</option>
+          </select>
+        </label>
+        <label className="report-field"><span>مقدار پیشنهادی</span>
+          <input required minLength={2} maxLength={120} value={value}
+            onChange={e=>setValue(e.target.value)}/>
+        </label>
+        <label className="report-field"><span>دلیل اصلاح (۱۰ تا ۶۰۰ نویسه)</span>
+          <textarea required minLength={10} maxLength={600} rows={2} value={reason}
+            onChange={e=>setReason(e.target.value)}/>
+        </label>
+        <small>تا تأیید مدیر، مشخصات فعلی تغییر نمی‌کنند.</small>
+        {hasPendingField(field)&&<small role="status">برای این مشخصه درخواست ثبت‌شده یا منتظر بررسی وجود دارد؛ ثبت دوباره غیرفعال است.</small>}
+        {submitNotice&&<small role="status">{submitNotice}</small>}
+        <button type="submit" className="report-btn report-btn--primary"
+          disabled={saving||hasPendingField(field)||value.trim().length<2||reason.trim().length<10}>
+          ارسال درخواست</button>
+      </form>}
+    </details>
+    {submitNotice&&<p className="ow-muted" role="status">{submitNotice}</p>}
+    {requestsError&&<div role="alert" className="report-alert report-alert--error">{requestsError}</div>}
+    {requestsLoading&&<p role="status" className="ow-muted">در حال دریافت وضعیت درخواست‌ها…</p>}
+    {requests.length>0&&<details className="ow-profile-fold"><summary>درخواست‌های اصلاح · {n(requests.length)}</summary>
+      <div className="ow-profile-mini-list">
+        {requests.map(r=><div key={r.id}>
+          <b>{r.field_code==='major'?'رشته تحصیلی':'نام'}: {r.proposed_value}</b>
+          <small>{r.review_state==='pending'?'منتظر تأیید':
+             r.review_state==='approved'?'تأیید شد':'رد شد'}</small>
+          {r.review_note&&<small>نظر مدیر: {r.review_note}</small>}
+        </div>)}
+      </div>
+    </details>}
     <div className="ow-profile-kpi-line" aria-label="خلاصه عملکرد">
       <span>{n(ongoing.length)} در جریان</span><span>{n(upcoming.length)} پیش‌رو</span>
       <span>{n(completed.length)} انجام‌شده</span><span>{n(records.length)} گزارش</span>
@@ -1090,6 +1441,11 @@ function WorkerSelfProfile({tasks,records}) {
 }
 export function WorkerOperations({profile,navigation,setNavigation}) {
   const [data,setData]=useState({tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+  // Task acknowledgements survive switching work/profile/presence tabs, but
+  // are strictly scoped to this authenticated worker and this React session.
+  const acknowledgedActions=useRef({workerId:profile.worker_id,items:new Map(),profileRequests:new Map()})
+  if(acknowledgedActions.current.workerId!==profile.worker_id)
+    acknowledgedActions.current={workerId:profile.worker_id,items:new Map(),profileRequests:new Map()}
   const [localNavigation,setLocalNavigation]=useState({section:'tasks',taskRange:'today'})
   const selected=navigation||localNavigation
   const updateNavigation=patch=>{
@@ -1100,22 +1456,43 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
   const taskRange=['today','week','month'].includes(selected.taskRange)?selected.taskRange:'today'
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
+  const [readFailed,setReadFailed]=useState(false)
+  const readSequence=useRef(0)
   const refresh=async()=>{
+    const sequence=++readSequence.current
     setLoading(true);setError('')
-    try{setData(await getMyWork()||{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})}
-    catch(e){setError(readableError(e))}
-    finally{setLoading(false)}
+    try{
+      const result=await getMyWorkV2()
+      if(sequence!==readSequence.current)return
+      setData(result||{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+      setReadFailed(false)
+    }catch(e){
+      if(sequence!==readSequence.current)return
+      // Never retain a visible old work list after a failed authorization refresh.
+      setData({tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+      setReadFailed(true)
+      setError(readableError(e))
+    }finally{if(sequence===readSequence.current)setLoading(false)}
   }
   useEffect(()=>{void refresh()},[profile.worker_id])
   const records=data.time_entries||[]
   const approved=records.filter(x=>x.review_state==='approved')
-  const total=approved.reduce((sum,e)=>sum+Number(e.approved_minutes||0),0)
+  const total=data.approved_minutes_total??approved.reduce(
+    (sum,e)=>sum+Number(e.approved_minutes||0),0)
   const tasks=data.tasks||[]
   const week=persianWeekBounds(today())
   const month=persianMonthBounds(today())
-  const visible=taskRange==='today'?tasks.filter(t=>t.planned_date===today()):
+  const ranged=taskRange==='today'?tasks.filter(t=>t.planned_date===today()):
     taskRange==='week'?tasks.filter(t=>t.planned_date>=week.start&&t.planned_date<=week.end):
     tasks.filter(t=>t.planned_date>=month.start&&t.planned_date<=month.end)
+  const overdue=tasks.filter(t=>t.planned_date<today()&&['assigned','in_progress','needs_changes'].includes(t.state))
+  const visible=[...overdue,...ranged.filter(t=>!overdue.some(p=>p.id===t.id))]
+  if(readFailed)return <div className="ow-workspace ow-worker-workspace ow-access-recheck" role="alert">
+    <p>برنامهٔ کاری در دسترس نیست. تا بررسی دوبارهٔ دسترسی، اطلاعات قبلی نمایش داده نمی‌شوند.</p>
+    <div className="report-alert report-alert--error">{error}</div>
+    <button type="button" className="report-btn report-btn--light" disabled={loading}
+      onClick={()=>{void refresh()}}>تلاش مجدد برای دریافت اطلاعات</button>
+  </div>
   return <div className="ow-workspace ow-worker-workspace">
     <div className="ow-summary">
       <article><span>کارهای باز</span><b>{n(tasks.filter(t=>!['completed','cancelled'].includes(t.state)).length)}</b></article>
@@ -1129,7 +1506,7 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
     {section==='tasks'&&<section className="report-panel">
       <div className="ow-worker-list-heading">
-        <h2>کارها</h2>
+        <h2>کارها {overdue.length>0&&<small className="ow-overdue-count">· {n(overdue.length)} نیازمند اقدام از روزهای قبل</small>}</h2>
         <div className="ow-range-switch" role="group" aria-label="بازه نمایش کارها">
           {[['today','امروز'],['week','این هفته'],['month','این ماه']].map(([id,title])=>
             <button type="button" key={id} aria-pressed={taskRange===id}
@@ -1138,7 +1515,11 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
         </div>
       </div>
       <div className="ow-list ow-worker-tasks">
-        {visible.map(t=><WorkerTaskCard key={t.id} task={t} onSaved={refresh}/>)}
+        {visible.map(t=><WorkerTaskCard key={t.id} task={t} onSaved={refresh}
+          actionLedger={acknowledgedActions.current.items}
+          reviewCycle={(data.time_entries||[]).filter(e=>e.task_id===t.id
+            &&['changes_requested','rejected'].includes(e.review_state))
+            .map(e=>e.id).sort().join('|')}/>)}
         {!visible.length&&<p className="ow-muted">کاری برای این بازه ثبت نشده است.</p>}
       </div>
     </section>}
@@ -1146,6 +1527,8 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
       <h2>برنامه حضور</h2>
       <ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
     </section>}
-    {section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records}/>}
+    {section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}
+      requestLedger={acknowledgedActions.current.profileRequests}
+      approvedMinutesTotal={data.approved_minutes_total}/>}
   </div>
 }

@@ -33,11 +33,27 @@ const plugin={
   name:'assignment-capacity-ui-no-network',
   enforce:'pre',
   resolveId(source,importer){
+    if((importer?.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operationsV2')
+      ||(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operationsV2'))
+      return '\0qa-v2-no-network'
+    if(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operations')
+      return '\0qa-operations-no-network'
+
     if(importer?.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operations')return '\0qa-operations-no-network'
     if(importer?.endsWith('/src/components/WorkerLifecycleControls.jsx')&&source==='../lib/operations')
       return '\0qa-lifecycle-no-network'
   },
   load(id){
+    if(id==='\0qa-v2-no-network')return [
+      'export const getAdminWorkV2=async()=>globalThis.__qaCapacityData;',
+      'export const getMyWorkV2=async()=>globalThis.__qaCapacityData;',
+      'export const getMyWorkerProfileV2=async()=>({worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"});',
+      'export const getMyProfileChangeRequests=async()=>[];',
+      'export const assignGroupTask=async args=>{globalThis.__qaGroupCalls.push(args);return {ok:true};};',
+      ...['requestProfileChange','reviewProfileChange'].map(name=>
+        `export const ${name}=async()=>{throw Error("QA_NO_REAL_BACKEND")};`),
+    ].join('\n')
+
     if(id==='\0qa-operations-no-network')return [
       'export const getAdminWork=async()=>globalThis.__qaCapacityData;',
       ...['getMyWork','setWeeklyDay','setDateException','assignWorkerTask','startMyTask',
@@ -50,7 +66,7 @@ const plugin={
     ].join('\n')
   },
 }
-let dom,vite,Component,createRoot
+let dom,vite,Component,Editor,createRoot
 before(async()=>{
   dom=new JSDOM('<!doctype html><html lang="fa"><body></body></html>',{
     url:'http://example.invalid/assignment-capacity-qa',pretendToBeVisual:true,
@@ -63,6 +79,7 @@ before(async()=>{
   vite=await createServer({plugins:[plugin],server:{middlewareMode:true},
     appType:'custom',logLevel:'error'})
   ;({AdminOperations:Component}=await vite.ssrLoadModule('/src/OperationsWorkspace.jsx'))
+  ;({default:Editor}=await vite.ssrLoadModule('/src/components/TaskAssignmentEditor.jsx'))
 })
 after(async()=>{
   await vite?.close()
@@ -79,6 +96,7 @@ function Wrapper({start}){
 }
 async function setup({start='tasks',data=sample()}={}){
   globalThis.__qaCapacityData=data
+  globalThis.__qaGroupCalls=[]
   const host=document.createElement('div')
   document.body.append(host)
   const root=createRoot(host)
@@ -100,12 +118,12 @@ test('manager sees exact read-only overbooking warning and retains enabled assig
   const {host,teardown}=await setup()
   try{
     assert.match(host.textContent,/هشدار بیش‌ازظرفیت/)
-    assert.match(host.textContent,/ظرفیت ثبت‌شده/)
-    assert.match(host.textContent,/۴۵ دقیقه/)
+    assert.match(host.textContent,/مجموع کارهای ثبت‌شده از ظرفیت اعلام‌شده/)
+    assert.match(host.textContent,/ظرفیت نفرات انتخابی/)
     const submit=Array.from(host.querySelectorAll('button')).find(x=>x.textContent==='واگذاری کار')
     assert.ok(submit)
     assert.equal(submit.disabled,false,'advice must not silently change server/business policy')
-    assert.match(host.textContent,/ظرفیت، یک برآورد بر اساس اطلاعات فعلی است/)
+    assert.match(host.textContent,/زمان استاندارد برای هر نفر جداگانه/)
   }finally{await teardown()}
 })
 test('no-weekday-record is uncertain, never mislabeled as confirmed absence',async()=>{
@@ -126,47 +144,96 @@ test('one-day zero-availability overrides recurring slot with warning',async()=>
     assert.match(host.textContent,/تغییر موقت همین روز/)
   }finally{await teardown()}
 })
-test('weekly schedule is one grid with inline row editor; month has one exception editor',async()=>{
-  const {host,teardown}=await setup({start:'availability'})
-  try{
-    assert.equal(host.querySelectorAll('.ow-week-row').length,7)
-    assert.equal(host.querySelectorAll('.ow-week-slot').length,28)
-    assert.equal(host.querySelectorAll('.ow-week-day-form').length,0)
-    assert.ok(host.querySelector('.ow-presence-month'))
-    assert.ok(host.querySelectorAll('.ow-month-day').length>=28)
-    const button=host.querySelector('button[aria-label^="ویرایش برنامه شنبه"]')
-    assert.ok(button)
-    await act(async()=>button.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-    const form=host.querySelector('.ow-week-row-shell .ow-week-day-form')
-    assert.ok(form,'editor must appear immediately under the clicked weekday')
-    assert.match(form.textContent,/کار ثبت شده/)
-    const add=Array.from(form.querySelectorAll('button')).find(x=>x.textContent.includes('+ نوبت'))
-    assert.ok(add)
-    await act(async()=>add.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-    assert.equal(form.querySelectorAll('.ow-inline-window').length,1)
-    assert.equal(Array.from(form.querySelectorAll('button')).find(x=>x.textContent==='ذخیره همین روز').disabled,false)
-    await act(async()=>host.querySelector('.ow-month-day.is-today')
-      .dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-    const exceptionForm=host.querySelector('.ow-exception-inline')
-    assert.ok(exceptionForm)
-    const absent=exceptionForm.querySelectorAll('input[name="exception-kind"]')[1]
-    await act(async()=>absent.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-    assert.match(exceptionForm.textContent,/ظرفیت این روز با/)
-  }finally{await teardown()}
+test('weekly schedule exposes 28 in-cell actions and preserves compact Jalali exception editor',async()=>{
+ const {host,teardown}=await setup({start:'availability'})
+ try{
+  assert.equal(host.querySelectorAll('.ow-week-row').length,7)
+  assert.equal(host.querySelectorAll('.ow-week-cell').length,28)
+  assert.equal(host.querySelectorAll('.ow-week-day-form').length,0)
+  assert.ok(host.querySelector('.ow-presence-month'))
+  const button=host.querySelector('button[aria-label="ویرایش برنامه شنبه نوبت 1"]')
+  assert.ok(button)
+  await act(async()=>button.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  const editor=host.querySelector('.ow-week-cell .ow-slot-editor')
+  assert.ok(editor,'editor appears in the exact cell, without an expanded row')
+  assert.equal(editor.querySelectorAll('input').length,2)
+  assert.equal(host.querySelectorAll('.ow-week-day-form').length,0)
+  assert.equal(editor.querySelector('button[aria-label="ذخیره همین روز"]').disabled,false)
+  await act(async()=>host.querySelector('.ow-month-day.is-today')
+    .dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  const exceptionForm=host.querySelector('.ow-exception-inline')
+  assert.ok(exceptionForm)
+  const absent=exceptionForm.querySelectorAll('input[name="exception-kind"]')[1]
+  await act(async()=>absent.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.match(exceptionForm.textContent,/ظرفیت این روز با/)
+ }finally{await teardown()}
 })
-test('invalid local weekday interval keeps submit disabled and never writes',async()=>{
-  const {host,teardown}=await setup({start:'availability'})
-  try{
-    const day=host.querySelector('button[aria-label^="ویرایش برنامه شنبه"]')
-    await act(async()=>day.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-    const add=Array.from(host.querySelectorAll('button')).find(x=>x.textContent.includes('+ نوبت'))
-    await act(async()=>add.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-    const form=host.querySelector('.ow-week-day-form')
-    const fields=Array.from(form.querySelectorAll('.ow-inline-window input[type="text"]'))
-    assert.equal(fields.length,2)
-    await fill(fields[0],'14:00')
-    await fill(fields[1],'12:00')
-    assert.match(form.textContent,/پایان هر بازه باید بعد از شروع/)
-    assert.equal(Array.from(form.querySelectorAll('button')).find(x=>x.textContent==='ذخیره همین روز').disabled,true)
-  }finally{await teardown()}
+test('invalid local in-cell interval blocks weekly saving',async()=>{
+ const {host,teardown}=await setup({start:'availability'})
+ try{
+  const day=host.querySelector('button[aria-label="ویرایش برنامه شنبه نوبت 1"]')
+  await act(async()=>day.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  const form=host.querySelector('.ow-slot-editor')
+  const fields=Array.from(form.querySelectorAll('input[type="text"]'))
+  assert.equal(fields.length,2)
+  await fill(fields[0],'14:00')
+  await fill(fields[1],'12:00')
+  assert.match(form.textContent,/پایان هر بازه باید بعد از شروع/)
+  assert.equal(form.querySelector('button[aria-label="ذخیره همین روز"]').disabled,true)
+ }finally{await teardown()}
+})
+
+test('group assignment submits a single atomic manager RPC with one standard duration for each selected member',async()=>{
+ const data=sample()
+ data.workers.push({id:'FAKE-WORKER-SECOND',name:'نمونه دوم',unit:'research',state:'active'})
+ const {host,teardown}=await setup({data})
+ try {
+  const checkbox=Array.from(host.querySelectorAll('.ow-worker-option-list input[type="checkbox"]'))[1]
+  assert.ok(checkbox,'group member selector exists')
+  await act(async()=>checkbox.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.match(host.textContent,/۲ نفر انتخاب‌شده/)
+  const title=labeledField(host,'عنوان کار')
+  await fill(title,'مرتب‌سازی گروهی منابع کتابخانه')
+  const short=labeledField(host,'علت واگذاری امروز یا فردا')
+  await fill(short,'آماده‌سازی سریع و هماهنگ منابع امروز')
+  const form=host.querySelector('.ow-assignment-form')
+  await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__qaGroupCalls.length,1)
+  const payload=globalThis.__qaGroupCalls[0]
+  assert.deepEqual(new Set(payload.workerIds),new Set([worker,'FAKE-WORKER-SECOND']))
+  assert.equal(payload.minutes,'60')
+  assert.equal(payload.title,'مرتب‌سازی گروهی منابع کتابخانه')
+ }finally{await teardown()}
+})
+
+test('committed group assignment cannot be submitted twice when post-save refresh fails',async()=>{
+ const host=document.createElement('div')
+ document.body.append(host)
+ const root=createRoot(host)
+ let closeCount=0
+ globalThis.__qaGroupCalls=[]
+ const workers=[
+  {id:'FAKE-FIRST',name:'عضو ساختگی اول',unit:'library',state:'active'},
+  {id:'FAKE-SECOND',name:'عضو ساختگی دوم',unit:'research',state:'active'},
+ ]
+ try{
+  await act(async()=>root.render(createElement(Editor,{
+   workers,data:{workers,tasks:[],weekly_slots:[],exceptions:[]},
+   defaultWorkerId:'FAKE-FIRST',onSaved:async()=>{throw Error('SYNTHETIC_REFRESH_FAILURE')},
+   onClose:()=>{closeCount++},
+  })))
+  const second=host.querySelectorAll('.ow-worker-option-list input[type="checkbox"]')[1]
+  await act(async()=>second.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  await fill(labeledField(host,'عنوان کار'),'وظیفه مشترک کاملاً ساختگی')
+  await fill(labeledField(host,'علت واگذاری امروز یا فردا'),'دلیل ساختگی قابل قبول برای واگذاری سریع')
+  const form=host.querySelector('form.ow-assignment-form')
+  await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__qaGroupCalls.length,1)
+  assert.match(host.textContent,/واگذاری با موفقیت ثبت شد؛ فقط تازه‌سازی فهرست ناموفق بود/)
+  assert.equal(closeCount,0)
+  const submit=Array.from(form.querySelectorAll('button')).find(b=>b.type==='submit')
+  assert.equal(submit.disabled,true,'must not allow a duplicate after confirmed commit')
+  await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__qaGroupCalls.length,1)
+ }finally{await act(async()=>root.unmount());host.remove()}
 })
