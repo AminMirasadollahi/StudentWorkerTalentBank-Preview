@@ -438,15 +438,31 @@ function ApprovalCard({entry,task,worker,onDone}) {
   const [approved,setApproved]=useState(String(Math.min(standard,requested)))
   const [note,setNote]=useState('')
   const [busy,setBusy]=useState(false)
+  const [committed,setCommitted]=useState(false)
+  const [notice,setNotice]=useState('')
+  const decisionLock=useRef(false)
   const [error,setError]=useState('')
   const approvalNeedsReason=Number(approved)!==requested || Number(approved)>standard
   const act=async decision=>{
-    setBusy(true);setError('')
+    // Prevent rapid double clicks before React can commit disabled=true.
+    if(decisionLock.current)return
+    decisionLock.current=true
+    setBusy(true);setError('');setNotice('')
     try{
       await reviewWorkerTime({entryId:entry.id,decision,approvedMinutes:approved,note})
-      await onDone()
-    }catch(e){setError(readableError(e))}
-    finally{setBusy(false)}
+      setCommitted(true)
+      setNotice('تصمیم در سرور ثبت شد؛ در حال دریافت فهرست تازه…')
+      // A post-commit refresh failure is NOT a failed server decision.
+      try{
+        const refreshed=await onDone?.()
+        if(refreshed===false)throw Error('REFRESH_ONLY_FAILURE')
+      }catch{
+        setNotice('تصمیم ثبت شده است، اما تازه‌سازی فهرست انجام نشد. دوباره اطلاعات را دریافت کنید.')
+      }
+    }catch(e){
+      decisionLock.current=false
+      setError(readableError(e))
+    }finally{setBusy(false)}
   }
   return <article className="ow-item">
     <div className="ow-item-header">
@@ -475,13 +491,14 @@ function ApprovalCard({entry,task,worker,onDone}) {
     </div>
     <div className="ow-actions">
       <button className="report-btn report-btn--primary" type="button"
-        disabled={busy||missingTask||approved===''||!Number.isInteger(Number(approved))||Number(approved)<0||Number(approved)>requested||(approvalNeedsReason&&!note.trim())}
+        disabled={busy||committed||missingTask||approved===''||!Number.isInteger(Number(approved))||Number(approved)<0||Number(approved)>requested||(approvalNeedsReason&&!note.trim())}
         onClick={()=>act('approved')}>تأیید ساعت</button>
       <button className="report-btn report-btn--light" type="button"
-        disabled={busy||missingTask||!note.trim()} onClick={()=>act('changes_requested')}>نیازمند اصلاح</button>
+        disabled={busy||committed||missingTask||!note.trim()} onClick={()=>act('changes_requested')}>نیازمند اصلاح</button>
       <button className="report-btn report-btn--light" type="button"
-        disabled={busy||missingTask||!note.trim()} onClick={()=>act('rejected')}>رد گزارش</button>
+        disabled={busy||committed||missingTask||!note.trim()} onClick={()=>act('rejected')}>رد گزارش</button>
     </div>
+    {notice&&<p role="status" className="ow-muted">{notice}</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
     </details>
   </article>
@@ -548,14 +565,26 @@ async function exportOpsExcel(data, filteredToOneWorker=false) {
 function ProfileChangeReview({request,worker,onDone}) {
  const [note,setNote]=useState('')
  const [busy,setBusy]=useState(false)
+ const [committed,setCommitted]=useState(false)
+ const [notice,setNotice]=useState('')
+ const decisionLock=useRef(false)
  const [error,setError]=useState('')
  const act=async decision=>{
-   if(busy)return
-   setBusy(true);setError('')
+   if(decisionLock.current)return
+   decisionLock.current=true
+   setBusy(true);setError('');setNotice('')
    try{
      await reviewProfileChange({requestId:request.id,decision,note:note.trim()})
-     await onDone?.()
+     setCommitted(true)
+     setNotice('تصمیم در سرور ثبت شد؛ در حال دریافت فهرست تازه…')
+     try{
+       const refreshed=await onDone?.()
+       if(refreshed===false)throw Error('REFRESH_ONLY_FAILURE')
+     }catch{
+       setNotice('درخواست بررسی شده است، اما تازه‌سازی فهرست انجام نشد. دوباره اطلاعات را دریافت کنید.')
+     }
    }catch(e){
+     decisionLock.current=false
      const raw=String(e?.message||'')
      setError(raw.includes('already_reviewed')?'این درخواست قبلاً بررسی شده است.':
        'بررسی انجام نشد؛ اطلاعات دوباره دریافت و بررسی شوند.')
@@ -573,11 +602,12 @@ function ProfileChangeReview({request,worker,onDone}) {
    <label className="report-field"><span>یادداشت بررسی (اختیاری)</span>
      <input maxLength={1000} value={note} onChange={e=>setNote(e.target.value)}/></label>
    <div className="ow-actions">
-     <button className="report-btn report-btn--primary" type="button" disabled={busy}
+     <button className="report-btn report-btn--primary" type="button" disabled={busy||committed}
        onClick={()=>act('approved')}>تأیید اصلاح</button>
-     <button className="report-btn report-btn--light" type="button" disabled={busy}
+     <button className="report-btn report-btn--light" type="button" disabled={busy||committed}
        onClick={()=>act('rejected')}>رد درخواست</button>
    </div>
+   {notice&&<p role="status" className="ow-muted">{notice}</p>}
    {error&&<p role="alert" className="report-alert report-alert--error">{error}</p>}
  </article>
 }
