@@ -267,3 +267,26 @@ test('a rejected server-side review remains retryable and does not masquerade as
   assert.ok(card.querySelector('[role="alert"]'))
  }finally{await ui.dispose()}
 })
+
+test('manager lifetime and per-worker approved credit use backend aggregate, not clipped reports',async()=>{
+ const original=fixture()
+ const workers=original.workers.map(w=>({
+  ...w,approved_minutes_total:w.id==='FAKE-A'?16500:0,
+ }))
+ const ui=await setup('profiles',{workers,approved_minutes_total:111045})
+ try{
+  const summary=ui.host.querySelectorAll('.ow-summary article')
+  assert.equal(summary.length,4)
+  assert.match(summary[3].textContent,/۱۸۵۰ ساعت و ۴۵ دقیقه/)
+  const first=ui.host.querySelector('.ow-people-directory button')
+  assert.ok(first)
+  await act(async()=>first.dispatchEvent(
+    new window.MouseEvent('click',{bubbles:true})))
+  const totals=ui.host.querySelectorAll('.ow-profile-metrics > div')
+  assert.equal(totals.length,4)
+  assert.match(totals[3].textContent,/۲۷۵ ساعت/)
+  assert.equal(ui.host.querySelectorAll('.ow-profile-mini-list').length>=0,true)
+  assert.equal(original.time_entries.filter(e=>e.review_state==='approved').length,1,
+    'synthetic history only carries one 45-minute approved entry')
+ }finally{await ui.dispose()}
+})
