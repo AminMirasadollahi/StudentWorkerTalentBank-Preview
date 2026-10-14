@@ -708,6 +708,7 @@ export function AdminOperations({ navigation, setNavigation }) {
   },[assignmentDialogDate])
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
+  const [readFailed,setReadFailed]=useState(false)
   const [notice,setNotice]=useState('')
   const [historyShown,setHistoryShown]=useState(100)
   const [tasksShown,setTasksShown]=useState(100)
@@ -721,9 +722,14 @@ export function AdminOperations({ navigation, setNavigation }) {
     try{
       const result=await getAdminWorkV2()
       setData(result||{workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+      setReadFailed(false)
       setError('')
       return true
     }catch(e){
+      // A previous successful read is not proof of CURRENT authorization.
+      setData({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+      setReadFailed(true)
+      setAssignmentDialogDate('')
       setError(readableError(e))
       return false
     }finally{setLoading(false)}
@@ -771,6 +777,13 @@ export function AdminOperations({ navigation, setNavigation }) {
     catch(e){setError(readableError(e))}
     finally{setBusy(false)}
   }
+
+  if(readFailed)return <div className="ow-workspace ow-access-recheck" role="alert">
+    <p>اطلاعات مدیریتی در دسترس نیست. تا بررسی دوبارهٔ مجوز، داده‌های قبلی نمایش داده نمی‌شوند.</p>
+    <Message error={error}/>
+    <button type="button" className="report-btn report-btn--light" disabled={loading}
+      onClick={()=>{void refresh()}}>تلاش مجدد برای دریافت اطلاعات</button>
+  </div>
 
   return <div className="ow-workspace">
     <div className="ow-summary">
@@ -1292,11 +1305,18 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
   const taskRange=['today','week','month'].includes(selected.taskRange)?selected.taskRange:'today'
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
+  const [readFailed,setReadFailed]=useState(false)
   const refresh=async()=>{
     setLoading(true);setError('')
-    try{setData(await getMyWorkV2()||{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})}
-    catch(e){setError(readableError(e))}
-    finally{setLoading(false)}
+    try{
+      setData(await getMyWorkV2()||{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+      setReadFailed(false)
+    }catch(e){
+      // Never retain a visible old work list after a failed authorization refresh.
+      setData({tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+      setReadFailed(true)
+      setError(readableError(e))
+    }finally{setLoading(false)}
   }
   useEffect(()=>{void refresh()},[profile.worker_id])
   const records=data.time_entries||[]
@@ -1310,6 +1330,12 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
     tasks.filter(t=>t.planned_date>=month.start&&t.planned_date<=month.end)
   const overdue=tasks.filter(t=>t.planned_date<today()&&['assigned','in_progress','needs_changes'].includes(t.state))
   const visible=[...overdue,...ranged.filter(t=>!overdue.some(p=>p.id===t.id))]
+  if(readFailed)return <div className="ow-workspace ow-worker-workspace ow-access-recheck" role="alert">
+    <p>برنامهٔ کاری در دسترس نیست. تا بررسی دوبارهٔ دسترسی، اطلاعات قبلی نمایش داده نمی‌شوند.</p>
+    <div className="report-alert report-alert--error">{error}</div>
+    <button type="button" className="report-btn report-btn--light" disabled={loading}
+      onClick={()=>{void refresh()}}>تلاش مجدد برای دریافت اطلاعات</button>
+  </div>
   return <div className="ow-workspace ow-worker-workspace">
     <div className="ow-summary">
       <article><span>کارهای باز</span><b>{n(tasks.filter(t=>!['completed','cancelled'].includes(t.state)).length)}</b></article>
