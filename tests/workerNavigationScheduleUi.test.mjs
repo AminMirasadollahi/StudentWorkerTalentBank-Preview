@@ -29,7 +29,7 @@ const plugin={
   if(id==='\0qa-worker-no-network')return [
     'export const getMyWork=async()=>globalThis.__workerFocusFixture;',
     'export const setWeeklyDay=async(...args)=>{globalThis.__workerFocusCalls.push(args);};',
-    'export const setDateException=async()=>{throw Error("QA_NO_EXCEPTION_WRITES")};',
+    'export const setDateException=async(...args)=>{globalThis.__workerExceptionCalls.push(args);};',
     ...['getAdminWork','assignWorkerTask','startMyTask','submitMyTime',
       'reviewWorkerTime'].map(name=>
       `export const ${name}=async()=>{throw Error("QA_WRITES_DENIED")};`),
@@ -47,6 +47,7 @@ before(async()=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true
  globalThis.__workerFocusFixture=fixture()
  globalThis.__workerFocusCalls=[]
+ globalThis.__workerExceptionCalls=[]
  ;({createRoot}=await import('react-dom/client'))
  server=await createServer({plugins:[plugin],server:{middlewareMode:true},
   appType:'custom',logLevel:'error'})
@@ -56,7 +57,7 @@ after(async()=>{
  await server?.close()
  dom?.window.close()
  for(const p of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT',
-  '__workerFocusFixture','__workerFocusCalls'])delete globalThis[p]
+  '__workerFocusFixture','__workerFocusCalls','__workerExceptionCalls'])delete globalThis[p]
 })
 function Harness(){
  const [nav,setNav]=useState({section:'tasks',taskRange:'today'})
@@ -109,11 +110,12 @@ test('seven weekday rows render four independent slots and safe per-day single R
   await ui.clickText('زمان حضور')
   assert.equal(ui.host.querySelectorAll('.ow-week-row').length,7)
   assert.equal(ui.host.querySelectorAll('.ow-week-slot').length,28)
-  assert.equal(ui.host.querySelectorAll('.ow-day-windows input').length,0)
+  assert.equal(ui.host.querySelectorAll('.ow-inline-window input').length,0)
+  assert.ok(ui.host.querySelector('.ow-month-grid'),'real monthly view is integrated into presence hub')
   await ui.click('button[aria-label^="ویرایش برنامه شنبه"]')
-  assert.equal(ui.host.querySelectorAll('.ow-day-window').length,0)
-  await ui.clickText('+ افزودن نوبت (۰ از ۴)')
-  assert.equal(ui.host.querySelectorAll('.ow-day-window').length,1)
+  assert.equal(ui.host.querySelectorAll('.ow-inline-window').length,0)
+  await ui.clickText('+ نوبت (۰ از ۴)')
+  assert.equal(ui.host.querySelectorAll('.ow-inline-window').length,1)
   await ui.clickText('ذخیره همین روز')
   assert.equal(globalThis.__workerFocusCalls.length,1)
   const [who,weekday,slots,effective]=globalThis.__workerFocusCalls[0]
@@ -123,6 +125,39 @@ test('seven weekday rows render four independent slots and safe per-day single R
   assert.match(effective,/^\d{4}-\d{2}-\d{2}$/)
  }finally{await ui.dispose()}
 })
+test('worker exposes This Month and personal profile without permanent password controls',async()=>{
+ const ui=await setup()
+ try{
+  await ui.clickText('این هفته')
+  assert.ok(ui.host.querySelector('.ow-range-switch'))
+  await ui.clickText('این ماه')
+  assert.equal(ui.host.querySelector('[aria-pressed="true"]').textContent,'این ماه')
+  await ui.clickText('پروفایل من')
+  assert.ok(ui.host.querySelector('.ow-self-profile'))
+  assert.ok(ui.host.textContent.includes('سابقه گزارش‌ها و ساعات'))
+  assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,3)
+ }finally{await ui.dispose()}
+})
+test('month view edits one dated exception through injected fake RPC only',async()=>{
+ const ui=await setup()
+ const previousWeeklyCalls=globalThis.__workerFocusCalls.length
+ try{
+  await ui.clickText('زمان حضور')
+  assert.ok(ui.host.querySelector('.ow-month-grid'))
+  await ui.click('.ow-month-day.is-today')
+  assert.ok(ui.host.querySelector('.ow-exception-inline'))
+  await ui.click('.ow-exception-kind label:last-child input')
+  await ui.clickText('ذخیره استثنای این تاریخ')
+  assert.equal(globalThis.__workerExceptionCalls.length,1)
+  const [who,date,kind,windows]=globalThis.__workerExceptionCalls[0]
+  assert.equal(who,worker)
+  assert.match(date,/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)
+  assert.equal(kind,'unavailable')
+  assert.deepEqual(windows,[])
+  assert.equal(globalThis.__workerFocusCalls.length,previousWeeklyCalls,
+    'date exception must not accidentally invoke weekly schedule writes')
+ }finally{await ui.dispose()}
+})
 test('sources preserve fail-closed auth and critical applicant/protected operational wiring',()=>{
  const app=readFileSync('src/OpsApp.jsx','utf8')
  const ops=readFileSync('src/OperationsWorkspace.jsx','utf8')
@@ -130,7 +165,8 @@ test('sources preserve fail-closed auth and critical applicant/protected operati
  assert.match(app,/watchOperationsResume/)
  assert.match(app,/if \(recheckingAccess && identity && !recoveryMode\)/)
  assert.match(app,/navigation=\{workerNavigation\}/)
- assert.match(app,/PasswordContainer = passwordEstablished \? 'details' : 'section'/)
+ assert.match(app,/setSettingsOpen/)
+ assert.match(app,/ops-account-settings-panel/)
  assert.doesNotMatch(ops,/WorkerLifecycleControls|VITE_WORKER_LIFECYCLE_ADMIN_ENABLED|ops_set_worker_state/)
  const css=readFileSync('src/operations-workspace.css','utf8')
  assert.match(css,/\.ow-worker-tasks,.ow-worker-history/)

@@ -3,7 +3,7 @@ name: Management Draft PR Safety Gate (NO DEPLOY)
 on:
   # Non-deploy verification of this review branch, independent of PR creation.
   push:
-    branches: [review/operations-ui-readonly-lifecycle-2026-10-13, feat/worker-focus-weekly-4slots-2026-10-13]
+    branches: [review/operations-ui-readonly-lifecycle-2026-10-13, feat/worker-focus-weekly-4slots-2026-10-13, feat/unified-focus-presence-profiles-2026-10-13]
   pull_request:
     branches: [main]
     paths:

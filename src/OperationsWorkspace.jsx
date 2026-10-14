@@ -11,6 +11,8 @@ import { describeTaskWorkflow,selectManagerTasks,summarizeTaskWorkflow,selectPen
 import WorkerLifecycleReadOnlyPreview from './components/WorkerLifecycleReadOnlyPreview'
 import { workerStateLabels } from './lib/workerLifecycle.mjs'
 import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persianWeekBounds, suggestNextWindow } from './lib/weeklyScheduleGrid.mjs'
+import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonthBounds } from './lib/persianMonthCalendar.mjs'
+import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -106,172 +108,253 @@ function ScheduleEditor({workerId,onSaved,data}) {
   const [effective,setEffective]=useState(today())
   const [editingDay,setEditingDay]=useState(null)
   const [draftWindows,setDraftWindows]=useState([])
-  const [exceptionDate,setExceptionDate]=useState(today())
-  const [exceptionKind,setExceptionKind]=useState('unavailable')
-  const [exceptionStart,setExceptionStart]=useState('08:00')
-  const [exceptionEnd,setExceptionEnd]=useState('12:00')
+  const [monthAnchor,setMonthAnchor]=useState(today())
+  const [selectedDate,setSelectedDate]=useState('')
+  const [exceptionKind,setExceptionKind]=useState('replacement_intervals')
+  const [exceptionWindows,setExceptionWindows]=useState([])
   const [note,setNote]=useState('')
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
-  const [saveDayState,setSaveDayState]=useState('')
-  useEffect(()=>{setEditingDay(null);setDraftWindows([]);setError('');setNotice('')},[workerId,effective])
-
-  const selectedDayDate=editingDay===null?null:firstMatchingWeekday(effective,editingDay)
+  const [saveState,setSaveState]=useState('')
+  const month=persianMonthCells(monthAnchor)
+  const calendarData=data||{}
   const weeklyValidation=validateDailyWindows(draftWindows)
-  const weeklyPreview=editingDay===null||!weeklyValidation.ok ? null :
-    assessAvailabilityOverride(data,workerId,selectedDayDate,weeklyValidation.intervals,
-      {unavailable:false})
-  const exceptionValid=exceptionKind==='unavailable'||(
-    Number.isInteger(toMin(exceptionStart))&&Number.isInteger(toMin(exceptionEnd))
-    &&toMin(exceptionStart)>=0&&toMin(exceptionEnd)<=1440&&toMin(exceptionEnd)>toMin(exceptionStart)
-  )
-  const exceptionPreview=assessAvailabilityOverride(data,workerId,exceptionDate,
-    exceptionKind==='unavailable'?[]:[{start:toMin(exceptionStart),end:toMin(exceptionEnd)}],
-    {unavailable:exceptionKind==='unavailable'})
+  const exceptionValidation=exceptionKind==='unavailable'
+    ? {ok:true,intervals:[],minutes:0}
+    : validateDailyWindows(exceptionWindows)
+  const selectedWeekDate=editingDay===null?'':firstMatchingWeekday(effective,editingDay)
+  const weekPreview=editingDay===null||!weeklyValidation.ok?null:
+    assessAvailabilityOverride(calendarData,workerId,selectedWeekDate,weeklyValidation.intervals)
+  const exceptionPreview=!selectedDate||!exceptionValidation.ok?null:
+    assessAvailabilityOverride(calendarData,workerId,selectedDate,exceptionValidation.intervals,
+      {unavailable:exceptionKind==='unavailable'})
 
-  const openDay=id=>{
+  useEffect(()=>{
+    setEditingDay(null);setDraftWindows([]);setSelectedDate('')
+    setError('');setNotice('');setSaveState('')
+  },[workerId])
+  useEffect(()=>{
+    setEditingDay(null);setDraftWindows([]);setSaveState('')
+  },[effective])
+
+  const openWeekday=id=>{
     if(busy)return
     if(editingDay===id){setEditingDay(null);return}
-    const target=firstMatchingWeekday(effective,id)
-    setDraftWindows(selectedWeeklyWindows(data?.weekly_slots||[],workerId,id,target))
-    setSaveDayState('')
-    setError('')
-    setNotice('')
+    const date=firstMatchingWeekday(effective,id)
     setEditingDay(id)
+    setDraftWindows(selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,id,date))
+    setError('');setNotice('');setSaveState('')
   }
-  const save=async (fn,onSuccess)=>{
-    setBusy(true);setError('');setNotice('')
+  const chooseMonthDay=date=>{
+    if(busy)return
+    if(selectedDate===date){setSelectedDate('');return}
+    const exception=(calendarData.exceptions||[]).find(ex=>ex.worker_id===workerId&&ex.local_date===date)
+    const kind=exception?.kind==='unavailable'?'unavailable':'replacement_intervals'
+    let windows=(exception?.kind==='replacement_intervals'&&Array.isArray(exception.intervals))
+      ? exception.intervals.map(x=>({
+          start:minutesToClock(Number(x.start??x.start_minute)),
+          end:minutesToClock(Number(x.end??x.end_minute)),
+        }))
+      : selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,isoWeekday(date),date)
+    setSelectedDate(date)
+    setExceptionKind(kind)
+    setExceptionWindows(windows.length?windows:[suggestNextWindow([])])
+    setNote(exception?.note||'')
+    setError('');setNotice('');setSaveState('')
+  }
+  const save=async(command,kind)=>{
+    if(busy)return
+    setBusy(true);setError('');setNotice('');setSaveState('')
     try{
-      await fn()
+      await command()
       await onSaved?.()
-      onSuccess?.()
-      setNotice('ذخیره این بخش با موفقیت انجام شد.')
-    } catch(e){setError(readableError(e));if(onSuccess)setSaveDayState('ذخیره نشد؛ دوباره تلاش کنید.')}
-    finally{setBusy(false)}
+      setSaveState(kind==='weekly'?'برنامه همین روز ذخیره شد.':'استثنای این تاریخ ذخیره شد.')
+      if(kind==='weekly')setEditingDay(null)
+      else setSelectedDate('')
+    }catch(e){
+      setError(readableError(e))
+      setSaveState('ذخیره انجام نشد؛ اطلاعات واردشده حفظ شده‌اند.')
+    }finally{setBusy(false)}
   }
-  const submitDay=event=>{
+  const submitWeek=event=>{
     event.preventDefault()
-    if(busy||editingDay===null||!weeklyValidation.ok)return
-    if(draftWindows.length===0&&!window.confirm('برنامه ثابت این روز حذف می‌شود و ظرفیت آن نامشخص خواهد بود. ادامه می‌دهید؟'))return
-    const weekday=editingDay
-    setSaveDayState('در حال ذخیره همین روز…')
-    void save(()=>setWeeklyDay(workerId,weekday,weeklyValidation.intervals,effective),()=>{
-      setSaveDayState('ذخیره شد')
-      setEditingDay(null)
-    })
+    if(!workerId||editingDay===null||!weeklyValidation.ok||busy)return
+    if(!draftWindows.length&&!window.confirm(
+      'برنامه ثابت این روز حذف می‌شود. نبود برنامه به معنی عدم حضور قطعی نیست. ادامه می‌دهید؟'))return
+    void save(()=>setWeeklyDay(workerId,editingDay,weeklyValidation.intervals,effective),'weekly')
   }
-
-  if(!workerId)return <p className="ow-muted">یک دانشجوکار انتخاب کنید.</p>
-  return <div className="ow-schedule-editor">
-    <section className="ow-week-editor" aria-label="برنامه ثابت هفتگی">
-      <div className="ow-week-heading">
-        <h3>برنامه ثابت هفتگی</h3>
-        <label className="report-field">
-          <span>اعمال تغییرات از تاریخ (شمسی)</span>
-          <JalaliDatePicker min={today()} value={effective} onChange={setEffective} ariaLabel="تاریخ شروع برنامه هفتگی"/>
-        </label>
+  const submitDate=event=>{
+    event.preventDefault()
+    if(!workerId||!selectedDate||selectedDate<today()||!exceptionValidation.ok||busy)return
+    if(exceptionKind==='replacement_intervals'&&!exceptionWindows.length)return
+    void save(()=>setDateException(workerId,selectedDate,exceptionKind,
+      exceptionValidation.intervals,note),'exception')
+  }
+  const setMonth=direction=>{
+    setMonthAnchor(previous=>direction==='previous'
+      ?previousPersianMonth(previous):nextPersianMonth(previous))
+    setSelectedDate('');setError('');setSaveState('')
+  }
+  const editWindow=(setter,index,field,value)=>
+    setter(current=>current.map((w,i)=>i===index?{...w,[field]:value}:w))
+  const renderWindows=(windows,setter,prefix)=>(
+    <div className="ow-inline-windows">
+      {windows.map((slot,i)=><div className="ow-inline-window" key={i}>
+        <span className="ow-inline-window-label">نوبت {n(i+1)}</span>
+        <label className="report-field"><span>از</span><input type="text" inputMode="numeric"
+          dir="ltr" required maxLength={5} placeholder="08:00"
+          value={slot.start} onChange={e=>editWindow(setter,i,'start',e.target.value)}/></label>
+        <label className="report-field"><span>تا</span><input type="text" inputMode="numeric"
+          dir="ltr" required maxLength={5} placeholder="09:00"
+          value={slot.end} onChange={e=>editWindow(setter,i,'end',e.target.value)}/></label>
+        <button type="button" className="ow-mini-btn" disabled={busy}
+          aria-label={`حذف نوبت ${i+1} ${prefix}`}
+          onClick={()=>setter(current=>current.filter((_,j)=>j!==i))}>حذف</button>
+      </div>)}
+      <div className="ow-inline-tools">
+        <button type="button" className="ow-mini-btn" disabled={busy||windows.length>=MAX_DAILY_WINDOWS}
+          onClick={()=>setter(current=>[...current,suggestNextWindow(current)])}>
+          + نوبت ({n(windows.length)} از {n(MAX_DAILY_WINDOWS)})
+        </button>
       </div>
-      <p className="ow-muted">برای ویرایش، یک روز را انتخاب کنید. هر روز تا چهار بازه مستقل دارد؛ ذخیره هر روز جداگانه انجام می‌شود.</p>
+    </div>
+  )
+  if(!workerId)return <p className="ow-muted">یک دانشجوکار انتخاب کنید.</p>
+  return <div className="ow-presence-hub">
+    <section className="ow-presence-week" aria-label="برنامه ثابت هفتگی">
+      <div className="ow-presence-section-title">
+        <h3>برنامه ثابت هفتگی</h3>
+        <details className="ow-quiet-details"><summary>تاریخ اعمال</summary>
+          <div className="report-field">
+            <span>از تاریخ (شمسی)</span>
+            <JalaliDatePicker min={today()} value={effective} onChange={setEffective}
+              ariaLabel="تاریخ شروع اعمال برنامه ثابت"/>
+          </div>
+        </details>
+      </div>
       <div className="ow-week-grid-header" aria-hidden="true">
         <span>روز</span>{[1,2,3,4].map(i=><span key={i}>نوبت {n(i)}</span>)}
       </div>
       <div className="ow-week-grid">
         {dayLabels.map(([id,name])=>{
           const date=firstMatchingWeekday(effective,id)
-          const slots=selectedWeeklyWindows(data?.weekly_slots||[],workerId,id,date)
-          return <button type="button" key={id}
-            className={editingDay===id?'ow-week-row is-editing':'ow-week-row'}
-            aria-expanded={editingDay===id}
-            onClick={()=>openDay(id)} disabled={busy}
-            aria-label={`ویرایش برنامه ${name}؛ ${slots.length ? n(slots.length)+' بازه' : 'برنامه نامشخص'}`}>
-            <span className="ow-week-day"><strong>{name}</strong><small>{pretty(date)}</small></span>
-            {[0,1,2,3].map(i=><span key={i} className={slots[i]?'ow-week-slot':'ow-week-slot is-empty'}>
-              {slots[i] ? <span dir="ltr">{slots[i].start}–{slots[i].end}</span> : <span aria-hidden="true">＋</span>}
-            </span>)}
+          const slots=selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,id,date)
+          return <div className="ow-week-row-shell" key={id}>
+            <button type="button" className={editingDay===id?'ow-week-row is-editing':'ow-week-row'}
+              onClick={()=>openWeekday(id)} aria-expanded={editingDay===id} disabled={busy}
+              aria-label={`ویرایش برنامه ${name}؛ ${slots.length?n(slots.length)+' بازه':'برنامه نامشخص'}`}>
+              <span className="ow-week-day"><strong>{name}</strong></span>
+              {[0,1,2,3].map(i=><span key={i}
+                className={slots[i]?'ow-week-slot':'ow-week-slot is-empty'}>
+                {slots[i]?<span dir="ltr">{slots[i].start}–{slots[i].end}</span>:<span aria-hidden="true">＋</span>}
+              </span>)}
+            </button>
+            {editingDay===id&&<form className="ow-week-day-form" onSubmit={submitWeek}>
+              {renderWindows(draftWindows,setDraftWindows,'ثابت')}
+              {!weeklyValidation.ok&&<p role="alert" className="ow-warning">{weeklyValidation.error}</p>}
+              {weeklyValidation.ok&&<small className="ow-muted">
+                مجموع: {exactDuration(weeklyValidation.minutes)} · ذخیره فقط برای {name}
+              </small>}
+              {weekPreview?.code==='conflict'&&<p role="status" className="ow-warning">
+                برای این روز {minutes(weekPreview.allocatedMinutes)} کار ثبت شده؛ ظرفیت پیشنهادی
+                {' '}{minutes(weekPreview.proposedCapacity)} است. کارهای قبلی حذف نمی‌شوند.
+              </p>}
+              <div className="ow-inline-save"><button className="report-btn report-btn--primary"
+                type="submit" disabled={busy||!weeklyValidation.ok}>
+                {draftWindows.length?'ذخیره همین روز':'حذف برنامه این روز'}
+              </button></div>
+            </form>}
+          </div>
+        })}
+      </div>
+      <small className="ow-muted">هر روز مستقل ذخیره می‌شود. خانه خالی یعنی برنامه نامشخص، نه غیبت قطعی.</small>
+    </section>
+    <section className="ow-presence-month" aria-label="تقویم حضور و استثناهای روزانه">
+      <div className="ow-presence-section-title ow-month-heading">
+        <h3>تقویم ماهانه · {month.title}</h3>
+        <div className="ow-month-navigation">
+          <button className="ow-mini-btn" type="button" onClick={()=>setMonth('previous')}
+            aria-label="ماه پیشین">ماه قبل</button>
+          <button className="ow-mini-btn" type="button" onClick={()=>setMonthAnchor(today())}
+            aria-label="بازگشت به ماه جاری">امروز</button>
+          <button className="ow-mini-btn" type="button" onClick={()=>setMonth('next')}
+            aria-label="ماه بعد">ماه بعد</button>
+        </div>
+      </div>
+      <div className="ow-month-weekdays" aria-hidden="true">
+        {['ش','ی','د','س','چ','پ','ج'].map((name,i)=><span key={i}>{name}</span>)}
+      </div>
+      <div className="ow-month-grid" role="group" aria-label={month.title}>
+        {month.days.map((day,index)=>{
+          if(!day)return <span className="ow-month-blank" key={'blank-'+index}/>
+          const daily=projectDayPresence(calendarData,workerId,day.date)
+          const hasException=['replacement','unavailable'].includes(daily.kind)
+          const tasks=(calendarData.tasks||[]).filter(t=>t.worker_id===workerId
+            &&t.planned_date===day.date&&t.state!=='cancelled')
+          const timings=daily.windows.map(w=>w.start+'–'+w.end).join('، ')
+          const heading=daily.kind==='unavailable'?'عدم حضور':
+            daily.kind==='replacement'?'تغییر موقت':'برنامه ثابت'
+          return <button type="button" key={day.date}
+            className={'ow-month-day'+(selectedDate===day.date?' is-selected':'')
+              +(day.date===today()?' is-today':'')
+              +(hasException?' has-exception':'')}
+            onClick={()=>chooseMonthDay(day.date)} disabled={busy}
+            aria-pressed={selectedDate===day.date}
+            title={`${pretty(day.date)}: ${daily.kind==='unknown'?'برنامه نامشخص':heading+' '+timings}`}
+            aria-label={`${pretty(day.date)}؛ ${daily.kind==='unknown'?'برنامه نامشخص':heading+' '+timings}؛ ${n(tasks.length)} کار`}>
+            <b>{n(day.day)}</b>
+            {daily.kind==='unavailable'?<small>عدم حضور</small>:
+              daily.windows.length?<small className="ow-day-times" dir="ltr">
+                {daily.windows.length===1?timings:`${daily.windows.length} بازه · ${daily.windows[0].start}`}
+              </small>:null}
+            {hasException&&daily.kind!=='unavailable'&&<i className="ow-exception-mark">تغییر</i>}
+            {tasks.length>0&&<small className="ow-task-count">{n(tasks.length)} کار</small>}
           </button>
         })}
       </div>
-      {editingDay!==null&&<form className="ow-week-day-form" onSubmit={submitDay}>
-        <h4>{dayLabels.find(([id])=>id===editingDay)?.[1]} · {pretty(selectedDayDate)}</h4>
-        <div className="ow-day-windows">
-          {draftWindows.map((slot,index)=><div className="ow-day-window" key={index}>
-            <strong>نوبت {n(index+1)}</strong>
-            <label className="report-field"><span>از (HH:MM)</span>
-              <input type="text" inputMode="numeric" dir="ltr" placeholder="08:00" required
-                value={slot.start} maxLength={5}
-                onChange={e=>setDraftWindows(old=>old.map((x,i)=>i===index?{...x,start:e.target.value}:x))}/>
-            </label>
-            <label className="report-field"><span>تا (HH:MM)</span>
-              <input type="text" inputMode="numeric" dir="ltr" placeholder="09:00" required
-                value={slot.end} maxLength={5}
-                onChange={e=>setDraftWindows(old=>old.map((x,i)=>i===index?{...x,end:e.target.value}:x))}/>
-            </label>
-            <button type="button" className="report-btn report-btn--light" disabled={busy}
-              onClick={()=>setDraftWindows(old=>old.filter((_,i)=>i!==index))}
-              aria-label={`حذف نوبت ${index+1}`}>حذف</button>
-          </div>)}
+      {selectedDate&&<form className="ow-exception-inline" onSubmit={submitDate}>
+        <div className="ow-presence-section-title">
+          <h4>تغییر موقت · {pretty(selectedDate)}</h4>
+          <button type="button" className="ow-mini-btn" onClick={()=>setSelectedDate('')}>بستن</button>
         </div>
-        <div className="ow-actions">
-          <button type="button" className="report-btn report-btn--light"
-            disabled={busy||draftWindows.length>=MAX_DAILY_WINDOWS}
-            onClick={()=>setDraftWindows(old=>[...old,suggestNextWindow(old)])}>
-            + افزودن نوبت ({n(draftWindows.length)} از {n(MAX_DAILY_WINDOWS)})
-          </button>
-          <button type="submit" className="report-btn report-btn--primary"
-            disabled={busy||!weeklyValidation.ok}>
-            {busy?'در حال ثبت…':draftWindows.length?'ذخیره همین روز':'حذف برنامه ثابت این روز'}
-          </button>
+        <p className="ow-muted ow-selected-current">
+          {(()=>{
+            const current=projectDayPresence(calendarData,workerId,selectedDate)
+            return current.kind==='unknown'?'برنامه فعلی: نامشخص':
+              current.kind==='unavailable'?'وضعیت فعلی: عدم حضور ثبت‌شده':
+              'برنامه فعلی: '+current.windows.map(w=>w.start+'–'+w.end).join('، ')
+          })()}
+        </p>
+        <div className="ow-exception-kind" role="group" aria-label="نوع تغییر این تاریخ">
+          <label><input type="radio" name="exception-kind" checked={exceptionKind==='replacement_intervals'}
+            onChange={()=>setExceptionKind('replacement_intervals')}/> ساعات جایگزین</label>
+          <label><input type="radio" name="exception-kind" checked={exceptionKind==='unavailable'}
+            onChange={()=>setExceptionKind('unavailable')}/> عدم حضور</label>
         </div>
-        {!weeklyValidation.ok&&<p role="alert" className="ow-warning">{weeklyValidation.error}</p>}
-        {weeklyValidation.ok&&<p className="ow-muted">مجموع حضور این روز: {exactDuration(weeklyValidation.minutes)}.
-          {draftWindows.length===0?' حذف برنامه به معنی عدم حضور قطعی نیست؛ ظرفیت نامشخص می‌شود.':''}
+        {exceptionKind==='replacement_intervals'&&
+          renderWindows(exceptionWindows,setExceptionWindows,'استثنا')}
+        <label className="report-field"><span>توضیح (اختیاری)</span>
+          <input maxLength={300} value={note} onChange={e=>setNote(e.target.value)}/>
+        </label>
+        {selectedDate<today()&&<p role="status" className="ow-muted">تاریخ گذشته فقط برای مشاهده است.</p>}
+        {!exceptionValidation.ok&&<p role="alert" className="ow-warning">{exceptionValidation.error}</p>}
+        {exceptionPreview?.code==='conflict'&&<p role="status" className="ow-warning">
+          ظرفیت این روز با {minutes(exceptionPreview.allocatedMinutes)} کار موجود تداخل دارد.
+          تغییر زمان کارها را خودکار لغو نمی‌کند.
         </p>}
-        {weeklyPreview?.code==='conflict'&&<div role="status" className="ow-capacity-warning">
-          <strong>هشدار تداخل با کارهای موجود: </strong>
-          {minutes(weeklyPreview.allocatedMinutes)} کار برای این روز ثبت شده و ظرفیت پیشنهادی
-          {' '}{minutes(weeklyPreview.proposedCapacity)} است. تغییر برنامه کارهای قبلی را لغو نمی‌کند.
-        </div>}
-        {saveDayState&&<p role="status" className="ow-muted">{saveDayState}</p>}
+        <button className="report-btn report-btn--primary" type="submit"
+          disabled={busy||selectedDate<today()||!exceptionValidation.ok
+            ||(exceptionKind==='replacement_intervals'&&!exceptionWindows.length)}>
+          ذخیره استثنای این تاریخ
+        </button>
       </form>}
+      <small className="ow-muted">هر تاریخ قابل انتخاب است؛ تغییر موقت تنها روی همان روز اثر دارد.</small>
     </section>
-    <form onSubmit={event=>{event.preventDefault();if(!exceptionValid||busy)return;void save(()=>setDateException(
-      workerId,exceptionDate,exceptionKind,
-      exceptionKind==='unavailable'?[]:[{start:toMin(exceptionStart),end:toMin(exceptionEnd)}],
-      note
-    ))}}>
-      <h3>تغییر موقت یک روز</h3>
-      <div className="ow-fields ow-fields--four">
-        <label className="report-field"><span>تاریخ (شمسی)</span>
-          <JalaliDatePicker min={today()} value={exceptionDate} onChange={setExceptionDate} ariaLabel="تاریخ تغییر موقت حضور"/>
-        </label>
-        <label className="report-field"><span>نوع تغییر</span>
-          <select value={exceptionKind} onChange={e=>setExceptionKind(e.target.value)}>
-            <option value="unavailable">عدم حضور</option>
-            <option value="replacement_intervals">ساعات جایگزین</option>
-          </select>
-        </label>
-        {exceptionKind==='replacement_intervals'&&<>
-          <label className="report-field"><span>از</span><input type="time" value={exceptionStart} onChange={e=>setExceptionStart(e.target.value)}/></label>
-          <label className="report-field"><span>تا</span><input type="time" value={exceptionEnd} onChange={e=>setExceptionEnd(e.target.value)}/></label>
-        </>}
-      </div>
-      <label className="report-field"><span>توضیح کوتاه (اختیاری)</span>
-        <input maxLength={300} value={note} onChange={e=>setNote(e.target.value)}/>
-      </label>
-      {!exceptionValid&&<p className="ow-warning" role="alert">ساعت پایان باید بعد از شروع و در همان روز باشد.</p>}
-      {exceptionPreview.code==='conflict'&&<div className="ow-capacity-warning" role="status">
-        <strong>هشدار: برای این روز قبلاً کار ثبت شده است.</strong>
-        {' '}{minutes(exceptionPreview.allocatedMinutes)} کار واگذار شده در برابر
-        {' '}{minutes(exceptionPreview.proposedCapacity)} ظرفیت پیشنهادی.
-        تغییر برنامه، کارهای قبلی را لغو نمی‌کند.
-      </div>}
-      <button className="report-btn report-btn--primary" disabled={busy||!exceptionValid} type="submit">ثبت تغییر این روز</button>
-    </form>
-    <Message error={error} notice={notice}/>
-    <details className="ow-context-help"><summary>راهنمای برنامه</summary>
-      <p className="ow-muted">تغییرات گذشته بازنویسی نمی‌شوند. بازه‌های هر روز بدون هم‌پوشانی و به‌ترتیب زمانی ذخیره می‌شوند؛ نبود برنامه به معنی عدم حضور قطعی نیست.</p>
-    </details>
+    <div className="ow-presence-feedback">
+      <Message error={error} notice={notice}/>
+      {saveState&&<p role="status" className="ow-muted">{saveState}</p>}
+    </div>
   </div>
 }
 function ApprovalCard({entry,task,worker,onDone}) {
@@ -389,9 +472,73 @@ async function exportOpsExcel(data, filteredToOneWorker=false) {
   a.href=url;a.download=filteredToOneWorker?'student-worker-selected-history.xlsx':'student-worker-operations.xlsx';a.click()
   setTimeout(()=>URL.revokeObjectURL(url),1000)
 }
+function ManagerWorkerProfile({data,selectedId,onChange}) {
+  const workers=data.workers||[]
+  const selected=workers.find(w=>w.id===selectedId)
+  const scoped=selected?scopeWorkerHistory(data,selectedId):null
+  const summary=scoped?summarizeWorkerHistory(scoped):null
+  const tasks=scoped?.tasks||[]
+  const entries=scoped?.time_entries||[]
+  const ongoing=tasks.filter(t=>['assigned','in_progress','submitted','needs_changes'].includes(t.state))
+  const completed=tasks.filter(t=>t.state==='completed')
+  return <section className="report-panel ow-profile-section">
+    <div className="ow-presence-section-title">
+      <h2>پروفایل دانشجوکارها</h2>
+      <label className="report-field ow-worker-selector"><span>انتخاب دانشجوکار</span>
+        <select value={selectedId} onChange={e=>onChange(e.target.value)}>
+          <option value="">انتخاب کنید</option>
+          {workers.map(w=><option key={w.id} value={w.id}>{w.name} · {unitLabels[w.unit]||w.unit}</option>)}
+        </select>
+      </label>
+    </div>
+    {!selected&&<p className="ow-muted">برای دیدن پرونده تجمیعی، یک دانشجوکار انتخاب کنید.</p>}
+    {selected&&<>
+      <div className="ow-profile-heading">
+        <div><h3>{selected.name}</h3>
+          <small className="ow-muted">{unitLabels[selected.unit]||selected.unit||'—'}
+            {selected.major&&<> · {selected.major}</>}</small></div>
+        <span className="ow-status">{workerStateLabels[selected.state]||selected.state}</span>
+      </div>
+      <div className="ow-profile-metrics">
+        <div><span>کارهای واگذارشده</span><b>{n(summary.taskCount)}</b></div>
+        <div><span>در جریان</span><b>{n(summary.openCount)}</b></div>
+        <div><span>گزارش منتظر</span><b>{n(summary.pendingCount)}</b></div>
+        <div><span>زمان تأییدشده</span><b>{exactDuration(summary.approvedMinutes)}</b></div>
+      </div>
+      <details className="ow-profile-fold"><summary>کارهای در جریان · {n(ongoing.length)}</summary>
+        <div className="ow-profile-mini-list">
+          {ongoing.map(t=><div key={t.id}><b>{t.title}</b><small>{pretty(t.planned_date)} · {stateLabels[t.state]||t.state}</small></div>)}
+          {!ongoing.length&&<p className="ow-muted">کاری در جریان نیست.</p>}
+        </div>
+      </details>
+      <details className="ow-profile-fold"><summary>کارهای تکمیل‌شده · {n(completed.length)}</summary>
+        <div className="ow-profile-mini-list">
+          {completed.map(t=><div key={t.id}><b>{t.title}</b><small>{pretty(t.planned_date)}</small></div>)}
+          {!completed.length&&<p className="ow-muted">کاری تکمیل نشده است.</p>}
+        </div>
+      </details>
+      <details className="ow-profile-fold"><summary>سوابق ساعات و گزارش‌ها · {n(entries.length)}</summary>
+        <div className="ow-profile-mini-list">
+          {entries.map(e=><div key={e.id}>
+            <b>{tasks.find(t=>t.id===e.task_id)?.title||'گزارش کار'}</b>
+            <small>{pretty(e.work_date)} · {reviewLabels[e.review_state]||e.review_state}
+              {' · '}{e.review_state==='approved'
+                ?exactDuration(e.approved_minutes):minutes(e.reported_minutes)}</small>
+          </div>)}
+          {!entries.length&&<p className="ow-muted">گزارشی وجود ندارد.</p>}
+        </div>
+      </details>
+      <details className="ow-profile-fold"><summary>وضعیت حساب · فقط مشاهده</summary>
+        <WorkerLifecycleReadOnlyPreview worker={selected}/>
+      </details>
+    </>}
+  </section>
+}
 export function AdminOperations({ navigation, setNavigation }) {
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const view=navigation.workView
+  const profileWorkerId=navigation.profileWorkerId||''
+  const setProfileWorkerId=value=>setNavigation(previous=>({...previous,profileWorkerId:value}))
   const workerId=navigation.workerId
   const historyWorkerId=navigation.historyWorkerId
   const historyUnit=navigation.historyUnit||''
@@ -444,9 +591,7 @@ export function AdminOperations({ navigation, setNavigation }) {
   const workers=data.workers||[]
   const active=workers.filter(w=>w.state==='active')
   const chosen=workers.find(w=>w.id===workerId)
-  const selectedHistoryWorker=workers.find(w=>w.id===historyWorkerId)
   const allWorkerHistory=scopeWorkerHistory(data,historyWorkerId)
-  const overallWorkerSummary=summarizeWorkerHistory(allWorkerHistory)
   const historyData=filterWorkerHistory(allWorkerHistory,{
     unit:historyUnit,from:historyFrom,to:historyTo,review:historyReview,
   })
@@ -483,8 +628,6 @@ export function AdminOperations({ navigation, setNavigation }) {
     catch(e){setError(readableError(e))}
     finally{setBusy(false)}
   }
-  const weekStart=shift(today(),-((new Date(today()+'T00:00:00Z').getUTCDay()+1)%7))
-  const week=Array.from({length:7},(_,i)=>shift(weekStart,i))
 
   return <div className="ow-workspace">
     <div className="ow-summary">
@@ -494,7 +637,7 @@ export function AdminOperations({ navigation, setNavigation }) {
       <article><span>کل ساعات تأییدشده</span><b>{exactDuration(approvedMinutes)}</b></article>
     </div>
     <SectionTabs value={view} onChange={setView} options={[
-      ['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],
+      ['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],['profiles','پروفایل‌ها'],
     ]}/>
     {loading&&<p className="ow-muted">در حال دریافت اطلاعات…</p>}
     <Message error={error} notice={notice}/>
@@ -684,25 +827,11 @@ export function AdminOperations({ navigation, setNavigation }) {
           {active.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
       </label>
-      {workerId&&<>
-        <div className="ow-week-grid">
-          {week.map(d=>{
-            const forecast=assessAssignmentCapacity(data,{workerId,date:d,estimateMinutes:0})
-            const warning=['overbooked','unavailable','not_configured','unknown'].includes(forecast.code)
-            return <article key={d} className={warning?'ow-week-alert':undefined}>
-              <strong>{dayLabels.find(x=>x[0]===isoWeekday(d))?.[1]}</strong>
-              <small>{pretty(d)}</small>
-              <b>{forecast.availableMinutes===null?'برنامه نامشخص':minutes(forecast.availableMinutes)}</b>
-              <small>کارهای قبلی: {forecast.assignedMinutes===null?'—':minutes(forecast.assignedMinutes)}</small>
-              {forecast.code==='overbooked'&&<small>بیش از ظرفیت</small>}
-              {forecast.code==='unavailable'&&<small>عدم حضور ثبت‌شده</small>}
-            </article>
-          })}
-        </div>
-        <ScheduleEditor key={workerId} workerId={workerId} data={data} onSaved={refresh}/>
-      </>}
+      {workerId&&<ScheduleEditor key={workerId} workerId={workerId} data={data} onSaved={refresh}/>}
+
     </section>}
 
+    {view==='profiles'&&<ManagerWorkerProfile data={data} selectedId={profileWorkerId} onChange={setProfileWorkerId}/>}
     {view==='history'&&<section className="report-panel">
       <div className="report-panel-heading">
         <h2>سابقه ساعات و خروجی</h2>
@@ -764,42 +893,24 @@ export function AdminOperations({ navigation, setNavigation }) {
       {invalidHistoryRange&&<div className="report-alert report-alert--error" role="alert">
         تاریخ شروع نباید بعد از تاریخ پایان باشد؛ بازه را اصلاح کنید.
       </div>}
-      {selectedHistoryWorker&&<section className="ow-worker-profile" aria-label="پروفایل عملکرد دانشجوکار">
-        <div className="ow-profile-heading">
-          <div>
-            <h3>پرونده عملکرد: {selectedHistoryWorker.name}</h3>
-            <p className="ow-muted">
-              {unitLabels[selectedHistoryWorker.unit]||selectedHistoryWorker.unit||'واحد نامشخص'}
-              {selectedHistoryWorker.major&&<> · {selectedHistoryWorker.major}</>}
-              {selectedHistoryWorker.entry_year&&<> · ورودی {n(selectedHistoryWorker.entry_year)}</>}
-            </p>
-          </div>
-          <span className="ow-status">{workerStateLabels[selectedHistoryWorker.state]||selectedHistoryWorker.state}</span>
-        </div>
-        <div className="ow-profile-metrics">
-          <div><span>کل کارهای واگذارشده</span><b>{n(overallWorkerSummary.taskCount)}</b></div>
-          <div><span>کارهای باز</span><b>{n(overallWorkerSummary.openCount)}</b></div>
-          <div><span>گزارش منتظر تأیید</span><b>{n(overallWorkerSummary.pendingCount)}</b></div>
-          <div><span>مجموع ساعات تأییدشده</span><b>{exactDuration(overallWorkerSummary.approvedMinutes)}</b></div>
-        </div>
-        <WorkerLifecycleReadOnlyPreview worker={selectedHistoryWorker}/>
-      </section>}
       <div className="report-panel-heading">
         <h3>{historyFiltersActive?'سوابق منطبق با فیلتر':'سوابق فعالیت همه دانشجوکارها'}</h3>
         <small>{n(historySummary.reportCount)} گزارش · {exactDuration(historySummary.approvedMinutes)} تأییدشده</small>
       </div>
-      <div className="ow-list">
+      <div className="ow-list ow-history-results">
         {historyData.time_entries.slice(0,historyShown).map(e=>(
           <article className="ow-item" key={e.id}>
             <strong>{label(e.worker_id,workers)} · {data.tasks?.find(t=>t.id===e.task_id)?.title||'کار'}</strong>
             <small>{pretty(e.work_date)} · {reviewLabels[e.review_state]||e.review_state}</small>
-            <p>درخواست: {minutes(e.reported_minutes)} · تأیید:
-              {e.review_state==='approved'?minutes(e.approved_minutes):'تأیید نشده'}
-            </p>
-            {e.extra_time_reason_code&&<small>دلیل درخواست اضافه: {extraTimeReasons[e.extra_time_reason_code]||e.extra_time_reason_code}
-              {e.extra_time_reason_text&&<> · {e.extra_time_reason_text}</>}
-            </small>}
-            {e.review_note&&<small>توضیح مدیر: {e.review_note}</small>}
+            <small>درخواست: {minutes(e.reported_minutes)} · تأیید:
+              {e.review_state==='approved'?minutes(e.approved_minutes):'در انتظار بررسی'}</small>
+            {(e.extra_time_reason_code||e.review_note)&&<details className="ow-task-detail">
+              <summary>جزئیات گزارش</summary>
+              {e.extra_time_reason_code&&<small>دلیل درخواست اضافه:
+                {' '}{extraTimeReasons[e.extra_time_reason_code]||e.extra_time_reason_code}
+                {e.extra_time_reason_text&&<> · {e.extra_time_reason_text}</>}</small>}
+              {e.review_note&&<small>توضیح مدیر: {e.review_note}</small>}
+            </details>}
           </article>
         ))}
         {historyData.time_entries.length>historyShown&&<div className="ow-history-load-more">
@@ -928,6 +1039,55 @@ function WorkerTaskCard({task,onSaved}) {
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
   </article>
 }
+function WorkerSelfProfile({tasks,records}) {
+  const completed=tasks.filter(t=>t.state==='completed')
+  const upcoming=tasks.filter(t=>t.planned_date>today()
+    &&!['completed','cancelled'].includes(t.state))
+  const ongoing=tasks.filter(t=>t.planned_date<=today()
+    &&!['completed','cancelled'].includes(t.state))
+  const approved=records.filter(e=>e.review_state==='approved')
+  const approvedTime=approved.reduce((sum,e)=>sum+Number(e.approved_minutes||0),0)
+  const panels=[
+    {id:'ongoing',title:'در جریان',tasks:ongoing},
+    {id:'upcoming',title:'پیش‌رو',tasks:upcoming},
+    {id:'completed',title:'انجام‌شده',tasks:completed},
+  ]
+  return <section className="report-panel ow-self-profile">
+    <div className="ow-presence-section-title"><h2>پروفایل من</h2>
+      <span className="ow-status">زمان تأییدشده: {exactDuration(approvedTime)}</span></div>
+    <div className="ow-profile-kpi-line" aria-label="خلاصه عملکرد">
+      <span>{n(ongoing.length)} در جریان</span><span>{n(upcoming.length)} پیش‌رو</span>
+      <span>{n(completed.length)} انجام‌شده</span><span>{n(records.length)} گزارش</span>
+    </div>
+    {panels.map(group=><details key={group.id} className="ow-profile-fold">
+      <summary>{group.title} · {n(group.tasks.length)}</summary>
+      <div className="ow-profile-mini-list">
+        {group.tasks.map(task=><div key={task.id}>
+          <b>{task.title}</b><small>{pretty(task.planned_date)} · {stateLabels[task.state]||task.state}</small>
+        </div>)}
+        {!group.tasks.length&&<p className="ow-muted">موردی ثبت نشده است.</p>}
+      </div>
+    </details>)}
+    <details className="ow-profile-fold">
+      <summary>سابقه گزارش‌ها و ساعات · {n(records.length)}</summary>
+      <div className="ow-profile-mini-list">
+        {records.map(e=><div key={e.id}>
+          <b>{tasks.find(t=>t.id===e.task_id)?.title||'گزارش کار'}</b>
+          <small>{pretty(e.work_date)} · {reviewLabels[e.review_state]||e.review_state}
+            {' · '}درخواست: {minutes(e.reported_minutes)}
+            {e.review_state==='approved'&&<> · تأیید: {minutes(e.approved_minutes)}</>}
+          </small>
+          {(e.review_note||e.extra_time_reason_text)&&<details className="ow-context-help">
+            <summary>جزئیات</summary>
+            {e.review_note&&<p>نظر مدیر: {e.review_note}</p>}
+            {e.extra_time_reason_text&&<p>علت زمان اضافه: {e.extra_time_reason_text}</p>}
+          </details>}
+        </div>)}
+        {!records.length&&<p className="ow-muted">هنوز گزارشی ثبت نشده است.</p>}
+      </div>
+    </details>
+  </section>
+}
 export function WorkerOperations({profile,navigation,setNavigation}) {
   const [data,setData]=useState({tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const [localNavigation,setLocalNavigation]=useState({section:'tasks',taskRange:'today'})
@@ -936,8 +1096,8 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
     const fn=previous=>({...previous,...patch})
     ;(setNavigation||setLocalNavigation)(fn)
   }
-  const section=['tasks','availability','history'].includes(selected.section)?selected.section:'tasks'
-  const taskRange=['today','week','all'].includes(selected.taskRange)?selected.taskRange:'today'
+  const section=['tasks','availability','profile'].includes(selected.section)?selected.section:'tasks'
+  const taskRange=['today','week','month'].includes(selected.taskRange)?selected.taskRange:'today'
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const refresh=async()=>{
@@ -952,8 +1112,10 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
   const total=approved.reduce((sum,e)=>sum+Number(e.approved_minutes||0),0)
   const tasks=data.tasks||[]
   const week=persianWeekBounds(today())
+  const month=persianMonthBounds(today())
   const visible=taskRange==='today'?tasks.filter(t=>t.planned_date===today()):
-    taskRange==='week'?tasks.filter(t=>t.planned_date>=week.start&&t.planned_date<=week.end):tasks
+    taskRange==='week'?tasks.filter(t=>t.planned_date>=week.start&&t.planned_date<=week.end):
+    tasks.filter(t=>t.planned_date>=month.start&&t.planned_date<=month.end)
   return <div className="ow-workspace ow-worker-workspace">
     <div className="ow-summary">
       <article><span>کارهای باز</span><b>{n(tasks.filter(t=>!['completed','cancelled'].includes(t.state)).length)}</b></article>
@@ -961,7 +1123,7 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
       <article><span>ساعات تأییدشده</span><b>{exactDuration(total)}</b></article>
     </div>
     <SectionTabs value={section} onChange={next=>updateNavigation({section:next})} options={[
-      ['tasks','کارها'],['availability','زمان حضور'],['history','سابقه من'],
+      ['tasks','کارها'],['availability','زمان حضور'],['profile','پروفایل من'],
     ]}/>
     {loading&&<p className="ow-muted" role="status">در حال دریافت برنامه…</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
@@ -969,7 +1131,7 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
       <div className="ow-worker-list-heading">
         <h2>کارها</h2>
         <div className="ow-range-switch" role="group" aria-label="بازه نمایش کارها">
-          {[['today','امروز'],['week','این هفته'],['all','همه']].map(([id,title])=>
+          {[['today','امروز'],['week','این هفته'],['month','این ماه']].map(([id,title])=>
             <button type="button" key={id} aria-pressed={taskRange===id}
               className={taskRange===id?'is-selected':''}
               onClick={()=>updateNavigation({taskRange:id})}>{title}</button>)}
@@ -984,21 +1146,6 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
       <h2>برنامه حضور</h2>
       <ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
     </section>}
-    {section==='history'&&<section className="report-panel">
-      <h2>سابقه عملکرد من</h2>
-      <div className="ow-list ow-worker-history">
-        {records.map(e=><article className="ow-item" key={e.id}>
-          <strong>{tasks.find(t=>t.id===e.task_id)?.title||'کار'}</strong>
-          <small>{pretty(e.work_date)} · {reviewLabels[e.review_state]||e.review_state}</small>
-          <details className="ow-context-help"><summary>جزئیات گزارش</summary>
-            <p>درخواست‌شده: {minutes(e.reported_minutes)} · تأیید:
-              {e.review_state==='approved'?minutes(e.approved_minutes):'هنوز تأیید نشده'}</p>
-            {e.extra_time_reason_code&&<small>دلیل زمان اضافه: {extraTimeReasons[e.extra_time_reason_code]} · {e.extra_time_reason_text}</small>}
-            {e.review_note&&<small>نظر مدیر: {e.review_note}</small>}
-          </details>
-        </article>)}
-        {!records.length&&<p className="ow-muted">هنوز گزارشی ثبت نکرده‌اید.</p>}
-      </div>
-    </section>}
+    {section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records}/>}
   </div>
 }

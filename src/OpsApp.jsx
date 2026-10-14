@@ -44,6 +44,7 @@ const initialAdminNavigation = () => ({
   historyReview: '',
   historyFrom: '',
   historyTo: '',
+  profileWorkerId: '',
 })
 
 // Navigation is non-sensitive and survives secure auth revalidation/unmounts.
@@ -258,7 +259,7 @@ function WorkerView({ profile, onLogout, initialPasswordRequired = false, naviga
   const [message, setMessage] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [passwordEstablished, setPasswordEstablished] = useState(!initialPasswordRequired)
-  const PasswordContainer = passwordEstablished ? 'details' : 'section'
+  const [settingsOpen,setSettingsOpen] = useState(false)
 
   const changePassword = async event => {
     event.preventDefault()
@@ -288,6 +289,7 @@ function WorkerView({ profile, onLogout, initialPasswordRequired = false, naviga
     setSaving(false)
     setMessage('رمز اختصاصی حساب شما ثبت شد.')
     setPasswordEstablished(true)
+    setSettingsOpen(false)
     setPassword('')
     setConfirmation('')
   }
@@ -300,15 +302,20 @@ function WorkerView({ profile, onLogout, initialPasswordRequired = false, naviga
           <h1>سلام، {profile.name}</h1>
           <p>{unitLabels[profile.unit] || profile.unit} · حساب فعال</p>
         </div>
-        <button className="report-btn report-btn--ghost" type="button" onClick={onLogout}>
-          خروج
-        </button>
+        <div className="report-header-actions">
+          {passwordEstablished&&<button className="report-btn report-btn--ghost" type="button"
+            aria-expanded={settingsOpen} aria-controls="ops-worker-account-settings"
+            onClick={()=>{setSettingsOpen(open=>!open);setPasswordError('');setMessage('')}}>تنظیمات حساب</button>}
+          <button className="report-btn report-btn--ghost" type="button" onClick={onLogout}>خروج</button>
+        </div>
       </header>
-      {passwordEstablished && <WorkerOperations profile={profile} navigation={navigation} setNavigation={setNavigation}/>}
-      <PasswordContainer key={passwordEstablished ? 'settings' : 'onboarding'}
-        className={`report-panel ops-password-panel ${!passwordEstablished ? 'ops-password-panel--required' : 'ops-password-settings'}`}>
+      {passwordEstablished&&message&&<p className="ops-alert-success" role="status">{message}</p>}
+      {(!passwordEstablished||settingsOpen)&&<section id="ops-worker-account-settings"
+        className={`report-panel ops-password-panel ${!passwordEstablished ? 'ops-password-panel--required' : 'ops-account-settings-panel'}`}>
         {passwordEstablished
-          ? <summary>تنظیمات حساب · تغییر رمز عبور</summary>
+          ? <div className="ops-settings-title"><h2>تنظیمات حساب · تغییر رمز عبور</h2>
+            <button type="button" className="report-btn report-btn--light"
+              onClick={()=>setSettingsOpen(false)}>بستن</button></div>
           : <><h2>در اولین ورود، رمز اختصاصی خودتان را تعیین کنید</h2>
               <p>حساب شما با لینک اختصاصی باز شده است. برای ادامه، یک رمز جدید حداقل ۸ نویسه‌ای تعیین کنید.</p></>}
         <form onSubmit={changePassword}>
@@ -331,7 +338,8 @@ function WorkerView({ profile, onLogout, initialPasswordRequired = false, naviga
             {saving ? 'در حال ذخیره…' : 'تغییر رمز'}
           </button>
         </form>
-      </PasswordContainer>
+      </section>}
+      {passwordEstablished && <WorkerOperations profile={profile} navigation={navigation} setNavigation={setNavigation}/>}
     </main>
   )
 }
@@ -391,6 +399,8 @@ function CandidateCard({ candidate, saving, onSave, onSaveEmail, onProvision, on
           {hasWorker ? 'دانشجوکار فعال' : 'داوطلب'}
         </span>
       </div>
+      <details className="ops-candidate-controls">
+        <summary>{hasWorker?'پرونده حساب و دسترسی':eligible?'بررسی و فعال‌سازی':'جزئیات و بررسی پرونده'}</summary>
       {!hasWorker && (
         <>
           <div className="ops-field-row ops-email-row">
@@ -479,6 +489,7 @@ function CandidateCard({ candidate, saving, onSave, onSaveEmail, onProvision, on
         </button>
         <small>لینک جدید به معنای الزام تعیین مجدد رمز در ورود بعدی است. فقط با درخواست دانشجو یا برای آزمون از این گزینه استفاده کنید.</small>
       </>}
+      </details>
     </article>
   )
 }
@@ -601,7 +612,7 @@ function AdminView({ onLogout, navigation, setNavigation }) {
       </section>
       <section className="report-panel">
         <div className="report-panel-heading">
-          <div><h2>داوطلبان و پذیرش</h2><p>اطلاعات ثبت‌نام به همین پرونده متصل می‌ماند.</p></div>
+          <div><h2>داوطلبان و پذیرش</h2></div>
           <label className="report-field ops-filter">
             <span>نمایش</span>
             <select value={filter} onChange={e => setFilter(e.target.value)}>

@@ -26,7 +26,7 @@ test('production applicant intake, API/auth, disabled lifecycle and deploy pipel
 test('public operations imports read-only lifecycle preview; no mutating component/flag',()=>{
   const workspace=read('src/OperationsWorkspace.jsx').toString()
   assert.match(workspace,/import WorkerLifecycleReadOnlyPreview from ['"]\.\/components\/WorkerLifecycleReadOnlyPreview['"]/)
-  assert.match(workspace,/<WorkerLifecycleReadOnlyPreview worker=\{selectedHistoryWorker\}\s*\/>/)
+  assert.match(workspace,/<WorkerLifecycleReadOnlyPreview worker=\{selected\}\s*\/>/)
   for(const fragment of ['WorkerLifecycleControls','VITE_WORKER_LIFECYCLE_ADMIN_ENABLED',
     'setWorkerState','getWorkerStateHistory','ops_set_worker_state',
     'lifecycleEnabled','import.meta.glob'])
