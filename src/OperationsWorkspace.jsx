@@ -467,7 +467,7 @@ function ApprovalCard({entry,task,worker,onDone}) {
   return <article className="ow-item">
     <div className="ow-item-header">
       <strong>{task?.title||'کار مرتبط نامشخص'}</strong>
-      <span className="ow-status">{missingTask?'نیازمند بررسی پرونده':asksExtra?'درخواست زمان اضافه':'گزارش عادی'}</span>
+      <span className="ow-status">{committed?'تصمیم ثبت‌شده':missingTask?'نیازمند بررسی پرونده':asksExtra?'درخواست زمان اضافه':'گزارش عادی'}</span>
     </div>
     <small>{worker?.name||'—'} · {pretty(entry.work_date)} · درخواست: {minutes(requested)}
       {asksExtra&&<> · اضافه: {minutes(requested-standard)}</>}
@@ -593,7 +593,7 @@ function ProfileChangeReview({request,worker,onDone}) {
  return <article className="ow-item ow-profile-request" data-request-id={request.id}>
    <div className="ow-item-header">
      <strong>{worker?.name||'دانشجوکار'} · اصلاح {request.field_code==='major'?'رشته':'نام'}</strong>
-     <span className="ow-status">نیازمند رسیدگی</span>
+     <span className="ow-status">{committed?'تصمیم ثبت‌شده':'نیازمند رسیدگی'}</span>
    </div>
    <p>مقدار پیشنهادی: <b>{request.proposed_value}</b></p>
    <details className="ow-context-help"><summary>دلیل درخواست</summary>
