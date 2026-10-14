@@ -104,7 +104,8 @@ async function setup(view,overrides={}){
   globalThis.__qaProfileReviewCalls=[]
   globalThis.__qaAllowDecision=false
   globalThis.__qaRefreshFailsAfterCommit=false
-  globalThis.__managerReadDenied=false
+  // Preserve an explicitly configured denied initial read for the fail-closed test.
+  globalThis.__managerReadDenied ??= false
   const host=document.createElement('div')
   document.body.append(host)
   const root=createRoot(host)
