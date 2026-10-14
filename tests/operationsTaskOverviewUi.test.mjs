@@ -201,6 +201,7 @@ test('approved time decision remains locked when returned manager data is stale'
   assert.equal(globalThis.__qaReviewCalls[0].entryId,'ENTRY-OLD')
   assert.equal(approve.disabled,true,'card cannot be re-approved even with stale cached queue')
   assert.match(card.textContent,/تصمیم در سرور ثبت شد/)
+  assert.match(card.querySelector('.ow-status').textContent,/تصمیم ثبت‌شده/)
   await act(async()=>approve.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
   assert.equal(globalThis.__qaReviewCalls.length,1)
  }finally{globalThis.__qaAllowDecision=false;await ui.dispose()}
@@ -224,6 +225,7 @@ test('profile correction review also commits once despite unchanged queue projec
   assert.equal(globalThis.__qaProfileReviewCalls.length,1)
   assert.equal(globalThis.__qaProfileReviewCalls[0].requestId,'FAKE-CHANGE')
   assert.equal(approve.disabled,true)
+  assert.match(card.querySelector('.ow-status').textContent,/تصمیم ثبت‌شده/)
   await act(async()=>approve.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
   assert.equal(globalThis.__qaProfileReviewCalls.length,1)
  }finally{globalThis.__qaAllowDecision=false;await ui.dispose()}
@@ -248,4 +250,20 @@ test('an acknowledged time review followed by denied refresh never reports serve
   globalThis.__managerReadDenied=false
   await ui.dispose()
  }
+})
+
+test('a rejected server-side review remains retryable and does not masquerade as committed',async()=>{
+ const ui=await setup('approvals')
+ try{
+  const card=Array.from(ui.host.querySelectorAll('.ow-approval-results .ow-item'))
+   .find(el=>el.textContent.includes('ثبت گزارش پژوهشی'))
+  const approve=Array.from(card.querySelectorAll('button'))
+   .find(el=>el.textContent==='تأیید ساعت')
+  assert.ok(approve)
+  await act(async()=>approve.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.equal(globalThis.__qaReviewCalls.length,0,'no backend acknowledgement')
+  assert.equal(approve.disabled,false,'server rejection must not lock a valid retry')
+  assert.doesNotMatch(card.querySelector('.ow-status').textContent,/تصمیم ثبت‌شده/)
+  assert.ok(card.querySelector('[role="alert"]'))
+ }finally{await ui.dispose()}
 })
