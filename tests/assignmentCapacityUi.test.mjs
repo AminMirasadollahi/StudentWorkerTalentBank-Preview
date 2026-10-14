@@ -66,7 +66,7 @@ const plugin={
     ].join('\n')
   },
 }
-let dom,vite,Component,createRoot
+let dom,vite,Component,Editor,createRoot
 before(async()=>{
   dom=new JSDOM('<!doctype html><html lang="fa"><body></body></html>',{
     url:'http://example.invalid/assignment-capacity-qa',pretendToBeVisual:true,
@@ -79,6 +79,7 @@ before(async()=>{
   vite=await createServer({plugins:[plugin],server:{middlewareMode:true},
     appType:'custom',logLevel:'error'})
   ;({AdminOperations:Component}=await vite.ssrLoadModule('/src/OperationsWorkspace.jsx'))
+  ;({default:Editor}=await vite.ssrLoadModule('/src/components/TaskAssignmentEditor.jsx'))
 })
 after(async()=>{
   await vite?.close()
@@ -203,4 +204,36 @@ test('group assignment submits a single atomic manager RPC with one standard dur
   assert.equal(payload.minutes,'60')
   assert.equal(payload.title,'مرتب‌سازی گروهی منابع کتابخانه')
  }finally{await teardown()}
+})
+
+test('committed group assignment cannot be submitted twice when post-save refresh fails',async()=>{
+ const host=document.createElement('div')
+ document.body.append(host)
+ const root=createRoot(host)
+ let closeCount=0
+ globalThis.__qaGroupCalls=[]
+ const workers=[
+  {id:'FAKE-FIRST',name:'عضو ساختگی اول',unit:'library',state:'active'},
+  {id:'FAKE-SECOND',name:'عضو ساختگی دوم',unit:'research',state:'active'},
+ ]
+ try{
+  await act(async()=>root.render(createElement(Editor,{
+   workers,data:{workers,tasks:[],weekly_slots:[],exceptions:[]},
+   defaultWorkerId:'FAKE-FIRST',onSaved:async()=>{throw Error('SYNTHETIC_REFRESH_FAILURE')},
+   onClose:()=>{closeCount++},
+  })))
+  const second=host.querySelectorAll('.ow-worker-option-list input[type="checkbox"]')[1]
+  await act(async()=>second.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  await fill(labeledField(host,'عنوان کار'),'وظیفه مشترک کاملاً ساختگی')
+  await fill(labeledField(host,'علت واگذاری امروز یا فردا'),'دلیل ساختگی قابل قبول برای واگذاری سریع')
+  const form=host.querySelector('form.ow-assignment-form')
+  await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__qaGroupCalls.length,1)
+  assert.match(host.textContent,/واگذاری با موفقیت ثبت شد؛ فقط تازه‌سازی فهرست ناموفق بود/)
+  assert.equal(closeCount,0)
+  const submit=Array.from(form.querySelectorAll('button')).find(b=>b.type==='submit')
+  assert.equal(submit.disabled,true,'must not allow a duplicate after confirmed commit')
+  await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__qaGroupCalls.length,1)
+ }finally{await act(async()=>root.unmount());host.remove()}
 })
