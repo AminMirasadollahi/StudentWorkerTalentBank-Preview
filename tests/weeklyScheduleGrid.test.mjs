@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
  MAX_DAILY_WINDOWS,clockToMinutes,minutesToClock,
- selectedWeeklyWindows,validateDailyWindows,persianWeekBounds,suggestNextWindow,scopeSelfPresenceRows
+ selectedWeeklyWindows,validateDailyWindows,persianWeekBounds,suggestNextWindow,scopeSelfWorkRows
 } from '../src/lib/weeklyScheduleGrid.mjs'
 
 const entries=[
@@ -87,7 +87,8 @@ test('adding up to four intervals proposes editable conflict-free hours',()=>{
 
 test('authenticated self RPC presence rows without worker_id render and remain owner-scoped',()=>{
  const original={
-  tasks:[{id:'t1'}],
+  tasks:[{id:'SELF-TASK',title:'Own task without owner key'},
+    {id:'FOREIGN-TASK',worker_id:'OTHER'}],
   weekly_slots:[
    {weekday_iso:6,start_minute:480,end_minute:540,valid_from:'2026-10-01',valid_until:null},
    {weekday_iso:6,start_minute:600,end_minute:660,valid_from:'2026-10-01',valid_until:null,worker_id:'OTHER'},
@@ -97,15 +98,16 @@ test('authenticated self RPC presence rows without worker_id render and remain o
    {local_date:'2026-10-19',kind:'unavailable',worker_id:'OTHER'},
   ],
  }
- const self=scopeSelfPresenceRows(original,'SELF')
- assert.equal(self.tasks,original.tasks,'other self-work payload fields must be preserved')
+ const self=scopeSelfWorkRows(original,'SELF')
+ assert.deepEqual(self.tasks,[{id:'SELF-TASK',title:'Own task without owner key',worker_id:'SELF'}])
+ assert.equal(original.tasks[0].worker_id,undefined,'RPC fixture must remain unchanged')
  assert.deepEqual(selectedWeeklyWindows(self.weekly_slots,'SELF',6,'2026-10-17'),
    [{start:'08:00',end:'09:00'}])
  assert.equal(self.weekly_slots.length,1,'explicit foreign worker record must not be re-labeled')
  assert.deepEqual(self.exceptions,[{local_date:'2026-10-18',kind:'unavailable',worker_id:'SELF'}])
  assert.equal(original.weekly_slots[0].worker_id,undefined,'server response remains immutable')
- assert.deepEqual(scopeSelfPresenceRows({weekly_slots:null,exceptions:undefined},'SELF'),
-   {weekly_slots:[],exceptions:[]})
- assert.throws(()=>scopeSelfPresenceRows(null,'SELF'))
- assert.throws(()=>scopeSelfPresenceRows(original,''))
+ assert.deepEqual(scopeSelfWorkRows({tasks:null,weekly_slots:null,exceptions:undefined},'SELF'),
+   {tasks:[],weekly_slots:[],exceptions:[]})
+ assert.throws(()=>scopeSelfWorkRows(null,'SELF'))
+ assert.throws(()=>scopeSelfWorkRows(original,''))
 })

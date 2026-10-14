@@ -10,7 +10,7 @@ import { assessAssignmentCapacity, assessAvailabilityOverride, firstMatchingWeek
 import { describeTaskWorkflow,selectManagerTasks,summarizeTaskWorkflow,selectPendingApprovals } from './lib/operationsTaskOverview.mjs'
 import WorkerLifecycleReadOnlyPreview from './components/WorkerLifecycleReadOnlyPreview'
 import { workerStateLabels } from './lib/workerLifecycle.mjs'
-import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persianWeekBounds, suggestNextWindow, scopeSelfPresenceRows } from './lib/weeklyScheduleGrid.mjs'
+import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persianWeekBounds, suggestNextWindow, scopeSelfWorkRows } from './lib/weeklyScheduleGrid.mjs'
 import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonthBounds } from './lib/persianMonthCalendar.mjs'
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 import TaskAssignmentEditor from './components/TaskAssignmentEditor'
@@ -1464,7 +1464,7 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
     try{
       const result=await getMyWorkV2()
       if(sequence!==readSequence.current)return
-      setData(scopeSelfPresenceRows(result,profile.worker_id))
+      setData(scopeSelfWorkRows(result,profile.worker_id))
       setReadFailed(false)
     }catch(e){
       if(sequence!==readSequence.current)return
