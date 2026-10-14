@@ -409,3 +409,35 @@
   width:min(100%,62rem); justify-self:start;
 }
 .ow-workspace .ow-history-results .ow-item { padding:0.5rem 0.65rem; }
+
+/* In-place fixed weekly slot editing. Do not expand the entire seven-day table. */
+.ow-week-cell {min-width:0; position:relative; display:flex; }
+.ow-week-cell .ow-week-slot {width:100%; height:100%; min-height:2.25rem; border:0; cursor:pointer; font:inherit; }
+.ow-week-cell .ow-week-slot:disabled {cursor:not-allowed; opacity:.35; }
+.ow-slot-editor {position:relative; isolation:isolate; width:100%; min-width:0; display:grid;
+ grid-template-columns:repeat(2,minmax(0,1fr)); gap:.18rem; padding:.2rem;
+ border:1px solid var(--report-teal); background:white; border-radius:.4rem; }
+.ow-slot-editor input {width:100%; min-width:0; padding:.15rem .08rem; font:inherit; font-size:.71rem;
+ color:var(--report-navy); border:1px solid var(--report-border); border-radius:.23rem; text-align:center; }
+.ow-slot-actions {grid-column:1/-1; display:flex; align-items:center; justify-content:center; gap:.25rem; }
+.ow-slot-actions button {border:1px solid var(--report-border); background:white;
+ color:var(--report-navy); min-width:1.4rem; min-height:1.3rem; border-radius:.25rem; cursor:pointer; }
+.ow-slot-actions button[type=submit] {background:var(--report-teal); color:white; }
+.ow-slot-actions button:disabled {opacity:.45;cursor:not-allowed;}
+.ow-slot-editor small {grid-column:1/-1; font-size:.6rem; overflow-wrap:anywhere;}
+.ow-slot-delete-confirm {display:flex; align-items:center; gap:.3rem; flex-wrap:wrap; padding:.25rem; font-size:.72rem; }
+.ow-sr-only {position:absolute!important; width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
+.ow-month-day .ow-day-task {display:block; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+ direction:rtl; text-align:right; font-size:.63rem; max-width:100%; font-weight:500;}
+.ow-selected-day-tasks {display:grid; gap:.25rem; max-width:38rem; padding:.4rem;
+ border:1px solid var(--report-border); border-radius:.45rem;}
+.ow-selected-day-tasks > div {display:flex; justify-content:space-between; flex-wrap:wrap; gap:.25rem; }
+.ow-selected-day-tasks small {font-size:.69rem; color:var(--report-muted);}
+.ow-worker-action-detail > summary {font-weight:700; color:var(--report-teal);
+ padding:.36rem .5rem; border:1px solid #bddddb; border-radius:.4rem; width:max-content; max-width:100%; }
+.ow-overdue-count {color:#94641f; font-size:.71rem; font-weight:500; margin-inline-start:.4rem;}
+@media(max-width:720px) {
+ .ow-week-grid {overflow-x:auto;}
+ .ow-week-row,.ow-week-grid-header {min-width:580px;}
+ .ow-month-day .ow-day-task {font-size:.57rem;}
+}
