@@ -489,3 +489,31 @@ test('fresh changes_requested review cycle reopens report with a new submission 
   await ui.dispose()
  }
 })
+
+test('manager rejected report opens a new cycle rather than permanently blocking revision',async()=>{
+ globalThis.__workerFocusFixture=fixture()
+ globalThis.__qaAllowWorkerSubmit=true
+ globalThis.__qaSubmitCalls=[]
+ const ui=await setup()
+ try{
+  await submitSyntheticWorkerReport(ui)
+  const initial=globalThis.__qaSubmitCalls[0].clientSubmissionId
+  await ui.clickText('پروفایل من')
+  globalThis.__workerFocusFixture.tasks[0].state='needs_changes'
+  globalThis.__workerFocusFixture.time_entries.push({
+   id:'SYNTHETIC-REJECTED-REPORT',task_id:'FAKE-TASK',
+   review_state:'rejected',work_date:day(),reported_minutes:60,
+  })
+  await ui.clickText('کارها')
+  const button=ui.host.querySelector('.ow-worker-action-detail button[type="submit"]')
+  assert.ok(button)
+  await submitSyntheticWorkerReport(ui)
+  assert.equal(globalThis.__qaSubmitCalls.length,2)
+  assert.notEqual(initial,globalThis.__qaSubmitCalls[1].clientSubmissionId)
+ }finally{
+  globalThis.__qaAllowWorkerSubmit=false
+  globalThis.__qaSubmitCalls=[]
+  globalThis.__workerFocusFixture=fixture()
+  await ui.dispose()
+ }
+})
