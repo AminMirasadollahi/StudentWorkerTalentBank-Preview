@@ -37,7 +37,7 @@ const plugin={
       'export const getMyWorkV2=async()=>{if(globalThis.__workerWorkPlan?.length)return await globalThis.__workerWorkPlan.shift()();if(globalThis.__workerReadDenied)throw Error("worker_access_denied");return globalThis.__workerFocusFixture;};',
       'export const getMyWorkerProfileV2=async()=>{if(globalThis.__qaProfileReadDenied)throw Error("worker_access_denied");return {worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"};};',
       'export const getMyProfileChangeRequests=async()=>{if(globalThis.__qaProfileHistoryDenied)throw Error("worker_access_denied");return globalThis.__profileChangeRequests;};',
-      'export const requestProfileChange=async args=>{globalThis.__profileChangeCalls.push(args);globalThis.__profileChangeRequests.push({id:"FAKE-REQUEST",field_code:args.field,proposed_value:args.value,review_state:"pending"});return {ok:true};};',
+      'export const requestProfileChange=async args=>{globalThis.__profileChangeCalls.push(args);if(globalThis.__qaProfileRequestError)throw Error("synthetic request failure");const id="FAKE-REQUEST-"+globalThis.__profileChangeCalls.length;if(!globalThis.__qaProfileQueueStale)globalThis.__profileChangeRequests.push({id,field_code:args.field,proposed_value:args.value,review_state:"pending"});if(globalThis.__qaProfileReadDeniedAfterSubmit)globalThis.__qaProfileHistoryDenied=true;return {ok:true,request_id:id};};',
       ...['reviewProfileChange','assignGroupTask'].map(name=>
        `export const ${name}=async()=>{throw Error("QA_NO_REAL_BACKEND")};`),
     ].join('\n')
@@ -76,6 +76,9 @@ before(async()=>{
  globalThis.__qaDenyReadAfterSubmission=false
  globalThis.__qaProfileReadDenied=false
  globalThis.__qaProfileHistoryDenied=false
+ globalThis.__qaProfileQueueStale=false
+ globalThis.__qaProfileRequestError=false
+ globalThis.__qaProfileReadDeniedAfterSubmit=false
  ;({createRoot}=await import('react-dom/client'))
  server=await createServer({plugins:[plugin],server:{middlewareMode:true},
   appType:'custom',logLevel:'error'})
@@ -89,7 +92,8 @@ after(async()=>{
   '__profileChangeCalls','__profileChangeRequests','__workerReadDenied',
   '__workerWorkPlan','__qaAllowWorkerSubmit','__qaSubmitFailCount',
   '__qaSubmitCalls','__qaStartCalls','__qaDenyReadAfterSubmission',
-  '__qaProfileReadDenied','__qaProfileHistoryDenied'])delete globalThis[p]
+  '__qaProfileReadDenied','__qaProfileHistoryDenied','__qaProfileQueueStale',
+  '__qaProfileRequestError','__qaProfileReadDeniedAfterSubmit'])delete globalThis[p]
 })
 function Harness(){
  const [nav,setNav]=useState({section:'tasks',taskRange:'today'})
@@ -514,6 +518,136 @@ test('manager rejected report opens a new cycle rather than permanently blocking
   globalThis.__qaAllowWorkerSubmit=false
   globalThis.__qaSubmitCalls=[]
   globalThis.__workerFocusFixture=fixture()
+  await ui.dispose()
+ }
+})
+
+async function openSyntheticProfileChange(ui){
+ await ui.clickText('پروفایل من')
+ const summary=ui.host.querySelector('.ow-profile-change > summary')
+ assert.ok(summary)
+ await act(async()=>summary.dispatchEvent(
+   new window.MouseEvent('click',{bubbles:true,cancelable:true})))
+ const form=ui.host.querySelector('.ow-profile-change-form')
+ assert.ok(form)
+ return form
+}
+async function typeSyntheticProfileChange(form,value='رشتهٔ ساختگی تأیید نشده'){
+ const fields=form.querySelectorAll('input,textarea')
+ assert.equal(fields.length,2)
+ const fill=async(el,v)=>{
+  const proto=el.tagName==='TEXTAREA'?window.HTMLTextAreaElement.prototype:
+   window.HTMLInputElement.prototype
+  const setter=Object.getOwnPropertyDescriptor(proto,'value').set
+  await act(async()=>{setter.call(el,v);el.dispatchEvent(new window.Event('input',{bubbles:true}))})
+ }
+ await fill(fields[0],value)
+ await fill(fields[1],'دلیل کافی و کاملاً ساختگی برای درخواست اصلاح مشخصات')
+}
+async function postSyntheticProfileChange(form,twice=false){
+ await act(async()=>{
+  form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}))
+  if(twice)form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}))
+ })
+}
+test('acknowledged profile correction is one-shot despite stale queue and tab remount',async()=>{
+ globalThis.__profileChangeRequests=[]
+ globalThis.__profileChangeCalls=[]
+ globalThis.__qaProfileQueueStale=true
+ const ui=await setup()
+ try{
+  const form=await openSyntheticProfileChange(ui)
+  await typeSyntheticProfileChange(form)
+  await postSyntheticProfileChange(form,true)
+  assert.equal(globalThis.__profileChangeCalls.length,1,'double submit before render must be blocked')
+  assert.match(ui.host.textContent,/درخواست اصلاح ثبت شد/)
+  await ui.clickText('زمان حضور')
+  const reopened=await openSyntheticProfileChange(ui)
+  await typeSyntheticProfileChange(reopened)
+  const btn=reopened.querySelector('button[type="submit"]')
+  assert.ok(btn.disabled,'same-field request receipt survives tab changes')
+  await postSyntheticProfileChange(reopened)
+  assert.equal(globalThis.__profileChangeCalls.length,1,'no second POST with same field')
+  const select=reopened.querySelector('select')
+  await act(async()=>{
+   select.value='full_name'
+   select.dispatchEvent(new window.Event('change',{bubbles:true}))
+  })
+  assert.equal(btn.disabled,false,'other independently editable field must not be blocked')
+ }finally{
+  globalThis.__qaProfileQueueStale=false
+  globalThis.__profileChangeRequests=[]
+  globalThis.__profileChangeCalls=[]
+  await ui.dispose()
+ }
+})
+test('successful correction followed by profile-history denial never implies server write failed',async()=>{
+ globalThis.__profileChangeCalls=[]
+ globalThis.__profileChangeRequests=[]
+ globalThis.__qaProfileReadDeniedAfterSubmit=true
+ const ui=await setup()
+ try{
+  const form=await openSyntheticProfileChange(ui)
+  await typeSyntheticProfileChange(form)
+  await postSyntheticProfileChange(form)
+  assert.equal(globalThis.__profileChangeCalls.length,1)
+  assert.ok(ui.host.querySelector('.ow-profile-access-recheck'))
+  assert.match(ui.host.textContent,/درخواست ثبت شده است/)
+  assert.doesNotMatch(ui.host.textContent,/نمونه غیرواقعی/)
+  globalThis.__qaProfileHistoryDenied=false
+  globalThis.__qaProfileReadDeniedAfterSubmit=false
+  await ui.clickText('تلاش مجدد برای دریافت مشخصات')
+  assert.equal(ui.host.querySelector('.ow-profile-access-recheck'),null)
+  assert.match(ui.host.textContent,/درخواست‌های اصلاح/)
+ }finally{
+  globalThis.__qaProfileReadDeniedAfterSubmit=false
+  globalThis.__qaProfileHistoryDenied=false
+  globalThis.__profileChangeCalls=[]
+  globalThis.__profileChangeRequests=[]
+  await ui.dispose()
+ }
+})
+test('rejected correction RPC stays editable and does not generate a fake receipt',async()=>{
+ globalThis.__profileChangeCalls=[]
+ globalThis.__qaProfileRequestError=true
+ const ui=await setup()
+ try{
+  const form=await openSyntheticProfileChange(ui)
+  await typeSyntheticProfileChange(form)
+  await postSyntheticProfileChange(form,true)
+  assert.equal(globalThis.__profileChangeCalls.length,1)
+  assert.ok(ui.host.querySelector('.ow-profile-change-form'))
+  assert.match(ui.host.textContent,/ثبت درخواست تأیید نشد/)
+  assert.equal(form.querySelector('button[type="submit"]').disabled,false)
+  globalThis.__qaProfileRequestError=false
+  await postSyntheticProfileChange(form)
+  assert.equal(globalThis.__profileChangeCalls.length,2,'same draft may be retried')
+ }finally{
+  globalThis.__qaProfileRequestError=false
+  globalThis.__profileChangeCalls=[]
+  globalThis.__profileChangeRequests=[]
+  await ui.dispose()
+ }
+})
+test('only a verified closed server request releases an acknowledged field lock',async()=>{
+ globalThis.__profileChangeRequests=[]
+ globalThis.__profileChangeCalls=[]
+ const ui=await setup()
+ try{
+  const form=await openSyntheticProfileChange(ui)
+  await typeSyntheticProfileChange(form)
+  await postSyntheticProfileChange(form)
+  assert.equal(globalThis.__profileChangeCalls.length,1)
+  assert.equal(globalThis.__profileChangeRequests[0].review_state,'pending')
+  await ui.clickText('زمان حضور')
+  globalThis.__profileChangeRequests[0].review_state='approved'
+  const reopened=await openSyntheticProfileChange(ui)
+  await typeSyntheticProfileChange(reopened)
+  assert.equal(reopened.querySelector('button[type="submit"]').disabled,false,
+    'new request can be raised after exact previous request visibly closed')
+ }finally{
+  globalThis.__profileChangeRequests=[]
+  globalThis.__profileChangeCalls=[]
   await ui.dispose()
  }
 })
