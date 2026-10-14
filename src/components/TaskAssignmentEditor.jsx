@@ -29,6 +29,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
   id:w.id,name:w.name,
   result:assessAssignmentCapacity(data,{workerId:w.id,date,estimateMinutes:Number(estimate)})
  })),[data,date,estimate,workers,workerIds])
+ const issues=capacity.filter(c=>['overbooked','unavailable','not_configured','unknown'].includes(c.result.code))
  const toggle=id=>setWorkerIds(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id])
  const submit=async event=>{
   event.preventDefault()
@@ -94,6 +95,19 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
     <span>علت واگذاری امروز یا فردا (الزامی)</span>
     <input required maxLength={300} value={reason} onChange={e=>setReason(e.target.value)}/>
   </label>}
+  {issues.length>0&&<div className="ow-capacity-warning" role="status">
+    {issues.map(c=><p key={c.id}>
+      {selected.length>1&&<b>{c.name}: </b>}
+      {c.result.code==='overbooked'
+        ?<><strong>هشدار بیش‌ازظرفیت:</strong> مجموع کارهای ثبت‌شده از ظرفیت اعلام‌شده بیشتر می‌شود.</>
+        :c.result.code==='unavailable'
+          ?<><strong>هشدار عدم حضور:</strong> برای این روز ظرفیت صفر ثبت شده است.</>
+          :c.result.code==='not_configured'
+            ?<><strong>برنامه حضور برای این روز ثبت نشده است.</strong> نبود برنامه به معنی غیبت قطعی نیست.</>
+            :<><strong>ظرفیت قابل محاسبه نیست.</strong> پیش از واگذاری بررسی کنید.</>}
+      {c.result.exception&&<small>محاسبه بر اساس تغییر موقت همین روز است.</small>}
+    </p>)}
+  </div>}
   {selected.length>0&&<details className="ow-context-help">
     <summary>ظرفیت نفرات انتخابی · {fa.format(selected.length)} نفر</summary>
     <div className="ow-capacity-preview">
