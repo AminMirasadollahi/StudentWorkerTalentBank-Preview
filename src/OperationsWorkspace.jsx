@@ -1487,7 +1487,8 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
       <div className="ow-list ow-worker-tasks">
         {visible.map(t=><WorkerTaskCard key={t.id} task={t} onSaved={refresh}
           actionLedger={acknowledgedActions.current.items}
-          reviewCycle={(data.time_entries||[]).filter(e=>e.task_id===t.id&&e.review_state==='changes_requested')
+          reviewCycle={(data.time_entries||[]).filter(e=>e.task_id===t.id
+            &&['changes_requested','rejected'].includes(e.review_state))
             .map(e=>e.id).sort().join('|')}/>)}
         {!visible.length&&<p className="ow-muted">کاری برای این بازه ثبت نشده است.</p>}
       </div>
