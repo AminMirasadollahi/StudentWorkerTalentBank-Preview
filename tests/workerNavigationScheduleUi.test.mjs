@@ -34,7 +34,7 @@ const plugin={
  load(id){
     if(id==='\0qa-v2-no-network')return [
       'export const getAdminWorkV2=async()=>globalThis.__workerFocusFixture;',
-      'export const getMyWorkV2=async()=>globalThis.__workerFocusFixture;',
+      'export const getMyWorkV2=async()=>{if(globalThis.__workerReadDenied)throw Error("worker_access_denied");return globalThis.__workerFocusFixture;};',
       'export const getMyWorkerProfileV2=async()=>({worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"});',
       'export const getMyProfileChangeRequests=async()=>globalThis.__profileChangeRequests;',
       'export const requestProfileChange=async args=>{globalThis.__profileChangeCalls.push(args);globalThis.__profileChangeRequests.push({id:"FAKE-REQUEST",field_code:args.field,proposed_value:args.value,review_state:"pending"});return {ok:true};};',
@@ -66,6 +66,7 @@ before(async()=>{
  globalThis.__workerExceptionCalls=[]
  globalThis.__profileChangeCalls=[]
  globalThis.__profileChangeRequests=[]
+ globalThis.__workerReadDenied=false
  ;({createRoot}=await import('react-dom/client'))
  server=await createServer({plugins:[plugin],server:{middlewareMode:true},
   appType:'custom',logLevel:'error'})
@@ -76,7 +77,7 @@ after(async()=>{
  dom?.window.close()
  for(const p of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT',
   '__workerFocusFixture','__workerFocusCalls','__workerExceptionCalls',
-  '__profileChangeCalls','__profileChangeRequests'])delete globalThis[p]
+  '__profileChangeCalls','__profileChangeRequests','__workerReadDenied'])delete globalThis[p]
 })
 function Harness(){
  const [nav,setNav]=useState({section:'tasks',taskRange:'today'})
@@ -234,4 +235,27 @@ test('sources preserve fail-closed auth and critical applicant/protected operati
  const css=readFileSync('src/operations-workspace.css','utf8')
  assert.match(css,/\.ow-worker-tasks,.ow-worker-history/)
  assert.match(css,/@media\(max-width:600px\)/)
+})
+
+
+test('worker loses stale task data after a failed read and can retry without changing tab selection',async()=>{
+ globalThis.__workerReadDenied=false
+ const ui=await setup()
+ try{
+  assert.match(ui.host.textContent,/کار نمونه دانشجوکار/)
+  await ui.clickText('زمان حضور')
+  await ui.click('button[aria-label="ویرایش برنامه شنبه نوبت 1"]')
+  globalThis.__workerReadDenied=true
+  await ui.click('button[aria-label="ذخیره همین روز"]')
+  assert.ok(ui.host.querySelector('.ow-access-recheck'),'restricted fallback should replace the work UI')
+  assert.doesNotMatch(ui.host.textContent,/کار نمونه دانشجوکار/)
+  assert.equal(ui.host.querySelector('.ow-week-row'),null)
+  globalThis.__workerReadDenied=false
+  await ui.clickText('تلاش مجدد برای دریافت اطلاعات')
+  assert.equal(ui.host.querySelector('.ow-access-recheck'),null)
+  assert.ok(ui.host.querySelector('.ow-week-row'),'selected schedule tab persists after retry')
+ }finally{
+  globalThis.__workerReadDenied=false
+  await ui.dispose()
+ }
 })
