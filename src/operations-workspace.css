@@ -510,3 +510,22 @@
  .ow-team-day {grid-template-columns:4rem minmax(0,1fr);}
  .ow-self-identity {grid-template-columns:repeat(2,minmax(0,1fr));}
 }
+
+.ow-date-slot-grid {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.3rem;align-items:stretch;}
+.ow-date-slot {background:#f7fafb;border:1px solid #deeaec;border-radius:.5rem;
+ padding:.36rem;display:grid;gap:.25rem;min-width:0;}
+.ow-date-slot>small {color:var(--report-muted);font-size:.66rem;}
+.ow-date-slot-toggle {background:white;color:var(--report-navy);
+ border:1px solid var(--report-border);border-radius:.35rem;padding:.38rem .16rem;
+ min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:inherit;cursor:pointer;}
+.ow-date-slot-toggle:disabled {opacity:.4;cursor:not-allowed;}
+.ow-date-slot-fields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.22rem;}
+.ow-date-slot-fields>label {min-width:0;}
+.ow-date-slot-fields input {width:100%;min-width:0;font:inherit;font-size:.72rem;
+ padding:.27rem .12rem;border:1px solid var(--report-border);border-radius:.28rem;text-align:center;}
+.ow-date-slot-fields button {border:1px solid var(--report-border);border-radius:.3rem;cursor:pointer;
+ color:var(--report-navy);background:white;}
+.ow-date-slot-fields button:first-of-type {background:var(--report-teal);color:white;}
+.ow-date-slot-grid>.ow-muted {grid-column:1/-1;font-size:.68rem;}
+@media(max-width:780px) {.ow-date-slot-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:430px) {.ow-date-slot-grid{grid-template-columns:1fr;}}
