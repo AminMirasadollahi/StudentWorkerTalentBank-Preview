@@ -693,3 +693,28 @@ test('worker V1 RPC weekly rows without worker_id are visible and unlock next sl
    globalThis.__workerFocusFixture=previous
  }
 })
+
+test('worker calendar shows self-only RPC tasks when worker_id is omitted',async()=>{
+ const original=globalThis.__workerFocusFixture
+ globalThis.__workerFocusFixture={...fixture(),tasks:[{
+   id:'SELF-TASK-NO-WORKER-ID',title:'وظیفه تقویم آزمایشی',
+   planned_date:day(),state:'assigned',estimate_minutes:60,
+   instructions:'only synthetic',created_at:'2026-10-14T08:00:00Z',
+ }]}
+ let ui
+ try{
+   ui=await setup()
+   assert.ok(ui.host.querySelector('.ow-worker-tasks .ow-item'),
+     'self-only task remains visible in task view')
+   await ui.clickText('زمان حضور')
+   const todayCell=ui.host.querySelector('.ow-month-day.is-today')
+   assert.ok(todayCell,'Iran-local today is in the monthly calendar')
+   assert.match(todayCell.textContent,/وظیفه تقویم آزمایشی/,
+     'calendar must not discard the auth-scoped task when worker_id is omitted')
+   assert.ok(todayCell.getAttribute('aria-label').includes('۱ کار'),
+     'accessible task count must agree with the calendar title')
+ }finally{
+   if(ui)await ui.dispose()
+   globalThis.__workerFocusFixture=original
+ }
+})
