@@ -50,14 +50,16 @@ const plugin={
       'export const getMyWorkV2=async()=>globalThis.__taskReviewFixture;',
       'export const getMyWorkerProfileV2=async()=>({worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"});',
       'export const getMyProfileChangeRequests=async()=>[];',
-      ...['requestProfileChange','reviewProfileChange','assignGroupTask'].map(name=>
+      'export const reviewProfileChange=async args=>{if(!globalThis.__qaAllowDecision)throw Error("QA_NO_REAL_BACKEND");globalThis.__qaProfileReviewCalls.push(args);if(globalThis.__qaRefreshFailsAfterCommit)globalThis.__managerReadDenied=true;return {ok:true};};',
+      ...['requestProfileChange','assignGroupTask'].map(name=>
        `export const ${name}=async()=>{throw Error("QA_NO_REAL_BACKEND")};`),
     ].join('\n')
     
     if(id==='\0qa-task-review-ops')return [
       'export const getAdminWork=async()=>globalThis.__taskReviewFixture;',
+      'export const reviewWorkerTime=async args=>{if(!globalThis.__qaAllowDecision)throw Error("NO_REAL_WRITES_OR_NETWORK");globalThis.__qaReviewCalls.push(args);if(globalThis.__qaRefreshFailsAfterCommit)globalThis.__managerReadDenied=true;return {ok:true};};',
       ...['getMyWork','setWeeklyDay','setDateException','assignWorkerTask',
-        'startMyTask','submitMyTime','reviewWorkerTime'].map(name=>
+        'startMyTask','submitMyTime'].map(name=>
         `export const ${name}=async()=>{throw Error("NO_REAL_WRITES_OR_NETWORK")};`),
     ].join('\n')
     if(id==='\0qa-task-review-lifecycle')return [
@@ -83,7 +85,8 @@ before(async()=>{
 after(async()=>{
   await vite?.close()
   dom?.window.close()
-  for(const name of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT','__taskReviewFixture'])
+  for(const name of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT','__taskReviewFixture',
+    '__qaReviewCalls','__qaProfileReviewCalls','__qaAllowDecision','__qaRefreshFailsAfterCommit','__managerReadDenied'])
     delete globalThis[name]
 })
 function Wrapper({view}){
@@ -95,8 +98,13 @@ function Wrapper({view}){
   })
   return createElement(AdminOperations,{navigation:nav,setNavigation:setNav})
 }
-async function setup(view){
-  globalThis.__taskReviewFixture=fixture()
+async function setup(view,overrides={}){
+  globalThis.__taskReviewFixture={...fixture(),...overrides}
+  globalThis.__qaReviewCalls=[]
+  globalThis.__qaProfileReviewCalls=[]
+  globalThis.__qaAllowDecision=false
+  globalThis.__qaRefreshFailsAfterCommit=false
+  globalThis.__managerReadDenied=false
   const host=document.createElement('div')
   document.body.append(host)
   const root=createRoot(host)
@@ -172,4 +180,71 @@ test('manager denies old privileged records when initial V2 read fails and recov
   assert.equal(ui.host.querySelector('.ow-access-recheck'),null)
   assert.equal(ui.host.querySelectorAll('.ow-task-results .ow-item').length,3)
  }finally{globalThis.__managerReadDenied=false;await ui.dispose()}
+})
+
+test('approved time decision remains locked when returned manager data is stale',async()=>{
+ const ui=await setup('approvals')
+ globalThis.__qaAllowDecision=true
+ try{
+  const card=Array.from(ui.host.querySelectorAll('.ow-approval-results .ow-item'))
+    .find(el=>el.textContent.includes('ثبت گزارش پژوهشی'))
+  assert.ok(card)
+  const approve=Array.from(card.querySelectorAll('button'))
+    .find(el=>el.textContent==='تأیید ساعت')
+  assert.ok(approve)
+  await act(async()=>{
+   approve.dispatchEvent(new window.MouseEvent('click',{bubbles:true}))
+   approve.dispatchEvent(new window.MouseEvent('click',{bubbles:true}))
+  })
+  assert.equal(globalThis.__qaReviewCalls.length,1,'only one server approval is requested')
+  assert.equal(globalThis.__qaReviewCalls[0].entryId,'ENTRY-OLD')
+  assert.equal(approve.disabled,true,'card cannot be re-approved even with stale cached queue')
+  assert.match(card.textContent,/تصمیم در سرور ثبت شد/)
+  await act(async()=>approve.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.equal(globalThis.__qaReviewCalls.length,1)
+ }finally{globalThis.__qaAllowDecision=false;await ui.dispose()}
+})
+
+test('profile correction review also commits once despite unchanged queue projection',async()=>{
+ const changes=[{id:'FAKE-CHANGE',worker_id:'FAKE-A',field_code:'major',
+   proposed_value:'رشته کاملاً ساختگی',reason:'توضیح ساختگی کافی برای تصمیم مدیر',review_state:'pending'}]
+ const ui=await setup('inbox',{profile_requests:changes})
+ globalThis.__qaAllowDecision=true
+ try{
+  const card=ui.host.querySelector('.ow-profile-request')
+  assert.ok(card)
+  const approve=Array.from(card.querySelectorAll('button'))
+    .find(el=>el.textContent==='تأیید اصلاح')
+  assert.ok(approve)
+  await act(async()=>{
+   approve.dispatchEvent(new window.MouseEvent('click',{bubbles:true}))
+   approve.dispatchEvent(new window.MouseEvent('click',{bubbles:true}))
+  })
+  assert.equal(globalThis.__qaProfileReviewCalls.length,1)
+  assert.equal(globalThis.__qaProfileReviewCalls[0].requestId,'FAKE-CHANGE')
+  assert.equal(approve.disabled,true)
+  await act(async()=>approve.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.equal(globalThis.__qaProfileReviewCalls.length,1)
+ }finally{globalThis.__qaAllowDecision=false;await ui.dispose()}
+})
+
+test('an acknowledged time review followed by denied refresh never reports server rejection',async()=>{
+ const ui=await setup('approvals')
+ globalThis.__qaAllowDecision=true
+ globalThis.__qaRefreshFailsAfterCommit=true
+ try{
+  const card=Array.from(ui.host.querySelectorAll('.ow-approval-results .ow-item'))
+    .find(el=>el.textContent.includes('ثبت گزارش پژوهشی'))
+  const approve=Array.from(card.querySelectorAll('button')).find(el=>el.textContent==='تأیید ساعت')
+  await act(async()=>approve.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.equal(globalThis.__qaReviewCalls.length,1)
+  assert.ok(ui.host.querySelector('.ow-access-recheck'),
+    'manager read failure hides any stale pending cards after acknowledged mutation')
+  assert.doesNotMatch(ui.host.textContent,/ثبت گزارش پژوهشی/)
+ }finally{
+  globalThis.__qaAllowDecision=false
+  globalThis.__qaRefreshFailsAfterCommit=false
+  globalThis.__managerReadDenied=false
+  await ui.dispose()
+ }
 })
