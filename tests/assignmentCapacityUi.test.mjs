@@ -49,7 +49,8 @@ const plugin={
       'export const getMyWorkV2=async()=>globalThis.__qaCapacityData;',
       'export const getMyWorkerProfileV2=async()=>({worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"});',
       'export const getMyProfileChangeRequests=async()=>[];',
-      ...['requestProfileChange','reviewProfileChange','assignGroupTask'].map(name=>
+      'export const assignGroupTask=async args=>{globalThis.__qaGroupCalls.push(args);return {ok:true};};',
+      ...['requestProfileChange','reviewProfileChange'].map(name=>
         `export const ${name}=async()=>{throw Error("QA_NO_REAL_BACKEND")};`),
     ].join('\n')
 
@@ -94,6 +95,7 @@ function Wrapper({start}){
 }
 async function setup({start='tasks',data=sample()}={}){
   globalThis.__qaCapacityData=data
+  globalThis.__qaGroupCalls=[]
   const host=document.createElement('div')
   document.body.append(host)
   const root=createRoot(host)
@@ -177,5 +179,28 @@ test('invalid local in-cell interval blocks weekly saving',async()=>{
   await fill(fields[1],'12:00')
   assert.match(form.textContent,/پایان هر بازه باید بعد از شروع/)
   assert.equal(form.querySelector('button[aria-label="ذخیره همین روز"]').disabled,true)
+ }finally{await teardown()}
+})
+
+test('group assignment submits a single atomic manager RPC with one standard duration for each selected member',async()=>{
+ const data=sample()
+ data.workers.push({id:'FAKE-WORKER-SECOND',name:'نمونه دوم',unit:'research',state:'active'})
+ const {host,teardown}=await setup({data})
+ try {
+  const checkbox=Array.from(host.querySelectorAll('.ow-worker-option-list input[type="checkbox"]'))[1]
+  assert.ok(checkbox,'group member selector exists')
+  await act(async()=>checkbox.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.match(host.textContent,/۲ نفر انتخاب‌شده/)
+  const title=labeledField(host,'عنوان کار')
+  await fill(title,'مرتب‌سازی گروهی منابع کتابخانه')
+  const short=labeledField(host,'علت واگذاری امروز یا فردا')
+  await fill(short,'آماده‌سازی سریع و هماهنگ منابع امروز')
+  const form=host.querySelector('.ow-assignment-form')
+  await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__qaGroupCalls.length,1)
+  const payload=globalThis.__qaGroupCalls[0]
+  assert.deepEqual(new Set(payload.workerIds),new Set([worker,'FAKE-WORKER-SECOND']))
+  assert.equal(payload.minutes,'60')
+  assert.equal(payload.title,'مرتب‌سازی گروهی منابع کتابخانه')
  }finally{await teardown()}
 })
