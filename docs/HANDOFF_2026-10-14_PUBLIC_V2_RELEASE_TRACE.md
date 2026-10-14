@@ -1,5 +1,14 @@
 # Operations V2 — public-safe handoff, 2026-10-14 (NO DEPLOY)
 
+## SWTB4 latest safety continuation — 2026-10-14
+
+- A read/auth refresh denial in real manager or worker React now **clears previous operational data**, hides sensitive panels and presents retry rather than continuing to show old tasks/reviews/profiles.
+- Late successful responses from an older request are ignored if a newer read has already superseded them. No changes to the existing focus-resume Auth protection or persisted section selection.
+- New synthetic React regression tests include manager/worker denied read, recovery after retry and out-of-order successful/denied fetches; current Draft CI [38530212202](https://github.com/AminMirasadollahi/StudentWorkerTalentBank-Preview/actions/runs/38530212202) **67/67 PASS, 0 fail, Vite build PASS, NO DEPLOY** on code SHA `a51c89565d2942b14b766fa106cf806ccfcb2ed7`.
+- Private Draft SQL profile tests now cover approval of full name, rejection and subsequent approval of major while retaining immutable original application data; isolated PostgreSQL 16+17 CI [38529603618](https://github.com/AminMirasadollahi/StudentWorkerTalentBank/actions/runs/38529603618) passed. Full worklog: PRIVATE `docs/OPERATIONS_V2_SWTB4_CONTINUED_SECURITY_UI_2026-10-14.md`.
+- **No production changes:** V2 database migrations unapplied, public main untouched, worker lifecycle unchanged, both PRs remain Draft. Live Supabase grants/JWT/race/recovery checks and separate owner authorizations are still required.
+
+
 ## SWTB 4 follow-through — verified 2026-10-14 (newer than the original handoff)
 
 - Public V2 UI protection patched on Draft-only branch: `TaskAssignmentEditor.jsx` now distinguishes a **committed** successful task/group RPC from a later failed list refresh, and disables duplicate submit. New synthetic React regression verifies exactly one RPC despite subsequent attempted resubmission.
