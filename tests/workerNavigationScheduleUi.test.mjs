@@ -22,10 +22,25 @@ const plugin={
  name:'worker-focus-ui-fully-isolated',
  enforce:'pre',
  resolveId(source,importer){
+    if((importer?.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operationsV2')
+      ||(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operationsV2'))
+      return '\0qa-v2-no-network'
+    if(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operations')
+      return '\0qa-worker-no-network'
+    
   if(importer?.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operations')
    return '\0qa-worker-no-network'
  },
  load(id){
+    if(id==='\0qa-v2-no-network')return [
+      'export const getAdminWorkV2=async()=>globalThis.__workerFocusFixture;',
+      'export const getMyWorkV2=async()=>globalThis.__workerFocusFixture;',
+      'export const getMyWorkerProfileV2=async()=>({worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"});',
+      'export const getMyProfileChangeRequests=async()=>[];',
+      ...['requestProfileChange','reviewProfileChange','assignGroupTask'].map(name=>
+       `export const ${name}=async()=>{throw Error("QA_NO_REAL_BACKEND")};`),
+    ].join('\n')
+    
   if(id==='\0qa-worker-no-network')return [
     'export const getMyWork=async()=>globalThis.__workerFocusFixture;',
     'export const setWeeklyDay=async(...args)=>{globalThis.__workerFocusCalls.push(args);};',
