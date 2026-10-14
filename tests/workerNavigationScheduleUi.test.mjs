@@ -46,8 +46,9 @@ const plugin={
     'export const getMyWork=async()=>globalThis.__workerFocusFixture;',
     'export const setWeeklyDay=async(...args)=>{globalThis.__workerFocusCalls.push(args);};',
     'export const setDateException=async(...args)=>{globalThis.__workerExceptionCalls.push(args);};',
-    ...['getAdminWork','assignWorkerTask','startMyTask','submitMyTime',
-      'reviewWorkerTime'].map(name=>
+    'export const submitMyTime=async args=>{if(!globalThis.__qaAllowWorkerSubmit)throw Error("QA_WRITES_DENIED");globalThis.__qaSubmitCalls.push(args);if(globalThis.__qaSubmitFailCount>0){globalThis.__qaSubmitFailCount--;throw Error("synthetic_submit_failed")}if(globalThis.__qaDenyReadAfterSubmission)globalThis.__workerReadDenied=true;return {ok:true};};',
+    'export const startMyTask=async id=>{if(!globalThis.__qaAllowWorkerSubmit)throw Error("QA_WRITES_DENIED");globalThis.__qaStartCalls.push(id);return {ok:true};};',
+    ...['getAdminWork','assignWorkerTask','reviewWorkerTime'].map(name=>
       `export const ${name}=async()=>{throw Error("QA_WRITES_DENIED")};`),
   ].join('\n')
  },
@@ -68,6 +69,11 @@ before(async()=>{
  globalThis.__profileChangeRequests=[]
  globalThis.__workerReadDenied=false
  globalThis.__workerWorkPlan=[]
+ globalThis.__qaAllowWorkerSubmit=false
+ globalThis.__qaSubmitFailCount=0
+ globalThis.__qaSubmitCalls=[]
+ globalThis.__qaStartCalls=[]
+ globalThis.__qaDenyReadAfterSubmission=false
  ;({createRoot}=await import('react-dom/client'))
  server=await createServer({plugins:[plugin],server:{middlewareMode:true},
   appType:'custom',logLevel:'error'})
@@ -79,7 +85,8 @@ after(async()=>{
  for(const p of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT',
   '__workerFocusFixture','__workerFocusCalls','__workerExceptionCalls',
   '__profileChangeCalls','__profileChangeRequests','__workerReadDenied',
-  '__workerWorkPlan'])delete globalThis[p]
+  '__workerWorkPlan','__qaAllowWorkerSubmit','__qaSubmitFailCount',
+  '__qaSubmitCalls','__qaStartCalls','__qaDenyReadAfterSubmission'])delete globalThis[p]
 })
 function Harness(){
  const [nav,setNav]=useState({section:'tasks',taskRange:'today'})
@@ -287,6 +294,106 @@ test('an older successful work fetch cannot override a newer denied refresh',asy
   globalThis.__workerReadDenied=false
   globalThis.__workerWorkPlan=[]
   if(resolveOld)resolveOld(fixture())
+  await ui.dispose()
+ }
+})
+
+async function submitSyntheticWorkerReport(ui){
+ const check=ui.host.querySelector('.ow-worker-action-detail .ow-checkbox input')
+ assert.ok(check,'worker completion checkbox')
+ await act(async()=>check.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+ const form=ui.host.querySelector('.ow-worker-action-detail form')
+ assert.ok(form)
+ await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+}
+test('acknowledged worker report cannot be double submitted while task snapshot is stale',async()=>{
+ globalThis.__qaAllowWorkerSubmit=true
+ globalThis.__qaSubmitCalls=[]
+ globalThis.__qaSubmitFailCount=0
+ const ui=await setup()
+ try{
+  await submitSyntheticWorkerReport(ui)
+  assert.equal(globalThis.__qaSubmitCalls.length,1)
+  const first=globalThis.__qaSubmitCalls[0]
+  assert.equal(first.taskId,'FAKE-TASK')
+  assert.match(first.clientSubmissionId,/^[0-9a-f-]{36}$/i)
+  assert.match(ui.host.textContent,/گزارش در سرور ثبت شد/)
+  const btn=ui.host.querySelector('.ow-worker-action-detail button[type="submit"]')
+  assert.equal(btn.disabled,true)
+  await act(async()=>ui.host.querySelector('.ow-worker-action-detail form')
+    .dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__qaSubmitCalls.length,1,'stale assigned task must not create a second report')
+ }finally{
+  globalThis.__qaAllowWorkerSubmit=false
+  globalThis.__qaSubmitCalls=[]
+  await ui.dispose()
+ }
+})
+test('definite report RPC rejection keeps the same submission identity on a safe retry',async()=>{
+ globalThis.__qaAllowWorkerSubmit=true
+ globalThis.__qaSubmitCalls=[]
+ globalThis.__qaSubmitFailCount=1
+ const ui=await setup()
+ try{
+  await submitSyntheticWorkerReport(ui)
+  assert.equal(globalThis.__qaSubmitCalls.length,1)
+  assert.ok(ui.host.querySelector('.ow-worker-tasks .report-alert--error'))
+  const btn=ui.host.querySelector('.ow-worker-action-detail button[type="submit"]')
+  assert.equal(btn.disabled,false,'actual RPC failure must not silently claim success')
+  await act(async()=>ui.host.querySelector('.ow-worker-action-detail form')
+    .dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__qaSubmitCalls.length,2)
+  assert.equal(globalThis.__qaSubmitCalls[0].clientSubmissionId,
+    globalThis.__qaSubmitCalls[1].clientSubmissionId,
+    'same idempotency key is reused instead of generating another report identity')
+  assert.equal(btn.disabled,true)
+ }finally{
+  globalThis.__qaAllowWorkerSubmit=false
+  globalThis.__qaSubmitFailCount=0
+  globalThis.__qaSubmitCalls=[]
+  await ui.dispose()
+ }
+})
+test('acknowledged worker report with denied refresh hides old task rather than resubmitting',async()=>{
+ globalThis.__qaAllowWorkerSubmit=true
+ globalThis.__qaSubmitCalls=[]
+ globalThis.__qaDenyReadAfterSubmission=true
+ globalThis.__workerReadDenied=false
+ const ui=await setup()
+ try{
+  await submitSyntheticWorkerReport(ui)
+  assert.equal(globalThis.__qaSubmitCalls.length,1)
+  assert.ok(ui.host.querySelector('.ow-access-recheck'))
+  assert.doesNotMatch(ui.host.textContent,/کار نمونه دانشجوکار/)
+ }finally{
+  globalThis.__qaAllowWorkerSubmit=false
+  globalThis.__qaDenyReadAfterSubmission=false
+  globalThis.__workerReadDenied=false
+  globalThis.__qaSubmitCalls=[]
+  await ui.dispose()
+ }
+})
+test('start work is one-shot after acknowledgement yet report can still be submitted',async()=>{
+ globalThis.__qaAllowWorkerSubmit=true
+ globalThis.__qaStartCalls=[]
+ globalThis.__qaSubmitCalls=[]
+ const ui=await setup()
+ try{
+  const start=Array.from(ui.host.querySelectorAll('.ow-worker-action-detail button'))
+    .find(el=>el.textContent.trim()==='شروع کار')
+  assert.ok(start)
+  await act(async()=>{
+   start.dispatchEvent(new window.MouseEvent('click',{bubbles:true}))
+   start.dispatchEvent(new window.MouseEvent('click',{bubbles:true}))
+  })
+  assert.equal(globalThis.__qaStartCalls.length,1)
+  assert.equal(start.disabled,true)
+  await submitSyntheticWorkerReport(ui)
+  assert.equal(globalThis.__qaSubmitCalls.length,1,'start acknowledgement must not block report')
+ }finally{
+  globalThis.__qaAllowWorkerSubmit=false
+  globalThis.__qaStartCalls=[]
+  globalThis.__qaSubmitCalls=[]
   await ui.dispose()
  }
 })
