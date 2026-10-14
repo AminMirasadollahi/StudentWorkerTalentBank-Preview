@@ -115,12 +115,12 @@ test('manager sees exact read-only overbooking warning and retains enabled assig
   const {host,teardown}=await setup()
   try{
     assert.match(host.textContent,/هشدار بیش‌ازظرفیت/)
-    assert.match(host.textContent,/ظرفیت ثبت‌شده/)
-    assert.match(host.textContent,/۴۵ دقیقه/)
+    assert.match(host.textContent,/مجموع کارهای ثبت‌شده از ظرفیت اعلام‌شده/)
+    assert.match(host.textContent,/ظرفیت نفرات انتخابی/)
     const submit=Array.from(host.querySelectorAll('button')).find(x=>x.textContent==='واگذاری کار')
     assert.ok(submit)
     assert.equal(submit.disabled,false,'advice must not silently change server/business policy')
-    assert.match(host.textContent,/ظرفیت، یک برآورد بر اساس اطلاعات فعلی است/)
+    assert.match(host.textContent,/زمان استاندارد برای هر نفر جداگانه/)
   }finally{await teardown()}
 })
 test('no-weekday-record is uncertain, never mislabeled as confirmed absence',async()=>{
