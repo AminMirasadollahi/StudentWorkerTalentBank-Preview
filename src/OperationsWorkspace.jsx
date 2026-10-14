@@ -535,8 +535,47 @@ async function exportOpsExcel(data, filteredToOneWorker=false) {
   a.href=url;a.download=filteredToOneWorker?'student-worker-selected-history.xlsx':'student-worker-operations.xlsx';a.click()
   setTimeout(()=>URL.revokeObjectURL(url),1000)
 }
-function ManagerWorkerProfile({data,selectedId,onChange}) {
+function ProfileChangeReview({request,worker,onDone}) {
+ const [note,setNote]=useState('')
+ const [busy,setBusy]=useState(false)
+ const [error,setError]=useState('')
+ const act=async decision=>{
+   if(busy)return
+   setBusy(true);setError('')
+   try{
+     await reviewProfileChange({requestId:request.id,decision,note:note.trim()})
+     await onDone?.()
+   }catch(e){
+     const raw=String(e?.message||'')
+     setError(raw.includes('already_reviewed')?'این درخواست قبلاً بررسی شده است.':
+       'بررسی انجام نشد؛ اطلاعات دوباره دریافت و بررسی شوند.')
+   }finally{setBusy(false)}
+ }
+ return <article className="ow-item ow-profile-request" data-request-id={request.id}>
+   <div className="ow-item-header">
+     <strong>{worker?.name||'دانشجوکار'} · اصلاح {request.field_code==='major'?'رشته':'نام'}</strong>
+     <span className="ow-status">نیازمند رسیدگی</span>
+   </div>
+   <p>مقدار پیشنهادی: <b>{request.proposed_value}</b></p>
+   <details className="ow-context-help"><summary>دلیل درخواست</summary>
+     <p>{request.reason}</p>
+   </details>
+   <label className="report-field"><span>یادداشت بررسی (اختیاری)</span>
+     <input maxLength={1000} value={note} onChange={e=>setNote(e.target.value)}/></label>
+   <div className="ow-actions">
+     <button className="report-btn report-btn--primary" type="button" disabled={busy}
+       onClick={()=>act('approved')}>تأیید اصلاح</button>
+     <button className="report-btn report-btn--light" type="button" disabled={busy}
+       onClick={()=>act('rejected')}>رد درخواست</button>
+   </div>
+   {error&&<p role="alert" className="report-alert report-alert--error">{error}</p>}
+ </article>
+}
+function ManagerWorkerProfile({data,selectedId,onChange,onDone}) {
   const workers=data.workers||[]
+  const [query,setQuery]=useState('')
+  const shownWorkers=workers.filter(w=>w.name?.toLocaleLowerCase('fa-IR')
+    .includes(query.trim().toLocaleLowerCase('fa-IR')))
   const selected=workers.find(w=>w.id===selectedId)
   const scoped=selected?scopeWorkerHistory(data,selectedId):null
   const summary=scoped?summarizeWorkerHistory(scoped):null
@@ -544,17 +583,27 @@ function ManagerWorkerProfile({data,selectedId,onChange}) {
   const entries=scoped?.time_entries||[]
   const ongoing=tasks.filter(t=>['assigned','in_progress','submitted','needs_changes'].includes(t.state))
   const completed=tasks.filter(t=>t.state==='completed')
+  const changeQueue=(data.profile_requests||[]).filter(r=>r.worker_id===selectedId
+    &&r.review_state==='pending')
+  const timeQueue=entries.filter(e=>e.review_state==='submitted')
+  const taskById=new Map(tasks.map(t=>[t.id,t]))
   return <section className="report-panel ow-profile-section">
-    <div className="ow-presence-section-title">
-      <h2>پروفایل دانشجوکارها</h2>
-      <label className="report-field ow-worker-selector"><span>انتخاب دانشجوکار</span>
-        <select value={selectedId} onChange={e=>onChange(e.target.value)}>
-          <option value="">انتخاب کنید</option>
-          {workers.map(w=><option key={w.id} value={w.id}>{w.name} · {unitLabels[w.unit]||w.unit}</option>)}
-        </select>
-      </label>
-    </div>
-    {!selected&&<p className="ow-muted">برای دیدن پرونده تجمیعی، یک دانشجوکار انتخاب کنید.</p>}
+    <h2>پروفایل دانشجوکارها</h2>
+    <div className="ow-profile-layout">
+      <aside className="ow-people-directory" aria-label="فهرست دانشجوکارها">
+        <input type="search" value={query} onChange={e=>setQuery(e.target.value)}
+          aria-label="جست‌وجوی دانشجوکار در پروفایل‌ها" placeholder="جست‌وجوی دانشجوکار"/>
+        {shownWorkers.map(w=><button type="button" key={w.id}
+          className={selectedId===w.id?'is-selected':''} onClick={()=>onChange(w.id)}>
+          <strong>{w.name}</strong>
+          <small>{unitLabels[w.unit]||w.unit}</small>
+          {(data.profile_requests||[]).some(r=>r.worker_id===w.id&&r.review_state==='pending')
+            &&<i aria-label="درخواست منتظر بررسی">•</i>}
+        </button>)}
+        {!shownWorkers.length&&<p className="ow-muted">موردی یافت نشد.</p>}
+      </aside>
+      <div className="ow-profile-body">
+      {!selected&&<p className="ow-muted">از فهرست، پرونده یک دانشجوکار را انتخاب کنید.</p>}
     {selected&&<>
       <div className="ow-profile-heading">
         <div><h3>{selected.name}</h3>
@@ -591,10 +640,21 @@ function ManagerWorkerProfile({data,selectedId,onChange}) {
           {!entries.length&&<p className="ow-muted">گزارشی وجود ندارد.</p>}
         </div>
       </details>
+      {(changeQueue.length>0||timeQueue.length>0)&&<details open className="ow-profile-fold">
+        <summary>نیازمند رسیدگی · {n(changeQueue.length+timeQueue.length)}</summary>
+        <div className="ow-profile-action-list">
+          {changeQueue.map(r=><ProfileChangeReview key={r.id} request={r}
+            worker={selected} onDone={onDone}/>)}
+          {timeQueue.map(e=><ApprovalCard key={e.id} entry={e}
+            worker={selected} task={taskById.get(e.task_id)} onDone={onDone}/>)}
+        </div>
+      </details>}
       <details className="ow-profile-fold"><summary>وضعیت حساب · فقط مشاهده</summary>
         <WorkerLifecycleReadOnlyPreview worker={selected}/>
       </details>
     </>}
+      </div>
+    </div>
   </section>
 }
 export function AdminOperations({ navigation, setNavigation }) {
@@ -686,6 +746,7 @@ export function AdminOperations({ navigation, setNavigation }) {
   const taskById=new Map(allTasks.map(task=>[task.id,task]))
   const todayTasks=(data.tasks||[]).filter(t=>t.planned_date===today()&&t.state!=='cancelled')
   const pending=(data.time_entries||[]).filter(e=>e.review_state==='submitted')
+  const pendingProfileChanges=(data.profile_requests||[]).filter(r=>r.review_state==='pending')
   const approvedMinutes=(data.time_entries||[])
     .filter(e=>e.review_state==='approved')
     .reduce((sum,e)=>sum+Number(e.approved_minutes||0),0)
@@ -709,11 +770,26 @@ export function AdminOperations({ navigation, setNavigation }) {
       <article><span>کل ساعات تأییدشده</span><b>{exactDuration(approvedMinutes)}</b></article>
     </div>
     <SectionTabs value={view} onChange={setView} options={[
-      ['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],['profiles','پروفایل‌ها'],
+      ['inbox','کارتابل'],['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],['profiles','پروفایل‌ها'],
     ]}/>
     {loading&&<p className="ow-muted">در حال دریافت اطلاعات…</p>}
     <Message error={error} notice={notice}/>
 
+    {view==='inbox'&&<section className="report-panel">
+      <div className="ow-presence-section-title">
+        <h2>کارتابل رسیدگی</h2>
+        <small>{n(pending.length)} گزارش · {n(pendingProfileChanges.length)} درخواست اصلاح</small>
+      </div>
+      {pending.length===0&&pendingProfileChanges.length===0&&
+        <p className="ow-muted">درخواستی برای رسیدگی وجود ندارد.</p>}
+      <div className="ow-inbox-items">
+        {pendingProfileChanges.map(r=><ProfileChangeReview key={r.id} request={r}
+          worker={workers.find(w=>w.id===r.worker_id)} onDone={refresh}/>)}
+        {pending.map(e=><ApprovalCard key={e.id} entry={e}
+          task={taskById.get(e.task_id)} worker={workers.find(w=>w.id===e.worker_id)}
+          onDone={refresh}/>)}
+      </div>
+    </section>}
     {view==='tasks'&&<>
       <section className="report-panel">
         <h2>واگذاری کار</h2>
@@ -846,7 +922,8 @@ export function AdminOperations({ navigation, setNavigation }) {
 
     </section>}
 
-    {view==='profiles'&&<ManagerWorkerProfile data={data} selectedId={profileWorkerId} onChange={setProfileWorkerId}/>}
+    {view==='profiles'&&<ManagerWorkerProfile data={data} selectedId={profileWorkerId}
+      onChange={setProfileWorkerId} onDone={refresh}/>}
     {assignmentDialogDate&&<dialog ref={assignmentDialogRef} className="ow-assignment-dialog"
       onCancel={e=>{e.preventDefault();setAssignmentDialogDate('')}} aria-label="تعریف کار جدید در تقویم">
       <div className="ow-presence-section-title">
