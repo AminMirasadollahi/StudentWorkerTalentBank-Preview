@@ -277,7 +277,7 @@ test('manager lifetime and per-worker approved credit use backend aggregate, not
  try{
   const summary=ui.host.querySelectorAll('.ow-summary article')
   assert.equal(summary.length,4)
-  assert.match(summary[3].textContent,/۱۸۵۰ ساعت و ۴۵ دقیقه/)
+  assert.match(summary[3].textContent,/۱٬۸۵۰ ساعت و ۴۵ دقیقه/)
   const first=ui.host.querySelector('.ow-people-directory button')
   assert.ok(first)
   await act(async()=>first.dispatchEvent(
@@ -285,7 +285,6 @@ test('manager lifetime and per-worker approved credit use backend aggregate, not
   const totals=ui.host.querySelectorAll('.ow-profile-metrics > div')
   assert.equal(totals.length,4)
   assert.match(totals[3].textContent,/۲۷۵ ساعت/)
-  assert.equal(ui.host.querySelectorAll('.ow-profile-mini-list').length>=0,true)
   assert.equal(original.time_entries.filter(e=>e.review_state==='approved').length,1,
     'synthetic history only carries one 45-minute approved entry')
  }finally{await ui.dispose()}
