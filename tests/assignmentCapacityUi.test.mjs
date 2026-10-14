@@ -126,47 +126,41 @@ test('one-day zero-availability overrides recurring slot with warning',async()=>
     assert.match(host.textContent,/تغییر موقت همین روز/)
   }finally{await teardown()}
 })
-test('weekly schedule is one grid with inline row editor; month has one exception editor',async()=>{
-  const {host,teardown}=await setup({start:'availability'})
-  try{
-    assert.equal(host.querySelectorAll('.ow-week-row').length,7)
-    assert.equal(host.querySelectorAll('.ow-week-slot').length,28)
-    assert.equal(host.querySelectorAll('.ow-week-day-form').length,0)
-    assert.ok(host.querySelector('.ow-presence-month'))
-    assert.ok(host.querySelectorAll('.ow-month-day').length>=28)
-    const button=host.querySelector('button[aria-label^="ویرایش برنامه شنبه"]')
-    assert.ok(button)
-    await act(async()=>button.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-    const form=host.querySelector('.ow-week-row-shell .ow-week-day-form')
-    assert.ok(form,'editor must appear immediately under the clicked weekday')
-    assert.match(form.textContent,/کار ثبت شده/)
-    const add=Array.from(form.querySelectorAll('button')).find(x=>x.textContent.includes('+ نوبت'))
-    assert.ok(add)
-    await act(async()=>add.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-    assert.equal(form.querySelectorAll('.ow-inline-window').length,1)
-    assert.equal(Array.from(form.querySelectorAll('button')).find(x=>x.textContent==='ذخیره همین روز').disabled,false)
-    await act(async()=>host.querySelector('.ow-month-day.is-today')
-      .dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-    const exceptionForm=host.querySelector('.ow-exception-inline')
-    assert.ok(exceptionForm)
-    const absent=exceptionForm.querySelectorAll('input[name="exception-kind"]')[1]
-    await act(async()=>absent.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-    assert.match(exceptionForm.textContent,/ظرفیت این روز با/)
-  }finally{await teardown()}
+test('weekly schedule exposes 28 in-cell actions and preserves compact Jalali exception editor',async()=>{
+ const {host,teardown}=await setup({start:'availability'})
+ try{
+  assert.equal(host.querySelectorAll('.ow-week-row').length,7)
+  assert.equal(host.querySelectorAll('.ow-week-cell').length,28)
+  assert.equal(host.querySelectorAll('.ow-week-day-form').length,0)
+  assert.ok(host.querySelector('.ow-presence-month'))
+  const button=host.querySelector('button[aria-label="ویرایش برنامه شنبه نوبت 1"]')
+  assert.ok(button)
+  await act(async()=>button.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  const editor=host.querySelector('.ow-week-cell .ow-slot-editor')
+  assert.ok(editor,'editor appears in the exact cell, without an expanded row')
+  assert.equal(editor.querySelectorAll('input').length,2)
+  assert.equal(host.querySelectorAll('.ow-week-day-form').length,0)
+  assert.equal(editor.querySelector('button[aria-label="ذخیره همین روز"]').disabled,false)
+  await act(async()=>host.querySelector('.ow-month-day.is-today')
+    .dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  const exceptionForm=host.querySelector('.ow-exception-inline')
+  assert.ok(exceptionForm)
+  const absent=exceptionForm.querySelectorAll('input[name="exception-kind"]')[1]
+  await act(async()=>absent.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.match(exceptionForm.textContent,/ظرفیت این روز با/)
+ }finally{await teardown()}
 })
-test('invalid local weekday interval keeps submit disabled and never writes',async()=>{
-  const {host,teardown}=await setup({start:'availability'})
-  try{
-    const day=host.querySelector('button[aria-label^="ویرایش برنامه شنبه"]')
-    await act(async()=>day.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-    const add=Array.from(host.querySelectorAll('button')).find(x=>x.textContent.includes('+ نوبت'))
-    await act(async()=>add.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-    const form=host.querySelector('.ow-week-day-form')
-    const fields=Array.from(form.querySelectorAll('.ow-inline-window input[type="text"]'))
-    assert.equal(fields.length,2)
-    await fill(fields[0],'14:00')
-    await fill(fields[1],'12:00')
-    assert.match(form.textContent,/پایان هر بازه باید بعد از شروع/)
-    assert.equal(Array.from(form.querySelectorAll('button')).find(x=>x.textContent==='ذخیره همین روز').disabled,true)
-  }finally{await teardown()}
+test('invalid local in-cell interval blocks weekly saving',async()=>{
+ const {host,teardown}=await setup({start:'availability'})
+ try{
+  const day=host.querySelector('button[aria-label="ویرایش برنامه شنبه نوبت 1"]')
+  await act(async()=>day.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  const form=host.querySelector('.ow-slot-editor')
+  const fields=Array.from(form.querySelectorAll('input[type="text"]'))
+  assert.equal(fields.length,2)
+  await fill(fields[0],'14:00')
+  await fill(fields[1],'12:00')
+  assert.match(form.textContent,/پایان هر بازه باید بعد از شروع/)
+  assert.equal(form.querySelector('button[aria-label="ذخیره همین روز"]').disabled,true)
+ }finally{await teardown()}
 })
