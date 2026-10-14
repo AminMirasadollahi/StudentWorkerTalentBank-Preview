@@ -153,9 +153,14 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
     setError('');setNotice('');setSaveState('')
   }
   const deleteSlot=()=>{
-    if(editingSlot===null)return
-    setDraftWindows(current=>current.filter((_,i)=>i!==editingSlot))
-    setEditingSlot(null)
+    if(editingSlot===null||editingDay===null||busy)return
+    const remaining=draftWindows.filter((_,i)=>i!==editingSlot)
+    const check=validateDailyWindows(remaining)
+    if(!check.ok)return
+    if(!window.confirm(remaining.length
+      ?'نوبت انتخاب‌شده از برنامه این روز حذف شود؟'
+      :'تنها نوبت این روز حذف می‌شود؛ نبود برنامه به معنای غیبت قطعی نیست. ادامه می‌دهید؟'))return
+    void save(()=>setWeeklyDay(workerId,editingDay,check.intervals,effective),'weekly')
   }
   const chooseMonthDay=date=>{
     if(busy)return
@@ -290,13 +295,6 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
                 </div>
               })}
             </div>
-            {editingDay===id&&editingSlot===null&&<div className="ow-slot-delete-confirm">
-              <span>نوبت حذف شد؛ برای ثبت برنامه جدید این روز، تغییر را ذخیره کنید.</span>
-              <button type="button" className="ow-mini-btn"
-                onClick={()=>{setEditingDay(null);setEditingSlot(null)}}>انصراف</button>
-              <button type="button" className="ow-mini-btn" disabled={busy||!weeklyValidation.ok}
-                onClick={()=>submitWeek({preventDefault:()=>{}})}>ذخیره حذف</button>
-            </div>}
           </div>
         })}
       </div>
