@@ -1,5 +1,15 @@
 # Operations V2 — public-safe handoff, 2026-10-14 (NO DEPLOY)
 
+## SWTB4 — worker profile change receipt hardening (2026-10-14)
+
+- In `src/OperationsWorkspace.jsx`, a worker's `WorkerSelfProfile` correction request now accepts success only after `ops_request_profile_change` provides `ok:true` plus `request_id`, and immediately locks double-submits before the React disabled state updates.
+- An acknowledged field-specific request receipt is kept **in memory**, worker-scoped, across navigation among worker tasks, schedule and self-profile. An older/stale queue cannot make the same correction request resubmittable; another supported field remains independently editable. Only an authoritative, newly read `approved` or `rejected` status for the **exact acknowledged request ID** releases that field lock.
+- A successful server ACK followed by denied/stale profile-history read does not produce a false request-failure message. Self-profile PII remains hidden on independent read failure; retry restores only authorized identity/history.
+- Four new fully synthetic React tests cover immediate double-click, stale queue and tab re-entry, post-commit read denial, server RPC rejection/retry and exact reviewed-receipt release. [CI 38536138698](https://github.com/AminMirasadollahi/StudentWorkerTalentBank-Preview/actions/runs/38536138698) on source/test SHA `39518ffde7a244ba4b828d9499e6ec24906c5e81` **84/84 PASS, 0 FAIL, Vite build PASS, no Pages deployment**.
+- No new database tables, frontend public intake edits, real applications, authentication settings or operations lifecycle changes. Private deep technical evidence: `docs/OPERATIONS_V2_SWTB4_PROFILE_CORRECTION_ACK_LOCK_2026-10-14.md` on private Draft PR #6.
+- This is NOT an end-to-end idempotency guarantee for a lost ACK, and live production JWT/grant/backup gates remain open. Both V2 PRs must stay Draft until owner separately approves SQL and later web release.
+
+
 ## SWTB4 — worker task reporting retry/ACK and profile-read safety (2026-10-14)
 
 - Real worker task card now distinguishes **successful server ACK** from a later failed/stale read. An ACK permanently disables re-submitting the **same review cycle** from an old card; the first successful start action is also one-shot and does not block eventual reporting. A synchronous lock blocks rapid double submits.
