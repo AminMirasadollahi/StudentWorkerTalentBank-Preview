@@ -67,11 +67,11 @@ export function suggestNextWindow(current) {
   return {start:minutesToClock(start),end:minutesToClock(start+60)}
 }
 
-// The authenticated self-work RPC returns weekly slots and date exceptions
-// without worker_id: every row is already scoped by auth.uid() in PostgreSQL.
-// Restore the owner key required by the shared manager/worker UI projection.
+// The authenticated self-work RPC returns tasks, weekly slots and date
+// exceptions without worker_id; PostgreSQL has already scoped these rows to
+// auth.uid(). Restore the owner key required by the shared calendar UI.
 // Never re-label an explicitly foreign row as belonging to this worker.
-export function scopeSelfPresenceRows(data, workerId) {
+export function scopeSelfWorkRows(data, workerId) {
   if (!data || typeof data !== 'object' || !workerId)
     throw new Error('invalid_self_presence_scope')
   const scoped = rows => Array.isArray(rows)
@@ -81,6 +81,7 @@ export function scopeSelfPresenceRows(data, workerId) {
     : []
   return {
     ...data,
+    tasks:scoped(data.tasks),
     weekly_slots:scoped(data.weekly_slots),
     exceptions:scoped(data.exceptions),
   }
