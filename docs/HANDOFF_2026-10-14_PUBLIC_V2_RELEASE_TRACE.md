@@ -1,5 +1,15 @@
 # Operations V2 — public-safe handoff, 2026-10-14 (NO DEPLOY)
 
+## SWTB4 — SQL V3 high-volume pending backlog safety (2026-10-14)
+
+- Verified against private V1 source that manager `ops_get_operations` limits projection to the 1,500 newest tasks and 2,000 newest time entries, while worker `ops_get_my_work` limits tasks to the 1,000 newest. These legacy caps can hide a still-submitted old time report or an old unfinished worker task in long-lived datasets.
+- The **PRIVATE Draft migration B only** now augments manager `ops_get_operations_v3` to include **all submitted time entries + missing linked tasks** while limiting only closed historical time entries to the most recent 2,000. Worker `ops_get_my_work_v2` similarly adds older unfinished/pending tasks scoped to that authenticated active worker without exposing others' tasks.
+- Tests ran **2,100 synthetic newer closed time reports + 1,550 newer completed tasks**, and verified the old base projection excludes the ancient pending report/task while V2/V3 returns exactly one of each and retains previously approved minutes. [PG16/PG17 isolated success 38537988158](https://github.com/AminMirasadollahi/StudentWorkerTalentBank/actions/runs/38537988158) on code/test SHA `9ebffaa121bcef9b269e71db7272828fbe7bd6a7`.
+- Scope: private **Draft SQL and synthetic tests only**, with this public-safe release note. Last existing PUBLIC V2 React code/test state: **84/84 passing** (the public UI was not modified for the SQL projection bug).
+- Complete details in PRIVATE `docs/OPERATIONS_V2_SWTB4_BACKLOG_STARVATION_AND_LEGACY_LIMIT_REGRESSION_2026-10-14.md`. No production DDL, merge, live database writes, applicant intake change, login/account mutation or public Pages deployment.
+- This fixes **pending-action completeness**, not infinite closed archive retention: authorized history export/pagination and performance at very high real data volume are separate release/performance checks. Production backup/recovery, live grants/JWT, and exact scoped permissions remain HOLD gates.
+
+
 ## SWTB4 — worker profile change receipt hardening (2026-10-14)
 
 - In `src/OperationsWorkspace.jsx`, a worker's `WorkerSelfProfile` correction request now accepts success only after `ops_request_profile_change` provides `ok:true` plus `request_id`, and immediately locks double-submits before the React disabled state updates.
