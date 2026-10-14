@@ -1,5 +1,17 @@
 # Operations V2 — public-safe handoff, 2026-10-14 (NO DEPLOY)
 
+## SWTB 4 follow-through — verified 2026-10-14 (newer than the original handoff)
+
+- Public V2 UI protection patched on Draft-only branch: `TaskAssignmentEditor.jsx` now distinguishes a **committed** successful task/group RPC from a later failed list refresh, and disables duplicate submit. New synthetic React regression verifies exactly one RPC despite subsequent attempted resubmission.
+- PUBLIC review-only CI **SUCCESS** on app/test SHA `931723dbccd2d3119a3ece49e6e81dcb9511380b`: https://github.com/AminMirasadollahi/StudentWorkerTalentBank-Preview/actions/runs/38524864584 . This is **not** a Pages deploy or real authenticated DB test.
+- Related PRIVATE SQL Draft PR #6 received security/correctness hardening (group-member uniqueness; active units; ready/active worker guards; pending-first identity correction queues) and independent ephemeral **PostgreSQL 16** compile/negative-role/atomicity/legacy-data tests **SUCCESS** at https://github.com/AminMirasadollahi/StudentWorkerTalentBank/actions/runs/38525285993 . The PostgreSQL job uses synthetic records ONLY, no live Supabase connection.
+- Read-only Supabase migration inventory confirmed **NEITHER V2 migration applied**; public LIVE main remains at `3d1cbfcdc03529ffab42f2f4ae2139db4169b8ca` at this checkpoint. Browser-facing new RPC calls must not ship ahead of server verification.
+- The full detailed SWTB4 engineering worklog lives in the PRIVATE V2 branch under `docs/OPERATIONS_V2_SWTB4_SECURITY_AND_TEST_PROGRESS_2026-10-14.md`. No real student data or credentials are copied here.
+- **No new owner authorization for production DDL, account changes, PR merge or public deployment.** Remaining gates: exact live function/grant/RLS review, recovery/backup evidence, deployment rehearsal/safe authenticated checks, then separate DB and Pages approvals.
+
+---
+
+
 > This documentation is committed to the V2 DEVELOPMENT branch only. It is not on the public live main branch. The public repository's ROOT enrollment form is LIVE, despite the word Preview in the repository name.
 
 ## Actual release/PR state at checkpoint
