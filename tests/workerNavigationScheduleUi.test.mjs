@@ -35,8 +35,8 @@ const plugin={
     if(id==='\0qa-v2-no-network')return [
       'export const getAdminWorkV2=async()=>globalThis.__workerFocusFixture;',
       'export const getMyWorkV2=async()=>{if(globalThis.__workerWorkPlan?.length)return await globalThis.__workerWorkPlan.shift()();if(globalThis.__workerReadDenied)throw Error("worker_access_denied");return globalThis.__workerFocusFixture;};',
-      'export const getMyWorkerProfileV2=async()=>({worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"});',
-      'export const getMyProfileChangeRequests=async()=>globalThis.__profileChangeRequests;',
+      'export const getMyWorkerProfileV2=async()=>{if(globalThis.__qaProfileReadDenied)throw Error("worker_access_denied");return {worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"};};',
+      'export const getMyProfileChangeRequests=async()=>{if(globalThis.__qaProfileHistoryDenied)throw Error("worker_access_denied");return globalThis.__profileChangeRequests;};',
       'export const requestProfileChange=async args=>{globalThis.__profileChangeCalls.push(args);globalThis.__profileChangeRequests.push({id:"FAKE-REQUEST",field_code:args.field,proposed_value:args.value,review_state:"pending"});return {ok:true};};',
       ...['reviewProfileChange','assignGroupTask'].map(name=>
        `export const ${name}=async()=>{throw Error("QA_NO_REAL_BACKEND")};`),
@@ -74,6 +74,8 @@ before(async()=>{
  globalThis.__qaSubmitCalls=[]
  globalThis.__qaStartCalls=[]
  globalThis.__qaDenyReadAfterSubmission=false
+ globalThis.__qaProfileReadDenied=false
+ globalThis.__qaProfileHistoryDenied=false
  ;({createRoot}=await import('react-dom/client'))
  server=await createServer({plugins:[plugin],server:{middlewareMode:true},
   appType:'custom',logLevel:'error'})
@@ -86,7 +88,8 @@ after(async()=>{
   '__workerFocusFixture','__workerFocusCalls','__workerExceptionCalls',
   '__profileChangeCalls','__profileChangeRequests','__workerReadDenied',
   '__workerWorkPlan','__qaAllowWorkerSubmit','__qaSubmitFailCount',
-  '__qaSubmitCalls','__qaStartCalls','__qaDenyReadAfterSubmission'])delete globalThis[p]
+  '__qaSubmitCalls','__qaStartCalls','__qaDenyReadAfterSubmission',
+  '__qaProfileReadDenied','__qaProfileHistoryDenied'])delete globalThis[p]
 })
 function Harness(){
  const [nav,setNav]=useState({section:'tasks',taskRange:'today'})
@@ -394,6 +397,43 @@ test('start work is one-shot after acknowledgement yet report can still be submi
   globalThis.__qaAllowWorkerSubmit=false
   globalThis.__qaStartCalls=[]
   globalThis.__qaSubmitCalls=[]
+  await ui.dispose()
+ }
+})
+
+test('worker self-profile independently hides cached identity after denied profile read',async()=>{
+ globalThis.__qaProfileReadDenied=true
+ const ui=await setup()
+ try{
+  await ui.clickText('پروفایل من')
+  assert.ok(ui.host.querySelector('.ow-profile-access-recheck'))
+  assert.doesNotMatch(ui.host.querySelector('.ow-self-profile').textContent,/نمونه غیرواقعی|پژوهش/)
+  globalThis.__qaProfileReadDenied=false
+  await ui.clickText('تلاش مجدد برای دریافت مشخصات')
+  assert.equal(ui.host.querySelector('.ow-profile-access-recheck'),null)
+  assert.match(ui.host.querySelector('.ow-self-profile').textContent,/نمونه غیرواقعی/)
+ }finally{
+  globalThis.__qaProfileReadDenied=false
+  await ui.dispose()
+ }
+})
+test('failed correction-history scope also hides self identity until successful retry',async()=>{
+ globalThis.__qaProfileHistoryDenied=true
+ globalThis.__profileChangeRequests=[{id:'SYNTHETIC-PENDING',field_code:'major',
+  proposed_value:'رشتهٔ آزمون',review_state:'pending'}]
+ const ui=await setup()
+ try{
+  await ui.clickText('پروفایل من')
+  assert.ok(ui.host.querySelector('.ow-profile-access-recheck'))
+  assert.doesNotMatch(ui.host.querySelector('.ow-self-profile').textContent,/نمونه غیرواقعی|رشتهٔ آزمون/)
+  globalThis.__qaProfileHistoryDenied=false
+  await ui.clickText('تلاش مجدد برای دریافت مشخصات')
+  assert.equal(ui.host.querySelector('.ow-profile-access-recheck'),null)
+  assert.match(ui.host.querySelector('.ow-self-profile').textContent,/درخواست‌های اصلاح/)
+  assert.match(ui.host.querySelector('.ow-self-profile').textContent,/نمونه غیرواقعی/)
+ }finally{
+  globalThis.__qaProfileHistoryDenied=false
+  globalThis.__profileChangeRequests=[]
   await ui.dispose()
  }
 })
