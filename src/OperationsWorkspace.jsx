@@ -1237,25 +1237,44 @@ function WorkerTaskCard({task,onSaved}) {
   </article>
 }
 function WorkerSelfProfile({tasks,records,profile}) {
- const [identity,setIdentity]=useState(profile)
+ const [identity,setIdentity]=useState(null)
  const [requests,setRequests]=useState([])
  const [requestsLoading,setRequestsLoading]=useState(true)
  const [requestsError,setRequestsError]=useState('')
+ const [profileReadFailed,setProfileReadFailed]=useState(false)
+ const profileReadSequence=useRef(0)
  const [editing,setEditing]=useState(false)
  const [field,setField]=useState('major')
  const [value,setValue]=useState('')
  const [reason,setReason]=useState('')
  const [saving,setSaving]=useState(false)
  const refreshProfile=async()=>{
+   const sequence=++profileReadSequence.current
+   setRequestsLoading(true)
    try{
      const [personal,items]=await Promise.all([getMyWorkerProfileV2(),getMyProfileChangeRequests()])
-     if(personal)setIdentity(personal)
-     setRequests(Array.isArray(items)?items:[])
+     if(sequence!==profileReadSequence.current)return false
+     if(!personal||typeof personal!=='object'||!Array.isArray(items))
+       throw Error('INVALID_PROFILE_PROJECTION')
+     setIdentity(personal)
+     setRequests(items)
+     setProfileReadFailed(false)
      setRequestsError('')
-   }catch{setRequestsError('مشخصات یا درخواست‌ها دریافت نشد؛ دوباره بررسی کنید.')}
-   finally{setRequestsLoading(false)}
+     return true
+   }catch{
+     if(sequence!==profileReadSequence.current)return false
+     // Fail closed for the independently fetched self-profile and request history.
+     setIdentity(null)
+     setRequests([])
+     setProfileReadFailed(true)
+     setRequestsError('مشخصات یا درخواست‌ها دریافت نشدند. برای نمایش دوباره، دسترسی را بررسی کنید.')
+     return false
+   }finally{if(sequence===profileReadSequence.current)setRequestsLoading(false)}
  }
- useEffect(()=>{void refreshProfile()},[profile.worker_id])
+ useEffect(()=>{
+   setIdentity(null);setRequests([]);setRequestsLoading(true)
+   void refreshProfile()
+ },[profile.worker_id])
  const submitChange=async event=>{
    event.preventDefault()
    if(saving||value.trim().length<2||reason.trim().length<10)return
@@ -1283,6 +1302,15 @@ function WorkerSelfProfile({tasks,records,profile}) {
     {id:'upcoming',title:'پیش‌رو',tasks:upcoming},
     {id:'completed',title:'انجام‌شده',tasks:completed},
   ]
+  if(profileReadFailed)return <section className="report-panel ow-self-profile ow-profile-access-recheck" role="alert">
+    <p>مشخصات شخصی در دسترس نیستند. اطلاعات قبلی تا تأیید دوبارهٔ دسترسی پنهان می‌مانند.</p>
+    {requestsError&&<p className="report-alert report-alert--error">{requestsError}</p>}
+    <button type="button" className="report-btn report-btn--light" disabled={requestsLoading}
+      onClick={()=>{void refreshProfile()}}>تلاش مجدد برای دریافت مشخصات</button>
+  </section>
+  if(!identity)return <section className="report-panel ow-self-profile" role="status">
+    <p className="ow-muted">در حال بررسی دسترسی به مشخصات…</p>
+  </section>
   return <section className="report-panel ow-self-profile">
     <div className="ow-presence-section-title"><h2>پروفایل من</h2>
       <span className="ow-status">زمان تأییدشده: {exactDuration(approvedTime)}</span></div>
