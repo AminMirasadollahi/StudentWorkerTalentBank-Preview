@@ -1111,8 +1111,25 @@ function WorkerTaskCard({task,onSaved}) {
   const [completionConfirmed,setCompletionConfirmed]=useState(false)
   const [note,setNote]=useState('')
   const [busy,setBusy]=useState(false)
+  const [reportCommitted,setReportCommitted]=useState(false)
+  const [startCommitted,setStartCommitted]=useState(false)
+  const [notice,setNotice]=useState('')
   const [error,setError]=useState('')
+  const actionLock=useRef(false)
+  // Preserve one submission identity across uncertain network failures.
   const keyRef=useRef(crypto.randomUUID())
+  const priorState=useRef(task.state)
+  useEffect(()=>{
+    // A new review cycle is possible only after server state has moved back
+    // into needs_changes. A stale snapshot with an unchanged state cannot reset
+    // an acknowledged report.
+    if(task.state==='needs_changes'&&priorState.current!==task.state){
+      setReportCommitted(false)
+      setCompletionConfirmed(false)
+      keyRef.current=crypto.randomUUID()
+    }
+    priorState.current=task.state
+  },[task.state])
   const ready=['assigned','in_progress','needs_changes'].includes(task.state)
   const standard=Number(task.estimate_minutes)
   const requestedMinutes=requestExtra?Number(requested):standard
@@ -1120,11 +1137,27 @@ function WorkerTaskCard({task,onSaved}) {
     Number.isInteger(requestedMinutes)&&requestedMinutes>standard&&requestedMinutes<=1440
     && Boolean(reasonCode)&&reasonText.trim().length>=10&&reasonText.trim().length<=600
   )
-  const perform=async fn=>{
-    setBusy(true);setError('')
-    try{await fn();await onSaved()}
-    catch(e){setError(readableError(e))}
-    finally{setBusy(false)}
+  const perform=async (fn,kind)=>{
+    if(actionLock.current||(kind==='report'&&reportCommitted)
+       ||(kind==='start'&&startCommitted))return
+    actionLock.current=true
+    setBusy(true);setError('');setNotice('')
+    try{
+      await fn()
+      if(kind==='report')setReportCommitted(true)
+      if(kind==='start')setStartCommitted(true)
+      setNotice(kind==='report'?'گزارش در سرور ثبت شد؛ در حال دریافت وضعیت تازه…':
+        'شروع کار در سرور ثبت شد؛ در حال دریافت وضعیت تازه…')
+      try{
+        const refreshed=await onSaved?.()
+        if(refreshed===false)throw Error('REFRESH_ONLY_FAILURE')
+      }catch{
+        setNotice('عملیات ثبت شده است؛ فقط تازه‌سازی وضعیت ناموفق بود. از ارسال دوباره خودداری کنید.')
+      }
+    }catch(e){
+      // No acknowledgement: retain the SAME idempotency key for a cautious retry.
+      setError(readableError(e))
+    }finally{actionLock.current=false;setBusy(false)}
   }
   return <article className="ow-item">
     <div className="ow-item-header"><strong>{task.title}</strong><span className="ow-status">{stateLabels[task.state]}</span></div>
@@ -1134,13 +1167,12 @@ function WorkerTaskCard({task,onSaved}) {
     </small>}
     {ready&&<details className="ow-worker-action-detail"><summary>ثبت انجام و گزارش کار</summary>
       {task.instructions&&<p>{task.instructions}</p>}
-      <form onSubmit={e=>{e.preventDefault();if(!completionConfirmed||!extraValid)return;perform(async()=>{
-      await submitMyTime({taskId:task.id,date,minutes:requestedMinutes,note,
+      <form onSubmit={e=>{e.preventDefault();if(!completionConfirmed||!extraValid||reportCommitted)return;void perform(
+      ()=>submitMyTime({taskId:task.id,date,minutes:requestedMinutes,note,
         clientSubmissionId:keyRef.current,
         extraReasonCode:requestExtra?reasonCode:null,
-        extraReasonText:requestExtra?reasonText.trim():null})
-      keyRef.current=crypto.randomUUID()
-    })}}>
+        extraReasonText:requestExtra?reasonText.trim():null}),'report')
+    }}>
       <div className="ow-fields ow-fields--two">
         <label className="report-field"><span>تاریخ انجام کار (شمسی)</span>
           <JalaliDatePicker value={date} max={today()} min={shift(today(),-90)}
@@ -1192,14 +1224,15 @@ function WorkerTaskCard({task,onSaved}) {
       </div>}
       <div className="ow-actions">
         {task.state!=='in_progress'&&<button type="button" className="report-btn report-btn--light"
-          onClick={()=>perform(()=>startMyTask(task.id))} disabled={busy}>شروع کار</button>}
+          onClick={()=>{void perform(()=>startMyTask(task.id),'start')}} disabled={busy||startCommitted||reportCommitted}>شروع کار</button>}
         <button type="submit" className="report-btn report-btn--primary"
-          disabled={busy||!completionConfirmed||!extraValid}>
+          disabled={busy||reportCommitted||!completionConfirmed||!extraValid}>
           {requestExtra?'ارسال درخواست زمان بیشتر برای بررسی':'ثبت انجام کار با زمان استاندارد'}
         </button>
       </div>
       </form>
     </details>}
+    {notice&&<p className="ow-muted" role="status">{notice}</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
   </article>
 }
