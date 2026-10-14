@@ -1,5 +1,16 @@
 # Operations V2 — public-safe handoff, 2026-10-14 (NO DEPLOY)
 
+## SWTB4 — Lifetime approved-hour arithmetic correctness (2026-10-14)
+
+- Real V1 RPC source caps manager report detail at **2,000** and worker report detail at **1,000**. Consequently the previous V2 header labeled `کل ساعات تأییدشده` could **undercount** lifetime approved credit when it summed only bounded history. This is a **source-proven future-scale risk**, not evidence of incorrect present production data.
+- The second **PRIVATE, UNAPPLIED** V2 migration now supplies `approved_minutes_total`: manager all-time approved minutes plus independent per-worker approved totals, and worker's own authenticated-only lifetime approved total. Only `review_state='approved'` / `approved_minutes` counts. Two dedicated partial indexes target pending-task lookup and approved-worker aggregates. Filtered history summaries intentionally remain filtered-history totals, not lifetime credit.
+- PUBLIC Draft `src/OperationsWorkspace.jsx` now uses the server-authoritative total for manager global banner, selected worker profile, worker summary and worker personal profile. It retains a fallback for synthetic/legacy UI fixtures, but the intended deployed V2 A+B contract provides the field.
+- Synthetic PostgreSQL 16+17 tests generated **3,201 approved time reports** (94,545 minutes for synthetic Worker 4; 16,500 for synthetic Worker 3; **111,045 total**) and confirmed server totals survive V1 history limits and cannot expose another worker's aggregate. Expanded negative function `anon` GRANT tests passed on SQL/test commit `4c38218e5ef371cba8eba3efd1691f27e5577a6d`: [private SQL CI 38540168590](https://github.com/AminMirasadollahi/StudentWorkerTalentBank/actions/runs/38540168590).
+- Two additional React component tests verify that global and self-approved totals use `approved_minutes_total`, not a truncated list. Review-only [PUBLIC CI 38539977530](https://github.com/AminMirasadollahi/StudentWorkerTalentBank-Preview/actions/runs/38539977530) on code/test SHA `4b3dab323c6bef5665f0031b01c47dc3d9b3e25b`: **86/86 PASS, 0 FAIL; Vite build PASS; applicant intake protection PASS; NO Pages deploy**.
+- Read-only Supabase connected project metadata confirms PostgreSQL **17.6.1**, `ACTIVE_HEALTHY`, all required existing table columns present, last migration `20261012082108_phase_n_guarded_worker_state_transitions`, **neither V2 migration installed** and **no development database branches**. This DOES NOT prove a recoverable database backup/PITR, current runtime effective grants or safe concurrent multi-session rollout.
+- Private full checkpoint: `docs/OPERATIONS_V2_SWTB4_LIFETIME_APPROVED_CREDIT_AND_PRODUCTION_PARITY_2026-10-14.md`. Both PRs remain **OPEN/DRAFT/UNMERGED**, production public main and applicant intake unchanged; no live SQL, no Auth/account state changes, no emails. DDL and later web merge still require **distinct explicit approvals**.
+
+
 ## SWTB4 — SQL V3 high-volume pending backlog safety (2026-10-14)
 
 - Verified against private V1 source that manager `ops_get_operations` limits projection to the 1,500 newest tasks and 2,000 newest time entries, while worker `ops_get_my_work` limits tasks to the 1,000 newest. These legacy caps can hide a still-submitted old time report or an old unfinished worker task in long-lived datasets.
