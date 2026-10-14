@@ -1,5 +1,16 @@
 # Operations V2 — public-safe handoff, 2026-10-14 (NO DEPLOY)
 
+## SWTB4 — worker task reporting retry/ACK and profile-read safety (2026-10-14)
+
+- Real worker task card now distinguishes **successful server ACK** from a later failed/stale read. An ACK permanently disables re-submitting the **same review cycle** from an old card; the first successful start action is also one-shot and does not block eventual reporting. A synchronous lock blocks rapid double submits.
+- Retry after an unsuccessful transport/RPC retains the **same UUID** rather than creating a new report ID. An in-memory per-worker receipt ledger keeps this ACK and the pending submission UUID when switching between `کارها`, `زمان حضور` and `پروفایل من`. Nothing is persisted to browser storage by this feature.
+- A truly new manager correction cycle (`review_state='changes_requested'` **or** `review_state='rejected'`) reopens reporting using a new UUID, without re-sending the previous acknowledged report.
+- The independent worker self-profile and correction-history RPCs now fail closed together: a rejected or malformed read clears the previous personal data, displays only a focused warning and provides retry; late obsolete reads cannot repopulate private fields.
+- The pre-existing SQL contract `ops_submit_time_v2` checks a unique `client_submission_id` and supports `replayed:true` for same worker+task UUID on retries. This is source inspection, NOT a live authenticated backend test; full-browser reload and ambiguous offline/network scenarios still warrant end-to-end verification.
+- Latest **verified code/test SHA** `9e8bdb72231fc9718a3c953c7dcf994ca120d47f`: [review-only GitHub Actions 38534589693](https://github.com/AminMirasadollahi/StudentWorkerTalentBank-Preview/actions/runs/38534589693) **80/80 PASS, 0 FAIL, Vite build PASS, intake-lock PASS, NO Pages deploy**.
+- Full technical provenance/runbook is in PRIVATE Draft branch `docs/OPERATIONS_V2_SWTB4_WORKER_REPORT_REPLAY_AND_PROFILE_READ_SAFETY_2026-10-14.md`. Neither real applicant intake nor auth/lifecycle/database has been modified; DDL and public-release authorizations remain separate mandatory HOLDs.
+
+
 ## SWTB4 manager decision reliability — latest review-only result (2026-10-14)
 
 - Time review (`ApprovalCard`) and worker profile correction review (`ProfileChangeReview`) now **separate an acknowledged server mutation from later read/refresh errors**. Synchronous decision locks stop rapid double clicks and keep the same mounted card locked even if the backend projection is stale; badges update to «تصمیم ثبت‌شده». A genuine RPC rejection remains a retryable error. A failed read still invokes the previous fail-closed manager panel gate.
