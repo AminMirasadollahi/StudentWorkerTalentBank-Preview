@@ -21,6 +21,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const [estimate,setEstimate]=useState('60')
  const [reason,setReason]=useState('')
  const [busy,setBusy]=useState(false)
+ const [committed,setCommitted]=useState(false)
  const [error,setError]=useState('')
  const [notice,setNotice]=useState('')
  const selected=workers.filter(w=>workerIds.includes(w.id)&&w.state==='active')
@@ -33,7 +34,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const toggle=id=>setWorkerIds(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id])
  const submit=async event=>{
   event.preventDefault()
-  if(busy||selected.length===0||selected.length!==workerIds.length||date<localToday())return
+  if(busy||committed||selected.length===0||selected.length!==workerIds.length||date<localToday())return
   setBusy(true);setError('');setNotice('')
   try {
     if(selected.length===1){
@@ -43,11 +44,18 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
       await assignGroupTask({workerIds:selected.map(w=>w.id),title,instructions,date,
         minutes:estimate,shortNoticeReason:reason})
     }
+    // The server mutation is committed; a failed refresh must not be reported
+    // as a failed assignment (or allow a second, duplicate submission).
+    setCommitted(true)
     setTitle('');setInstructions('');setReason('')
     setNotice(selected.length===1?'کار به دانشجوکار واگذار شد.':
       `کار گروهی برای ${fa.format(selected.length)} نفر ثبت شد؛ تأیید ساعت هر نفر مستقل است.`)
-    await onSaved?.()
-    onClose?.()
+    try {
+      await onSaved?.()
+      onClose?.()
+    } catch {
+      setNotice('واگذاری با موفقیت ثبت شد؛ فقط تازه‌سازی فهرست ناموفق بود. برای مشاهده نتیجه، صفحه را دوباره بارگذاری کنید.')
+    }
   } catch(err) {
     const message=String(err?.message||'')
     setError(message.includes('short_notice_reason_required')?'علت واگذاری نزدیک ضروری است.':
@@ -125,7 +133,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
   <div className="ow-actions">
     {onClose&&<button type="button" className="report-btn report-btn--light" onClick={onClose}>انصراف</button>}
     <button type="submit" className="report-btn report-btn--primary"
-      disabled={busy||!selected.length||selected.length!==workerIds.length||date<localToday()}>
+      disabled={busy||committed||!selected.length||selected.length!==workerIds.length||date<localToday()}>
       {busy?'در حال ثبت…':selected.length>1?'واگذاری گروهی':'واگذاری کار'}
     </button>
   </div>
