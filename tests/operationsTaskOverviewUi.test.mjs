@@ -33,12 +33,27 @@ const plugin={
   name:'qa-task-review-offline',
   enforce:'pre',
   resolveId(source,importer){
+    if((importer?.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operationsV2')
+      ||(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operationsV2'))
+      return '\0qa-v2-no-network'
+    if(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operations')
+      return '\0qa-task-review-ops'
+    
     if(importer?.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operations')
       return '\0qa-task-review-ops'
     if(importer?.endsWith('/src/components/WorkerLifecycleControls.jsx')&&source==='../lib/operations')
       return '\0qa-task-review-lifecycle'
   },
   load(id){
+    if(id==='\0qa-v2-no-network')return [
+      'export const getAdminWorkV2=async()=>globalThis.__taskReviewFixture;',
+      'export const getMyWorkV2=async()=>globalThis.__taskReviewFixture;',
+      'export const getMyWorkerProfileV2=async()=>({worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"});',
+      'export const getMyProfileChangeRequests=async()=>[];',
+      ...['requestProfileChange','reviewProfileChange','assignGroupTask'].map(name=>
+       `export const ${name}=async()=>{throw Error("QA_NO_REAL_BACKEND")};`),
+    ].join('\n')
+    
     if(id==='\0qa-task-review-ops')return [
       'export const getAdminWork=async()=>globalThis.__taskReviewFixture;',
       ...['getMyWork','setWeeklyDay','setDateException','assignWorkerTask',
