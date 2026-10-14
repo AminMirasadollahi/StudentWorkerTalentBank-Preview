@@ -1102,7 +1102,9 @@ export function AdminOperations({ navigation, setNavigation }) {
     </section>}
   </div>
 }
-function WorkerTaskCard({task,onSaved}) {
+function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
+  const acknowledged=actionLedger.get(task.id)
+  const sameReviewCycle=acknowledged?.reviewCycle===reviewCycle
   const [date,setDate]=useState(today())
   const [requestExtra,setRequestExtra]=useState(false)
   const [requested,setRequested]=useState(String(task.estimate_minutes))
@@ -1111,25 +1113,26 @@ function WorkerTaskCard({task,onSaved}) {
   const [completionConfirmed,setCompletionConfirmed]=useState(false)
   const [note,setNote]=useState('')
   const [busy,setBusy]=useState(false)
-  const [reportCommitted,setReportCommitted]=useState(false)
-  const [startCommitted,setStartCommitted]=useState(false)
+  const [reportCommitted,setReportCommitted]=useState(Boolean(sameReviewCycle&&acknowledged.report))
+  const [startCommitted,setStartCommitted]=useState(Boolean(sameReviewCycle&&acknowledged.start))
   const [notice,setNotice]=useState('')
   const [error,setError]=useState('')
   const actionLock=useRef(false)
   // Preserve one submission identity across uncertain network failures.
-  const keyRef=useRef(crypto.randomUUID())
-  const priorState=useRef(task.state)
+  const keyRef=useRef(sameReviewCycle&&acknowledged.clientSubmissionId
+    ?acknowledged.clientSubmissionId:crypto.randomUUID())
+  const priorReviewCycle=useRef(reviewCycle)
   useEffect(()=>{
-    // A new review cycle is possible only after server state has moved back
-    // into needs_changes. A stale snapshot with an unchanged state cannot reset
-    // an acknowledged report.
-    if(task.state==='needs_changes'&&priorState.current!==task.state){
+    // A NEW manager-requested correction creates a distinct review cycle.
+    // Stale task state alone is never enough to re-enable acknowledged reports.
+    if(task.state==='needs_changes'&&priorReviewCycle.current!==reviewCycle){
+      actionLedger.delete(task.id)
       setReportCommitted(false)
       setCompletionConfirmed(false)
       keyRef.current=crypto.randomUUID()
     }
-    priorState.current=task.state
-  },[task.state])
+    priorReviewCycle.current=reviewCycle
+  },[reviewCycle,task.state,actionLedger])
   const ready=['assigned','in_progress','needs_changes'].includes(task.state)
   const standard=Number(task.estimate_minutes)
   const requestedMinutes=requestExtra?Number(requested):standard
@@ -1138,12 +1141,21 @@ function WorkerTaskCard({task,onSaved}) {
     && Boolean(reasonCode)&&reasonText.trim().length>=10&&reasonText.trim().length<=600
   )
   const perform=async (fn,kind)=>{
-    if(actionLock.current||(kind==='report'&&reportCommitted)
-       ||(kind==='start'&&startCommitted))return
+    const previous=actionLedger.get(task.id)
+    if(actionLock.current||(kind==='report'&&(reportCommitted||
+       (previous?.reviewCycle===reviewCycle&&previous?.report)))
+       ||(kind==='start'&&(startCommitted||
+       (previous?.reviewCycle===reviewCycle&&previous?.start))))return
     actionLock.current=true
     setBusy(true);setError('');setNotice('')
     try{
       await fn()
+      const prior=actionLedger.get(task.id)
+      actionLedger.set(task.id,{
+        ...(prior?.reviewCycle===reviewCycle?prior:{}),
+        reviewCycle,
+        ...(kind==='report'?{report:true,clientSubmissionId:keyRef.current}:{start:true}),
+      })
       if(kind==='report')setReportCommitted(true)
       if(kind==='start')setStartCommitted(true)
       setNotice(kind==='report'?'گزارش در سرور ثبت شد؛ در حال دریافت وضعیت تازه…':
@@ -1167,7 +1179,16 @@ function WorkerTaskCard({task,onSaved}) {
     </small>}
     {ready&&<details className="ow-worker-action-detail"><summary>ثبت انجام و گزارش کار</summary>
       {task.instructions&&<p>{task.instructions}</p>}
-      <form onSubmit={e=>{e.preventDefault();if(!completionConfirmed||!extraValid||reportCommitted)return;void perform(
+      <form onSubmit={e=>{e.preventDefault();if(!completionConfirmed||!extraValid||reportCommitted)return;
+      // Keep the same client submission identity if the tab temporarily unmounts
+      // after a request with uncertain network outcome.
+      const prior=actionLedger.get(task.id)
+      if(prior?.reviewCycle!==reviewCycle){
+        actionLedger.set(task.id,{reviewCycle,clientSubmissionId:keyRef.current})
+      }else if(!prior.clientSubmissionId){
+        actionLedger.set(task.id,{...prior,clientSubmissionId:keyRef.current})
+      }
+      void perform(
       ()=>submitMyTime({taskId:task.id,date,minutes:requestedMinutes,note,
         clientSubmissionId:keyRef.current,
         extraReasonCode:requestExtra?reasonCode:null,
@@ -1391,6 +1412,11 @@ function WorkerSelfProfile({tasks,records,profile}) {
 }
 export function WorkerOperations({profile,navigation,setNavigation}) {
   const [data,setData]=useState({tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+  // Task acknowledgements survive switching work/profile/presence tabs, but
+  // are strictly scoped to this authenticated worker and this React session.
+  const acknowledgedActions=useRef({workerId:profile.worker_id,items:new Map()})
+  if(acknowledgedActions.current.workerId!==profile.worker_id)
+    acknowledgedActions.current={workerId:profile.worker_id,items:new Map()}
   const [localNavigation,setLocalNavigation]=useState({section:'tasks',taskRange:'today'})
   const selected=navigation||localNavigation
   const updateNavigation=patch=>{
@@ -1459,7 +1485,10 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
         </div>
       </div>
       <div className="ow-list ow-worker-tasks">
-        {visible.map(t=><WorkerTaskCard key={t.id} task={t} onSaved={refresh}/>)}
+        {visible.map(t=><WorkerTaskCard key={t.id} task={t} onSaved={refresh}
+          actionLedger={acknowledgedActions.current.items}
+          reviewCycle={(data.time_entries||[]).filter(e=>e.task_id===t.id&&e.review_state==='changes_requested')
+            .map(e=>e.id).sort().join('|')}/>)}
         {!visible.length&&<p className="ow-muted">کاری برای این بازه ثبت نشده است.</p>}
       </div>
     </section>}
