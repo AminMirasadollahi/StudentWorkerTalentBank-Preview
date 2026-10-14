@@ -709,6 +709,7 @@ export function AdminOperations({ navigation, setNavigation }) {
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [readFailed,setReadFailed]=useState(false)
+  const readSequence=useRef(0)
   const [notice,setNotice]=useState('')
   const [historyShown,setHistoryShown]=useState(100)
   const [tasksShown,setTasksShown]=useState(100)
@@ -718,21 +719,25 @@ export function AdminOperations({ navigation, setNavigation }) {
   useEffect(()=>{setHistoryShown(100)},[historyWorkerId,historyUnit,historyFrom,historyTo,historyReview])
 
   const refresh=async ()=>{
+    // Ignore older in-flight responses after a newer role check has completed.
+    const sequence=++readSequence.current
     setLoading(true)
     try{
       const result=await getAdminWorkV2()
+      if(sequence!==readSequence.current)return false
       setData(result||{workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       setReadFailed(false)
       setError('')
       return true
     }catch(e){
+      if(sequence!==readSequence.current)return false
       // A previous successful read is not proof of CURRENT authorization.
       setData({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       setReadFailed(true)
       setAssignmentDialogDate('')
       setError(readableError(e))
       return false
-    }finally{setLoading(false)}
+    }finally{if(sequence===readSequence.current)setLoading(false)}
   }
   useEffect(()=>{void refresh()},[])
 
@@ -1306,17 +1311,22 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [readFailed,setReadFailed]=useState(false)
+  const readSequence=useRef(0)
   const refresh=async()=>{
+    const sequence=++readSequence.current
     setLoading(true);setError('')
     try{
-      setData(await getMyWorkV2()||{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+      const result=await getMyWorkV2()
+      if(sequence!==readSequence.current)return
+      setData(result||{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       setReadFailed(false)
     }catch(e){
+      if(sequence!==readSequence.current)return
       // Never retain a visible old work list after a failed authorization refresh.
       setData({tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       setReadFailed(true)
       setError(readableError(e))
-    }finally{setLoading(false)}
+    }finally{if(sequence===readSequence.current)setLoading(false)}
   }
   useEffect(()=>{void refresh()},[profile.worker_id])
   const records=data.time_entries||[]
