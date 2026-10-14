@@ -13,6 +13,9 @@ import { workerStateLabels } from './lib/workerLifecycle.mjs'
 import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persianWeekBounds, suggestNextWindow } from './lib/weeklyScheduleGrid.mjs'
 import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonthBounds } from './lib/persianMonthCalendar.mjs'
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
+import TaskAssignmentEditor from './components/TaskAssignmentEditor'
+import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
+ requestProfileChange,reviewProfileChange } from './lib/operationsV2'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -395,6 +398,28 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
     </div>
   </div>
 }
+function AllWorkerTimeline({data}) {
+ const workers=(data?.workers||[]).filter(w=>w.state==='active')
+ const slots=data?.weekly_slots||[]
+ return <div className="ow-all-workers-timeline" aria-label="نمای حضور هفتگی همه دانشجوکارها">
+   {dayLabels.map(([id,name])=>{
+     const date=firstMatchingWeekday(today(),id)
+     const entries=workers.flatMap(w=>selectedWeeklyWindows(slots,w.id,id,date)
+       .map(slot=>({key:w.id+'-'+slot.start,name:w.name,unit:w.unit,...slot})))
+       .sort((a,b)=>a.start.localeCompare(b.start)||a.name.localeCompare(b.name,'fa'))
+     return <div className="ow-team-day" key={id}>
+       <b>{name}</b>
+       <div className="ow-team-intervals">
+         {entries.map(e=><span className="ow-team-interval" key={e.key}>
+           <span dir="ltr">{e.start}–{e.end}</span>
+           <strong>{e.name}</strong>
+         </span>)}
+         {!entries.length&&<small>برنامه ثبت‌شده‌ای برای این روز موجود نیست.</small>}
+       </div>
+     </div>
+   })}
+ </div>
+}
 function ApprovalCard({entry,task,worker,onDone}) {
   const standard=Number(task?.estimate_minutes ?? entry.reported_minutes)
   const missingTask=!task
@@ -602,6 +627,15 @@ export function AdminOperations({ navigation, setNavigation }) {
   const [estimate,setEstimate]=useState('60')
   const [reason,setReason]=useState('')
   const [busy,setBusy]=useState(false)
+  const [assignmentDialogDate,setAssignmentDialogDate]=useState('')
+  const assignmentDialogRef=useRef(null)
+  useEffect(()=>{
+    const dialog=assignmentDialogRef.current
+    if(!dialog||!assignmentDialogDate)return
+    if(typeof dialog.showModal==='function')dialog.showModal()
+    else dialog.setAttribute('open','')
+    return ()=>{if(typeof dialog.close==='function'&&dialog.open)dialog.close()}
+  },[assignmentDialogDate])
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
@@ -615,7 +649,7 @@ export function AdminOperations({ navigation, setNavigation }) {
   const refresh=async ()=>{
     setLoading(true)
     try{
-      const result=await getAdminWork()
+      const result=await getAdminWorkV2()
       setData(result||{workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       setError('')
       return true
@@ -682,67 +716,9 @@ export function AdminOperations({ navigation, setNavigation }) {
 
     {view==='tasks'&&<>
       <section className="report-panel">
-        <h2>کار جدید</h2>
-        <form onSubmit={e=>{e.preventDefault();run(async()=>{
-          await assignWorkerTask({workerId,unit:chosen?.unit,title,instructions,
-            date,minutes:estimate,shortNoticeReason:reason})
-          setTitle('');setInstructions('');setReason('')
-        })}}>
-          <div className="ow-fields ow-fields--three">
-            <label className="report-field"><span>دانشجوکار</span>
-              <select value={workerId} required onChange={e=>setWorkerId(e.target.value)}>
-                <option value="">انتخاب کنید</option>
-                {active.map(w=><option key={w.id} value={w.id}>{w.name} · {unitLabels[w.unit]}</option>)}
-              </select>
-            </label>
-            <label className="report-field"><span>تاریخ اجرا (شمسی)</span>
-              <JalaliDatePicker min={today()} value={date} onChange={setDate} ariaLabel="تاریخ اجرای کار"/>
-            </label>
-            <label className="report-field"><span>زمان استاندارد (دقیقه)</span>
-              <input type="number" required min="1" max="1440" value={estimate} onChange={e=>setEstimate(e.target.value)}/>
-            </label>
-          </div>
-          <div className="ow-fields ow-fields--two">
-            <label className="report-field"><span>عنوان کار</span>
-              <input required minLength={3} maxLength={160} value={title} onChange={e=>setTitle(e.target.value)} placeholder="مثلاً ثبت ۱۰ جلد کتاب"/>
-            </label>
-            <label className="report-field"><span>شرح کوتاه</span>
-              <input maxLength={3000} value={instructions} onChange={e=>setInstructions(e.target.value)} placeholder="خروجی مورد انتظار را توضیح دهید"/>
-            </label>
-          </div>
-          {isShort&&<label className="report-field ow-short-notice">
-            <span>علت واگذاری نزدیک به موعد (الزامی)</span>
-            <input required maxLength={300} value={reason} onChange={e=>setReason(e.target.value)}
-              placeholder="این کار برای امروز یا فردا برنامه‌ریزی شده است"/>
-          </label>}
-          {workerId&&assignmentCapacity&&<div className={
-            ['overbooked','unavailable','not_configured','unknown'].includes(assignmentCapacity.code)
-              ?'ow-capacity-warning':'ow-capacity-summary'
-          } role="status" aria-live="polite">
-            {assignmentCapacity.code==='unknown'
-              ?<p><strong>ظرفیت قابل محاسبه نیست.</strong> برنامه یا زمان واردشده نیازمند بررسی است.</p>
-              :assignmentCapacity.code==='not_configured'
-                ?<p><strong>برنامه حضور برای این روز ثبت نشده است.</strong> این به معنی عدم حضور قطعی نیست؛ پیش از واگذاری هماهنگ کنید.</p>
-                :<>
-                  <p>ظرفیت ثبت‌شده: <b>{minutes(assignmentCapacity.availableMinutes)}</b>
-                    {' · '}کارهای قبلی: <b>{minutes(assignmentCapacity.assignedMinutes)}</b>
-                    {' · '}کار جدید: <b>{minutes(assignmentCapacity.proposedMinutes)}</b></p>
-                  {assignmentCapacity.code==='unavailable'
-                    ?<p><strong>هشدار عدم حضور:</strong> برای این روز ظرفیت صفر ثبت شده است.</p>
-                    :assignmentCapacity.code==='overbooked'
-                      ?<p><strong>هشدار بیش‌ازظرفیت:</strong> مجموع کارها
-                         {' '}{minutes(-assignmentCapacity.remainingMinutes)} بیشتر از زمان حضور است.</p>
-                      :<p>ظرفیت باقی‌مانده پس از واگذاری:
-                         {' '}<b>{minutes(assignmentCapacity.remainingMinutes)}</b>
-                         {assignmentCapacity.code==='full'?' · ظرفیت دقیقاً تکمیل می‌شود.':''}</p>}
-                  {assignmentCapacity.exception&&<small>محاسبه بر اساس تغییر موقت همین روز است.</small>}
-                </>}
-            <details className="ow-context-help"><summary>توضیح محاسبه</summary>
-              <small>ظرفیت، یک برآورد بر اساس اطلاعات فعلی است. ثبت کار در سرور با مجوزها و قواعد مستقل انجام می‌شود.</small>
-            </details>
-          </div>}
-          <button className="report-btn report-btn--primary" type="submit" disabled={busy||!workerId}>واگذاری کار</button>
-        </form>
+        <h2>واگذاری کار</h2>
+        <TaskAssignmentEditor workers={active} data={data}
+          defaultWorkerId={workerId} defaultDate={date} onSaved={refresh}/>
       </section>
       <section className="report-panel">
         <div className="report-panel-heading">
@@ -861,15 +837,27 @@ export function AdminOperations({ navigation, setNavigation }) {
       <h2>ظرفیت و برنامه دانشجوکارها</h2>
       <label className="report-field ow-worker-selector"><span>دانشجوکار</span>
         <select value={workerId} onChange={e=>setWorkerId(e.target.value)}>
-          <option value="">انتخاب کنید</option>
+          <option value="">همه دانشجوکارها · تایم‌لاین هفتگی</option>
           {active.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
       </label>
-      {workerId&&<ScheduleEditor key={workerId} workerId={workerId} data={data} onSaved={refresh}/>}
+      {workerId?<ScheduleEditor key={workerId} workerId={workerId} data={data}
+        onSaved={refresh} onPlanAssignment={setAssignmentDialogDate}/>:<AllWorkerTimeline data={data}/>}
 
     </section>}
 
     {view==='profiles'&&<ManagerWorkerProfile data={data} selectedId={profileWorkerId} onChange={setProfileWorkerId}/>}
+    {assignmentDialogDate&&<dialog ref={assignmentDialogRef} className="ow-assignment-dialog"
+      onCancel={e=>{e.preventDefault();setAssignmentDialogDate('')}} aria-label="تعریف کار جدید در تقویم">
+      <div className="ow-presence-section-title">
+        <h2>تعریف کار · {pretty(assignmentDialogDate)}</h2>
+        <button type="button" className="ow-mini-btn"
+          onClick={()=>setAssignmentDialogDate('')}>بستن</button>
+      </div>
+      <TaskAssignmentEditor key={assignmentDialogDate} workers={active} data={data}
+        defaultDate={assignmentDialogDate} defaultWorkerId={workerId}
+        onSaved={refresh} onClose={()=>setAssignmentDialogDate('')}/>
+    </dialog>}
     {view==='history'&&<section className="report-panel">
       <div className="report-panel-heading">
         <h2>سابقه ساعات و خروجی</h2>
