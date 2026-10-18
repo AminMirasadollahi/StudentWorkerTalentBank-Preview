@@ -109,6 +109,7 @@ async function mount(initial = worker()) {
     currentIdentity = identity
     deferredIdentity = null
     await act(async () => {
+      window.dispatchEvent(new window.Event('blur'))
       window.dispatchEvent(new window.Event('focus'))
       await Promise.resolve()
     })
@@ -117,13 +118,17 @@ async function mount(initial = worker()) {
     let release
     deferredIdentity = new Promise(resolve => { release = resolve })
     await act(async () => {
+      window.dispatchEvent(new window.Event('blur'))
       window.dispatchEvent(new window.Event('focus'))
       await Promise.resolve()
     })
-    assert.match(userVisibleText(host), /در حال بررسی مجدد مجوز حساب/)
+    assert.match(userVisibleText(host), /بررسی کوتاه دسترسی/)
     assert.doesNotMatch(userVisibleText(host), /WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED/)
-    const frozen=host.querySelector('[hidden][inert][aria-hidden="true"]')
-    assert.ok(frozen,'the still-mounted operational DOM must be hidden, inert and a11y-suppressed')
+    const frozen=host.querySelector('.ops-recheck-frozen[inert][aria-hidden="true"]')
+    assert.ok(frozen,'the still-mounted operational DOM must stay inert and a11y-suppressed')
+    assert.equal(frozen.hasAttribute('hidden'),false,'keep geometry and scroll stable')
+    assert.ok(host.querySelector('.ops-recheck-curtain[role="status"]'),
+      'opaque data-free placeholder is rendered instead of login-like route')
     return async value => {
       deferredIdentity = null
       currentIdentity = value
@@ -133,6 +138,7 @@ async function mount(initial = worker()) {
   async function fail() {
     deferredIdentity = Promise.reject(new Error('synthetic disconnect'))
     await act(async () => {
+      window.dispatchEvent(new window.Event('blur'))
       window.dispatchEvent(new window.Event('focus'))
       await Promise.resolve()
     })

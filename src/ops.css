@@ -209,3 +209,117 @@
 .ops-recheck-frozen dialog {
   display: none !important;
 }
+
+/* Silent-focus secure visual freeze: this retains page geometry/scroll in
+   memory, but hides all privileged content during each online role check.
+   The overlay is a fabricated, opaque non-data shell: NO stale user fields,
+   form text, contacts or token-bearing views may remain visible. */
+.ops-recheck-frozen {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+.ops-recheck-frozen :is(dialog,[role="dialog"]) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+.ops-recheck-frozen dialog { display: none !important; }
+/* A still-open native modal also has a top-layer ::backdrop, which can sit
+   above even very high z-index overlays. Remove its hit area while frozen. */
+.ops-recheck-frozen dialog::backdrop {
+  display: none !important;
+  pointer-events: none !important;
+}
+dialog.ops-recheck-curtain {
+  /* Native top layer, above ANY pre-existing open assignment dialog. */
+  position: fixed;
+  inset: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  pointer-events: auto;
+  background: #f2f7f9;
+  color: #123a52;
+}
+dialog.ops-recheck-curtain::backdrop {
+  background: #f2f7f9;
+}
+.ops-recheck-layout {
+  width: min(100% - 2.25rem, 90rem);
+  margin: min(4vh,1.8rem) auto;
+}
+.ops-recheck-banner {
+  min-height: 7rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1rem;
+  border-radius: 1.2rem;
+  padding: 1.4rem;
+  background: linear-gradient(105deg,#0c2c45,#1e837e);
+}
+.ops-recheck-ghost {
+  display: block;
+  background: #e5edef;
+  border-radius: 0.45rem;
+}
+.ops-recheck-banner .ops-recheck-ghost { background: #ffffff32; }
+.ops-recheck-ghost--title { height: 1.3rem; width: min(40%,19rem); }
+.ops-recheck-ghost--subtitle { height: 0.7rem; width: min(24%,12rem); }
+.ops-recheck-toolbar {
+  display: flex;
+  gap: 0.8rem;
+  padding: 1.25rem 0;
+}
+.ops-recheck-ghost--tab { width: 5.7rem; height: 2rem; }
+.ops-recheck-panels {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 0.85rem;
+}
+.ops-recheck-panel {
+  min-height: 12rem;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  border: 1px solid #d7e4e9;
+  background: #fff;
+  border-radius: 1rem;
+}
+.ops-recheck-ghost--heading { height: 1rem; width: 38%; }
+.ops-recheck-ghost--line { height: 1.85rem; width: 100%; }
+.ops-recheck-indicator {
+  position: fixed;
+  inset-inline-start: 1rem;
+  bottom: 1rem;
+  z-index: 1;
+  display: inline-flex;
+  gap: 0.55rem;
+  align-items: center;
+  border: 1px solid #c5dde0;
+  border-radius: 999px;
+  padding: 0.52rem 0.9rem;
+  background: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #256c71;
+}
+.ops-recheck-indicator__dot {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 50%;
+  background: #268d8b;
+}
+@media(max-width:650px) {
+  .ops-recheck-panels { grid-template-columns: 1fr; }
+  .ops-recheck-panel { min-height: 8rem; }
+  .ops-recheck-layout { width: calc(100% - 1rem); }
+}
