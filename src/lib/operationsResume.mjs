@@ -17,6 +17,7 @@ export function watchOperationsResume({
   // blur/hidden event re-arms, including fast reactivation during a request.
   let needsVerification = true
   let activationGeneration = 0
+  let windowFocused = true
 
   function markInactive() {
     if (disposed || needsVerification) return
@@ -26,7 +27,8 @@ export function watchOperationsResume({
 
   async function recheck() {
     if (disposed || inFlight ||
-        !needsVerification || documentTarget.visibilityState === 'hidden') return
+        !needsVerification || !windowFocused ||
+        documentTarget.visibilityState === 'hidden') return
     needsVerification = false
     inFlight = true
     const generation = activationGeneration
@@ -35,29 +37,30 @@ export function watchOperationsResume({
       const fresh = await readIdentity()
       // A result started before the browser left the page cannot authorize a
       // later activation. Only apply the generation that is still current.
-      if (!disposed && generation === activationGeneration &&
+      if (!disposed && generation === activationGeneration && windowFocused &&
           documentTarget.visibilityState !== 'hidden') onIdentity(fresh)
     } catch (error) {
-      if (!disposed && generation === activationGeneration &&
+      if (!disposed && generation === activationGeneration && windowFocused &&
           documentTarget.visibilityState !== 'hidden') onFailure(error)
     } finally {
       inFlight = false
       if (disposed) return
-      if (needsVerification && documentTarget.visibilityState !== 'hidden') {
-        // A new activation happened during the old request; do not unfreeze
-        // with a stale result. Validate again before revealing the workspace.
-        void recheck()
-      } else {
+      if (needsVerification) {
+        // If still blurred, remain frozen. A fresh focused activation MUST
+        // produce its own server read before any protected content is revealed.
+        if (windowFocused && documentTarget.visibilityState !== 'hidden')
+          void recheck()
+      } else if (windowFocused && documentTarget.visibilityState !== 'hidden') {
         onFinish()
       }
     }
   }
 
-  const onFocus = () => { void recheck() }
-  const onBlur = () => { markInactive() }
+  const onFocus = () => { windowFocused = true; void recheck() }
+  const onBlur = () => { windowFocused = false; markInactive() }
   const onVisible = () => {
     if (documentTarget.visibilityState === 'hidden') markInactive()
-    else void recheck()
+    else if (windowFocused) void recheck()
   }
   windowTarget.addEventListener('focus', onFocus)
   windowTarget.addEventListener('blur', onBlur)
