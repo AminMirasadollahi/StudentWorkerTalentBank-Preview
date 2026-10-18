@@ -191,13 +191,29 @@ test('denied or lost access fails closed to the login screen', async () => {
     assert.doesNotMatch(ui.host.textContent, /WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED/)
   } finally { await ui.unmount() }
 })
-test('network failure on resume drops the stale operational view', async () => {
-  const ui = await mount(worker())
-  try {
+test('transient identity check failure removes stale UI but offers read-only revalidation without reissuing links',async()=>{
+  const ui=await mount(worker())
+  try{
     await ui.fail()
-    assert.match(ui.host.textContent, /بررسی مجدد دسترسی ممکن نشد/)
-    assert.doesNotMatch(ui.host.textContent, /WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED/)
-  } finally { await ui.unmount() }
+    assert.match(userVisibleText(ui.host),/دسترسی نیازمند بررسی مجدد است/)
+    assert.doesNotMatch(ui.host.textContent,/WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED/)
+    const retry=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent.includes('بررسی دوبارهٔ دسترسی'))
+    assert.ok(retry)
+    await act(async()=>{retry.click();await Promise.resolve()})
+    assert.match(userVisibleText(ui.host),/WORKER_WORK_MOUNTED/,
+      'fresh online user+role check must restore account without password reset')
+  }finally{await ui.unmount()}
+})
+test('temporary retry that proves session absent must show login, never cached operations',async()=>{
+ const ui=await mount(worker())
+ try{
+   await ui.fail()
+   currentIdentity=null
+   const retry=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent.includes('بررسی دوبارهٔ دسترسی'))
+   await act(async()=>{retry.click();await Promise.resolve()})
+   assert.match(userVisibleText(ui.host),/ورود به/)
+   assert.doesNotMatch(ui.host.textContent,/WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED/)
+ }finally{await ui.unmount()}
 })
 
 test('focus recheck preserves the same mounted admin workspace until fresh authorization and drops it on role change',async()=>{
