@@ -691,6 +691,22 @@ function AdminView({ onLogout, navigation, setNavigation }) {
 }
 
 export default function OpsApp({ mode = 'admin' }) {
+  // This does NOT trust a cached session for authorization. When the fresh
+  // server identity check returns no user but a local Supabase session still
+  // exists, we cannot distinguish temporary network failure from revoked
+  // credentials. Fail closed and let the user explicitly repeat the online
+  // identity+role check without reissuing a secure link.
+  const verifyIdentityOrBlock = async () => {
+    const verified = await currentOperationsIdentity()
+    if (verified) return verified
+    try {
+      const {data} = await opsClient.auth.getSession()
+      if (data?.session) throw new Error('OPS_IDENTITY_UNVERIFIED')
+    } catch (e) {
+      if (e?.message === 'OPS_IDENTITY_UNVERIFIED') throw e
+    }
+    return null
+  }
   const [identity, setIdentity] = useState(null)
   const [adminNavigation, setAdminNavigation] = useState(initialAdminNavigation)
   const [workerNavigation, setWorkerNavigation] = useState(initialWorkerNavigation)
@@ -719,6 +735,7 @@ export default function OpsApp({ mode = 'admin' }) {
         setAdminNavigation(initialAdminNavigation)
         setWorkerNavigation(initialWorkerNavigation)
         setRecheckingAccess(false)
+        setNotice('نشست این مرورگر پایان یافت. برای ورود مجدد از ایمیل حساب استفاده کنید؛ برای کار هم‌زمان با چند حساب، پروفایل‌های جداگانه باز کنید.')
       }
     })
     return () => subscription.unsubscribe()
@@ -727,7 +744,7 @@ export default function OpsApp({ mode = 'admin' }) {
   useEffect(() => {
     let mounted = true
     document.title = mode === 'worker' ? 'پنل دانشجوکار' : 'مدیریت دانشجوکارها'
-    currentOperationsIdentity().then(result => {
+    verifyIdentityOrBlock().then(result => {
       if (mounted) {
         if (result?.role === 'no_access') setError('برای این حساب، دسترسی عملیاتی فعال نشده است.')
         setIdentity(result?.role === 'no_access' ? null : result)
@@ -748,10 +765,20 @@ export default function OpsApp({ mode = 'admin' }) {
     return watchOperationsResume({
       windowTarget: window,
       documentTarget: document,
-      readIdentity: currentOperationsIdentity,
+      readIdentity: verifyIdentityOrBlock,
       onStart: () => setRecheckingAccess(true),
       onIdentity: fresh => {
-        if (!fresh || fresh.role === 'no_access') {
+        // One Chrome profile stores ONE Supabase session. If a separate tab
+        // signed in as another person, NEVER silently morph this A tab into
+        // B's authenticated workspace. Prompt for isolated profile/login.
+        if (fresh?.user?.id && identity.user?.id &&
+            fresh.user.id !== identity.user.id) {
+          setAdminNavigation(initialAdminNavigation)
+          setWorkerNavigation(initialWorkerNavigation)
+          setIdentity(null)
+          setAccessUnverified(false)
+          setError('نشست مرورگر به حساب دیگری تغییر کرده است. برای بررسی هم‌زمان چند حساب از پروفایل‌های جداگانهٔ مرورگر استفاده کنید.')
+        } else if (!fresh || fresh.role === 'no_access') {
           setError('دسترسی این نشست دیگر معتبر نیست. لطفاً مجدداً وارد شوید.')
           setAdminNavigation(initialAdminNavigation)
           setWorkerNavigation(initialWorkerNavigation)
@@ -787,7 +814,7 @@ export default function OpsApp({ mode = 'admin' }) {
     setBusy(true)
     setError('')
     try {
-      const fresh = await currentOperationsIdentity()
+      const fresh = await verifyIdentityOrBlock()
       setAccessUnverified(false)
       if (!fresh || fresh.role === 'no_access') {
         setIdentity(null)
