@@ -223,6 +223,12 @@
   pointer-events: none !important;
 }
 .ops-recheck-frozen dialog { display: none !important; }
+/* A still-open native modal also has a top-layer ::backdrop, which can sit
+   above even very high z-index overlays. Remove its hit area while frozen. */
+.ops-recheck-frozen dialog::backdrop {
+  display: none !important;
+  pointer-events: none !important;
+}
 .ops-recheck-curtain {
   position: fixed;
   inset: 0;
