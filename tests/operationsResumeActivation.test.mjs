@@ -105,3 +105,23 @@ test('disposed observer ignores late identity responses and removes all handlers
  assert.equal(reads,1)
  assert.deepEqual(s.events,['START'])
 })
+
+test('an old request completing while the browser stays blurred never authorizes until next focus',async()=>{
+ let reads=0, releaseFirst
+ const s=setup(()=>{
+   reads++
+   if(reads===1)return new Promise(resolve=>{releaseFirst=resolve})
+   return Promise.resolve({user:'fresh'})
+ })
+ try {
+  s.focus()
+  s.blur()
+  releaseFirst({user:'STALE'})
+  await settle()
+  assert.equal(reads,1,'must not send request while unfocused')
+  assert.deepEqual(s.events,['START'],'must not reveal stale UI or finish recheck')
+  s.focus();await settle()
+  assert.equal(reads,2)
+  assert.deepEqual(s.events,['START','START','OK:fresh','FINISH'])
+ }finally{s.dispose()}
+})
