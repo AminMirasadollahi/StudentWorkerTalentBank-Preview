@@ -927,14 +927,42 @@ export default function OpsApp({ mode = 'admin' }) {
   return (
     <>
       <div className={recheckingAccess ? 'ops-recheck-frozen' : undefined}
-        hidden={recheckingAccess} inert={recheckingAccess}
+        inert={recheckingAccess}
         aria-hidden={recheckingAccess ? 'true' : undefined}>
         {authorizedView}
       </div>
       {recheckingAccess && !recoveryMode && (
-        <main className="report-shell report-shell--login ops-root" dir="rtl">
-          <div className="report-login-card" role="status">در حال بررسی مجدد مجوز حساب…</div>
-        </main>
+        <div className="ops-recheck-curtain ops-root" dir="rtl"
+          role="status" aria-live="polite"
+          aria-label="در حال تأیید مجدد مجوز؛ تعاملات موقتاً متوقف است.">
+          <div className="ops-recheck-layout" aria-hidden="true">
+            <div className="ops-recheck-banner">
+              <span className="ops-recheck-ghost ops-recheck-ghost--title" />
+              <span className="ops-recheck-ghost ops-recheck-ghost--subtitle" />
+            </div>
+            <div className="ops-recheck-toolbar">
+              <span className="ops-recheck-ghost ops-recheck-ghost--tab" />
+              <span className="ops-recheck-ghost ops-recheck-ghost--tab" />
+              <span className="ops-recheck-ghost ops-recheck-ghost--tab" />
+            </div>
+            <div className="ops-recheck-panels">
+              <div className="ops-recheck-panel">
+                <span className="ops-recheck-ghost ops-recheck-ghost--heading" />
+                <span className="ops-recheck-ghost ops-recheck-ghost--line" />
+                <span className="ops-recheck-ghost ops-recheck-ghost--line" />
+              </div>
+              <div className="ops-recheck-panel">
+                <span className="ops-recheck-ghost ops-recheck-ghost--heading" />
+                <span className="ops-recheck-ghost ops-recheck-ghost--line" />
+                <span className="ops-recheck-ghost ops-recheck-ghost--line" />
+              </div>
+            </div>
+          </div>
+          <span className="ops-recheck-indicator" aria-hidden="true">
+            <span className="ops-recheck-indicator__dot" />
+            بررسی کوتاه دسترسی…
+          </span>
+        </div>
       )}
     </>
   )
