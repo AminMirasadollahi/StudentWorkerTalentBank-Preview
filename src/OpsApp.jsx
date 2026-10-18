@@ -809,12 +809,6 @@ export default function OpsApp({ mode = 'admin' }) {
     setNotice('رمز جدید ثبت شد. اکنون با ایمیل حساب و رمز جدید وارد شوید.')
   }
 
-  if (recheckingAccess && identity && !recoveryMode) return (
-    <main className="report-shell report-shell--login ops-root" dir="rtl">
-      <div className="report-login-card" role="status">در حال بررسی مجدد مجوز حساب…</div>
-    </main>
-  )
-
   if (busy && !identity) return (
     <main className="report-shell report-shell--login ops-root" dir="rtl">
       <div className="report-login-card"><p>در حال بررسی دسترسی…</p></div>
@@ -834,16 +828,36 @@ export default function OpsApp({ mode = 'admin' }) {
   )
   if (recoveryMode) return <RecoveryPasswordView onComplete={finishRecovery} onCancel={logout}/>
   if (!identity) return <Login onLogin={login} busy={busy} error={error} defaultMode={mode} notice={notice}/>
-  if (identity.role === 'admin') return <AdminView key={identity.user?.id} onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}/>
-  if (identity.role === 'worker_disabled') return <WorkerDisabledView profile={identity.profile} onLogout={logout}/>
-  return <WorkerView
-    key={identity.user?.id||identity.profile?.worker_id}
-    profile={identity.profile}
-    navigation={workerNavigation}
-    setNavigation={setWorkerNavigation}
-    onLogout={logout}
-    initialPasswordRequired={
-      identity.profile?.onboarding_state === 'password_required'
-    }
-  />
+  // Keep same-account unsent form state through a role revalidation on
+  // tab focus, but never present or accept input in privileged UI while
+  // permission is being checked. Identity/role/revocation changes remount.
+  const authorizedView = identity.role === 'admin'
+    ? <AdminView key={'admin:' + identity.user?.id}
+        onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}/>
+    : identity.role === 'worker_disabled'
+      ? <WorkerDisabledView key={'disabled:' + identity.user?.id + ':' + identity.profile?.state}
+          profile={identity.profile} onLogout={logout}/>
+      : <WorkerView
+          key={'worker:' + (identity.user?.id || identity.profile?.worker_id) + ':' +
+            identity.profile?.worker_id + ':' + identity.profile?.state + ':' +
+            identity.profile?.onboarding_state}
+          profile={identity.profile}
+          navigation={workerNavigation}
+          setNavigation={setWorkerNavigation}
+          onLogout={logout}
+          initialPasswordRequired={identity.profile?.onboarding_state === 'password_required'}/>
+  return (
+    <>
+      <div className={recheckingAccess ? 'ops-recheck-frozen' : undefined}
+        hidden={recheckingAccess} inert={recheckingAccess}
+        aria-hidden={recheckingAccess ? 'true' : undefined}>
+        {authorizedView}
+      </div>
+      {recheckingAccess && !recoveryMode && (
+        <main className="report-shell report-shell--login ops-root" dir="rtl">
+          <div className="report-login-card" role="status">در حال بررسی مجدد مجوز حساب…</div>
+        </main>
+      )}
+    </>
+  )
 }

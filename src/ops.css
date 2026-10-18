@@ -197,3 +197,15 @@
  .ops-root .ops-kpis article { min-width:0; }
  .ops-root .ops-account-settings-panel { width:100%; }
 }
+
+/* Authorized tab-resume recheck: preserve unsent drafts, block stale UI.
+   Native modal dialogs escape inherited inertness into the top layer, so
+   suppress them explicitly until identity/role is independently verified. */
+.ops-recheck-frozen,
+.ops-recheck-frozen :is(dialog, [role="dialog"]) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+.ops-recheck-frozen dialog {
+  display: none !important;
+}

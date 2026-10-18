@@ -1,0 +1,40 @@
+name: Ops Focus Draft Preservation — Native Dialog Browser Gate (NO DEPLOY)
+
+on:
+  push:
+    branches:
+      - feat/integrated-operations-v2-2026-10-14
+    paths:
+      - "src/OpsApp.jsx"
+      - "src/ops.css"
+      - "tests/opsFocusSessionTransitions.test.mjs"
+      - "qa/opsFocusDialog.browser.mjs"
+      - ".github/workflows/ops-focus-dialog-security.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chrome:
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install app dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install offline synthetic regression deps
+        run: npm install --no-save --no-package-lock --no-audit --no-fund jsdom@26.1.0 @playwright/test@1.56.1
+      - name: Validate mounted React focus/session guard
+        run: node --test tests/opsFocusSessionTransitions.test.mjs
+      - name: Build actual Preview source WITHOUT deploying
+        run: npm run build
+      - name: Install isolated Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Native modal popup and inert auth-check browser proofs (offline)
+        run: node --test qa/opsFocusDialog.browser.mjs
