@@ -252,7 +252,7 @@ function RecoveryPasswordView({ onComplete, onCancel }) {
   )
 }
 
-function WorkerView({ profile, onLogout, initialPasswordRequired = false, navigation, setNavigation }) {
+function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = false, navigation, setNavigation }) {
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [saving, setSaving] = useState(false)
@@ -301,6 +301,9 @@ function WorkerView({ profile, onLogout, initialPasswordRequired = false, naviga
           <span className="report-eyebrow">پنل اختصاصی دانشجوکار</span>
           <h1>سلام، {profile.name}</h1>
           <p>{unitLabels[profile.unit] || profile.unit} · حساب فعال</p>
+          {loginEmail && <p className="ops-worker-login-email">
+            ایمیل ورود: <bdi dir="ltr">{loginEmail}</bdi>
+          </p>}
         </div>
         <div className="report-header-actions">
           {passwordEstablished&&<button className="report-btn report-btn--ghost" type="button"
@@ -693,6 +696,7 @@ export default function OpsApp({ mode = 'admin' }) {
   const [workerNavigation, setWorkerNavigation] = useState(initialWorkerNavigation)
   const [busy, setBusy] = useState(true)
   const [recheckingAccess, setRecheckingAccess] = useState(false)
+  const [accessUnverified, setAccessUnverified] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [recoveryMode, setRecoveryMode] = useState(() => {
@@ -710,6 +714,7 @@ export default function OpsApp({ mode = 'admin' }) {
         setRecoveryMode(true)
       }
       if (event === 'SIGNED_OUT') {
+        setAccessUnverified(false)
         setIdentity(null)
         setAdminNavigation(initialAdminNavigation)
         setWorkerNavigation(initialWorkerNavigation)
@@ -728,7 +733,10 @@ export default function OpsApp({ mode = 'admin' }) {
         setIdentity(result?.role === 'no_access' ? null : result)
       }
     }).catch(() => {
-      if (mounted) setIdentity(null)
+      if (mounted) {
+        setIdentity(null)
+        setAccessUnverified(true)
+      }
     }).finally(() => { if (mounted) setBusy(false) })
     return () => { mounted = false }
   }, [mode])
@@ -747,8 +755,10 @@ export default function OpsApp({ mode = 'admin' }) {
           setError('دسترسی این نشست دیگر معتبر نیست. لطفاً مجدداً وارد شوید.')
           setAdminNavigation(initialAdminNavigation)
           setWorkerNavigation(initialWorkerNavigation)
+          setAccessUnverified(false)
           setIdentity(null)
         } else {
+          setAccessUnverified(false)
           // Never carry a former administrator's selection across identities.
           if (fresh.role !== identity.role || fresh.user?.id !== identity.user?.id) {
             setAdminNavigation(initialAdminNavigation)
@@ -759,14 +769,38 @@ export default function OpsApp({ mode = 'admin' }) {
         }
       },
       onFailure: () => {
+        // We have no fresh authorization. Immediately UNMOUNT the old secure
+        // view; do not assume its previous session was actually revoked.
+        // Require a new server validation via an explicit, read-only button.
         setAdminNavigation(initialAdminNavigation)
         setWorkerNavigation(initialWorkerNavigation)
         setIdentity(null)
-        setError('بررسی مجدد دسترسی ممکن نشد. اتصال را بررسی و صفحه را دوباره بارگذاری کنید.')
+        setAccessUnverified(true)
+        setError('')
       },
       onFinish: () => setRecheckingAccess(false),
     })
   }, [Boolean(identity), recoveryMode])
+
+  const retryIdentityVerification = async () => {
+    if (busy) return
+    setBusy(true)
+    setError('')
+    try {
+      const fresh = await currentOperationsIdentity()
+      setAccessUnverified(false)
+      if (!fresh || fresh.role === 'no_access') {
+        setIdentity(null)
+        setError('نشست معتبر نیست. با ایمیل حساب و رمز انتخابی خود وارد شوید.')
+      } else {
+        setIdentity(fresh)
+      }
+    } catch {
+      setAccessUnverified(true)
+      setIdentity(null)
+      setError('اتصال برای بررسی مجوز برقرار نشد؛ دوباره تلاش کنید.')
+    } finally { setBusy(false) }
+  }
 
   const clearRecoveryIntent = () => {
     try { window.sessionStorage.removeItem(PASSWORD_RECOVERY_PENDING_KEY) } catch {}
@@ -775,7 +809,7 @@ export default function OpsApp({ mode = 'admin' }) {
 
   const login = async (email, password) => {
     setRecheckingAccess(false)
-    setBusy(true); setError(''); setNotice('')
+    setBusy(true); setAccessUnverified(false); setError(''); setNotice('')
     try {
       await signInOperations(email, password)
       const who = await currentOperationsIdentity()
@@ -792,6 +826,7 @@ export default function OpsApp({ mode = 'admin' }) {
 
   const logout = async () => {
     setRecheckingAccess(false)
+    setAccessUnverified(false)
     setAdminNavigation(initialAdminNavigation)
     setWorkerNavigation(initialWorkerNavigation)
     setBusy(true)
@@ -809,6 +844,21 @@ export default function OpsApp({ mode = 'admin' }) {
     setNotice('رمز جدید ثبت شد. اکنون با ایمیل حساب و رمز جدید وارد شوید.')
   }
 
+  if (accessUnverified && !identity && !recoveryMode) return (
+    <main className="report-shell report-shell--login ops-root" dir="rtl">
+      <section className="report-login-card" role="alert">
+        <h1>دسترسی نیازمند بررسی مجدد است</h1>
+        <p>تأیید آنلاین مجوز کامل نشد؛ برای حفاظت از اطلاعات، پنل بسته شده است.
+        این اتفاق لزوماً به معنی خروج از حساب یا تغییر رمز نیست.</p>
+        {error && <p className="report-alert report-alert--error">{error}</p>}
+        <button type="button" className="report-btn report-btn--primary"
+          disabled={busy} onClick={retryIdentityVerification}>
+          {busy ? 'در حال بررسی مجوز…' : 'بررسی دوبارهٔ دسترسی'}
+        </button>
+        <p>اگر نشست واقعاً منقضی شده باشد، فرم ورود نمایش داده می‌شود.</p>
+      </section>
+    </main>
+  )
   if (busy && !identity) return (
     <main className="report-shell report-shell--login ops-root" dir="rtl">
       <div className="report-login-card"><p>در حال بررسی دسترسی…</p></div>
@@ -842,6 +892,7 @@ export default function OpsApp({ mode = 'admin' }) {
             identity.profile?.worker_id + ':' + identity.profile?.state + ':' +
             identity.profile?.onboarding_state}
           profile={identity.profile}
+          loginEmail={identity.user?.email}
           navigation={workerNavigation}
           setNavigation={setWorkerNavigation}
           onLogout={logout}
