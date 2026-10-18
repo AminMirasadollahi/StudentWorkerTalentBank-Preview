@@ -7,7 +7,7 @@ import { createServer } from 'vite'
 let dom, vite, OpsApp, createRoot
 let currentIdentity, deferredIdentity
 let issuedAuthEvents = new Set()
-const userA = Object.freeze({ id: 'FAKE_WORKER_AUTH_ID' })
+const userA = Object.freeze({ id: 'FAKE_WORKER_AUTH_ID', email: 'qa-a@example.invalid' })
 const userB = Object.freeze({ id: 'FAKE_OTHER_AUTH_ID' })
 const worker = (state = 'active', onboarding_state = 'ready', user = userA) => ({
   role: state === 'paused' || state === 'inactive' ? 'worker_disabled' : 'worker',
@@ -35,6 +35,7 @@ const stub = {
         '  onAuthStateChange(callback) { globalThis.__authListeners.add(callback);',
         '    return {data:{subscription:{unsubscribe() { globalThis.__authListeners.delete(callback) }}}} },',
         '  updateUser: async () => ({error:null}),',
+        '  getSession: async () => ({data:{session:globalThis.__qaHasLocalSession ? {access_token:"SYNTHETIC_ONLY"} : null},error:null}),',
         '  resetPasswordForEmail: async () => ({error:null}),',
         '}, functions: {invoke:async () => ({error:new Error("QA_FORBIDDEN")})}};',
         'export const currentOperationsIdentity = async () => globalThis.__getQaIdentity();',
@@ -64,6 +65,7 @@ before(async () => {
   globalThis.HTMLElement = dom.window.HTMLElement
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   globalThis.__authListeners = issuedAuthEvents
+  globalThis.__qaHasLocalSession = false
   globalThis.__getQaIdentity = () => {
     if (deferredIdentity) return deferredIdentity
     return currentIdentity
@@ -82,6 +84,7 @@ after(async () => {
   dom?.window.close()
   delete globalThis.__getQaIdentity
   delete globalThis.__authListeners
+  delete globalThis.__qaHasLocalSession
   delete globalThis.IS_REACT_ACT_ENVIRONMENT
   delete globalThis.window
   delete globalThis.document
@@ -95,6 +98,7 @@ function userVisibleText(host) {
 }
 
 async function mount(initial = worker()) {
+  globalThis.__qaHasLocalSession = false
   currentIdentity = initial
   deferredIdentity = null
   const host = document.createElement('div')
@@ -178,7 +182,7 @@ test('manager to worker and worker to manager replace privileged views', async (
     await ui.resolve(worker())
     assert.doesNotMatch(ui.host.textContent, /پذیرش داوطلبان|ADMIN_WORK_MOUNTED/)
     assert.match(ui.host.textContent, /WORKER_WORK_MOUNTED/)
-    await ui.resolve(admin(userB))
+    await ui.resolve(admin())
     assert.match(ui.host.textContent, /پذیرش داوطلبان/)
     assert.doesNotMatch(ui.host.textContent, /WORKER_WORK_MOUNTED/)
   } finally { await ui.unmount() }
@@ -235,4 +239,37 @@ test('focus recheck preserves the same mounted admin workspace until fresh autho
     assert.doesNotMatch(userVisibleText(ui.host),/ADMIN_WORK_MOUNTED/)
     assert.match(userVisibleText(ui.host),/WORKER_WORK_MOUNTED/)
   }finally{await ui.unmount();delete globalThis.__qaAdminMounts}
+})
+
+test('a different authenticated principal in a second tab never silently replaces the first worker',async()=>{
+  const ui=await mount(worker())
+  try{
+    await ui.resolve(worker('active','ready',userB))
+    assert.match(userVisibleText(ui.host),/نشست مرورگر به حساب دیگری تغییر کرده است/)
+    assert.doesNotMatch(ui.host.textContent,/WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED/)
+    assert.match(userVisibleText(ui.host),/ورود به/)
+  }finally{await ui.unmount()}
+})
+test('cached session after missing online identity must be blocked until server revalidation; no local token grants access',async()=>{
+ const ui=await mount(worker())
+ try{
+   await ui.fail()
+   globalThis.__qaHasLocalSession=true
+   currentIdentity=null
+   const retry=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent.includes('بررسی دوبارهٔ دسترسی'))
+   await act(async()=>{retry.click();await Promise.resolve()})
+   assert.match(userVisibleText(ui.host),/دسترسی نیازمند بررسی مجدد است/)
+   assert.doesNotMatch(ui.host.textContent,/WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED/)
+   currentIdentity=worker()
+   const retry2=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent.includes('بررسی دوبارهٔ دسترسی'))
+   await act(async()=>{retry2.click();await Promise.resolve()})
+   assert.match(userVisibleText(ui.host),/WORKER_WORK_MOUNTED/)
+ }finally{await ui.unmount()}
+})
+test('authenticated worker can see their OWN login email but no foreign user email',async()=>{
+ const ui=await mount(worker())
+ try{
+  assert.match(userVisibleText(ui.host),/qa-a@example.invalid/)
+  assert.doesNotMatch(userVisibleText(ui.host),/qa-b@example.invalid/)
+ }finally{await ui.unmount()}
 })
