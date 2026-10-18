@@ -1,0 +1,222 @@
+import test, { before, after } from 'node:test'
+import assert from 'node:assert/strict'
+import { JSDOM } from 'jsdom'
+import { act, createElement } from 'react'
+import { createServer } from 'vite'
+
+let dom, vite, OpsApp, createRoot
+let currentIdentity, deferredIdentity
+let issuedAuthEvents = new Set()
+const userA = Object.freeze({ id: 'FAKE_WORKER_AUTH_ID' })
+const userB = Object.freeze({ id: 'FAKE_OTHER_AUTH_ID' })
+const worker = (state = 'active', onboarding_state = 'ready', user = userA) => ({
+  role: state === 'paused' || state === 'inactive' ? 'worker_disabled' : 'worker',
+  user, profile: {
+    worker_id: 'FAKE_WORKER_ID', name: 'دانشجوکار ساختگی فقط آزمون',
+    unit: 'library', state, onboarding_state,
+  },
+})
+const admin = (user = userA) => ({ role: 'admin', user })
+const stub = {
+  name: 'ops-session-test-stubs',
+  enforce: 'pre',
+  resolveId(source, importer) {
+    if (importer?.endsWith('/src/OpsApp.jsx') && source === './lib/operations') {
+      return '\0qa-session-auth-client'
+    }
+    if (importer?.endsWith('/src/OpsApp.jsx') && source === './OperationsWorkspace') {
+      return '\0qa-session-workspaces'
+    }
+  },
+  load(id) {
+    if (id === '\0qa-session-auth-client') {
+      return [
+        'export const opsClient = { auth: {',
+        '  onAuthStateChange(callback) { globalThis.__authListeners.add(callback);',
+        '    return {data:{subscription:{unsubscribe() { globalThis.__authListeners.delete(callback) }}}} },',
+        '  updateUser: async () => ({error:null}),',
+        '  resetPasswordForEmail: async () => ({error:null}),',
+        '}, functions: {invoke:async () => ({error:new Error("QA_FORBIDDEN")})}};',
+        'export const currentOperationsIdentity = async () => globalThis.__getQaIdentity();',
+        'export const getOperationsCandidates = async () => [];',
+        'export const provisionWorker = async () => {throw new Error("QA_FORBIDDEN")};',
+        'export const setCandidateScreening = async () => {throw new Error("QA_FORBIDDEN")};',
+        'export const setCandidateEmail = async () => {throw new Error("QA_FORBIDDEN")};',
+        'export const signInOperations = async () => ({}) ;',
+        'export const signOutOperations = async () => {globalThis.__authListeners.forEach(f=>f("SIGNED_OUT"));};',
+      ].join('\n')
+    }
+    if (id === '\0qa-session-workspaces') {
+      return [
+        'import React from "react";',
+        'export function AdminOperations(){React.useEffect(()=>{globalThis.__qaAdminMounts=(globalThis.__qaAdminMounts||0)+1},[]);return React.createElement("div", {"data-testid":"admin-work"}, "ADMIN_WORK_MOUNTED")}',
+        'export function WorkerOperations(){return React.createElement("div", {"data-testid":"worker-work"}, "WORKER_WORK_MOUNTED")}',
+      ].join('\n')
+    }
+  },
+}
+before(async () => {
+  dom = new JSDOM('<!doctype html><html lang="fa"><body></body></html>', {
+    url: 'http://example.invalid/operations-session-qa', pretendToBeVisual: true,
+  })
+  globalThis.window = dom.window
+  globalThis.document = dom.window.document
+  globalThis.HTMLElement = dom.window.HTMLElement
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  globalThis.__authListeners = issuedAuthEvents
+  globalThis.__getQaIdentity = () => {
+    if (deferredIdentity) return deferredIdentity
+    return currentIdentity
+  }
+  // Browser visibility is a read-only DOM property.
+  Object.defineProperty(dom.window.document, 'visibilityState', { configurable: true, get: () => 'visible' })
+  ;({ createRoot } = await import('react-dom/client'))
+  vite = await createServer({
+    plugins: [stub], server: { middlewareMode: true },
+    appType: 'custom', logLevel: 'error',
+  })
+  OpsApp = (await vite.ssrLoadModule('/src/OpsApp.jsx')).default
+})
+after(async () => {
+  await vite?.close()
+  dom?.window.close()
+  delete globalThis.__getQaIdentity
+  delete globalThis.__authListeners
+  delete globalThis.IS_REACT_ACT_ENVIRONMENT
+  delete globalThis.window
+  delete globalThis.document
+  delete globalThis.HTMLElement
+})
+
+function userVisibleText(host) {
+  const clone=host.cloneNode(true)
+  for(const element of clone.querySelectorAll('[hidden], [aria-hidden="true"]'))element.remove()
+  return clone.textContent
+}
+
+async function mount(initial = worker()) {
+  currentIdentity = initial
+  deferredIdentity = null
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  await act(async () => { root.render(createElement(OpsApp, {mode:'worker'})) })
+  async function resolve(identity) {
+    currentIdentity = identity
+    deferredIdentity = null
+    await act(async () => {
+      window.dispatchEvent(new window.Event('focus'))
+      await Promise.resolve()
+    })
+  }
+  async function pending() {
+    let release
+    deferredIdentity = new Promise(resolve => { release = resolve })
+    await act(async () => {
+      window.dispatchEvent(new window.Event('focus'))
+      await Promise.resolve()
+    })
+    assert.match(userVisibleText(host), /در حال بررسی مجدد مجوز حساب/)
+    assert.doesNotMatch(userVisibleText(host), /WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED/)
+    const frozen=host.querySelector('[hidden][inert][aria-hidden="true"]')
+    assert.ok(frozen,'the still-mounted operational DOM must be hidden, inert and a11y-suppressed')
+    return async value => {
+      deferredIdentity = null
+      currentIdentity = value
+      await act(async () => { release(value) })
+    }
+  }
+  async function fail() {
+    deferredIdentity = Promise.reject(new Error('synthetic disconnect'))
+    await act(async () => {
+      window.dispatchEvent(new window.Event('focus'))
+      await Promise.resolve()
+    })
+    deferredIdentity = null
+  }
+  async function unmount() {
+    await act(async () => root.unmount())
+    host.remove()
+  }
+  return {host, resolve, pending, fail, unmount}
+}
+
+test('active/ready shows work, and pending resume hides it before reading permission', async () => {
+  const ui = await mount()
+  try {
+    assert.match(ui.host.textContent, /WORKER_WORK_MOUNTED/)
+    const release = await ui.pending()
+    await release(worker('paused'))
+    assert.match(ui.host.textContent, /موقتاً تعلیق شده است/)
+    assert.doesNotMatch(ui.host.textContent, /WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED|تغییر رمز عبور/)
+  } finally { await ui.unmount() }
+})
+test('inactive is also a restricted, zero-work view; restored active shows work', async () => {
+  const ui = await mount(worker('inactive'))
+  try {
+    assert.match(ui.host.textContent, /غیرفعال شده است/)
+    assert.doesNotMatch(ui.host.textContent, /WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED/)
+    await ui.resolve(worker('active'))
+    assert.match(ui.host.textContent, /WORKER_WORK_MOUNTED/)
+  } finally { await ui.unmount() }
+})
+test('active but password_required cannot mount work; ready resumes it', async () => {
+  const ui = await mount(worker('active','ready'))
+  try {
+    assert.match(ui.host.textContent, /WORKER_WORK_MOUNTED/)
+    await ui.resolve(worker('active','password_required'))
+    assert.doesNotMatch(ui.host.textContent, /WORKER_WORK_MOUNTED/)
+    assert.match(ui.host.textContent, /در اولین ورود، رمز اختصاصی خودتان را تعیین کنید/)
+    await ui.resolve(worker('active','ready'))
+    assert.match(ui.host.textContent, /WORKER_WORK_MOUNTED/)
+  } finally { await ui.unmount() }
+})
+test('manager to worker and worker to manager replace privileged views', async () => {
+  const ui = await mount(admin())
+  try {
+    assert.match(ui.host.textContent, /پذیرش داوطلبان/)
+    await ui.resolve(worker())
+    assert.doesNotMatch(ui.host.textContent, /پذیرش داوطلبان|ADMIN_WORK_MOUNTED/)
+    assert.match(ui.host.textContent, /WORKER_WORK_MOUNTED/)
+    await ui.resolve(admin(userB))
+    assert.match(ui.host.textContent, /پذیرش داوطلبان/)
+    assert.doesNotMatch(ui.host.textContent, /WORKER_WORK_MOUNTED/)
+  } finally { await ui.unmount() }
+})
+test('denied or lost access fails closed to the login screen', async () => {
+  const ui = await mount(worker())
+  try {
+    await ui.resolve({role:'no_access',user:userA})
+    assert.match(ui.host.textContent, /دسترسی این نشست دیگر معتبر نیست/)
+    assert.doesNotMatch(ui.host.textContent, /WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED/)
+  } finally { await ui.unmount() }
+})
+test('network failure on resume drops the stale operational view', async () => {
+  const ui = await mount(worker())
+  try {
+    await ui.fail()
+    assert.match(ui.host.textContent, /بررسی مجدد دسترسی ممکن نشد/)
+    assert.doesNotMatch(ui.host.textContent, /WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED/)
+  } finally { await ui.unmount() }
+})
+
+test('focus recheck preserves the same mounted admin workspace until fresh authorization and drops it on role change',async()=>{
+  globalThis.__qaAdminMounts=0
+  const ui=await mount(admin())
+  try{
+    const workTab=Array.from(ui.host.querySelectorAll('button')).find(x=>x.textContent==='برنامه و کارها')
+    assert.ok(workTab)
+    await act(async()=>{workTab.click()})
+    assert.match(userVisibleText(ui.host),/ADMIN_WORK_MOUNTED/)
+    assert.equal(globalThis.__qaAdminMounts,1)
+    const release=await ui.pending()
+    assert.equal(globalThis.__qaAdminMounts,1,'no remount during recheck')
+    assert.doesNotMatch(userVisibleText(ui.host),/ADMIN_WORK_MOUNTED/)
+    await release(admin())
+    assert.equal(globalThis.__qaAdminMounts,1,'successful same-principal recheck preserves form state')
+    assert.match(userVisibleText(ui.host),/ADMIN_WORK_MOUNTED/)
+    await ui.resolve(worker())
+    assert.doesNotMatch(userVisibleText(ui.host),/ADMIN_WORK_MOUNTED/)
+    assert.match(userVisibleText(ui.host),/WORKER_WORK_MOUNTED/)
+  }finally{await ui.unmount();delete globalThis.__qaAdminMounts}
+})
