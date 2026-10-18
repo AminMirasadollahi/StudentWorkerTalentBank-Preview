@@ -109,6 +109,7 @@ async function mount(initial = worker()) {
     currentIdentity = identity
     deferredIdentity = null
     await act(async () => {
+      window.dispatchEvent(new window.Event('blur'))
       window.dispatchEvent(new window.Event('focus'))
       await Promise.resolve()
     })
@@ -117,6 +118,7 @@ async function mount(initial = worker()) {
     let release
     deferredIdentity = new Promise(resolve => { release = resolve })
     await act(async () => {
+      window.dispatchEvent(new window.Event('blur'))
       window.dispatchEvent(new window.Event('focus'))
       await Promise.resolve()
     })
@@ -136,6 +138,7 @@ async function mount(initial = worker()) {
   async function fail() {
     deferredIdentity = Promise.reject(new Error('synthetic disconnect'))
     await act(async () => {
+      window.dispatchEvent(new window.Event('blur'))
       window.dispatchEvent(new window.Event('focus'))
       await Promise.resolve()
     })
