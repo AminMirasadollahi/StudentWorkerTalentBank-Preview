@@ -229,14 +229,26 @@
   display: none !important;
   pointer-events: none !important;
 }
-.ops-recheck-curtain {
+dialog.ops-recheck-curtain {
+  /* Native top layer, above ANY pre-existing open assignment dialog. */
   position: fixed;
   inset: 0;
-  z-index: 2147483000;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
   pointer-events: auto;
   background: #f2f7f9;
   color: #123a52;
+}
+dialog.ops-recheck-curtain::backdrop {
+  background: #f2f7f9;
 }
 .ops-recheck-layout {
   width: min(100% - 2.25rem, 90rem);
