@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
 import { classifyOperationsIdentity } from './workerAccess.mjs'
-import { isTransientIdentityTransportError } from './opsAuthError.mjs'
 
 // Separate identity/session from the public, intentionally sessionless intake client.
 // Only the publishable key enters the browser. Never use the service-role key here.
@@ -32,14 +31,7 @@ export async function signOutOperations() {
 
 export async function currentOperationsIdentity() {
   const { data, error } = await opsClient.auth.getUser()
-  // No cached browser session ever authorizes access. However, a temporary
-  // GET-user transport failure must not be mislabeled as a revoked session.
-  // The caller must hide all protected UI and require a fresh server read.
-  if (error) {
-    if (isTransientIdentityTransportError(error)) throw error
-    return null
-  }
-  if (!data?.user) return null
+  if (error || !data?.user) return null
 
   const isAdmin = assertResult(await opsClient.rpc('ops_is_admin'))
   if (isAdmin) return classifyOperationsIdentity({ user: data.user, isAdmin: true })
