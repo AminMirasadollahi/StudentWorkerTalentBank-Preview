@@ -958,7 +958,7 @@ export default function OpsApp({ mode = 'admin' }) {
               </div>
             </div>
           </div>
-          <span className="ops-recheck-indicator" aria-hidden="true">
+          <span className="ops-recheck-indicator">
             <span className="ops-recheck-indicator__dot" />
             بررسی کوتاه دسترسی…
           </span>
