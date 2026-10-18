@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   currentOperationsIdentity,
   getOperationsCandidates,
@@ -712,6 +712,7 @@ export default function OpsApp({ mode = 'admin' }) {
   const [workerNavigation, setWorkerNavigation] = useState(initialWorkerNavigation)
   const [busy, setBusy] = useState(true)
   const [recheckingAccess, setRecheckingAccess] = useState(false)
+  const focusGateDialogRef = useRef(null)
   const [accessUnverified, setAccessUnverified] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -722,6 +723,24 @@ export default function OpsApp({ mode = 'admin' }) {
       return isCallback || window.sessionStorage.getItem(PASSWORD_RECOVERY_PENDING_KEY) === '1'
     } catch { return isCallback }
   })
+
+  // The account's existing native assignment dialog may be in Chrome's top
+  // layer. A z-index (or ::backdrop CSS) cannot rise above that dialog. Put
+  // the privacy mask in a NEW native top-layer dialog, opened synchronously
+  // before paint after the authorized subtree becomes hidden/inert. The mask
+  // never contains cached worker or manager data.
+  useLayoutEffect(() => {
+    const dialog = focusGateDialogRef.current
+    if (!dialog || !recheckingAccess || recoveryMode) return undefined
+    try {
+      if (typeof dialog.showModal === 'function' && !dialog.open) dialog.showModal()
+    } catch {
+      // Fail closed: the cached subtree remains inert and invisible.
+    }
+    return () => {
+      if (dialog.open && typeof dialog.close === 'function') dialog.close()
+    }
+  }, [recheckingAccess, recoveryMode])
 
   useEffect(() => {
     const { data: { subscription } } = opsClient.auth.onAuthStateChange(event => {
@@ -932,7 +951,8 @@ export default function OpsApp({ mode = 'admin' }) {
         {authorizedView}
       </div>
       {recheckingAccess && !recoveryMode && (
-        <div className="ops-recheck-curtain ops-root" dir="rtl"
+        <dialog ref={focusGateDialogRef}
+          className="ops-recheck-curtain ops-root" dir="rtl"
           role="status" aria-live="polite"
           aria-label="در حال تأیید مجدد مجوز؛ تعاملات موقتاً متوقف است.">
           <div className="ops-recheck-layout" aria-hidden="true">
@@ -962,7 +982,7 @@ export default function OpsApp({ mode = 'admin' }) {
             <span className="ops-recheck-indicator__dot" />
             بررسی کوتاه دسترسی…
           </span>
-        </div>
+        </dialog>
       )}
     </>
   )
