@@ -17,7 +17,7 @@ try{
           <label>Pending task<input id="draft" value="unsent owner draft"></label>
           <button id="submit">TEST ONLY</button>
         </dialog>
-       </div><div id="checking" class="ops-recheck-curtain" hidden role="status"><span class="ops-recheck-indicator">Checking identity</span></div>
+       </div><dialog id="checking" class="ops-recheck-curtain" role="status"><span class="ops-recheck-indicator">Checking identity</span></dialog>
      </body></html>`)
      await page.addStyleTag({content:css})
      await page.evaluate(()=>document.getElementById('calendar').showModal())
@@ -30,7 +30,7 @@ try{
        w.hidden=false
        w.inert=true
        w.setAttribute('aria-hidden','true')
-       document.getElementById('checking').hidden=false
+       document.getElementById('checking').showModal()
      })
      assert.equal(await page.locator('#calendar').isVisible(),false,
        'native top-layer modal must never be visible during authorization')
@@ -52,14 +52,14 @@ try{
          maskedAtCenter:document.elementFromPoint(innerWidth/2,innerHeight/2)?.closest('#checking')?.id}
      })
      assert.equal(masked.visible,'hidden','privileged stale DOM must never be rendered')
-     assert.equal(masked.maskedAtCenter,'checking','fully opaque shield captures pointer region')
+     assert.equal(masked.maskedAtCenter,'checking','the newest modal top layer MUST cover the earlier assignment modal')
      assert.equal(security.a11yHidden,'true')
      assert.equal(security.draft,'unsent owner draft')
      await page.evaluate(()=>{
        const w=document.getElementById('workspace')
        w.classList.remove('ops-recheck-frozen')
        w.hidden=false;w.inert=false;w.removeAttribute('aria-hidden')
-       document.getElementById('checking').hidden=true
+       document.getElementById('checking').close()
      })
      assert.equal(await page.locator('#calendar').isVisible(),true)
      assert.equal(await page.evaluate(()=>window.scrollY),initialScroll)
