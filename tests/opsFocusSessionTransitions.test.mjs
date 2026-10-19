@@ -332,3 +332,34 @@ test('P0: revoked online identity never refreshes the old privileged projection'
   assert.doesNotMatch(userVisibleText(ui.host),/WORKER_WORK_MOUNTED/)
  }finally{await ui.unmount();delete globalThis.__qaWorkerReads}
 })
+
+test('P0 regression: real worker signed in on operations URL gets worker tab title without role change',async()=>{
+ const ui=await mount(worker(), 'admin')
+ try {
+  assert.match(userVisibleText(ui.host),/WORKER_WORK_MOUNTED/)
+  assert.equal(document.title,'پنل اختصاصی دانشجوکار | SWTB')
+  await ui.resolve(worker())
+  assert.equal(document.title,'پنل اختصاصی دانشجوکار | SWTB')
+  assert.match(userVisibleText(ui.host),/WORKER_WORK_MOUNTED/)
+ } finally {await ui.unmount()}
+})
+
+test('P0 regression: manager signed in on worker URL gets manager tab title without role change',async()=>{
+ const ui=await mount(admin(), 'worker')
+ try{
+  assert.match(userVisibleText(ui.host),/پذیرش داوطلبان/)
+  assert.equal(document.title,'مدیریت دانشجوکارها | SWTB')
+ }finally{await ui.unmount()}
+})
+
+test('P0 regression: tab title follows role transition and revocation, never stale identity',async()=>{
+ const ui=await mount(admin(), 'admin')
+ try{
+  assert.equal(document.title,'مدیریت دانشجوکارها | SWTB')
+  await ui.resolve(worker())
+  assert.equal(document.title,'پنل اختصاصی دانشجوکار | SWTB')
+  await ui.resolve({role:'no_access',user:userA})
+  assert.equal(document.title,'مدیریت دانشجوکارها | SWTB')
+  assert.doesNotMatch(userVisibleText(ui.host),/WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED/)
+ }finally{await ui.unmount()}
+})
