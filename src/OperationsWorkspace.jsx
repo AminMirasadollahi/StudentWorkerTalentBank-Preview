@@ -698,7 +698,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone}) {
     </div>
   </section>
 }
-export function AdminOperations({ navigation, setNavigation }) {
+export function AdminOperations({ navigation, setNavigation, refreshRevision = 0 }) {
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const view=navigation.workView
   const profileWorkerId=navigation.profileWorkerId||''
@@ -770,7 +770,7 @@ export function AdminOperations({ navigation, setNavigation }) {
       return false
     }finally{if(sequence===readSequence.current)setLoading(false)}
   }
-  useEffect(()=>{void refresh()},[])
+  useEffect(()=>{void refresh()},[refreshRevision])
 
   const workers=data.workers||[]
   const active=workers.filter(w=>w.state==='active')
@@ -1259,7 +1259,7 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
   </article>
 }
-function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal}) {
+function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal,refreshRevision=0}) {
  const [identity,setIdentity]=useState(null)
  const [requests,setRequests]=useState([])
  const [requestsLoading,setRequestsLoading]=useState(true)
@@ -1307,7 +1307,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
  useEffect(()=>{
    setIdentity(null);setRequests([]);setRequestsLoading(true)
    void refreshProfile()
- },[profile.worker_id])
+ },[profile.worker_id,refreshRevision])
  const submitChange=async event=>{
    event.preventDefault()
    // A ref guards against same-tick double-submits before React updates.
@@ -1439,7 +1439,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
     </details>
   </section>
 }
-export function WorkerOperations({profile,navigation,setNavigation}) {
+export function WorkerOperations({profile,navigation,setNavigation,refreshRevision=0}) {
   const [data,setData]=useState({tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   // Task acknowledgements survive switching work/profile/presence tabs, but
   // are strictly scoped to this authenticated worker and this React session.
@@ -1474,7 +1474,7 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
       setError(readableError(e))
     }finally{if(sequence===readSequence.current)setLoading(false)}
   }
-  useEffect(()=>{void refresh()},[profile.worker_id])
+  useEffect(()=>{void refresh()},[profile.worker_id,refreshRevision])
   const records=data.time_entries||[]
   const approved=records.filter(x=>x.review_state==='approved')
   const total=data.approved_minutes_total??approved.reduce(
@@ -1529,6 +1529,6 @@ export function WorkerOperations({profile,navigation,setNavigation}) {
     </section>}
     {section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}
       requestLedger={acknowledgedActions.current.profileRequests}
-      approvedMinutesTotal={data.approved_minutes_total}/>}
+      approvedMinutesTotal={data.approved_minutes_total} refreshRevision={refreshRevision}/>}
   </div>
 }
