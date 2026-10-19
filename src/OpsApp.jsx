@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { documentTitleForRoute } from './lib/routeTitles.mjs'
 import {
   currentOperationsIdentity,
   getOperationsCandidates,
@@ -252,7 +253,7 @@ function RecoveryPasswordView({ onComplete, onCancel }) {
   )
 }
 
-function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = false, navigation, setNavigation }) {
+function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = false, navigation, setNavigation, refreshRevision = 0 }) {
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [saving, setSaving] = useState(false)
@@ -260,6 +261,7 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
   const [passwordError, setPasswordError] = useState('')
   const [passwordEstablished, setPasswordEstablished] = useState(!initialPasswordRequired)
   const [settingsOpen,setSettingsOpen] = useState(false)
+  const [manualRefreshRevision,setManualRefreshRevision] = useState(0)
 
   const changePassword = async event => {
     event.preventDefault()
@@ -307,6 +309,8 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
         </div>
         <div className="report-header-actions">
           {passwordEstablished&&<button className="report-btn report-btn--ghost" type="button"
+            onClick={()=>setManualRefreshRevision(v=>v+1)}>به‌روزرسانی</button>}
+          {passwordEstablished&&<button className="report-btn report-btn--ghost" type="button"
             aria-expanded={settingsOpen} aria-controls="ops-worker-account-settings"
             onClick={()=>{setSettingsOpen(open=>!open);setPasswordError('');setMessage('')}}>تنظیمات حساب</button>}
           <button className="report-btn report-btn--ghost" type="button" onClick={onLogout}>خروج</button>
@@ -342,7 +346,8 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
           </button>
         </form>
       </section>}
-      {passwordEstablished && <WorkerOperations profile={profile} navigation={navigation} setNavigation={setNavigation}/>}
+      {passwordEstablished && <WorkerOperations profile={profile} navigation={navigation} setNavigation={setNavigation}
+        refreshRevision={refreshRevision+manualRefreshRevision}/>}
     </main>
   )
 }
@@ -497,13 +502,14 @@ function CandidateCard({ candidate, saving, onSave, onSaveEmail, onProvision, on
   )
 }
 
-function AdminView({ onLogout, navigation, setNavigation }) {
+function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 }) {
   const [rows, setRows] = useState([])
   const [busyId, setBusyId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [flash, setFlash] = useState('')
   const [issuedCredentials, setIssuedCredentials] = useState(null)
+  const [manualWorkRevision,setManualWorkRevision] = useState(0)
   const filter = navigation.candidateFilter
   const adminSection = navigation.section
   const setFilter = value => setNavigation(previous => ({ ...previous, candidateFilter: value }))
@@ -516,13 +522,23 @@ function AdminView({ onLogout, navigation, setNavigation }) {
       const results = await getOperationsCandidates()
       setRows(Array.isArray(results) ? results : [])
     } catch (e) {
+      // Never leave the previous candidate list visible after a denied read.
+      setRows([])
       setError(getMessage(e))
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { void refresh() }, [])
+  // The manager tab switch and post-authentication resume fetch the active
+  // module. Other, unmounted workspaces fetch when they are selected.
+  useEffect(() => {
+    if (adminSection === 'candidates') void refresh()
+  }, [adminSection, refreshRevision])
+  const refreshCurrentSection = () => {
+    if (adminSection === 'work') setManualWorkRevision(v => v + 1)
+    else void refresh()
+  }
 
   const saveScreening = async (id, interview, clearance) => {
     setBusyId(id); setError(''); setFlash('')
@@ -595,7 +611,7 @@ function AdminView({ onLogout, navigation, setNavigation }) {
           <p>بررسی داوطلبان، مصاحبه، استعلام و فعال‌سازی حساب</p>
         </div>
         <div className="report-header-actions">
-          <button type="button" className="report-btn report-btn--ghost" onClick={refresh} disabled={loading}>به‌روزرسانی</button>
+          <button type="button" className="report-btn report-btn--ghost" onClick={refreshCurrentSection} disabled={adminSection === 'candidates' && loading}>به‌روزرسانی</button>
           <button type="button" className="report-btn report-btn--ghost" onClick={onLogout}>خروج</button>
         </div>
       </header>
@@ -628,7 +644,7 @@ function AdminView({ onLogout, navigation, setNavigation }) {
         </div>
         {error && <div role="alert" className="report-alert report-alert--error">{error}</div>}
         {flash && <div role="status" className="ops-alert-success">{flash}</div>}
-        {loading ? <p className="ops-muted">در حال دریافت اطلاعات…</p> :
+        {loading && rows.length === 0 ? <p className="ops-muted">در حال دریافت اطلاعات…</p> :
           filtered.length ? (
             <div className="ops-list">
               {filtered.map(row => (
@@ -646,7 +662,8 @@ function AdminView({ onLogout, navigation, setNavigation }) {
           ) : <p className="ops-muted">موردی برای نمایش وجود ندارد.</p>}
       </section>
       </>}
-      {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation} />}
+      {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation}
+        refreshRevision={refreshRevision + manualWorkRevision} />}
       {issuedCredentials && (
         <div className="ops-modal" role="dialog" aria-modal="true" aria-labelledby="ops-credentials-title">
           <div className="ops-modal__card">
@@ -712,6 +729,7 @@ export default function OpsApp({ mode = 'admin' }) {
   const [workerNavigation, setWorkerNavigation] = useState(initialWorkerNavigation)
   const [busy, setBusy] = useState(true)
   const [recheckingAccess, setRecheckingAccess] = useState(false)
+  const [dataRefreshRevision, setDataRefreshRevision] = useState(0)
   const focusGateDialogRef = useRef(null)
   const [accessUnverified, setAccessUnverified] = useState(false)
   const [error, setError] = useState('')
@@ -762,7 +780,7 @@ export default function OpsApp({ mode = 'admin' }) {
 
   useEffect(() => {
     let mounted = true
-    document.title = mode === 'worker' ? 'پنل دانشجوکار' : 'مدیریت دانشجوکارها'
+    document.title = documentTitleForRoute(mode === 'worker' ? 'worker' : 'operations')
     verifyIdentityOrBlock().then(result => {
       if (mounted) {
         if (result?.role === 'no_access') setError('برای این حساب، دسترسی عملیاتی فعال نشده است.')
@@ -812,6 +830,11 @@ export default function OpsApp({ mode = 'admin' }) {
           }
           setError('')
           setIdentity(fresh)
+          // Authorization has just been checked ONLINE. Only now ask the
+          // still-mounted, same-principal view to fetch fresh task/report data.
+          // This changes a prop, not the React identity key or form draft.
+          if (fresh.role === identity.role && fresh.user?.id === identity.user?.id)
+            setDataRefreshRevision(v => v + 1)
         }
       },
       onFailure: () => {
@@ -826,7 +849,7 @@ export default function OpsApp({ mode = 'admin' }) {
       },
       onFinish: () => setRecheckingAccess(false),
     })
-  }, [Boolean(identity), recoveryMode])
+  }, [Boolean(identity), identity?.role, identity?.user?.id, recoveryMode])
 
   const retryIdentityVerification = async () => {
     if (busy) return
@@ -929,7 +952,8 @@ export default function OpsApp({ mode = 'admin' }) {
   // permission is being checked. Identity/role/revocation changes remount.
   const authorizedView = identity.role === 'admin'
     ? <AdminView key={'admin:' + identity.user?.id}
-        onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}/>
+        onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
+        refreshRevision={dataRefreshRevision}/>
     : identity.role === 'worker_disabled'
       ? <WorkerDisabledView key={'disabled:' + identity.user?.id + ':' + identity.profile?.state}
           profile={identity.profile} onLogout={logout}/>
@@ -942,7 +966,8 @@ export default function OpsApp({ mode = 'admin' }) {
           navigation={workerNavigation}
           setNavigation={setWorkerNavigation}
           onLogout={logout}
-          initialPasswordRequired={identity.profile?.onboarding_state === 'password_required'}/>
+          initialPasswordRequired={identity.profile?.onboarding_state === 'password_required'}
+          refreshRevision={dataRefreshRevision}/>
   return (
     <>
       <div className={recheckingAccess ? 'ops-recheck-frozen' : undefined}

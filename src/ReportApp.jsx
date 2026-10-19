@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { availabilitySlots, skills, units } from './data'
 import { getStudentWorkerReport } from './lib/reporting'
+import { documentTitleForRoute } from './lib/routeTitles.mjs'
 import './report.css'
 
 const REPORT_SESSION_KEY = 'student-worker-report:access:v1'
@@ -187,7 +188,7 @@ export default function ReportApp() {
   }
 
   useEffect(() => {
-    document.title = 'گزارش همکاری دانشجویی'
+    document.title = documentTitleForRoute('report')
     if (accessCode) void loadReport(accessCode, filters, true)
     // only bootstrap saved session code
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -39,7 +39,7 @@ const stub = {
         '  resetPasswordForEmail: async () => ({error:null}),',
         '}, functions: {invoke:async () => ({error:new Error("QA_FORBIDDEN")})}};',
         'export const currentOperationsIdentity = async () => globalThis.__getQaIdentity();',
-        'export const getOperationsCandidates = async () => [];',
+        'export const getOperationsCandidates = async () => {globalThis.__qaCandidateReads=(globalThis.__qaCandidateReads||0)+1;return []};',
         'export const provisionWorker = async () => {throw new Error("QA_FORBIDDEN")};',
         'export const setCandidateScreening = async () => {throw new Error("QA_FORBIDDEN")};',
         'export const setCandidateEmail = async () => {throw new Error("QA_FORBIDDEN")};',
@@ -50,8 +50,8 @@ const stub = {
     if (id === '\0qa-session-workspaces') {
       return [
         'import React from "react";',
-        'export function AdminOperations(){React.useEffect(()=>{globalThis.__qaAdminMounts=(globalThis.__qaAdminMounts||0)+1},[]);return React.createElement("div", {"data-testid":"admin-work"}, "ADMIN_WORK_MOUNTED")}',
-        'export function WorkerOperations(){return React.createElement("div", {"data-testid":"worker-work"}, "WORKER_WORK_MOUNTED")}',
+        'export function AdminOperations({refreshRevision=0}){React.useEffect(()=>{globalThis.__qaAdminMounts=(globalThis.__qaAdminMounts||0)+1},[]);React.useEffect(()=>{globalThis.__qaAdminReads=(globalThis.__qaAdminReads||0)+1},[refreshRevision]);return React.createElement("div", {"data-testid":"admin-work"}, "ADMIN_WORK_MOUNTED")}',
+        'export function WorkerOperations({refreshRevision=0}){React.useEffect(()=>{globalThis.__qaWorkerReads=(globalThis.__qaWorkerReads||0)+1},[refreshRevision]);return React.createElement("div", {"data-testid":"worker-work"}, "WORKER_WORK_MOUNTED")}',
       ].join('\n')
     }
   },
@@ -97,14 +97,14 @@ function userVisibleText(host) {
   return clone.textContent
 }
 
-async function mount(initial = worker()) {
+async function mount(initial = worker(), mode = initial.role === 'admin' ? 'admin' : 'worker') {
   globalThis.__qaHasLocalSession = false
   currentIdentity = initial
   deferredIdentity = null
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
-  await act(async () => { root.render(createElement(OpsApp, {mode:'worker'})) })
+  await act(async () => { root.render(createElement(OpsApp, {mode})) })
   async function resolve(identity) {
     currentIdentity = identity
     deferredIdentity = null
@@ -278,4 +278,57 @@ test('authenticated worker can see their OWN login email but no foreign user ema
   assert.match(userVisibleText(ui.host),/qa-a@example.invalid/)
   assert.doesNotMatch(userVisibleText(ui.host),/qa-b@example.invalid/)
  }finally{await ui.unmount()}
+})
+
+test('P0: worker browser title, manual reload and same-principal refocus all target worker projection',async()=>{
+ globalThis.__qaWorkerReads=0
+ const ui=await mount(worker())
+ try {
+  assert.equal(document.title,'پنل اختصاصی دانشجوکار | SWTB')
+  assert.equal(globalThis.__qaWorkerReads,1,'worker initially loads once')
+  const refresh=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent==='به‌روزرسانی')
+  assert.ok(refresh,'worker dashboard must offer explicit refresh without browser F5')
+  await act(async()=>{refresh.click();await Promise.resolve()})
+  assert.equal(globalThis.__qaWorkerReads,2,'worker button rereads own protected data')
+  const pending=await ui.pending()
+  assert.equal(globalThis.__qaWorkerReads,2,'no work refresh while online identity is uncertain')
+  await pending(worker())
+  assert.equal(globalThis.__qaWorkerReads,3,'authorized refocus requests an updated worker projection')
+  assert.equal(document.title,'پنل اختصاصی دانشجوکار | SWTB')
+  assert.equal(ui.host.querySelectorAll('[data-testid="worker-work"]').length,1,'worker view retains mounted React state')
+ } finally {await ui.unmount();delete globalThis.__qaWorkerReads}
+})
+
+test('P0: manager title, header refresh of active work tab, tab-switch candidate invalidation',async()=>{
+ globalThis.__qaAdminReads=0
+ globalThis.__qaCandidateReads=0
+ const ui=await mount(admin())
+ try {
+  assert.equal(document.title,'مدیریت دانشجوکارها | SWTB')
+  assert.equal(globalThis.__qaCandidateReads,1,'initial candidate fetch')
+  const workTab=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent==='برنامه و کارها')
+  await act(async()=>{workTab.click()})
+  assert.equal(globalThis.__qaAdminReads,1,'work section loads when mounted')
+  const header=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent==='به‌روزرسانی')
+  assert.ok(header)
+  await act(async()=>{header.click();await Promise.resolve()})
+  assert.equal(globalThis.__qaAdminReads,2,'header button targets active work module')
+  assert.equal(globalThis.__qaCandidateReads,1,'not the hidden candidate list')
+  await ui.resolve(admin())
+  assert.equal(globalThis.__qaAdminReads,3,'valid identity on refocus triggers work readback')
+  const candidateTab=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent==='پذیرش داوطلبان')
+  await act(async()=>{candidateTab.click();await Promise.resolve()})
+  assert.equal(globalThis.__qaCandidateReads,2,'return to applicant module refreshes stale candidate data')
+ }finally{await ui.unmount();delete globalThis.__qaAdminReads;delete globalThis.__qaCandidateReads}
+})
+
+test('P0: revoked online identity never refreshes the old privileged projection',async()=>{
+ globalThis.__qaWorkerReads=0
+ const ui=await mount(worker())
+ try{
+  assert.equal(globalThis.__qaWorkerReads,1)
+  await ui.resolve({role:'no_access',user:userA})
+  assert.equal(globalThis.__qaWorkerReads,1,'permission revocation cannot authorize a data refetch')
+  assert.doesNotMatch(userVisibleText(ui.host),/WORKER_WORK_MOUNTED/)
+ }finally{await ui.unmount();delete globalThis.__qaWorkerReads}
 })
