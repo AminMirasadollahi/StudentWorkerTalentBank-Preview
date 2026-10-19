@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { documentTitleForRoute } from './lib/routeTitles.mjs'
+import { documentTitleForOperationsIdentity } from './lib/routeTitles.mjs'
 import {
   currentOperationsIdentity,
   getOperationsCandidates,
@@ -778,9 +778,16 @@ export default function OpsApp({ mode = 'admin' }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  // The same valid worker may sign in through ?page=operations (or vice
+  // versa). Display the name of the SERVER-VERIFIED workspace, never a
+  // conflicting title inferred only from the link. Signed-out/blocked views
+  // revert to the intended entry route without exposing a prior role.
+  useEffect(() => {
+    document.title = documentTitleForOperationsIdentity(identity?.role, mode)
+  }, [identity?.role, mode])
+
   useEffect(() => {
     let mounted = true
-    document.title = documentTitleForRoute(mode === 'worker' ? 'worker' : 'operations')
     verifyIdentityOrBlock().then(result => {
       if (mounted) {
         if (result?.role === 'no_access') setError('برای این حساب، دسترسی عملیاتی فعال نشده است.')
