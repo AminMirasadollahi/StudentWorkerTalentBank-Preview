@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {documentTitleForRoute} from '../src/lib/routeTitles.mjs'
+import {documentTitleForRoute,documentTitleForOperationsIdentity} from '../src/lib/routeTitles.mjs'
 
 test('P0: route titles are distinct for privileged worker, manager, report and public intake',()=>{
  const expected={
@@ -13,4 +13,14 @@ test('P0: route titles are distinct for privileged worker, manager, report and p
   assert.equal(documentTitleForRoute(route),title)
  assert.equal(new Set(Object.values(expected)).size,4)
  assert.equal(documentTitleForRoute(null),expected.intake)
+})
+
+test('P0 real-role routing: worker identity overrides manager URL title; manager identity overrides worker URL',()=>{
+ const title=documentTitleForOperationsIdentity
+ assert.equal(title('worker','admin'),'پنل اختصاصی دانشجوکار | SWTB')
+ assert.equal(title('worker_disabled','admin'),'پنل اختصاصی دانشجوکار | SWTB')
+ assert.equal(title('admin','worker'),'مدیریت دانشجوکارها | SWTB')
+ assert.equal(title(null,'admin'),'مدیریت دانشجوکارها | SWTB')
+ assert.equal(title(null,'worker'),'پنل اختصاصی دانشجوکار | SWTB')
+ assert.equal(title('no_access','admin'),'مدیریت دانشجوکارها | SWTB')
 })
