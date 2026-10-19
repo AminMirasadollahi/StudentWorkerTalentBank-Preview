@@ -205,7 +205,7 @@ test('overdue unfinished task remains actionable when Today is selected',async()
   const card=Array.from(ui.host.querySelectorAll('.ow-worker-tasks .ow-item'))
     .find(x=>x.textContent.includes('کار قدیمی ناتمام'))
   assert.ok(card)
-  assert.match(card.textContent,/ثبت انجام و گزارش کار/)
+  assert.match(card.textContent,/ثبت انجام کار/)
  }finally{
   await ui.dispose()
   globalThis.__workerFocusFixture=fixture()
@@ -313,12 +313,13 @@ test('an older successful work fetch cannot override a newer denied refresh',asy
 })
 
 async function submitSyntheticWorkerReport(ui){
- const check=ui.host.querySelector('.ow-worker-action-detail .ow-checkbox input')
- assert.ok(check,'worker completion checkbox')
- await act(async()=>check.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
  const form=ui.host.querySelector('.ow-worker-action-detail form')
  assert.ok(form)
- await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+ assert.equal(form.querySelector('.ow-checkbox input:not(.ow-extra-toggle input)'),null,
+   'ordinary report has no redundant completion attestation')
+ const submit=form.querySelector('button[type="submit"]')
+ assert.ok(submit && !submit.disabled,'the explicit send action is available without Start')
+ await act(async()=>submit.click())
 }
 test('acknowledged worker report cannot be double submitted while task snapshot is stale',async()=>{
  globalThis.__qaAllowWorkerSubmit=true
@@ -723,5 +724,64 @@ test('worker calendar shows self-only RPC tasks when worker_id is omitted',async
  }finally{
    if(ui)await ui.dispose()
    globalThis.__workerFocusFixture=original
+ }
+})
+
+test('P1: assigned task can be completed directly in two explicit actions without start or pre-checked attestations',async()=>{
+ globalThis.__workerFocusFixture=fixture()
+ globalThis.__qaAllowWorkerSubmit=true
+ globalThis.__qaSubmitCalls=[]
+ globalThis.__qaStartCalls=[]
+ const ui=await setup()
+ try{
+  const disclosure=ui.host.querySelector('.ow-worker-action-detail > summary')
+  assert.match(disclosure.textContent,/ثبت انجام کار/)
+  assert.equal(disclosure.parentElement.open,false,'ordinary cards remain compact')
+  await act(async()=>disclosure.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  const form=ui.host.querySelector('.ow-worker-action-detail form')
+  assert.equal(form.querySelectorAll('.ow-checkbox input').length,1,'only extra-time opt-in remains')
+  const send=form.querySelector('button[type="submit"]')
+  assert.ok(!send.disabled,'no separate Start/checked confirmation is mandatory')
+  assert.match(send.textContent,/ارسال گزارش انجام کار/)
+  await act(async()=>send.click())
+  assert.equal(globalThis.__qaStartCalls.length,0,'sending a normal report must not start work implicitly')
+  assert.equal(globalThis.__qaSubmitCalls.length,1)
+  assert.equal(globalThis.__qaSubmitCalls[0].minutes,60)
+  assert.equal(globalThis.__qaSubmitCalls[0].extraReasonCode,null)
+  assert.equal(globalThis.__qaSubmitCalls[0].extraReasonText,null)
+  assert.equal(send.disabled,true,'post-acknowledgement send must remain locked')
+ }finally{
+  globalThis.__qaAllowWorkerSubmit=false;globalThis.__qaSubmitCalls=[]
+  globalThis.__qaStartCalls=[];globalThis.__workerFocusFixture=fixture()
+  await ui.dispose()
+ }
+})
+
+test('P1: extra-time fields remain hidden by default and an incomplete request never submits',async()=>{
+ globalThis.__workerFocusFixture=fixture()
+ globalThis.__qaAllowWorkerSubmit=true
+ globalThis.__qaSubmitCalls=[]
+ const ui=await setup()
+ try{
+  const form=ui.host.querySelector('.ow-worker-action-detail form')
+  assert.equal(form.querySelector('.ow-extra-panel'),null)
+  const toggle=form.querySelector('.ow-extra-toggle input')
+  assert.ok(toggle)
+  assert.equal(toggle.checked,false)
+  await act(async()=>toggle.click())
+  assert.ok(form.querySelector('.ow-extra-panel'))
+  const send=form.querySelector('button[type="submit"]')
+  assert.equal(send.disabled,true,'time extension requires complete reason and larger total')
+  await act(async()=>send.click())
+  assert.equal(globalThis.__qaSubmitCalls.length,0,'incomplete extension cannot be sent')
+  await act(async()=>toggle.click())
+  assert.equal(form.querySelector('.ow-extra-panel'),null)
+  assert.equal(send.disabled,false,'normal report is possible after cancelling extension')
+  await act(async()=>send.click())
+  assert.equal(globalThis.__qaSubmitCalls.length,1)
+  assert.equal(globalThis.__qaSubmitCalls[0].minutes,60)
+ }finally{
+  globalThis.__qaAllowWorkerSubmit=false;globalThis.__qaSubmitCalls=[]
+  globalThis.__workerFocusFixture=fixture();await ui.dispose()
  }
 })
