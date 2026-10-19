@@ -205,7 +205,7 @@ test('overdue unfinished task remains actionable when Today is selected',async()
   const card=Array.from(ui.host.querySelectorAll('.ow-worker-tasks .ow-item'))
     .find(x=>x.textContent.includes('کار قدیمی ناتمام'))
   assert.ok(card)
-  assert.match(card.textContent,/ثبت انجام کار/)
+  assert.match(card.textContent,/اصلاح و ارسال گزارش/)
  }finally{
   await ui.dispose()
   globalThis.__workerFocusFixture=fixture()
