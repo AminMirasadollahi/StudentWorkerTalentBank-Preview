@@ -849,7 +849,7 @@ export default function OpsApp({ mode = 'admin' }) {
       },
       onFinish: () => setRecheckingAccess(false),
     })
-  }, [Boolean(identity), recoveryMode])
+  }, [Boolean(identity), identity?.role, identity?.user?.id, recoveryMode])
 
   const retryIdentityVerification = async () => {
     if (busy) return
