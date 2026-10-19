@@ -1112,7 +1112,6 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
   const [requested,setRequested]=useState(String(task.estimate_minutes))
   const [reasonCode,setReasonCode]=useState('')
   const [reasonText,setReasonText]=useState('')
-  const [completionConfirmed,setCompletionConfirmed]=useState(false)
   const [note,setNote]=useState('')
   const [busy,setBusy]=useState(false)
   const [reportCommitted,setReportCommitted]=useState(Boolean(sameReviewCycle&&acknowledged.report))
@@ -1130,7 +1129,6 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
     if(task.state==='needs_changes'&&priorReviewCycle.current!==reviewCycle){
       actionLedger.delete(task.id)
       setReportCommitted(false)
-      setCompletionConfirmed(false)
       keyRef.current=crypto.randomUUID()
     }
     priorReviewCycle.current=reviewCycle
@@ -1179,9 +1177,12 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
     {task.collaborators?.length>0&&<small className="ow-task-collaborators">
       با همکاری: {task.collaborators.map(x=>x.name).join('، ')}
     </small>}
-    {ready&&<details className="ow-worker-action-detail"><summary>ثبت انجام و گزارش کار</summary>
-      {task.instructions&&<p>{task.instructions}</p>}
-      <form onSubmit={e=>{e.preventDefault();if(!completionConfirmed||!extraValid||reportCommitted)return;
+    {ready&&<details className="ow-worker-action-detail">
+      <summary>{task.state==='needs_changes'?'اصلاح و ارسال گزارش':'ثبت انجام کار'}</summary>
+      {task.instructions&&<details className="ow-worker-task-instructions">
+        <summary>شرح کار محول‌شده</summary><p>{task.instructions}</p>
+      </details>}
+      <form onSubmit={e=>{e.preventDefault();if(!extraValid||reportCommitted||busy)return;
       // Keep the same client submission identity if the tab temporarily unmounts
       // after a request with uncertain network outcome.
       const prior=actionLedger.get(task.id)
@@ -1203,15 +1204,11 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
         </label>
         <div className="ow-standard-credit">
           <span>زمان استاندارد این کار</span><b>{minutes(standard)}</b>
-          <small>با تأیید انجام کار، همین زمان برای بررسی مدیر ارسال می‌شود؛ حتی اگر زودتر تمام کرده باشید.</small>
+          <small>این زمان پس از تأیید مدیر ثبت می‌شود.</small>
         </div>
       </div>
-      <label className="ow-checkbox">
-        <input type="checkbox" checked={completionConfirmed} onChange={e=>setCompletionConfirmed(e.target.checked)}/>
-        کار محول‌شده را انجام داده‌ام و گزارش من برای بررسی مدیر آماده است.
-      </label>
       <label className="report-field"><span>خلاصه نتیجه کار (اختیاری)</span>
-        <input maxLength={2000} value={note} onChange={e=>setNote(e.target.value)}
+        <textarea maxLength={2000} rows={2} value={note} onChange={e=>setNote(e.target.value)}
           placeholder="مثلاً تعداد منابع ثبت‌شده یا نتیجه کار"/>
       </label>
       <label className="ow-checkbox ow-extra-toggle">
@@ -1220,10 +1217,10 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
           setRequestExtra(checked)
           if(!checked){setRequested(String(standard));setReasonCode('');setReasonText('')}
         }}/>
-        درخواست ثبت زمان بیشتر از زمان استاندارد دارم
+        درخواست زمان بیشتر
       </label>
       {requestExtra&&<div className="ow-extra-panel">
-        <p>زمان اضافه فقط پس از بررسی و تأیید مدیر قابل ثبت است. دلیل دقیق افزایش زمان را وارد کنید.</p>
+        <p>مجموع زمان و علت افزایش را وارد کنید؛ تأیید نهایی با مدیر است.</p>
         <div className="ow-fields ow-fields--two">
           <label className="report-field"><span>زمان درخواستی کل (دقیقه)</span>
             <input type="number" min={standard+1} max="1440" required
@@ -1245,14 +1242,16 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
           زمان اضافه درخواستی: {minutes(requestedMinutes-standard)}
         </p>}
       </div>}
-      <div className="ow-actions">
-        {task.state!=='in_progress'&&<button type="button" className="report-btn report-btn--light"
-          onClick={()=>{void perform(()=>startMyTask(task.id),'start')}} disabled={busy||startCommitted||reportCommitted}>شروع کار</button>}
+      <div className="ow-actions ow-worker-submit-actions">
         <button type="submit" className="report-btn report-btn--primary"
-          disabled={busy||reportCommitted||!completionConfirmed||!extraValid}>
-          {requestExtra?'ارسال درخواست زمان بیشتر برای بررسی':'ثبت انجام کار با زمان استاندارد'}
+          disabled={busy||reportCommitted||!extraValid}>
+          {requestExtra?'ارسال درخواست زمان بیشتر':'ارسال گزارش انجام کار'}
         </button>
+        {task.state!=='in_progress'&&<button type="button" className="report-btn report-btn--light"
+          onClick={()=>{void perform(()=>startMyTask(task.id),'start')}} disabled={busy||startCommitted||reportCommitted}
+          title="اختیاری؛ برای اعلام وضعیت در حال انجام، بدون ثبت ساعت">شروع کار</button>}
       </div>
+      <small className="ow-commit-disclosure">با ارسال این گزارش، انجام کار را اعلام می‌کنید؛ ساعت‌ها پس از تأیید مدیر منظور می‌شوند.</small>
       </form>
     </details>}
     {notice&&<p className="ow-muted" role="status">{notice}</p>}

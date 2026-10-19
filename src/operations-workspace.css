@@ -185,11 +185,25 @@
 .ow-worker-tasks,.ow-worker-history { grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr)); align-items:start; }
 .ow-worker-tasks .ow-item { padding:0.65rem 0.75rem; }
 .ow-worker-tasks .ow-item small { font-size:0.72rem; }
-.ow-worker-action-detail { border-top:1px solid #e2eced; padding-top:0.4rem; margin-top:0.45rem; }
-.ow-worker-action-detail > summary { color:#1c7574; font-size:0.78rem; font-weight:700;
-  cursor:pointer; padding:0.35rem 0; }
-.ow-worker-action-detail[open] > summary { margin-bottom:0.6rem; }
-.ow-worker-action-detail form { display:grid; gap:0.35rem; }
+.ow-worker-action-detail { border-top:1px solid #e2eced; padding-top:0.48rem; margin-top:0.45rem; }
+.ow-worker-action-detail > summary { color:var(--report-teal); border:1px solid #a8d8d1;
+  background:#f2fbf9; border-radius:0.52rem; width:max-content; max-width:100%;
+  font-size:0.84rem; font-weight:750; line-height:1.65;
+  cursor:pointer; padding:0.44rem 0.72rem; }
+.ow-worker-action-detail > summary:hover { background:#e5f5f1; }
+.ow-worker-action-detail > summary:focus-visible { outline:2px solid var(--report-teal); outline-offset:2px; }
+.ow-worker-action-detail[open] > summary { margin-bottom:0.55rem; }
+.ow-worker-action-detail form { display:grid; gap:0.5rem; }
+.ow-worker-task-instructions { border:1px solid #dfebeb; border-radius:0.52rem;
+  padding:0.35rem 0.55rem; background:#fcfefe; }
+.ow-worker-task-instructions > summary { cursor:pointer; color:#34586b;
+  font-size:0.76rem; font-weight:600; }
+.ow-worker-task-instructions p { margin:0.3rem 0 0; }
+.ow-worker-action-detail .report-field textarea { resize:vertical; min-height:3.15rem; }
+.ow-worker-submit-actions { display:flex; gap:0.55rem; flex-wrap:wrap; }
+.ow-worker-submit-actions .report-btn--light { color:#58717e; border-color:#d5e1e5; }
+.ow-worker-action-detail .ow-commit-disclosure { font-size:0.72rem; color:var(--report-muted);
+  line-height:1.6; margin-top:0; }
 .ow-worker-workspace .ow-list .ow-item { width:auto; }
 .ops-root .ops-password-settings { width:min(100%,26rem); margin-inline-start:auto;
   margin-top:0.65rem; padding:0.6rem 0.85rem; }
