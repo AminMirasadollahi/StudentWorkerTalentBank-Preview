@@ -195,12 +195,12 @@ test('active but password_required cannot mount work; ready resumes it', async (
 test('manager to worker and worker to manager replace privileged views', async () => {
   const ui = await mount(admin())
   try {
-    assert.match(ui.host.textContent, /پذیرش داوطلبان/)
+    assert.match(ui.host.textContent, /داوطلبان و پذیرش/)
     await ui.resolve(worker())
-    assert.doesNotMatch(ui.host.textContent, /پذیرش داوطلبان|ADMIN_WORK_MOUNTED/)
+    assert.doesNotMatch(ui.host.textContent, /داوطلبان و پذیرش|ADMIN_WORK_MOUNTED/)
     assert.match(ui.host.textContent, /WORKER_WORK_MOUNTED/)
     await ui.resolve(admin())
-    assert.match(ui.host.textContent, /پذیرش داوطلبان/)
+    assert.match(ui.host.textContent, /داوطلبان و پذیرش/)
     assert.doesNotMatch(ui.host.textContent, /WORKER_WORK_MOUNTED/)
   } finally { await ui.unmount() }
 })
@@ -327,7 +327,7 @@ test('P0: manager title, header refresh of active work tab, tab-switch candidate
   assert.equal(globalThis.__qaCandidateReads,1,'not the hidden candidate list')
   await ui.resolve(admin())
   assert.equal(globalThis.__qaAdminReads,3,'valid identity on refocus triggers work readback')
-  const candidateTab=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent==='پذیرش داوطلبان')
+  const candidateTab=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent==='داوطلبان و پذیرش')
   await act(async()=>{candidateTab.click();await Promise.resolve()})
   assert.equal(globalThis.__qaCandidateReads,2,'return to applicant module refreshes stale candidate data')
  }finally{await ui.unmount();delete globalThis.__qaAdminReads;delete globalThis.__qaCandidateReads}
@@ -358,7 +358,7 @@ test('P0 regression: real worker signed in on operations URL gets worker tab tit
 test('P0 regression: manager signed in on worker URL gets manager tab title without role change',async()=>{
  const ui=await mount(admin(), 'worker')
  try{
-  assert.match(userVisibleText(ui.host),/پذیرش داوطلبان/)
+  assert.match(userVisibleText(ui.host),/داوطلبان و پذیرش/)
   assert.equal(document.title,'مدیریت دانشجوکارها | SWTB')
  }finally{await ui.unmount()}
 })
