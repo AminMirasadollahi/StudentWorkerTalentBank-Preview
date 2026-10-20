@@ -303,7 +303,7 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
           <span className="report-eyebrow">پنل اختصاصی دانشجوکار</span>
           <h1>سلام، {profile.name}</h1>
           <p>{unitLabels[profile.unit] || profile.unit} · حساب فعال</p>
-          {loginEmail && <p className="ops-worker-login-email">
+          {loginEmail && <p className="ops-worker-login-email" title={loginEmail}>
             ایمیل ورود: <bdi dir="ltr">{loginEmail}</bdi>
           </p>}
         </div>
