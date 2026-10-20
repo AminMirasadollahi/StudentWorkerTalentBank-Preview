@@ -323,3 +323,74 @@ dialog.ops-recheck-curtain::backdrop {
   .ops-recheck-panel { min-height: 8rem; }
   .ops-recheck-layout { width: calc(100% - 1rem); }
 }
+
+
+/* P2 attention density: applies ONLY to authenticated manager/worker dashboard.
+   Login, public intake/report and security recheck curtain keep their layouts. */
+.ops-root.report-shell--dashboard .report-header {
+  padding: 0.72rem 1.05rem;
+  gap: 0.65rem 1rem;
+  min-height: 0;
+  border-radius: 0.92rem;
+  box-shadow: 0 8px 23px rgba(15,47,70,0.10);
+}
+.ops-root.report-shell--dashboard .report-header > div:first-child {
+  min-width: 0;
+  flex: 1 1 30rem;
+}
+.ops-root.report-shell--dashboard .report-header h1 {
+  margin: 0.05rem 0 0;
+  font-size: clamp(1.18rem, 1.7vw, 1.6rem);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.ops-root.report-shell--dashboard .report-header .report-eyebrow {
+  font-size: 0.73rem;
+  line-height: 1.4;
+}
+.ops-root.report-shell--dashboard .report-header p {
+  display: inline-block;
+  margin: 0.08rem 0.6rem 0 0;
+  line-height: 1.45;
+  font-size: 0.73rem;
+  vertical-align: middle;
+}
+.ops-root.report-shell--dashboard .ops-worker-login-email {
+  max-width: min(100%, 39rem);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+}
+.ops-root.report-shell--dashboard .report-header-actions {
+  flex: 0 0 auto;
+  align-self: center;
+  gap: 0.4rem;
+}
+.ops-root.report-shell--dashboard .report-header-actions .report-btn {
+  min-height: 2.55rem;
+  padding: 0.39rem 0.79rem;
+  font-size: 0.86rem;
+}
+.ops-root.report-shell--dashboard .ops-kpis {
+  margin: 0.38rem 0 0.45rem;
+  gap: 0.35rem;
+}
+.ops-root.report-shell--dashboard .ops-kpis article {
+  padding: 0.43rem 0.68rem;
+}
+@media (max-width: 700px) {
+  .ops-root.report-shell--dashboard .report-header {
+    align-items: stretch;
+    gap: 0.55rem;
+    padding: 0.8rem 0.85rem;
+  }
+  .ops-root.report-shell--dashboard .report-header > div:first-child { flex-basis: 100%; }
+  .ops-root.report-shell--dashboard .report-header-actions { align-self: stretch; }
+  .ops-root.report-shell--dashboard .report-header-actions .report-btn {
+    min-height: 2.75rem;
+  }
+  .ops-root.report-shell--dashboard .ops-worker-login-email {
+    max-width: 100%;
+  }
+}
