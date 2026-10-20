@@ -394,3 +394,46 @@ dialog.ops-recheck-curtain::backdrop {
     max-width: 100%;
   }
 }
+
+
+/* P3: report is a role-protected subview inside the existing manager shell.
+   Legacy standalone report uses its original independent layout and entry code. */
+.ops-root .ops-subtabs {
+  margin: 0.25rem 0 0.7rem;
+  padding: 0.2rem 0.25rem 0.3rem;
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--report-border);
+}
+.ops-root .ops-subtabs .ow-tab {
+  font-size: 0.83rem;
+  min-height: 2.4rem;
+  padding: 0.4rem 0.75rem;
+}
+.ops-root .report-shell--embedded {
+  background: none;
+  padding: 0;
+  min-height: 0;
+  max-width: 100%;
+  width: 100%;
+}
+.ops-root .report-shell--embedded .report-kpis {
+  margin: 0.35rem 0 0.45rem;
+  gap: 0.4rem;
+}
+.ops-root .report-shell--embedded .report-kpis article {
+  padding: 0.55rem 0.7rem;
+}
+.ops-root .report-shell--embedded .report-analytics-note {
+  font-size: 0.76rem;
+  margin: 0.35rem 0 0.7rem;
+}
+.ops-root .report-admin-empty {
+  min-height: 9rem;
+  display: grid;
+  align-content: center;
+  gap: 0.65rem;
+}
+@media (max-width:700px) {
+  .ops-root .ops-subtabs { flex-wrap: wrap; }
+  .ops-root .report-shell--embedded { padding: 0; }
+}
