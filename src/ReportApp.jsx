@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { availabilitySlots, skills, units } from './data'
 import { getStudentWorkerReport } from './lib/reporting'
+import { getAdminStudentWorkerReport } from './lib/adminReporting'
 import { documentTitleForRoute } from './lib/routeTitles.mjs'
 import './report.css'
 
@@ -138,11 +139,13 @@ async function downloadExcel(rows) {
   URL.revokeObjectURL(url)
 }
 
-export default function ReportApp() {
+export default function ReportApp({ adminMode = false, refreshRevision = 0 }) {
   const [accessCode, setAccessCode] = useState(() => {
+    if (adminMode) return '' // Admin never reads the legacy access code or session cache.
     try { return sessionStorage.getItem(REPORT_SESSION_KEY) || '' } catch { return '' }
   })
-  const [authorized, setAuthorized] = useState(false)
+  const [authorized, setAuthorized] = useState(Boolean(adminMode))
+  const requestSeq = useRef(0)
   const [data, setData] = useState(null)
   const [filters, setFilters] = useState({ major: '', entryYear: '', primaryUnit: '' })
   const [loading, setLoading] = useState(false)
@@ -161,38 +164,56 @@ export default function ReportApp() {
   }, [summary.form_starts, summary.tracked_submissions])
 
   const loadReport = async (code = accessCode, nextFilters = filters, remember = false) => {
-    const normalized = code.trim()
-    if (!normalized) {
+    const normalized = String(code || '').trim()
+    if (!adminMode && !normalized) {
       setError('کد دسترسی را وارد کنید.')
       return
     }
 
+    const sequence = ++requestSeq.current
     setLoading(true)
     setError('')
+    // A previously authorized report must never remain visible after an
+    // unsuccessful role-sensitive refresh.
+    if (adminMode) { setData(null); setDetail(null) }
     try {
-      const result = await getStudentWorkerReport(normalized, nextFilters)
+      const result = adminMode
+        ? await getAdminStudentWorkerReport(nextFilters)
+        : await getStudentWorkerReport(normalized, nextFilters)
+      if (sequence !== requestSeq.current) return
       setData(result)
       setAuthorized(true)
-      setAccessCode(normalized)
-      if (remember) {
-        try { sessionStorage.setItem(REPORT_SESSION_KEY, normalized) } catch { /* convenience only */ }
+      if (!adminMode) {
+        setAccessCode(normalized)
+        if (remember) {
+          try { sessionStorage.setItem(REPORT_SESSION_KEY, normalized) } catch { /* convenience only */ }
+        }
       }
     } catch (caught) {
+      if (sequence !== requestSeq.current) return
       setError(caught instanceof Error ? caught.message : 'دریافت گزارش با خطا مواجه شد.')
-      if (!authorized) {
+      if (adminMode) {
+        setData(null)
+        setDetail(null)
+      } else if (!authorized) {
         try { sessionStorage.removeItem(REPORT_SESSION_KEY) } catch { /* ignore */ }
       }
     } finally {
-      setLoading(false)
+      if (sequence === requestSeq.current) setLoading(false)
     }
   }
 
   useEffect(() => {
-    document.title = documentTitleForRoute('report')
-    if (accessCode) void loadReport(accessCode, filters, true)
-    // only bootstrap saved session code
+    if (adminMode) {
+      void loadReport('', filters)
+    } else {
+      document.title = documentTitleForRoute('report')
+      if (accessCode) void loadReport(accessCode, filters, true)
+    }
+    return () => { requestSeq.current += 1 } // stale responses cannot restore a former role's data
+    // Bootstrap the legacy report only at mount; admin refresh is role-scoped.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [adminMode, refreshRevision])
 
   useEffect(() => {
     if (!detail) return
@@ -231,6 +252,19 @@ export default function ReportApp() {
     } finally {
       setExporting(false)
     }
+  }
+
+  if (adminMode && !data) {
+    return (
+      <section className="report-panel report-admin-empty" aria-label="گزارش‌های مدیریتی">
+        <h2>آمار و خروجی‌ها</h2>
+        <p role={error ? 'alert' : 'status'}>
+          {loading ? 'در حال دریافت امن گزارش‌ها…' : error || 'گزارش‌ها هنوز دریافت نشده‌اند.'}
+        </p>
+        {!loading && <button type="button" className="report-btn report-btn--light"
+          onClick={() => void loadReport('', filters)}>تلاش مجدد</button>}
+      </section>
+    )
   }
 
   if (!authorized) {
@@ -277,8 +311,8 @@ export default function ReportApp() {
   }
 
   return (
-    <main className="report-shell report-shell--dashboard" dir="rtl">
-      <header className="report-header">
+    <section className={adminMode ? 'report-shell report-shell--embedded' : 'report-shell report-shell--dashboard'} dir="rtl">
+      {!adminMode && <header className="report-header">
         <div>
           <span className="report-eyebrow">دانشکده علوم انسانی شهید رجایی بابل</span>
           <h1>داشبورد همکاری دانشجویی</h1>
@@ -288,7 +322,7 @@ export default function ReportApp() {
           <a className="report-btn report-btn--ghost" href={window.location.pathname} target="_blank" rel="noreferrer">فرم عمومی</a>
           <button type="button" className="report-btn report-btn--ghost" onClick={logout}>خروج</button>
         </div>
-      </header>
+      </header>}
 
       <section className="report-kpis" aria-label="آمار کلی">
         <article><span>کل ثبت‌ها</span><strong>{faNumber.format(summary.total_applications || 0)}</strong></article>
@@ -420,6 +454,6 @@ export default function ReportApp() {
           </section>
         </div>
       )}
-    </main>
+    </section>
   )
 }
