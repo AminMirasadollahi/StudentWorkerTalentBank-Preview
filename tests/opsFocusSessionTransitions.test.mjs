@@ -327,7 +327,7 @@ test('P0: manager title, header refresh of active work tab, tab-switch candidate
   assert.equal(globalThis.__qaCandidateReads,1,'not the hidden candidate list')
   await ui.resolve(admin())
   assert.equal(globalThis.__qaAdminReads,3,'valid identity on refocus triggers work readback')
-  const candidateTab=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent==='داوطلبان و پذیرش')
+  const candidateTab=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent==='داشبورد و داوطلبان')
   await act(async()=>{candidateTab.click();await Promise.resolve()})
   assert.equal(globalThis.__qaCandidateReads,2,'return to applicant module refreshes stale candidate data')
  }finally{await ui.unmount();delete globalThis.__qaAdminReads;delete globalThis.__qaCandidateReads}
