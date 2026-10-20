@@ -14,6 +14,7 @@ import { normalizeCandidateEmail, isValidCandidateEmail } from './lib/candidateE
 import { disabledWorkerCopy } from './lib/workerAccess.mjs'
 import { watchOperationsResume } from './lib/operationsResume.mjs'
 import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
+import ReportApp from './ReportApp'
 import {
   WORKER_PASSWORD_RECOVERY_REDIRECT,
   PASSWORD_RECOVERY_PENDING_KEY,
@@ -31,6 +32,7 @@ const emailInvitesAvailable = import.meta.env.VITE_OPS_EMAIL_INVITES_AVAILABLE =
 // No credentials, worker records or unsaved form inputs are cached here.
 const initialAdminNavigation = () => ({
   section: 'candidates',
+  candidateView: 'applicants',
   candidateFilter: 'all',
   workView: 'tasks',
   workerId: '',
@@ -510,8 +512,11 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   const [flash, setFlash] = useState('')
   const [issuedCredentials, setIssuedCredentials] = useState(null)
   const [manualWorkRevision,setManualWorkRevision] = useState(0)
+  const [manualReportRevision,setManualReportRevision] = useState(0)
   const filter = navigation.candidateFilter
   const adminSection = navigation.section
+  const candidateView = navigation.candidateView || 'applicants'
+  const setCandidateView = value => setNavigation(previous => ({ ...previous, candidateView: value }))
   const setFilter = value => setNavigation(previous => ({ ...previous, candidateFilter: value }))
   const setAdminSection = value => setNavigation(previous => ({ ...previous, section: value }))
 
@@ -533,10 +538,11 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   // The manager tab switch and post-authentication resume fetch the active
   // module. Other, unmounted workspaces fetch when they are selected.
   useEffect(() => {
-    if (adminSection === 'candidates') void refresh()
-  }, [adminSection, refreshRevision])
+    if (adminSection === 'candidates' && candidateView === 'applicants') void refresh()
+  }, [adminSection, candidateView, refreshRevision])
   const refreshCurrentSection = () => {
     if (adminSection === 'work') setManualWorkRevision(v => v + 1)
+    else if (candidateView === 'report') setManualReportRevision(v => v + 1)
     else void refresh()
   }
 
@@ -618,12 +624,19 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
       <nav className="ow-tabs" aria-label="بخش‌های مدیریت دانشجوکار">
         <button type="button"
           className={adminSection === 'candidates' ? 'ow-tab is-selected' : 'ow-tab'}
-          onClick={() => setAdminSection('candidates')}>پذیرش داوطلبان</button>
+          onClick={() => setAdminSection('candidates')}>داشبورد و داوطلبان</button>
         <button type="button"
           className={adminSection === 'work' ? 'ow-tab is-selected' : 'ow-tab'}
           onClick={() => setAdminSection('work')}>برنامه و کارها</button>
       </nav>
       {adminSection === 'candidates' && <>
+      <nav className="ow-tabs ops-subtabs" aria-label="بخش‌های داشبورد و داوطلبان">
+        <button type="button" className={candidateView === 'applicants' ? 'ow-tab is-selected' : 'ow-tab'}
+          onClick={() => setCandidateView('applicants')}>داوطلبان و پذیرش</button>
+        <button type="button" className={candidateView === 'report' ? 'ow-tab is-selected' : 'ow-tab'}
+          onClick={() => setCandidateView('report')}>آمار و خروجی‌ها</button>
+      </nav>
+      {candidateView === 'applicants' && <>
       <section className="ops-kpis" aria-label="وضعیت دانشجوکارها">
         <article><span>کل داوطلبان</span><strong>{numbers.format(rows.length)}</strong></article>
         <article><span>آماده فعال‌سازی</span><strong>{numbers.format(readyCount)}</strong></article>
@@ -661,6 +674,9 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
             </div>
           ) : <p className="ops-muted">موردی برای نمایش وجود ندارد.</p>}
       </section>
+      </>}
+      {candidateView === 'report' && <ReportApp adminMode
+        refreshRevision={refreshRevision + manualReportRevision} />}
       </>}
       {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation}
         refreshRevision={refreshRevision + manualWorkRevision} />}
