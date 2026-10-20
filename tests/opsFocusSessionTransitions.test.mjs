@@ -27,6 +27,9 @@ const stub = {
     if (importer?.endsWith('/src/OpsApp.jsx') && source === './OperationsWorkspace') {
       return '\0qa-session-workspaces'
     }
+    if (importer?.endsWith('/src/OpsApp.jsx') && source === './ReportApp') {
+      return '\0qa-session-admin-report'
+    }
   },
   load(id) {
     if (id === '\0qa-session-auth-client') {
@@ -45,6 +48,14 @@ const stub = {
         'export const setCandidateEmail = async () => {throw new Error("QA_FORBIDDEN")};',
         'export const signInOperations = async () => ({}) ;',
         'export const signOutOperations = async () => {globalThis.__authListeners.forEach(f=>f("SIGNED_OUT"));};',
+      ].join('\n')
+    }
+    if (id === '\0qa-session-admin-report') {
+      return [
+        'import React from "react";',
+        'export default function ReportApp({adminMode=false,refreshRevision=0}){',
+        'React.useEffect(()=>{globalThis.__qaReportReads=(globalThis.__qaReportReads||0)+1},[refreshRevision]);',
+        'return React.createElement("div", {"data-testid":"admin-report"}, adminMode?"AUTHORIZED_ADMIN_REPORT":"INVALID_ADMIN_REPORT_MODE")}',
       ].join('\n')
     }
     if (id === '\0qa-session-workspaces') {
@@ -362,4 +373,24 @@ test('P0 regression: tab title follows role transition and revocation, never sta
   assert.equal(document.title,'مدیریت دانشجوکارها | SWTB')
   assert.doesNotMatch(userVisibleText(ui.host),/WORKER_WORK_MOUNTED|ADMIN_WORK_MOUNTED/)
  }finally{await ui.unmount()}
+})
+
+test('P3: manager sees integrated subview and header/focus refresh of report only',async()=>{
+ globalThis.__qaReportReads=0
+ const ui=await mount(admin())
+ try{
+  assert.equal(ui.host.querySelector('[data-testid="admin-report"]'),null)
+  const tab=Array.from(ui.host.querySelectorAll('button')).find(x=>x.textContent==='آمار و خروجی‌ها')
+  assert.ok(tab,'dashboard includes report tab for signed-in manager')
+  await act(async()=>tab.click())
+  assert.equal(ui.host.querySelector('[data-testid="admin-report"]')?.textContent,'AUTHORIZED_ADMIN_REPORT')
+  assert.equal(globalThis.__qaReportReads,1)
+  const refresh=Array.from(ui.host.querySelectorAll('button')).find(x=>x.textContent==='به‌روزرسانی')
+  await act(async()=>refresh.click())
+  assert.equal(globalThis.__qaReportReads,2,'manager header refreshes selected reports, not only applicants')
+  await ui.resolve(admin())
+  assert.equal(globalThis.__qaReportReads,3,'same-principal refocus invalidates admin report')
+  await ui.resolve(worker())
+  assert.equal(ui.host.querySelector('[data-testid="admin-report"]'),null,'role change removes report UI')
+ }finally{await ui.unmount();delete globalThis.__qaReportReads}
 })
