@@ -310,8 +310,9 @@ export default function ReportApp({ adminMode = false, refreshRevision = 0 }) {
     )
   }
 
+  const Shell = adminMode ? 'section' : 'main'
   return (
-    <section className={adminMode ? 'report-shell report-shell--embedded' : 'report-shell report-shell--dashboard'} dir="rtl">
+    <Shell className={adminMode ? 'report-shell report-shell--embedded' : 'report-shell report-shell--dashboard'} dir="rtl">
       {!adminMode && <header className="report-header">
         <div>
           <span className="report-eyebrow">دانشکده علوم انسانی شهید رجایی بابل</span>
@@ -454,6 +455,6 @@ export default function ReportApp({ adminMode = false, refreshRevision = 0 }) {
           </section>
         </div>
       )}
-    </section>
+    </Shell>
   )
 }
