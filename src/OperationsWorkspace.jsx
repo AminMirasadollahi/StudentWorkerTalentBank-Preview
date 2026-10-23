@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { trapModalTab } from './lib/dialogFocusTrap.mjs'
 import {
   getAdminWork, getMyWork, setWeeklyDay, setDateException,
   assignWorkerTask, startMyTask, submitMyTime, reviewWorkerTime,
@@ -377,6 +378,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
         })}
       </div>
       <dialog ref={dateDialogRef} className="ow-presence-date-dialog" dir="rtl"
+        onKeyDown={trapModalTab}
         aria-labelledby="ow-presence-day-dialog-title"
         onCancel={event=>{event.preventDefault();if(!busy)setSelectedDate('')}}
         onClose={()=>{if(selectedDate&&!busy)setSelectedDate('')}}>
@@ -1240,6 +1242,7 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
       </div>
       <dialog ref={reportDialogRef} id={`ow-worker-report-dialog-${task.id}`}
         className="ow-worker-report-dialog ow-worker-action-detail" dir="rtl"
+        onKeyDown={trapModalTab}
         aria-labelledby={`ow-worker-report-heading-${task.id}`}
         onCancel={event=>{event.preventDefault();if(!busy)setReportOpen(false)}}
         onClose={()=>{if(reportOpen&&!busy)setReportOpen(false)}}>
@@ -1490,6 +1493,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
     </div>
     <dialog ref={profileDialogRef} id="ow-profile-change-dialog"
       className="ow-profile-action-dialog" dir="rtl"
+      onKeyDown={trapModalTab}
       aria-labelledby="ow-profile-change-dialog-title"
       onCancel={event=>{
         event.preventDefault()
@@ -1545,6 +1549,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
     </div>}
     <dialog ref={requestDialogRef} className="ow-profile-requests-dialog"
       id="ow-profile-requests-dialog" dir="rtl"
+      onKeyDown={trapModalTab}
       aria-labelledby="ow-profile-requests-dialog-title"
       onCancel={event=>{event.preventDefault();setRequestsOpen(false)}}
       onClose={()=>{if(requestsOpen)setRequestsOpen(false)}}>
