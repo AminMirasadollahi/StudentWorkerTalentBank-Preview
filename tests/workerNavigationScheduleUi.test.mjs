@@ -734,10 +734,11 @@ test('P1: assigned task can be completed directly in two explicit actions withou
  globalThis.__qaStartCalls=[]
  const ui=await setup()
  try{
-  const disclosure=ui.host.querySelector('.ow-worker-action-detail > summary')
-  assert.match(disclosure.textContent,/ثبت انجام کار/)
-  assert.equal(disclosure.parentElement.open,false,'ordinary cards remain compact')
-  await act(async()=>disclosure.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  const trigger=ui.host.querySelector('.ow-worker-report-trigger')
+  assert.match(trigger.textContent,/ثبت انجام کار/)
+  assert.equal(trigger.getAttribute('aria-haspopup'),'dialog')
+  assert.ok(ui.host.querySelector('dialog.ow-worker-report-dialog'),'task form uses native modal')
+  await act(async()=>trigger.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
   const form=ui.host.querySelector('.ow-worker-action-detail form')
   assert.equal(form.querySelectorAll('.ow-checkbox input').length,1,'only extra-time opt-in remains')
   const send=form.querySelector('button[type="submit"]')
@@ -811,4 +812,48 @@ test('desktop profile correction uses one focused native dialog; dismiss preserv
     'cancel must retain in-session draft for reopening')
   assert.equal(globalThis.__profileChangeCalls.length,0,'open/close can never submit a request')
  }finally{await ui.dispose()}
+})
+
+
+test('desktop task action dialog is cancelable without any business write and retains unsent note',async()=>{
+ globalThis.__workerFocusFixture=fixture()
+ globalThis.__qaSubmitCalls=[]
+ globalThis.__qaStartCalls=[]
+ const ui=await setup()
+ try{
+  const trigger=ui.host.querySelector('.ow-worker-report-trigger')
+  const dialog=ui.host.querySelector('dialog.ow-worker-report-dialog')
+  assert.ok(trigger && dialog)
+  assert.equal(dialog.getAttribute('aria-labelledby'),dialog.querySelector('h3').id)
+  assert.equal(dialog.getAttribute('dir'),'rtl')
+  await act(async()=>trigger.click())
+  const form=dialog.querySelector('form')
+  const note=form.querySelector('textarea[maxlength="2000"]')
+  const setter=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set
+  await act(async()=>{
+   setter.call(note,'یادداشت موقت ثبت‌نشده')
+   note.dispatchEvent(new window.Event('input',{bubbles:true}))
+  })
+  await act(async()=>dialog.querySelector('button[aria-label="بستن پنجره ثبت کار"]').click())
+  assert.equal(dialog.querySelector('textarea[maxlength="2000"]').value,'یادداشت موقت ثبت‌نشده')
+  await act(async()=>trigger.click())
+  assert.equal(form.querySelector('textarea[maxlength="2000"]').value,'یادداشت موقت ثبت‌نشده')
+  assert.equal(globalThis.__qaSubmitCalls.length,0,'dismiss and reopen never POST')
+  assert.equal(globalThis.__qaStartCalls.length,0,'opening report never starts a task')
+ }finally{
+  globalThis.__qaSubmitCalls=[]
+  globalThis.__qaStartCalls=[]
+  globalThis.__workerFocusFixture=fixture()
+  await ui.dispose()
+ }
+})
+test('task reporting dialog and profile dialog preserve existing auth-freeze integration',()=>{
+ const ops=readFileSync('src/OpsApp.jsx','utf8')
+ const workspace=readFileSync('src/OperationsWorkspace.jsx','utf8')
+ const styles=readFileSync('src/ops.css','utf8')
+ assert.match(workspace,/className="ow-worker-report-dialog ow-worker-action-detail"/)
+ assert.match(workspace,/dialog\.querySelector\('\[data-task-dialog-heading\]'\)\?\.focus\(\)/)
+ assert.match(workspace,/if\(!busy\)setReportOpen\(false\)/)
+ assert.match(styles,/\.ops-recheck-frozen dialog\s*\{/)
+ assert.match(ops,/inert=\{recheckingAccess\}/)
 })
