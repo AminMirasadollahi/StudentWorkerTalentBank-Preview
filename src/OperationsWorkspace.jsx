@@ -1562,13 +1562,25 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
         <button type="button" className="ow-mini-btn"
           onClick={()=>setRequestsOpen(false)}>بستن</button>
       </div>
-      {requestsOpen&&<div className="ow-profile-mini-list ow-profile-requests-list">
-        {requests.map(r=><div key={r.id}>
-          <b>{r.field_code==='major'?'رشته تحصیلی':'نام'}: {r.proposed_value}</b>
-          <small>{r.review_state==='pending'?'منتظر تأیید':
-             r.review_state==='approved'?'تأیید شد':'رد شد'}</small>
-          {r.review_note&&<small>نظر مدیر: {r.review_note}</small>}
-        </div>)}
+      {requestsOpen&&<div className="ow-profile-requests-list">
+        {requests.map(r=><article className="ow-profile-request-item" key={r.id}>
+          <div className="ow-profile-request-item__top">
+            <div className="ow-profile-request-item__identity">
+              <small>مشخصهٔ درخواستی</small>
+              <strong>{r.field_code==='major'?'رشته تحصیلی':'نام و نام خانوادگی'}</strong>
+              <p>{r.proposed_value}</p>
+            </div>
+            <span className={'ow-profile-request-status ow-profile-request-status--'+
+                (['pending','approved','rejected'].includes(r.review_state)?r.review_state:'other')}>
+              {r.review_state==='pending'?'منتظر تأیید':
+               r.review_state==='approved'?'تأیید شد':'رد شد'}
+            </span>
+          </div>
+          {r.review_note&&<div className="ow-profile-request-item__note">
+            <strong>نظر مدیر</strong>
+            <p>{r.review_note}</p>
+          </div>}
+        </article>)}
       </div>}
     </dialog>
     <section className="ow-profile-work-summary" aria-label="نمای وضعیت کارهای من">
