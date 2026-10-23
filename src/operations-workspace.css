@@ -691,3 +691,38 @@ dialog.ow-worker-report-dialog .ow-fields {margin:.15rem 0}
 dialog.ow-worker-report-dialog .ow-worker-task-instructions {margin-bottom:.7rem}
 dialog.ow-worker-report-dialog .ow-worker-submit-actions {margin-top:.45rem}
 dialog.ow-worker-report-dialog .ow-worker-submit-actions button[type="submit"] {min-height:2.75rem}
+
+
+/* SWTB7 desktop date context: the calendar day action always reveals a
+   focused surface; past dates show only historical details, never save. */
+dialog.ow-presence-date-dialog {
+ position:fixed;inset:0;margin:auto;box-sizing:border-box;
+ width:min(46rem,calc(100vw - 2rem));max-width:none;
+ max-height:min(84vh,53rem);overflow:auto;
+ padding:1.15rem 1.3rem 1.4rem;
+ border:1px solid var(--report-border);border-radius:1rem;
+ background:#fff;color:var(--report-navy);
+ text-align:right;box-shadow:0 26px 70px rgba(9,43,64,.28);
+}
+dialog.ow-presence-date-dialog::backdrop {background:rgba(8,35,53,.58)}
+dialog.ow-presence-date-dialog .ow-exception-inline {
+ border:0;background:transparent;padding:0;margin:0;gap:.8rem;
+}
+.ow-presence-date-dialog__head {
+ margin-bottom:.1rem;padding-bottom:.75rem;
+ border-bottom:1px solid var(--report-border);
+}
+.ow-presence-date-dialog__head h4 {
+ margin:0;font-size:1.2rem;line-height:1.55;
+}
+.ow-presence-date-dialog__head h4:focus {outline:none}
+.ow-presence-date-dialog__head .ow-mini-btn:focus-visible {
+ outline:2px solid var(--report-teal);outline-offset:3px;
+}
+.ow-presence-readonly-note {
+ border-radius:.7rem;padding:.65rem .8rem;
+ background:#f3f7f8;border:1px solid var(--report-border);
+}
+dialog.ow-presence-date-dialog .ow-selected-day-tasks {
+ max-height:16rem;overflow:auto;
+}
