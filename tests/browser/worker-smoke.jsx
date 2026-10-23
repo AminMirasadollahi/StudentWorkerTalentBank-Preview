@@ -24,10 +24,18 @@ globalThis.__qaWorkerData={
  ],
  weekly_slots:[],exceptions:[],time_entries:[],approved_minutes_total:105,
 }
-globalThis.__qaProfileRequests=[{
- id:'SYNTHETIC-REQUEST-1',field_code:'major',proposed_value:'رشتهٔ آزمایشی',
- review_state:'pending',review_note:'این تنها دادهٔ ساختگی برای آزمون مرورگر است',
-}]
+globalThis.__qaProfileRequests=[
+ {id:'SYNTHETIC-REQUEST-1',field_code:'major',
+  proposed_value:'رشتهٔ آزمایشی',review_state:'pending',
+  review_note:'این توضیح صرفاً نمونهٔ ساختگی برای آزمون مرورگر است'},
+ {id:'SYNTHETIC-REQUEST-2',field_code:'name',
+  proposed_value:'نام آزمایشی ثبت‌شده',review_state:'approved',
+  review_note:'اصلاح این مشخصه در داده‌های ساختگی تأیید شده است'},
+ {id:'SYNTHETIC-REQUEST-3',field_code:'major',
+  proposed_value:'یک مقدار آزمایشی طولانی برای بررسی خوانایی متن فارسی و شکست خط',
+  review_state:'rejected',
+  review_note:'درخواست نمونه به‌دلیل وجود مغایرت آزمایشی رد شده است؛ جهت بررسی بعدی از مسیر تعریف‌شده اقدام کنید'},
+]
 globalThis.__qaWriteAttempts=0
 
 function App(){
