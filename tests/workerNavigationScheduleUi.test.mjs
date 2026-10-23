@@ -217,9 +217,9 @@ test('personal profile change only queues a synthetic manager-reviewed proposal'
   await ui.clickText('پروفایل من')
   assert.match(ui.host.textContent,/رشته تحصیلی/)
   assert.match(ui.host.textContent,/پژوهش/)
-  const summary=ui.host.querySelector('.ow-profile-change > summary')
-  assert.ok(summary)
-  await act(async()=>summary.dispatchEvent(new window.MouseEvent('click',{bubbles:true,cancelable:true})))
+  const open=ui.host.querySelector('.ow-profile-change-trigger')
+  assert.ok(open)
+  await act(async()=>open.dispatchEvent(new window.MouseEvent('click',{bubbles:true,cancelable:true})))
   assert.ok(ui.host.querySelector('.ow-profile-change-form'))
   const fields=ui.host.querySelectorAll('.ow-profile-change-form input,.ow-profile-change-form textarea')
   assert.equal(fields.length,2)
@@ -532,9 +532,9 @@ test('manager rejected report opens a new cycle rather than permanently blocking
 
 async function openSyntheticProfileChange(ui){
  await ui.clickText('پروفایل من')
- const summary=ui.host.querySelector('.ow-profile-change > summary')
- assert.ok(summary)
- await act(async()=>summary.dispatchEvent(
+ const open=ui.host.querySelector('.ow-profile-change-trigger')
+ assert.ok(open)
+ await act(async()=>open.dispatchEvent(
    new window.MouseEvent('click',{bubbles:true,cancelable:true})))
  const form=ui.host.querySelector('.ow-profile-change-form')
  assert.ok(form)
@@ -784,4 +784,31 @@ test('P1: extra-time fields remain hidden by default and an incomplete request n
   globalThis.__qaAllowWorkerSubmit=false;globalThis.__qaSubmitCalls=[]
   globalThis.__workerFocusFixture=fixture();await ui.dispose()
  }
+})
+
+
+test('desktop profile correction uses one focused native dialog; dismiss preserves draft',async()=>{
+ const ui=await setup()
+ try{
+  const form=await openSyntheticProfileChange(ui)
+  const dialog=ui.host.querySelector('dialog.ow-profile-action-dialog')
+  assert.ok(dialog,'real native dialog exists, not an aria-only visual popup')
+  assert.equal(dialog.getAttribute('aria-labelledby'),'ow-profile-change-dialog-title')
+  assert.equal(dialog.getAttribute('dir'),'rtl')
+  const heading=dialog.querySelector('#ow-profile-change-dialog-title')
+  assert.ok(heading)
+  const value=form.querySelector('input')
+  const setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set
+  await act(async()=>{
+   setter.call(value,'رشته اصلاحی موقت')
+   value.dispatchEvent(new window.Event('input',{bubbles:true}))
+  })
+  await act(async()=>dialog.querySelector('button[aria-label="بستن پنجره اصلاح مشخصات"]').click())
+  assert.equal(ui.host.querySelector('.ow-profile-change-form'),null,'closed form is not interactive')
+  const open=ui.host.querySelector('.ow-profile-change-trigger')
+  await act(async()=>open.click())
+  assert.equal(ui.host.querySelector('.ow-profile-change-form input').value,'رشته اصلاحی موقت',
+    'cancel must retain in-session draft for reopening')
+  assert.equal(globalThis.__profileChangeCalls.length,0,'open/close can never submit a request')
+ }finally{await ui.dispose()}
 })
