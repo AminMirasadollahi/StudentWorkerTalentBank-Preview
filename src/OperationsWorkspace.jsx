@@ -114,6 +114,8 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
   const [draftWindows,setDraftWindows]=useState([])
   const [monthAnchor,setMonthAnchor]=useState(today())
   const [selectedDate,setSelectedDate]=useState('')
+  const dateDialogRef=useRef(null)
+  const lastDateButtonRef=useRef(null)
   const [exceptionKind,setExceptionKind]=useState('replacement_intervals')
   const [exceptionWindows,setExceptionWindows]=useState([])
   const [exceptionSlot,setExceptionSlot]=useState(null)
@@ -122,6 +124,21 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
   const [saveState,setSaveState]=useState('')
+  // A selected day must reveal information at the point of action, not
+  // silently append an off-screen form after the complete month grid.
+  useLayoutEffect(()=>{
+    const dialog=dateDialogRef.current
+    if(!dialog)return
+    if(selectedDate){
+      if(!dialog.open && typeof dialog.showModal==='function'){
+        try{dialog.showModal()}catch{return}
+      }
+      dialog.querySelector('[data-presence-date-heading]')?.focus()
+    }else if(dialog.open){
+      dialog.close()
+      lastDateButtonRef.current?.focus()
+    }
+  },[selectedDate])
   const month=persianMonthCells(monthAnchor)
   const calendarData=data||{}
   const weeklyValidation=validateDailyWindows(draftWindows)
@@ -341,7 +358,10 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
             className={'ow-month-day'+(selectedDate===day.date?' is-selected':'')
               +(day.date===today()?' is-today':'')
               +(hasException?' has-exception':'')}
-            onClick={()=>chooseMonthDay(day.date)} disabled={busy}
+            onClick={event=>{
+              lastDateButtonRef.current=event.currentTarget
+              chooseMonthDay(day.date)
+            }} disabled={busy}
             aria-pressed={selectedDate===day.date}
             title={`${pretty(day.date)}: ${daily.kind==='unknown'?'برنامه نامشخص':heading+' '+timings}`}
             aria-label={`${pretty(day.date)}؛ ${daily.kind==='unknown'?'برنامه نامشخص':heading+' '+timings}؛ ${n(tasks.length)} کار`}>
@@ -356,10 +376,18 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
           </button>
         })}
       </div>
+      <dialog ref={dateDialogRef} className="ow-presence-date-dialog" dir="rtl"
+        aria-labelledby="ow-presence-day-dialog-title"
+        onCancel={event=>{event.preventDefault();if(!busy)setSelectedDate('')}}
+        onClose={()=>{if(selectedDate&&!busy)setSelectedDate('')}}>
       {selectedDate&&<form className="ow-exception-inline" onSubmit={submitDate}>
-        <div className="ow-presence-section-title">
-          <h4>تغییر موقت · {pretty(selectedDate)}</h4>
-          <button type="button" className="ow-mini-btn" onClick={()=>setSelectedDate('')}>بستن</button>
+        <div className="ow-presence-section-title ow-presence-date-dialog__head">
+          <h4 id="ow-presence-day-dialog-title" tabIndex={-1}
+            data-presence-date-heading>
+            {selectedDate<today()?'جزئیات روز':'برنامه و تغییرات روز'} · {pretty(selectedDate)}
+          </h4>
+          <button type="button" className="ow-mini-btn" disabled={busy}
+            onClick={()=>setSelectedDate('')}>بستن</button>
         </div>
         <p className="ow-muted ow-selected-current">
           {(()=>{
@@ -377,7 +405,11 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
           </div>}
         {onPlanAssignment&&<button type="button" className="ow-mini-btn"
           onClick={()=>onPlanAssignment(selectedDate)}>+ تعریف کار در این تاریخ</button>}
-        <div className="ow-exception-kind" role="group" aria-label="نوع تغییر این تاریخ">
+        {selectedDate<today()
+          ? <p role="status" className="ow-muted ow-presence-readonly-note">
+              این تاریخ گذشته است؛ برنامه و کارهای آن فقط قابل مشاهده‌اند و تغییر جدید ثبت نمی‌شود.
+            </p>
+          : <>        <div className="ow-exception-kind" role="group" aria-label="نوع تغییر این تاریخ">
           <label><input type="radio" name="exception-kind" checked={exceptionKind==='replacement_intervals'}
             onChange={()=>setExceptionKind('replacement_intervals')}/> ثبت ساعات جایگزین</label>
           <label><input type="radio" name="exception-kind" checked={exceptionKind==='unavailable'}
@@ -388,7 +420,6 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
         <label className="report-field"><span>توضیح (اختیاری)</span>
           <input maxLength={300} value={note} onChange={e=>setNote(e.target.value)}/>
         </label>
-        {selectedDate<today()&&<p role="status" className="ow-muted">تاریخ گذشته فقط برای مشاهده است.</p>}
         {!exceptionValidation.ok&&<p role="alert" className="ow-warning">{exceptionValidation.error}</p>}
         {exceptionPreview?.code==='conflict'&&<p role="status" className="ow-warning">
           ظرفیت این روز با {minutes(exceptionPreview.allocatedMinutes)} کار موجود تداخل دارد.
@@ -399,8 +430,10 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
             ||(exceptionKind==='replacement_intervals'&&!exceptionWindows.length)}>
           ذخیره استثنای این تاریخ
         </button>
+          </>}
       </form>}
-      <small className="ow-muted">هر تاریخ قابل انتخاب است؛ تغییر موقت تنها روی همان روز اثر دارد.</small>
+      </dialog>
+      <small className="ow-muted">برای مشاهده یا ویرایش برنامهٔ یک روز، آن روز را در تقویم انتخاب کنید.</small>
     </section>
     <div className="ow-presence-feedback">
       <Message error={error} notice={notice}/>
