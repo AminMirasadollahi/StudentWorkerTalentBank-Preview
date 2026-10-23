@@ -1539,7 +1539,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     ;(setNavigation||setLocalNavigation)(fn)
   }
   const section=['tasks','availability','profile'].includes(selected.section)?selected.section:'tasks'
-  const taskRange=['today','week','month'].includes(selected.taskRange)?selected.taskRange:'today'
+  const taskRange=['today','week','month','upcoming'].includes(selected.taskRange)?selected.taskRange:'today'
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [readFailed,setReadFailed]=useState(false)
@@ -1568,11 +1568,17 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const tasks=data.tasks||[]
   const week=persianWeekBounds(today())
   const month=persianMonthBounds(today())
+  // An explicit Upcoming filter avoids hiding next-month assignments behind
+  // the profile page. It excludes completed/cancelled tasks and never adds
+  // overdue work that contradicts the selected future-only interval.
   const ranged=taskRange==='today'?tasks.filter(t=>t.planned_date===today()):
     taskRange==='week'?tasks.filter(t=>t.planned_date>=week.start&&t.planned_date<=week.end):
-    tasks.filter(t=>t.planned_date>=month.start&&t.planned_date<=month.end)
+    taskRange==='month'?tasks.filter(t=>t.planned_date>=month.start&&t.planned_date<=month.end):
+    tasks.filter(t=>t.planned_date>today()&&!['completed','cancelled'].includes(t.state))
+      .sort((a,b)=>a.planned_date.localeCompare(b.planned_date))
   const overdue=tasks.filter(t=>t.planned_date<today()&&['assigned','in_progress','needs_changes'].includes(t.state))
-  const visible=[...overdue,...ranged.filter(t=>!overdue.some(p=>p.id===t.id))]
+  const visible=taskRange==='upcoming' ? ranged :
+    [...overdue,...ranged.filter(t=>!overdue.some(p=>p.id===t.id))]
   if(readFailed)return <div className="ow-workspace ow-worker-workspace ow-access-recheck" role="alert">
     <p>برنامهٔ کاری در دسترس نیست. تا بررسی دوبارهٔ دسترسی، اطلاعات قبلی نمایش داده نمی‌شوند.</p>
     <div className="report-alert report-alert--error">{error}</div>
@@ -1592,9 +1598,9 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
     {section==='tasks'&&<section className="report-panel">
       <div className="ow-worker-list-heading">
-        <h2>کارها {overdue.length>0&&<small className="ow-overdue-count">· {n(overdue.length)} نیازمند اقدام از روزهای قبل</small>}</h2>
+        <h2>کارها {taskRange!=='upcoming'&&overdue.length>0&&<small className="ow-overdue-count">· {n(overdue.length)} نیازمند اقدام از روزهای قبل</small>}</h2>
         <div className="ow-range-switch" role="group" aria-label="بازه نمایش کارها">
-          {[['today','امروز'],['week','این هفته'],['month','این ماه']].map(([id,title])=>
+          {[['today','امروز'],['week','این هفته'],['month','این ماه'],['upcoming','آینده']].map(([id,title])=>
             <button type="button" key={id} aria-pressed={taskRange===id}
               className={taskRange===id?'is-selected':''}
               onClick={()=>updateNavigation({taskRange:id})}>{title}</button>)}
