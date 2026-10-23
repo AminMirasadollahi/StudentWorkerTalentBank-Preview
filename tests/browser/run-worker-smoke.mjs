@@ -54,8 +54,17 @@ try{
    'یادداشت کاملاً آزمایشی و ثبت‌نشده')
   for(let i=0;i<9;i++){
    await page.keyboard.press('Tab')
-   assert.ok(await page.evaluate(()=>!!document.activeElement?.closest('dialog.ow-worker-report-dialog')),
-    'native modal must keep keyboard focus inside dialog')
+   const focus=await page.evaluate(()=>{
+    const node=document.activeElement
+    return {tag:node?.tagName,id:node?.id,role:node?.getAttribute('role'),
+      className:typeof node?.className==='string'?node.className.slice(0,100):'',
+      text:node?.textContent?.trim().slice(0,80)||'',
+      inside:!!node?.closest('dialog.ow-worker-report-dialog'),
+      modal:document.querySelector('dialog.ow-worker-report-dialog')?.matches(':modal'),
+      otherInteractive:document.querySelector('.ow-profile-change-trigger')?.matches(':enabled')}
+   })
+   assert.ok(focus.inside,
+    'native modal focus after Tab #'+i+': '+JSON.stringify(focus))
   }
   await page.keyboard.press('Escape')
   await page.waitForFunction(()=>!document.querySelector('dialog.ow-worker-report-dialog')?.open)
