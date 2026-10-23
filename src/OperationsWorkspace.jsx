@@ -1345,6 +1345,10 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
  const [profileReadFailed,setProfileReadFailed]=useState(false)
  const profileReadSequence=useRef(0)
  const [editing,setEditing]=useState(false)
+ const [requestsOpen,setRequestsOpen]=useState(false)
+ const [profileWorkTab,setProfileWorkTab]=useState('ongoing')
+ const requestDialogRef=useRef(null)
+ const requestDialogTriggerRef=useRef(null)
  const profileDialogRef=useRef(null)
  const profileDialogTriggerRef=useRef(null)
  const [field,setField]=useState('major')
@@ -1369,6 +1373,19 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
      profileDialogTriggerRef.current?.focus()
    }
  },[editing])
+ useLayoutEffect(()=>{
+   const dialog=requestDialogRef.current
+   if(!dialog)return
+   if(requestsOpen){
+     if(!dialog.open && typeof dialog.showModal==='function'){
+       try{dialog.showModal()}catch{return}
+     }
+     dialog.querySelector('[data-profile-requests-heading]')?.focus()
+   }else if(dialog.open){
+     dialog.close()
+     requestDialogTriggerRef.current?.focus()
+   }
+ },[requestsOpen])
  const hasPendingField=fieldCode=>requestLedger.has(fieldCode)
    ||requests.some(r=>r.field_code===fieldCode&&r.review_state==='pending')
  const refreshProfile=async()=>{
@@ -1444,6 +1461,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
     {id:'upcoming',title:'پیش‌رو',tasks:upcoming},
     {id:'completed',title:'انجام‌شده',tasks:completed},
   ]
+  const activePanel=panels.find(panel=>panel.id===profileWorkTab)||panels[0]
   if(profileReadFailed)return <section className="report-panel ow-self-profile ow-profile-access-recheck" role="alert">
     <p>مشخصات شخصی در دسترس نیستند. اطلاعات قبلی تا تأیید دوبارهٔ دسترسی پنهان می‌مانند.</p>
     {requestsError&&<p className="report-alert report-alert--error">{requestsError}</p>}
@@ -1515,29 +1533,60 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
     {submitNotice&&<p className="ow-muted" role="status">{submitNotice}</p>}
     {requestsError&&<div role="alert" className="report-alert report-alert--error">{requestsError}</div>}
     {requestsLoading&&<p role="status" className="ow-muted">در حال دریافت وضعیت درخواست‌ها…</p>}
-    {requests.length>0&&<details className="ow-profile-fold"><summary>درخواست‌های اصلاح · {n(requests.length)}</summary>
-      <div className="ow-profile-mini-list">
+    {requests.length>0&&<div className="ow-profile-requests-launch">
+      <button type="button" ref={requestDialogTriggerRef}
+        className="report-btn report-btn--light"
+        aria-haspopup="dialog" aria-controls="ow-profile-requests-dialog"
+        onClick={()=>setRequestsOpen(true)}>
+        درخواست‌های اصلاح · {n(requests.length)}
+      </button>
+      {requests.some(r=>r.review_state==='pending')&&
+        <small className="ow-status">منتظر تأیید · {n(requests.filter(r=>r.review_state==='pending').length)}</small>}
+    </div>}
+    <dialog ref={requestDialogRef} className="ow-profile-requests-dialog"
+      id="ow-profile-requests-dialog" dir="rtl"
+      aria-labelledby="ow-profile-requests-dialog-title"
+      onCancel={event=>{event.preventDefault();setRequestsOpen(false)}}
+      onClose={()=>{if(requestsOpen)setRequestsOpen(false)}}>
+      <div className="ow-profile-requests-dialog__head">
+        <div>
+          <h3 id="ow-profile-requests-dialog-title" data-profile-requests-heading
+            tabIndex={-1}>درخواست‌های اصلاح مشخصات</h3>
+          <p className="ow-muted">وضعیت بررسی درخواست‌ها و نظر مدیر</p>
+        </div>
+        <button type="button" className="ow-mini-btn"
+          onClick={()=>setRequestsOpen(false)}>بستن</button>
+      </div>
+      {requestsOpen&&<div className="ow-profile-mini-list ow-profile-requests-list">
         {requests.map(r=><div key={r.id}>
           <b>{r.field_code==='major'?'رشته تحصیلی':'نام'}: {r.proposed_value}</b>
           <small>{r.review_state==='pending'?'منتظر تأیید':
              r.review_state==='approved'?'تأیید شد':'رد شد'}</small>
           {r.review_note&&<small>نظر مدیر: {r.review_note}</small>}
         </div>)}
+      </div>}
+    </dialog>
+    <section className="ow-profile-work-summary" aria-label="نمای وضعیت کارهای من">
+      <div className="ow-profile-work-heading">
+        <h3>وضعیت کارها</h3>
+        <small className="ow-muted">کارهای ثبت‌شده به تفکیک وضعیت</small>
       </div>
-    </details>}
-    <div className="ow-profile-kpi-line" aria-label="خلاصه عملکرد">
-      <span>{n(ongoing.length)} در جریان</span><span>{n(upcoming.length)} پیش‌رو</span>
-      <span>{n(completed.length)} انجام‌شده</span><span>{n(records.length)} گزارش</span>
-    </div>
-    {panels.map(group=><details key={group.id} className="ow-profile-fold">
-      <summary>{group.title} · {n(group.tasks.length)}</summary>
-      <div className="ow-profile-mini-list">
-        {group.tasks.map(task=><div key={task.id}>
-          <b>{task.title}</b><small>{pretty(task.planned_date)} · {stateLabels[task.state]||task.state}</small>
+      <div className="ow-profile-work-tabs" role="group" aria-label="دسته‌بندی کارهای پروفایل">
+        {panels.map(group=><button key={group.id} type="button"
+          aria-pressed={profileWorkTab===group.id}
+          className={profileWorkTab===group.id?'is-selected':''}
+          onClick={()=>setProfileWorkTab(group.id)}>
+          {group.title} <span>{n(group.tasks.length)}</span>
+        </button>)}
+      </div>
+      <div className="ow-profile-work-list ow-profile-mini-list">
+        {activePanel.tasks.map(task=><div key={task.id}>
+          <b>{task.title}</b>
+          <small>{pretty(task.planned_date)} · {stateLabels[task.state]||task.state}</small>
         </div>)}
-        {!group.tasks.length&&<p className="ow-muted">موردی ثبت نشده است.</p>}
+        {!activePanel.tasks.length&&<p className="ow-muted">کاری در این دسته ثبت نشده است.</p>}
       </div>
-    </details>)}
+    </section>
     <details className="ow-profile-fold">
       <summary>سابقه گزارش‌ها و ساعات · {n(records.length)}</summary>
       <div className="ow-profile-mini-list">
