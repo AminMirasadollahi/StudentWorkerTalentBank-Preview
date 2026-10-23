@@ -754,7 +754,58 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 .ow-profile-requests-dialog__head .ow-mini-btn:focus-visible {
  outline:2px solid var(--report-teal);outline-offset:3px;
 }
-.ow-profile-requests-list {max-height:none;padding:.25rem 0;gap:.5rem}
+.ow-profile-requests-list {
+ display:grid;grid-template-columns:minmax(0,1fr);gap:.8rem;
+ max-height:none;padding:.35rem 0 .1rem;
+}
+.ow-profile-request-item {
+ min-width:0;border:1px solid var(--report-border);
+ border-radius:.75rem;padding:.95rem 1rem;
+ background:#f9fcfd;
+}
+.ow-profile-request-item__top {
+ display:flex;align-items:start;justify-content:space-between;gap:1rem;
+}
+.ow-profile-request-item__identity {min-width:0;flex:1}
+.ow-profile-request-item__identity>small {
+ display:block;font-size:.78rem;color:var(--report-muted);
+ margin-bottom:.12rem;
+}
+.ow-profile-request-item__identity>strong {
+ display:block;font-size:.98rem;color:var(--report-navy);
+ line-height:1.55;
+}
+.ow-profile-request-item__identity>p {
+ margin:.25rem 0 0;font-size:.92rem;line-height:1.7;
+ overflow-wrap:anywhere;
+}
+.ow-profile-request-status {
+ display:inline-flex;align-items:center;flex:0 0 auto;
+ border:1px solid #cfdfe3;border-radius:999px;
+ padding:.32rem .65rem;font-size:.78rem;font-weight:700;
+ color:#4a6775;background:#eef3f5;
+}
+.ow-profile-request-status--pending {
+ background:#fff4e1;color:#81520c;border-color:#e9d5b2;
+}
+.ow-profile-request-status--approved {
+ background:#e8f5f0;color:#13684e;border-color:#c2e3d5;
+}
+.ow-profile-request-status--rejected {
+ background:#fff0ee;color:#9a3730;border-color:#efc8c1;
+}
+.ow-profile-request-item__note {
+ margin-top:.75rem;padding:.7rem .8rem;border-radius:.6rem;
+ background:white;border-right:3px solid #80b5b7;
+}
+.ow-profile-request-item__note strong {
+ display:block;font-size:.82rem;color:var(--report-navy);
+}
+.ow-profile-request-item__note p {
+ margin:.2rem 0 0;font-size:.87rem;line-height:1.8;
+ color:var(--report-text);overflow-wrap:anywhere;
+}
+
 .ow-profile-work-summary {
  margin:.7rem 0;min-width:0;border-radius:.8rem;
  border:1px solid var(--report-border);background:#fff;
