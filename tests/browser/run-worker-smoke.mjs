@@ -115,7 +115,7 @@ try{
   await page.screenshot({path:resolve(output,'05-synthetic-calendar-day.png')})
   await page.keyboard.press('Escape')
   await page.waitForFunction(()=>!document.querySelector('.ow-presence-date-dialog')?.open)
-  await page.getByRole('button',{name:'ماه قبل'}).click()
+  await page.getByRole('button',{name:'ماه پیشین'}).click()
   await page.locator('.ow-month-grid .ow-month-day').first().click()
   assert.ok(await matchesModal('.ow-presence-date-dialog'))
   assert.ok((await page.locator('.ow-presence-date-dialog').innerText()).includes('فقط قابل مشاهده‌اند'))
