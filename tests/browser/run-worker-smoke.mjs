@@ -26,7 +26,7 @@ const bound=async selector=>{
 try{
  server=await createServer({configFile:resolve('tests/browser/vite.smoke.config.mjs')})
  await server.listen()
- browser=await chromium.launch({headless:true,args:['--no-sandbox']})
+ browser=await chromium.launch({headless:true,channel:'chrome',args:['--no-sandbox']})
  page=await browser.newPage({viewport:{width:1440,height:900},locale:'fa-IR'})
  page.on('pageerror',err=>{process.stderr.write('Browser page error: '+err.message+'\n')})
  await page.route('**/*',route=>{
