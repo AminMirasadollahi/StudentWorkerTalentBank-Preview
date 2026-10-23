@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   getAdminWork, getMyWork, setWeeklyDay, setDateException,
   assignWorkerTask, startMyTask, submitMyTime, reviewWorkerTime,
@@ -1266,12 +1266,30 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
  const [profileReadFailed,setProfileReadFailed]=useState(false)
  const profileReadSequence=useRef(0)
  const [editing,setEditing]=useState(false)
+ const profileDialogRef=useRef(null)
+ const profileDialogTriggerRef=useRef(null)
  const [field,setField]=useState('major')
  const [value,setValue]=useState('')
  const [reason,setReason]=useState('')
  const [saving,setSaving]=useState(false)
  const [submitNotice,setSubmitNotice]=useState('')
  const submitLock=useRef(false)
+ // Native browser top layer: preserve draft when dismissed, without changing
+ // the operations authorization or the existing single-flight submit contract.
+ // OpsApp's focus recheck explicitly hides any still-open descendant dialog.
+ useLayoutEffect(()=>{
+   const dialog=profileDialogRef.current
+   if(!dialog)return
+   if(editing){
+     if(!dialog.open && typeof dialog.showModal==='function'){
+       try{dialog.showModal()}catch{return}
+     }
+     dialog.querySelector('[data-profile-dialog-heading]')?.focus()
+   }else if(dialog.open){
+     dialog.close()
+     profileDialogTriggerRef.current?.focus()
+   }
+ },[editing])
  const hasPendingField=fieldCode=>requestLedger.has(fieldCode)
    ||requests.some(r=>r.field_code===fieldCode&&r.review_state==='pending')
  const refreshProfile=async()=>{
@@ -1366,11 +1384,33 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
       <div><small>سال ورود</small><strong>{identity?.entry_year||'ثبت نشده'}</strong></div>
       <div><small>واحد همکاری</small><strong>{unitLabels[identity?.unit]||identity?.unit||'نامشخص'}</strong></div>
     </div>
-    <details className="ow-profile-fold ow-profile-change" open={editing} onToggle={e=>{
-       if(!e.currentTarget.open&&editing)setEditing(false)
-     }}>
-      <summary onClick={e=>{e.preventDefault();setEditing(open=>!open)}}>درخواست اصلاح مشخصات</summary>
-      {editing&&<form onSubmit={submitChange} className="ow-profile-change-form">
+    <div className="ow-profile-change-launch">
+      <button type="button" ref={profileDialogTriggerRef}
+        className="report-btn report-btn--light ow-profile-change-trigger"
+        aria-haspopup="dialog" aria-controls="ow-profile-change-dialog"
+        onClick={()=>setEditing(true)}>درخواست اصلاح مشخصات</button>
+      <small className="ow-muted">مشخصات فعلی تا بررسی و تأیید مدیر تغییر نمی‌کنند.</small>
+    </div>
+    <dialog ref={profileDialogRef} id="ow-profile-change-dialog"
+      className="ow-profile-action-dialog" dir="rtl"
+      aria-labelledby="ow-profile-change-dialog-title"
+      onCancel={event=>{
+        event.preventDefault()
+        if(!saving)setEditing(false)
+      }}
+      onClose={()=>{if(editing&&!saving)setEditing(false)}}>
+      <div className="ow-profile-action-dialog__head">
+        <div>
+          <h3 id="ow-profile-change-dialog-title" tabIndex={-1}
+            data-profile-dialog-heading>درخواست اصلاح مشخصات</h3>
+          <p className="ow-muted">فقط مشخصه موردنظر و دلیل اصلاح را وارد کنید.</p>
+        </div>
+        <button type="button" className="ow-profile-action-dialog__close"
+          disabled={saving} onClick={()=>setEditing(false)}
+          aria-label="بستن پنجره اصلاح مشخصات">بستن</button>
+      </div>
+      {editing&&
+      <form onSubmit={submitChange} className="ow-profile-change-form">
         <label className="report-field"><span>مشخصه موردنظر</span>
           <select value={field} onChange={e=>setField(e.target.value)}>
             <option value="major">رشته تحصیلی</option><option value="full_name">نام و نام خانوادگی</option>
@@ -1390,8 +1430,9 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
         <button type="submit" className="report-btn report-btn--primary"
           disabled={saving||hasPendingField(field)||value.trim().length<2||reason.trim().length<10}>
           ارسال درخواست</button>
-      </form>}
-    </details>
+      </form>
+      }
+    </dialog>
     {submitNotice&&<p className="ow-muted" role="status">{submitNotice}</p>}
     {requestsError&&<div role="alert" className="report-alert report-alert--error">{requestsError}</div>}
     {requestsLoading&&<p role="status" className="ow-muted">در حال دریافت وضعیت درخواست‌ها…</p>}
