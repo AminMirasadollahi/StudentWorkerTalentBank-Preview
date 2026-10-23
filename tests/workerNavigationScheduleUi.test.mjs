@@ -918,3 +918,61 @@ test('calendar date selection opens a focused native detail surface; past dates 
   await ui.dispose()
  }
 })
+
+
+test('desktop profile shows a focused request-history dialog without modifying requests',async()=>{
+ globalThis.__profileChangeRequests=[{
+  id:'FAKE-PROFILE-REQUEST',field_code:'major',
+  proposed_value:'رشته آزمایشی نمونه',review_state:'pending',
+  review_note:'در انتظار نتیجه'
+ }]
+ globalThis.__profileChangeCalls=[]
+ const ui=await setup()
+ try{
+  await ui.clickText('پروفایل من')
+  const trigger=ui.host.querySelector('.ow-profile-requests-launch button')
+  const dialog=ui.host.querySelector('dialog.ow-profile-requests-dialog')
+  assert.ok(trigger && dialog)
+  assert.equal(trigger.getAttribute('aria-haspopup'),'dialog')
+  assert.equal(dialog.getAttribute('aria-labelledby'),'ow-profile-requests-dialog-title')
+  assert.match(ui.host.querySelector('.ow-profile-requests-launch').textContent,/منتظر تأیید/)
+  await act(async()=>trigger.click())
+  assert.match(dialog.textContent,/رشته آزمایشی نمونه/)
+  await act(async()=>dialog.querySelector('.ow-profile-requests-dialog__head button').click())
+  assert.equal(dialog.querySelector('.ow-profile-requests-list'),null,
+    'request history details are not kept interactive after dismiss')
+  assert.equal(globalThis.__profileChangeCalls.length,0,'view-only history does not request changes')
+ }finally{
+  globalThis.__profileChangeRequests=[]
+  globalThis.__profileChangeCalls=[]
+  await ui.dispose()
+ }
+})
+test('profile activity categories separate current, future and completed work on desktop',async()=>{
+ const data=fixture()
+ const base=data.tasks[0]
+ data.tasks.push(
+  {...base,id:'FAKE-PROFILE-UPCOMING',title:'کار آینده ساختگی',planned_date:'2099-04-01',state:'assigned'},
+  {...base,id:'FAKE-PROFILE-DONE',title:'کار تکمیل‌شده ساختگی',planned_date:'2020-04-01',state:'completed'}
+ )
+ globalThis.__workerFocusFixture=data
+ const ui=await setup()
+ try{
+  await ui.clickText('پروفایل من')
+  const buttons=ui.host.querySelectorAll('.ow-profile-work-tabs button')
+  assert.equal(buttons.length,3,'a compact category selector replaces three stacked task disclosures')
+  assert.match(ui.host.querySelector('.ow-profile-work-list').textContent,/کار نمونه دانشجوکار/)
+  await act(async()=>buttons[1].click())
+  assert.equal(buttons[1].getAttribute('aria-pressed'),'true')
+  assert.match(ui.host.querySelector('.ow-profile-work-list').textContent,/کار آینده ساختگی/)
+  assert.doesNotMatch(ui.host.querySelector('.ow-profile-work-list').textContent,/کار تکمیل‌شده ساختگی/)
+  await act(async()=>buttons[2].click())
+  assert.match(ui.host.querySelector('.ow-profile-work-list').textContent,/کار تکمیل‌شده ساختگی/)
+  assert.doesNotMatch(ui.host.querySelector('.ow-profile-work-list').textContent,/کار آینده ساختگی/)
+  assert.match(ui.host.textContent,/سابقه گزارش‌ها و ساعات/,
+    'existing independent time-report history is preserved')
+ }finally{
+  globalThis.__workerFocusFixture=fixture()
+  await ui.dispose()
+ }
+})
