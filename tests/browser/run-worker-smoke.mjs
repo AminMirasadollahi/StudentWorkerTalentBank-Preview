@@ -99,6 +99,13 @@ try{
   await page.locator('.ow-profile-requests-launch button').click()
   assert.ok(await matchesModal('.ow-profile-requests-dialog'))
   assert.ok((await page.locator('.ow-profile-requests-dialog').innerText()).includes('رشتهٔ آزمایشی'))
+  assert.equal(await page.locator('.ow-profile-request-item').count(),3)
+  for(const state of ['pending','approved','rejected']){
+   const badge=page.locator('.ow-profile-request-status--'+state)
+   assert.equal(await badge.count(),1,'separate request status must remain visible: '+state)
+  }
+  assert.equal(await page.locator('.ow-profile-request-item__note').count(),3)
+  await bound('.ow-profile-requests-dialog')
   await page.screenshot({path:resolve(output,'04-synthetic-request-history.png')})
   await page.locator('.ow-profile-requests-dialog__head button').click()
   await page.locator('.ow-profile-work-tabs button').nth(1).click()
