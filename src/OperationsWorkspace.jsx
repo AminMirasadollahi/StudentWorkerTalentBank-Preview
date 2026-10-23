@@ -1107,6 +1107,9 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
 function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
   const acknowledged=actionLedger.get(task.id)
   const sameReviewCycle=acknowledged?.reviewCycle===reviewCycle
+  const [reportOpen,setReportOpen]=useState(false)
+  const reportDialogRef=useRef(null)
+  const reportTriggerRef=useRef(null)
   const [date,setDate]=useState(today())
   const [requestExtra,setRequestExtra]=useState(false)
   const [requested,setRequested]=useState(String(task.estimate_minutes))
@@ -1123,6 +1126,21 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
   const keyRef=useRef(sameReviewCycle&&acknowledged.clientSubmissionId
     ?acknowledged.clientSubmissionId:crypto.randomUUID())
   const priorReviewCycle=useRef(reviewCycle)
+  // Native modal dialog keeps its form mounted so unsent edits survive
+  // dismiss/reopen and parent identity focus-rechecks without localStorage.
+  useLayoutEffect(()=>{
+    const dialog=reportDialogRef.current
+    if(!dialog)return
+    if(reportOpen){
+      if(!dialog.open && typeof dialog.showModal==='function'){
+        try{dialog.showModal()}catch{return}
+      }
+      dialog.querySelector('[data-task-dialog-heading]')?.focus()
+    }else if(dialog.open){
+      dialog.close()
+      reportTriggerRef.current?.focus()
+    }
+  },[reportOpen])
   useEffect(()=>{
     // A NEW manager-requested correction creates a distinct review cycle.
     // Stale task state alone is never enough to re-enable acknowledged reports.
@@ -1156,7 +1174,7 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
         reviewCycle,
         ...(kind==='report'?{report:true,clientSubmissionId:keyRef.current}:{start:true}),
       })
-      if(kind==='report')setReportCommitted(true)
+      if(kind==='report'){setReportCommitted(true);setReportOpen(false)}
       if(kind==='start')setStartCommitted(true)
       setNotice(kind==='report'?'گزارش در سرور ثبت شد؛ در حال دریافت وضعیت تازه…':
         'شروع کار در سرور ثبت شد؛ در حال دریافت وضعیت تازه…')
@@ -1177,11 +1195,36 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
     {task.collaborators?.length>0&&<small className="ow-task-collaborators">
       با همکاری: {task.collaborators.map(x=>x.name).join('، ')}
     </small>}
-    {ready&&<details className="ow-worker-action-detail">
-      <summary>{task.state==='needs_changes'?'اصلاح و ارسال گزارش':'ثبت انجام کار'}</summary>
-      {task.instructions&&<details className="ow-worker-task-instructions">
-        <summary>شرح کار محول‌شده</summary><p>{task.instructions}</p>
-      </details>}
+    {ready&&<>
+      <div className="ow-worker-action-launch">
+        <button type="button" ref={reportTriggerRef}
+          className="report-btn report-btn--light ow-worker-report-trigger"
+          aria-haspopup="dialog" aria-controls={`ow-worker-report-dialog-${task.id}`}
+          disabled={busy||reportCommitted}
+          onClick={()=>setReportOpen(true)}>
+          {task.state==='needs_changes'?'اصلاح و ارسال گزارش':'ثبت انجام کار'}
+        </button>
+      </div>
+      <dialog ref={reportDialogRef} id={`ow-worker-report-dialog-${task.id}`}
+        className="ow-worker-report-dialog ow-worker-action-detail" dir="rtl"
+        aria-labelledby={`ow-worker-report-heading-${task.id}`}
+        onCancel={event=>{event.preventDefault();if(!busy)setReportOpen(false)}}
+        onClose={()=>{if(reportOpen&&!busy)setReportOpen(false)}}>
+        <div className="ow-worker-report-dialog__head">
+          <div>
+            <h3 tabIndex={-1} data-task-dialog-heading
+              id={`ow-worker-report-heading-${task.id}`}>
+              {task.state==='needs_changes'?'اصلاح و ارسال گزارش':'ثبت انجام کار'}
+            </h3>
+            <p className="ow-muted">{task.title} · {pretty(task.planned_date)}</p>
+          </div>
+          <button type="button" className="ow-worker-report-dialog__close"
+            disabled={busy} aria-label="بستن پنجره ثبت کار"
+            onClick={()=>setReportOpen(false)}>بستن</button>
+        </div>
+        {task.instructions&&<details className="ow-worker-task-instructions">
+          <summary>شرح کار محول‌شده</summary><p>{task.instructions}</p>
+        </details>}
       <form onSubmit={e=>{e.preventDefault();if(!extraValid||reportCommitted||busy)return;
       // Keep the same client submission identity if the tab temporarily unmounts
       // after a request with uncertain network outcome.
@@ -1253,7 +1296,10 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
       </div>
       <small className="ow-commit-disclosure">با ارسال این گزارش، انجام کار را اعلام می‌کنید؛ ساعت‌ها پس از تأیید مدیر منظور می‌شوند.</small>
       </form>
-    </details>}
+      {notice&&<p className="ow-muted" role="status">{notice}</p>}
+      {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
+      </dialog>
+    </>}
     {notice&&<p className="ow-muted" role="status">{notice}</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
   </article>
