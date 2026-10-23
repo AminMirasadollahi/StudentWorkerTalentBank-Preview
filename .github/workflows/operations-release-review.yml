@@ -50,9 +50,9 @@ jobs:
       - name: Install Chromium smoke dependencies (draft worker branch only)
         if: github.event_name == 'pull_request' && github.head_ref == 'feat/worker-desktop-ux-stage1-2026-10-23'
         run: npm install --no-save --no-package-lock --no-audit --no-fund jsdom@26.1.0 playwright@1.56.1
-      - name: Install headless Chromium for isolated smoke
+      - name: Use preinstalled Chrome on GitHub Ubuntu runner for isolated smoke
         if: github.event_name == 'pull_request' && github.head_ref == 'feat/worker-desktop-ux-stage1-2026-10-23'
-        run: npx playwright install --with-deps chromium
+        run: google-chrome --version
       - name: Smoke native worker dialogs and calendar with fake data (NO NETWORK / NO DEPLOY)
         if: github.event_name == 'pull_request' && github.head_ref == 'feat/worker-desktop-ux-stage1-2026-10-23'
         run: node tests/browser/run-worker-smoke.mjs
