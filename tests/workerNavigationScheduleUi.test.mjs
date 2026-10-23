@@ -857,3 +857,36 @@ test('task reporting dialog and profile dialog preserve existing auth-freeze int
  assert.match(styles,/\.ops-recheck-frozen dialog\s*\{/)
  assert.match(ops,/inert=\{recheckingAccess\}/)
 })
+
+test('upcoming worker filter surfaces next-month assignments without mixing overdue or completed work',async()=>{
+ const data=fixture()
+ const sample=data.tasks[0]
+ data.tasks.push(
+  {...sample,id:'FAKE-FUTURE-TASK',title:'وظیفه ساختگی ماه‌های آینده',planned_date:'2099-03-02',state:'assigned'},
+  {...sample,id:'FAKE-FUTURE-COMPLETED',title:'وظیفه ساختگی قبلاً تکمیل‌شده',planned_date:'2099-03-03',state:'completed'},
+  {...sample,id:'FAKE-OVERDUE-TASK',title:'کار قدیمی نیازمند اقدام',planned_date:'2020-02-02',state:'needs_changes'}
+ )
+ globalThis.__workerFocusFixture=data
+ const ui=await setup()
+ try{
+  await ui.clickText('آینده')
+  const selected=ui.host.querySelector('.ow-range-switch [aria-pressed="true"]')
+  assert.equal(selected.textContent,'آینده')
+  const listed=ui.host.querySelector('.ow-worker-tasks').textContent
+  assert.match(listed,/وظیفه ساختگی ماه‌های آینده/)
+  assert.doesNotMatch(listed,/وظیفه ساختگی قبلاً تکمیل‌شده/)
+  assert.doesNotMatch(listed,/کار قدیمی نیازمند اقدام/)
+  await ui.clickText('امروز')
+  const current=ui.host.querySelector('.ow-worker-tasks').textContent
+  assert.doesNotMatch(current,/وظیفه ساختگی ماه‌های آینده/)
+  assert.match(current,/کار قدیمی نیازمند اقدام/)
+  await ui.clickText('آینده')
+  await ui.clickText('پروفایل من')
+  await ui.clickText('کارها')
+  assert.equal(ui.host.querySelector('.ow-range-switch [aria-pressed="true"]').textContent,'آینده',
+    'future task filter persists across worker navigation')
+ }finally{
+  globalThis.__workerFocusFixture=fixture()
+  await ui.dispose()
+ }
+})
