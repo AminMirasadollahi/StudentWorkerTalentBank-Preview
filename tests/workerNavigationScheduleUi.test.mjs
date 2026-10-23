@@ -217,9 +217,9 @@ test('personal profile change only queues a synthetic manager-reviewed proposal'
   await ui.clickText('پروفایل من')
   assert.match(ui.host.textContent,/رشته تحصیلی/)
   assert.match(ui.host.textContent,/پژوهش/)
-  const summary=ui.host.querySelector('.ow-profile-change > summary')
-  assert.ok(summary)
-  await act(async()=>summary.dispatchEvent(new window.MouseEvent('click',{bubbles:true,cancelable:true})))
+  const open=ui.host.querySelector('.ow-profile-change-trigger')
+  assert.ok(open)
+  await act(async()=>open.dispatchEvent(new window.MouseEvent('click',{bubbles:true,cancelable:true})))
   assert.ok(ui.host.querySelector('.ow-profile-change-form'))
   const fields=ui.host.querySelectorAll('.ow-profile-change-form input,.ow-profile-change-form textarea')
   assert.equal(fields.length,2)
@@ -532,9 +532,9 @@ test('manager rejected report opens a new cycle rather than permanently blocking
 
 async function openSyntheticProfileChange(ui){
  await ui.clickText('پروفایل من')
- const summary=ui.host.querySelector('.ow-profile-change > summary')
- assert.ok(summary)
- await act(async()=>summary.dispatchEvent(
+ const open=ui.host.querySelector('.ow-profile-change-trigger')
+ assert.ok(open)
+ await act(async()=>open.dispatchEvent(
    new window.MouseEvent('click',{bubbles:true,cancelable:true})))
  const form=ui.host.querySelector('.ow-profile-change-form')
  assert.ok(form)
@@ -734,10 +734,11 @@ test('P1: assigned task can be completed directly in two explicit actions withou
  globalThis.__qaStartCalls=[]
  const ui=await setup()
  try{
-  const disclosure=ui.host.querySelector('.ow-worker-action-detail > summary')
-  assert.match(disclosure.textContent,/ثبت انجام کار/)
-  assert.equal(disclosure.parentElement.open,false,'ordinary cards remain compact')
-  await act(async()=>disclosure.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  const trigger=ui.host.querySelector('.ow-worker-report-trigger')
+  assert.match(trigger.textContent,/ثبت انجام کار/)
+  assert.equal(trigger.getAttribute('aria-haspopup'),'dialog')
+  assert.ok(ui.host.querySelector('dialog.ow-worker-report-dialog'),'task form uses native modal')
+  await act(async()=>trigger.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
   const form=ui.host.querySelector('.ow-worker-action-detail form')
   assert.equal(form.querySelectorAll('.ow-checkbox input').length,1,'only extra-time opt-in remains')
   const send=form.querySelector('button[type="submit"]')
@@ -783,5 +784,195 @@ test('P1: extra-time fields remain hidden by default and an incomplete request n
  }finally{
   globalThis.__qaAllowWorkerSubmit=false;globalThis.__qaSubmitCalls=[]
   globalThis.__workerFocusFixture=fixture();await ui.dispose()
+ }
+})
+
+
+test('desktop profile correction uses one focused native dialog; dismiss preserves draft',async()=>{
+ const ui=await setup()
+ try{
+  const form=await openSyntheticProfileChange(ui)
+  const dialog=ui.host.querySelector('dialog.ow-profile-action-dialog')
+  assert.ok(dialog,'real native dialog exists, not an aria-only visual popup')
+  assert.equal(dialog.getAttribute('aria-labelledby'),'ow-profile-change-dialog-title')
+  assert.equal(dialog.getAttribute('dir'),'rtl')
+  const heading=dialog.querySelector('#ow-profile-change-dialog-title')
+  assert.ok(heading)
+  const value=form.querySelector('input')
+  const setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set
+  await act(async()=>{
+   setter.call(value,'رشته اصلاحی موقت')
+   value.dispatchEvent(new window.Event('input',{bubbles:true}))
+  })
+  await act(async()=>dialog.querySelector('button[aria-label="بستن پنجره اصلاح مشخصات"]').click())
+  assert.equal(ui.host.querySelector('.ow-profile-change-form'),null,'closed form is not interactive')
+  const open=ui.host.querySelector('.ow-profile-change-trigger')
+  await act(async()=>open.click())
+  assert.equal(ui.host.querySelector('.ow-profile-change-form input').value,'رشته اصلاحی موقت',
+    'cancel must retain in-session draft for reopening')
+  assert.equal(globalThis.__profileChangeCalls.length,0,'open/close can never submit a request')
+ }finally{await ui.dispose()}
+})
+
+
+test('desktop task action dialog is cancelable without any business write and retains unsent note',async()=>{
+ globalThis.__workerFocusFixture=fixture()
+ globalThis.__qaSubmitCalls=[]
+ globalThis.__qaStartCalls=[]
+ const ui=await setup()
+ try{
+  const trigger=ui.host.querySelector('.ow-worker-report-trigger')
+  const dialog=ui.host.querySelector('dialog.ow-worker-report-dialog')
+  assert.ok(trigger && dialog)
+  assert.equal(dialog.getAttribute('aria-labelledby'),dialog.querySelector('h3').id)
+  assert.equal(dialog.getAttribute('dir'),'rtl')
+  await act(async()=>trigger.click())
+  const form=dialog.querySelector('form')
+  const note=form.querySelector('textarea[maxlength="2000"]')
+  const setter=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set
+  await act(async()=>{
+   setter.call(note,'یادداشت موقت ثبت‌نشده')
+   note.dispatchEvent(new window.Event('input',{bubbles:true}))
+  })
+  await act(async()=>dialog.querySelector('button[aria-label="بستن پنجره ثبت کار"]').click())
+  assert.equal(dialog.querySelector('textarea[maxlength="2000"]').value,'یادداشت موقت ثبت‌نشده')
+  await act(async()=>trigger.click())
+  assert.equal(form.querySelector('textarea[maxlength="2000"]').value,'یادداشت موقت ثبت‌نشده')
+  assert.equal(globalThis.__qaSubmitCalls.length,0,'dismiss and reopen never POST')
+  assert.equal(globalThis.__qaStartCalls.length,0,'opening report never starts a task')
+ }finally{
+  globalThis.__qaSubmitCalls=[]
+  globalThis.__qaStartCalls=[]
+  globalThis.__workerFocusFixture=fixture()
+  await ui.dispose()
+ }
+})
+test('task reporting dialog and profile dialog preserve existing auth-freeze integration',()=>{
+ const ops=readFileSync('src/OpsApp.jsx','utf8')
+ const workspace=readFileSync('src/OperationsWorkspace.jsx','utf8')
+ const styles=readFileSync('src/ops.css','utf8')
+ assert.match(workspace,/className="ow-worker-report-dialog ow-worker-action-detail"/)
+ assert.match(workspace,/dialog\.querySelector\('\[data-task-dialog-heading\]'\)\?\.focus\(\)/)
+ assert.match(workspace,/if\(!busy\)setReportOpen\(false\)/)
+ assert.match(styles,/\.ops-recheck-frozen dialog\s*\{/)
+ assert.match(ops,/inert=\{recheckingAccess\}/)
+})
+
+test('upcoming worker filter surfaces next-month assignments without mixing overdue or completed work',async()=>{
+ const data=fixture()
+ const sample=data.tasks[0]
+ data.tasks.push(
+  {...sample,id:'FAKE-FUTURE-TASK',title:'وظیفه ساختگی ماه‌های آینده',planned_date:'2099-03-02',state:'assigned'},
+  {...sample,id:'FAKE-FUTURE-COMPLETED',title:'وظیفه ساختگی قبلاً تکمیل‌شده',planned_date:'2099-03-03',state:'completed'},
+  {...sample,id:'FAKE-OVERDUE-TASK',title:'کار قدیمی نیازمند اقدام',planned_date:'2020-02-02',state:'needs_changes'}
+ )
+ globalThis.__workerFocusFixture=data
+ const ui=await setup()
+ try{
+  await ui.clickText('آینده')
+  const selected=ui.host.querySelector('.ow-range-switch [aria-pressed="true"]')
+  assert.equal(selected.textContent,'آینده')
+  const listed=ui.host.querySelector('.ow-worker-tasks').textContent
+  assert.match(listed,/وظیفه ساختگی ماه‌های آینده/)
+  assert.doesNotMatch(listed,/وظیفه ساختگی قبلاً تکمیل‌شده/)
+  assert.doesNotMatch(listed,/کار قدیمی نیازمند اقدام/)
+  await ui.clickText('امروز')
+  const current=ui.host.querySelector('.ow-worker-tasks').textContent
+  assert.doesNotMatch(current,/وظیفه ساختگی ماه‌های آینده/)
+  assert.match(current,/کار قدیمی نیازمند اقدام/)
+  await ui.clickText('آینده')
+  await ui.clickText('پروفایل من')
+  await ui.clickText('کارها')
+  assert.equal(ui.host.querySelector('.ow-range-switch [aria-pressed="true"]').textContent,'آینده',
+    'future task filter persists across worker navigation')
+ }finally{
+  globalThis.__workerFocusFixture=fixture()
+  await ui.dispose()
+ }
+})
+
+
+test('calendar date selection opens a focused native detail surface; past dates have no save action',async()=>{
+ globalThis.__workerExceptionCalls=[]
+ const ui=await setup()
+ try{
+  await ui.clickText('زمان حضور')
+  const dialog=ui.host.querySelector('dialog.ow-presence-date-dialog')
+  assert.ok(dialog,'calendar date should use a native dialog, not an offscreen inline form')
+  assert.equal(dialog.getAttribute('dir'),'rtl')
+  assert.equal(dialog.getAttribute('aria-labelledby'),'ow-presence-day-dialog-title')
+  await ui.click('.ow-month-day.is-today')
+  assert.ok(dialog.querySelector('.ow-exception-inline'),'today opens visible day context')
+  assert.ok(dialog.querySelector('button[type="submit"]'),'current day permits authorized change')
+  assert.ok(dialog.querySelector('[data-presence-date-heading]'))
+  await ui.click('.ow-presence-date-dialog__head button')
+  assert.equal(dialog.querySelector('.ow-exception-inline'),null,'close removes actionable day form')
+  await ui.clickText('ماه قبل')
+  await ui.click('.ow-month-grid .ow-month-day')
+  assert.match(dialog.textContent,/تاریخ گذشته است/)
+  assert.equal(dialog.querySelector('button[type="submit"]'),null,'past day cannot submit')
+  assert.equal(dialog.querySelector('.ow-exception-kind'),null,'past day cannot select write semantics')
+  assert.equal(globalThis.__workerExceptionCalls.length,0,'view/close never mutate attendance')
+ }finally{
+  globalThis.__workerExceptionCalls=[]
+  await ui.dispose()
+ }
+})
+
+
+test('desktop profile shows a focused request-history dialog without modifying requests',async()=>{
+ globalThis.__profileChangeRequests=[{
+  id:'FAKE-PROFILE-REQUEST',field_code:'major',
+  proposed_value:'رشته آزمایشی نمونه',review_state:'pending',
+  review_note:'در انتظار نتیجه'
+ }]
+ globalThis.__profileChangeCalls=[]
+ const ui=await setup()
+ try{
+  await ui.clickText('پروفایل من')
+  const trigger=ui.host.querySelector('.ow-profile-requests-launch button')
+  const dialog=ui.host.querySelector('dialog.ow-profile-requests-dialog')
+  assert.ok(trigger && dialog)
+  assert.equal(trigger.getAttribute('aria-haspopup'),'dialog')
+  assert.equal(dialog.getAttribute('aria-labelledby'),'ow-profile-requests-dialog-title')
+  assert.match(ui.host.querySelector('.ow-profile-requests-launch').textContent,/منتظر تأیید/)
+  await act(async()=>trigger.click())
+  assert.match(dialog.textContent,/رشته آزمایشی نمونه/)
+  await act(async()=>dialog.querySelector('.ow-profile-requests-dialog__head button').click())
+  assert.equal(dialog.querySelector('.ow-profile-requests-list'),null,
+    'request history details are not kept interactive after dismiss')
+  assert.equal(globalThis.__profileChangeCalls.length,0,'view-only history does not request changes')
+ }finally{
+  globalThis.__profileChangeRequests=[]
+  globalThis.__profileChangeCalls=[]
+  await ui.dispose()
+ }
+})
+test('profile activity categories separate current, future and completed work on desktop',async()=>{
+ const data=fixture()
+ const base=data.tasks[0]
+ data.tasks.push(
+  {...base,id:'FAKE-PROFILE-UPCOMING',title:'کار آینده ساختگی',planned_date:'2099-04-01',state:'assigned'},
+  {...base,id:'FAKE-PROFILE-DONE',title:'کار تکمیل‌شده ساختگی',planned_date:'2020-04-01',state:'completed'}
+ )
+ globalThis.__workerFocusFixture=data
+ const ui=await setup()
+ try{
+  await ui.clickText('پروفایل من')
+  const buttons=ui.host.querySelectorAll('.ow-profile-work-tabs button')
+  assert.equal(buttons.length,3,'a compact category selector replaces three stacked task disclosures')
+  assert.match(ui.host.querySelector('.ow-profile-work-list').textContent,/کار نمونه دانشجوکار/)
+  await act(async()=>buttons[1].click())
+  assert.equal(buttons[1].getAttribute('aria-pressed'),'true')
+  assert.match(ui.host.querySelector('.ow-profile-work-list').textContent,/کار آینده ساختگی/)
+  assert.doesNotMatch(ui.host.querySelector('.ow-profile-work-list').textContent,/کار تکمیل‌شده ساختگی/)
+  await act(async()=>buttons[2].click())
+  assert.match(ui.host.querySelector('.ow-profile-work-list').textContent,/کار تکمیل‌شده ساختگی/)
+  assert.doesNotMatch(ui.host.querySelector('.ow-profile-work-list').textContent,/کار آینده ساختگی/)
+  assert.match(ui.host.textContent,/سابقه گزارش‌ها و ساعات/,
+    'existing independent time-report history is preserved')
+ }finally{
+  globalThis.__workerFocusFixture=fixture()
+  await ui.dispose()
  }
 })
