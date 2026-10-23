@@ -597,3 +597,56 @@
   .ow-worker-workspace .ow-worker-tasks > .ow-item { width:100%; }
   .ow-worker-action-detail form { max-width:100%; }
 }
+
+
+/* SWTB7 staged desktop-only profile action, NOT merged or published.
+   Native showModal() owns top-layer focus/inertness; the existing OpsApp
+   role-recheck curtain must suppress this dialog while authorization refreshes. */
+.ow-profile-change-launch {
+ display:flex; align-items:center; flex-wrap:wrap; gap:.75rem;
+ margin:.72rem 0 .55rem;
+}
+.ow-profile-change-trigger { min-height:2.55rem; }
+dialog.ow-profile-action-dialog {
+ position:fixed; inset:0; margin:auto; box-sizing:border-box;
+ width:min(42rem, calc(100vw - 2rem)); max-width:none;
+ max-height:min(82vh, 46rem); overflow:auto;
+ padding:1.35rem 1.5rem 1.5rem;
+ background:#fff; color:var(--report-navy); text-align:right;
+ border:1px solid var(--report-border); border-radius:1rem;
+ box-shadow:0 28px 72px rgba(9,43,64,.27);
+}
+dialog.ow-profile-action-dialog::backdrop {
+ background:rgba(8,35,53,.58);
+}
+.ow-profile-action-dialog__head {
+ display:flex; align-items:start; justify-content:space-between;
+ gap:.75rem; padding-bottom:.75rem; margin-bottom:1rem;
+ border-bottom:1px solid var(--report-border);
+}
+.ow-profile-action-dialog__head h3 {
+ margin:0; font-size:1.2rem; line-height:1.6;
+}
+.ow-profile-action-dialog__head h3:focus { outline:none; }
+.ow-profile-action-dialog__head p { margin:.2rem 0 0; }
+.ow-profile-action-dialog__close {
+ border:1px solid var(--report-border); background:#f6f9fa;
+ color:var(--report-navy); border-radius:.5rem;
+ cursor:pointer; padding:.5rem .7rem; font:inherit;
+}
+.ow-profile-action-dialog__close:focus-visible,
+.ow-profile-change-trigger:focus-visible {
+ outline:2px solid var(--report-teal); outline-offset:3px;
+}
+dialog.ow-profile-action-dialog .ow-profile-change-form {
+ display:grid; grid-template-columns:1fr; gap:.85rem; max-width:none;
+}
+dialog.ow-profile-action-dialog .ow-profile-change-form .report-field {
+ min-width:0; width:100%;
+}
+dialog.ow-profile-action-dialog .ow-profile-change-form :is(input,select,textarea) {
+ width:100%; max-width:none;
+}
+dialog.ow-profile-action-dialog .ow-profile-change-form button[type="submit"] {
+ min-height:2.8rem;
+}
