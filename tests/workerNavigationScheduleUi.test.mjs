@@ -890,3 +890,31 @@ test('upcoming worker filter surfaces next-month assignments without mixing over
   await ui.dispose()
  }
 })
+
+
+test('calendar date selection opens a focused native detail surface; past dates have no save action',async()=>{
+ globalThis.__workerExceptionCalls=[]
+ const ui=await setup()
+ try{
+  await ui.clickText('زمان حضور')
+  const dialog=ui.host.querySelector('dialog.ow-presence-date-dialog')
+  assert.ok(dialog,'calendar date should use a native dialog, not an offscreen inline form')
+  assert.equal(dialog.getAttribute('dir'),'rtl')
+  assert.equal(dialog.getAttribute('aria-labelledby'),'ow-presence-day-dialog-title')
+  await ui.click('.ow-month-day.is-today')
+  assert.ok(dialog.querySelector('.ow-exception-inline'),'today opens visible day context')
+  assert.ok(dialog.querySelector('button[type="submit"]'),'current day permits authorized change')
+  assert.ok(dialog.querySelector('[data-presence-date-heading]'))
+  await ui.click('.ow-presence-date-dialog__head button')
+  assert.equal(dialog.querySelector('.ow-exception-inline'),null,'close removes actionable day form')
+  await ui.clickText('ماه قبل')
+  await ui.click('.ow-month-grid .ow-month-day')
+  assert.match(dialog.textContent,/تاریخ گذشته است/)
+  assert.equal(dialog.querySelector('button[type="submit"]'),null,'past day cannot submit')
+  assert.equal(dialog.querySelector('.ow-exception-kind'),null,'past day cannot select write semantics')
+  assert.equal(globalThis.__workerExceptionCalls.length,0,'view/close never mutate attendance')
+ }finally{
+  globalThis.__workerExceptionCalls=[]
+  await ui.dispose()
+ }
+})
