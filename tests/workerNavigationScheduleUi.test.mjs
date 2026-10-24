@@ -1023,3 +1023,37 @@ test('worker homepage is action-first and preserves the familiar date drilldown'
   await ui.dispose()
  }
 })
+
+
+test('confirmed report receipt stays visible when server moves task out of the action lane',async()=>{
+ const initial=fixture()
+ globalThis.__workerFocusFixture=initial
+ globalThis.__qaAllowWorkerSubmit=true
+ globalThis.__qaSubmitCalls=[]
+ globalThis.__qaSubmitFailCount=0
+ const ui=await setup()
+ try{
+  globalThis.__workerWorkPlan=[()=>Promise.resolve({
+   ...initial,tasks:initial.tasks.map(t=>({...t,state:'submitted'}))
+  })]
+  await submitSyntheticWorkerReport(ui)
+  assert.equal(globalThis.__qaSubmitCalls.length,1,'only one confirmed synthetic report')
+  assert.equal(ui.host.querySelectorAll('.ow-worker-tasks .ow-worker-report-trigger').length,0,
+   'submitted task must disappear from the attention lane after fresh server state')
+  const receipt=ui.host.querySelector('.ow-worker-submission-receipt')
+  assert.ok(receipt,'confirmation must survive removal of the submitting task card')
+  assert.match(receipt.textContent,/گزارش انجام کار دریافت شد/)
+  assert.match(receipt.textContent,/فقط پس از تأیید مدیر/)
+  await act(async()=>receipt.querySelector('.ow-worker-submission-receipt__actions button').click())
+  assert.match(ui.host.querySelector('.ow-worker-tasks').textContent,/کار نمونه دانشجوکار/,
+    'explicit follow-up leads to the pending-review lane')
+  assert.equal(ui.host.querySelectorAll('.ow-worker-report-trigger').length,0,
+    'pending report must not offer duplicate submission controls')
+ }finally{
+  globalThis.__workerFocusFixture=fixture()
+  globalThis.__workerWorkPlan=[]
+  globalThis.__qaAllowWorkerSubmit=false
+  globalThis.__qaSubmitCalls=[]
+  await ui.dispose()
+ }
+})
