@@ -976,3 +976,50 @@ test('profile activity categories separate current, future and completed work on
   await ui.dispose()
  }
 })
+
+
+test('worker homepage is action-first and preserves the familiar date drilldown',async()=>{
+ const data=fixture()
+ const template=data.tasks[0]
+ data.tasks.push(
+  {...template,id:'FAKE-NEEDS-FIX',title:'اصلاح فوری گزارش',planned_date:'2020-02-03',state:'needs_changes'},
+  {...template,id:'FAKE-PENDING',title:'گزارش ارسال‌شده و منتظر مدیر',planned_date:'2020-02-04',state:'submitted'},
+  {...template,id:'FAKE-LATER',title:'وظیفه آینده در ماه بعد',planned_date:'2099-02-01',state:'assigned'},
+  {...template,id:'FAKE-DONE',title:'وظیفه تکمیل‌شده دیگر',planned_date:'2020-02-01',state:'completed'},
+  {...template,id:'FAKE-CANCELLED',title:'کار لغوشده دیگر',planned_date:'2020-02-01',state:'cancelled'}
+ )
+ globalThis.__workerFocusFixture=data
+ const ui=await setup()
+ try{
+  assert.equal(ui.host.querySelector('.ow-worker-focus-switch button[aria-current="true"]').textContent.includes('نیازمند اقدام'),true)
+  const initial=ui.host.querySelector('.ow-worker-tasks').textContent
+  assert.match(initial,/اصلاح فوری گزارش/)
+  assert.match(initial,/کار نمونه دانشجوکار/)
+  assert.doesNotMatch(initial,/گزارش ارسال‌شده و منتظر مدیر|وظیفه آینده در ماه بعد|وظیفه تکمیل‌شده دیگر/)
+  const first=ui.host.querySelector('.ow-worker-tasks .ow-item')
+  assert.match(first.textContent,/اصلاح فوری گزارش/,'corrections must precede other due work')
+  const switches=ui.host.querySelectorAll('.ow-worker-focus-switch button')
+  assert.equal(switches.length,4,'four canonical action states with counts')
+  assert.equal(ui.host.querySelector('.ow-worker-focus-switch').textContent.includes('نیازمند اقدام'),true)
+  await act(async()=>switches[1].click())
+  assert.match(ui.host.querySelector('.ow-worker-tasks').textContent,/گزارش ارسال‌شده و منتظر مدیر/)
+  assert.equal(ui.host.querySelectorAll('.ow-worker-tasks .ow-worker-report-trigger').length,0,
+    'submitted tasks are view-only here, never offered a second report action')
+  await act(async()=>switches[2].click())
+  assert.match(ui.host.querySelector('.ow-worker-tasks').textContent,/وظیفه آینده در ماه بعد/)
+  await act(async()=>switches[3].click())
+  assert.match(ui.host.querySelector('.ow-worker-tasks').textContent,/وظیفه تکمیل‌شده دیگر/)
+  await ui.clickText('این ماه')
+  assert.equal(ui.host.querySelector('.ow-range-switch button[aria-pressed="true"]').textContent,'این ماه')
+  await ui.clickText('پروفایل من')
+  await ui.clickText('کارها')
+  assert.equal(ui.host.querySelector('.ow-range-switch button[aria-pressed="true"]').textContent,'این ماه',
+    'date drilldown must survive section navigation')
+  await act(async()=>ui.host.querySelector('.ow-worker-focus-switch button').click())
+  assert.match(ui.host.querySelector('.ow-worker-tasks').textContent,/اصلاح فوری گزارش/,
+    'action view remains independently available from date filters')
+ }finally{
+  globalThis.__workerFocusFixture=fixture()
+  await ui.dispose()
+ }
+})
