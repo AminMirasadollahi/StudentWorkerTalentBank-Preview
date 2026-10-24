@@ -130,7 +130,7 @@ try{
   assert.equal(await panel.locator('.ow-history-entry').count(),3)
   assert.ok((await panel.innerText()).includes('کل زمان تأییدشده'))
   assert.ok((await panel.innerText()).includes('نظر مدیر'))
-  assert.ok((await panel.innerText()).includes('هنوز تأیید نشده'))
+  assert.ok((await panel.innerText()).includes('در انتظار بررسی'))
   assert.equal(await panel.locator('.ow-history-filter button').count(),5)
   await page.screenshot({path:resolve(output,'04b-synthetic-report-history.png')})
   await panel.locator('.ow-history-filter button').nth(2).click()
