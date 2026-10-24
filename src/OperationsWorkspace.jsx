@@ -1403,8 +1403,12 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate}) {
            <strong>{entry.reported_minutes===null?'ثبت نشده':minutes(entry.reported_minutes)}</strong>
          </div>
          <div><span>زمان تأییدشده</span>
-           <strong>{entry.review_state==='approved'&&entry.approved_minutes!==null
-             ?minutes(entry.approved_minutes):'هنوز تأیید نشده'}</strong>
+           <strong>{entry.review_state==='approved'
+             ?(entry.approved_minutes===null?'مقدار تأییدشده ثبت نشده':minutes(entry.approved_minutes))
+             :entry.review_state==='rejected'?'تأیید نشد'
+             :entry.review_state==='changes_requested'?'در انتظار اصلاح گزارش'
+             :entry.review_state==='submitted'?'در انتظار بررسی'
+             :'تأییدشده نیست'}</strong>
          </div>
        </div>
        {entry.review_note&&<div className="ow-history-feedback">
