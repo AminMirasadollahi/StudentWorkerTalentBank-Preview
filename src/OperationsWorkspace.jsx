@@ -1676,7 +1676,12 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
   </section>
 }
 export function WorkerOperations({profile,navigation,setNavigation,refreshRevision=0}) {
-  const [data,setData]=useState({tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+  // The protected worker projection must never be rendered for a new principal
+  // while its new server read is pending. Same-component account replacement
+  // may otherwise expose the previous worker for one React paint.
+  const [workSnapshot,setWorkSnapshot]=useState({workerId:null,data:null})
+  const data=workSnapshot.workerId===profile.worker_id&&workSnapshot.data
+    ?workSnapshot.data:{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]}
   // Task acknowledgements survive switching work/profile/presence tabs, but
   // are strictly scoped to this authenticated worker and this React session.
   const acknowledgedActions=useRef({workerId:profile.worker_id,items:new Map(),profileRequests:new Map()})
@@ -1703,12 +1708,12 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     try{
       const result=await getMyWorkV2()
       if(sequence!==readSequence.current)return
-      setData(scopeSelfWorkRows(result,profile.worker_id))
+      setWorkSnapshot({workerId:profile.worker_id,data:scopeSelfWorkRows(result,profile.worker_id)})
       setReadFailed(false)
     }catch(e){
       if(sequence!==readSequence.current)return
       // Never retain a visible old work list after a failed authorization refresh.
-      setData({tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+      setWorkSnapshot({workerId:profile.worker_id,data:{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]}})
       setReadFailed(true)
       setError(readableError(e))
     }finally{if(sequence===readSequence.current)setLoading(false)}
