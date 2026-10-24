@@ -38,7 +38,10 @@ test('empty, missing or malformed date data stays safe and never fabricates a du
  const odd=[task('unknown','not-a-real-state','2026-10-20'),
   task('no-date','assigned',null),
   task('bad-date','in_progress','2026-10-24<script>')]
- assert.deepEqual(selectWorkerTaskFocus(odd,today,'action'),[])
+ assert.deepEqual(selectWorkerTaskFocus(odd,today,'action').map(x=>x.id),['no-date','bad-date'],
+  'untrusted dates must not bury potentially actionable tasks in upcoming')
+ assert.deepEqual(selectWorkerTaskFocus(odd,today,'upcoming'),[],
+  'missing or malformed dates must not fabricate future scheduling')
  assert.deepEqual(selectWorkerTaskFocus(null,today,'action'),[])
  assert.deepEqual(selectWorkerTaskFocus(odd,today,'not-supported'),[])
 })
