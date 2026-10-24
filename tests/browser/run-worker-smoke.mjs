@@ -106,7 +106,7 @@ try{
    'same protected dialog should remain in session after safe recheck')
   await page.getByRole('button',{name:'بستن پنجره اصلاح مشخصات'}).click()
  })
- await check('request history modal and activity categories are display-only',async()=>{
+ await check('profile request history is read-only, with dedicated activity links',async()=>{
   await page.locator('.ow-profile-requests-launch button').click()
   assert.ok(await matchesModal('.ow-profile-requests-dialog'))
   assert.ok((await page.locator('.ow-profile-requests-dialog').innerText()).includes('رشتهٔ آزمایشی'))
@@ -119,10 +119,24 @@ try{
   await bound('.ow-profile-requests-dialog')
   await page.screenshot({path:resolve(output,'04-synthetic-request-history.png')})
   await page.locator('.ow-profile-requests-dialog__head button').click()
-  await page.locator('.ow-profile-work-tabs button').nth(1).click()
-  assert.ok((await page.locator('.ow-profile-work-list').innerText()).includes('سال آینده'))
-  await page.locator('.ow-profile-work-tabs button').nth(2).click()
-  assert.ok((await page.locator('.ow-profile-work-list').innerText()).includes('تکمیل‌شده'))
+  assert.equal(await page.locator('.ow-profile-work-tabs').count(),0,
+   'do not duplicate task list in worker identity')
+  assert.equal(await page.locator('.ow-profile-activity-links__buttons button').count(),2)
+ })
+ await check('dedicated activity history shows actual status, credit and review feedback',async()=>{
+  await page.getByRole('button',{name:'سوابق'}).click()
+  const panel=page.locator('.ow-worker-history-panel')
+  await panel.waitFor({state:'visible'})
+  assert.equal(await panel.locator('.ow-history-entry').count(),3)
+  assert.ok((await panel.innerText()).includes('کل زمان تأییدشده'))
+  assert.ok((await panel.innerText()).includes('نظر مدیر'))
+  assert.ok((await panel.innerText()).includes('هنوز تأیید نشده'))
+  assert.equal(await panel.locator('.ow-history-filter button').count(),5)
+  await page.screenshot({path:resolve(output,'04b-synthetic-report-history.png')})
+  await panel.locator('.ow-history-filter button').nth(2).click()
+  assert.equal(await panel.locator('.ow-history-entry').count(),1)
+  await panel.locator('.ow-history-next-step button').click()
+  assert.ok(await page.locator('.ow-worker-task-workspace').isVisible())
  })
  await check('calendar date dialog visible, historical dates read-only',async()=>{
   await page.getByRole('button',{name:'زمان حضور'}).click()
