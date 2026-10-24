@@ -46,3 +46,19 @@ test('malformed dates and missing optional text stay safe and do not fabricate v
   all:0,submitted:0,changes_requested:0,rejected:0,approved:0
  })
 })
+
+test('null minutes remain missing, not invented as zero-minute approved credit',()=>{
+ const rows=[
+  {id:'null-approved',task_id:'A',work_date:'2026-10-23',
+    review_state:'approved',reported_minutes:null,approved_minutes:null},
+  {id:'empty-approved',task_id:'A',work_date:'2026-10-23',
+    review_state:'approved',reported_minutes:'',approved_minutes:''},
+  {id:'legit-zero',task_id:'A',work_date:'2026-10-23',
+    review_state:'approved',reported_minutes:0,approved_minutes:0},
+ ]
+ const r=projectWorkerReportActivity(rows,tasks)
+ assert.equal(r.find(x=>x.id==='null-approved').reported_minutes,null)
+ assert.equal(r.find(x=>x.id==='null-approved').approved_minutes,null)
+ assert.equal(r.find(x=>x.id==='empty-approved').approved_minutes,null)
+ assert.equal(r.find(x=>x.id==='legit-zero').approved_minutes,0)
+})
