@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { trapModalTab } from './lib/dialogFocusTrap.mjs'
+import { selectWorkerTaskFocus, summarizeWorkerTaskFocus } from './lib/workerTaskFocus.mjs'
 import {
   getAdminWork, getMyWork, setWeeklyDay, setDateException,
   assignWorkerTask, startMyTask, submitMyTime, reviewWorkerTime,
@@ -1224,12 +1225,16 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
       setError(readableError(e))
     }finally{actionLock.current=false;setBusy(false)}
   }
-  return <article className="ow-item">
-    <div className="ow-item-header"><strong>{task.title}</strong><span className="ow-status">{stateLabels[task.state]}</span></div>
-    <small>{pretty(task.planned_date)} · زمان استاندارد قابل ثبت: {minutes(standard)}</small>
-    {task.collaborators?.length>0&&<small className="ow-task-collaborators">
-      با همکاری: {task.collaborators.map(x=>x.name).join('، ')}
-    </small>}
+  return <article className={`ow-item ow-worker-task--${task.state}`}>
+    <div className="ow-worker-card-main">
+      <div className="ow-item-header"><strong>{task.title}</strong>
+        <span className="ow-status">{stateLabels[task.state]||'وضعیت نامشخص'}</span>
+      </div>
+      <small>{pretty(task.planned_date)} · زمان استاندارد: {minutes(standard)}</small>
+      {task.collaborators?.length>0&&<small className="ow-task-collaborators">
+        با همکاری: {task.collaborators.map(x=>x.name).join('، ')}
+      </small>}
+    </div>
     {ready&&<>
       <div className="ow-worker-action-launch">
         <button type="button" ref={reportTriggerRef}
@@ -1639,6 +1644,8 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   }
   const section=['tasks','availability','profile'].includes(selected.section)?selected.section:'tasks'
   const taskRange=['today','week','month','upcoming'].includes(selected.taskRange)?selected.taskRange:'today'
+  const taskView=['action','pending','upcoming','completed','calendar'].includes(selected.taskView)
+    ?selected.taskView:'action'
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [readFailed,setReadFailed]=useState(false)
@@ -1676,8 +1683,24 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     tasks.filter(t=>t.planned_date>today()&&!['completed','cancelled'].includes(t.state))
       .sort((a,b)=>a.planned_date.localeCompare(b.planned_date))
   const overdue=tasks.filter(t=>t.planned_date<today()&&['assigned','in_progress','needs_changes'].includes(t.state))
-  const visible=taskRange==='upcoming' ? ranged :
+  const byDate=taskRange==='upcoming' ? ranged :
     [...overdue,...ranged.filter(t=>!overdue.some(p=>p.id===t.id))]
+  const focusCounts=summarizeWorkerTaskFocus(tasks,today())
+  const visible=taskView==='calendar'?byDate:selectWorkerTaskFocus(tasks,today(),taskView)
+  const focusOptions=[
+    ['action','نیازمند اقدام','اصلاح گزارش‌ها و انجام کارهای موعدرسیده'],
+    ['pending','منتظر بررسی','گزارش‌های ارسالی که هنوز در انتظار مدیرند'],
+    ['upcoming','پیش‌رو','کارهای برنامه‌ریزی‌شده برای روزهای بعد'],
+    ['completed','انجام‌شده','کارهای تکمیل‌شده'],
+  ]
+  const focusHeading=focusOptions.find(item=>item[0]===taskView)
+  const emptyText={
+    action:'اکنون کاری که نیازمند اقدام شما باشد وجود ندارد.',
+    pending:'گزارش منتظر بررسی در فهرست کارها وجود ندارد.',
+    upcoming:'کار برنامه‌ریزی‌شده‌ای برای روزهای آینده ثبت نشده است.',
+    completed:'هنوز کاری با وضعیت تکمیل‌شده ثبت نشده است.',
+    calendar:'کاری برای این بازهٔ زمانی ثبت نشده است.',
+  }
   if(readFailed)return <div className="ow-workspace ow-worker-workspace ow-access-recheck" role="alert">
     <p>برنامهٔ کاری در دسترس نیست. تا بررسی دوبارهٔ دسترسی، اطلاعات قبلی نمایش داده نمی‌شوند.</p>
     <div className="report-alert report-alert--error">{error}</div>
@@ -1695,15 +1718,44 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     ]}/>
     {loading&&<p className="ow-muted" role="status">در حال دریافت برنامه…</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
-    {section==='tasks'&&<section className="report-panel">
-      <div className="ow-worker-list-heading">
-        <h2>کارها {taskRange!=='upcoming'&&overdue.length>0&&<small className="ow-overdue-count">· {n(overdue.length)} نیازمند اقدام از روزهای قبل</small>}</h2>
+    {section==='tasks'&&<section className="report-panel ow-worker-task-workspace">
+      <div className="ow-worker-task-intro">
+        <div><h2>کارهای من</h2>
+          <p>ابتدا کارهای نیازمند اقدام را ببینید؛ سایر وضعیت‌ها و برنامهٔ زمانی در دسترس‌اند.</p>
+        </div>
+        {focusCounts.action>0&&<span className="ow-worker-action-count">
+          {n(focusCounts.action)} کار نیازمند اقدام</span>}
+      </div>
+      <div className="ow-worker-focus-switch" role="group" aria-label="وضعیت کارهای من">
+        {focusOptions.map(([id,title,description])=>
+          <button type="button" key={id} aria-current={taskView===id?'true':undefined}
+            className={taskView===id?'is-selected':''}
+            onClick={()=>updateNavigation({taskView:id})}>
+            <span className="ow-worker-focus-title">{title}</span>
+            <strong>{n(focusCounts[id])}</strong>
+            <small>{description}</small>
+          </button>)}
+      </div>
+      <div className="ow-worker-date-tools">
+        <span>برنامه بر اساس تاریخ</span>
         <div className="ow-range-switch" role="group" aria-label="بازه نمایش کارها">
           {[['today','امروز'],['week','این هفته'],['month','این ماه'],['upcoming','آینده']].map(([id,title])=>
-            <button type="button" key={id} aria-pressed={taskRange===id}
-              className={taskRange===id?'is-selected':''}
-              onClick={()=>updateNavigation({taskRange:id})}>{title}</button>)}
+            <button type="button" key={id}
+              aria-pressed={taskView==='calendar'&&taskRange===id}
+              className={taskView==='calendar'&&taskRange===id?'is-selected':''}
+              onClick={()=>updateNavigation({taskView:'calendar',taskRange:id})}>{title}</button>)}
         </div>
+      </div>
+      <div className="ow-worker-list-heading ow-worker-results-heading">
+        <div>
+          <h3>{focusHeading?.[1]||'برنامهٔ زمانی'}</h3>
+          <p className="ow-muted">
+            {focusHeading?.[2]||'فهرست کارها بر اساس تاریخ انتخابی'}
+            {taskView==='calendar'&&taskRange!=='upcoming'&&overdue.length>0
+              ?` · ${n(overdue.length)} کار معوق نیز نمایش داده می‌شود`:''}
+          </p>
+        </div>
+        <span className="ow-worker-results-count" role="status">{n(visible.length)} کار</span>
       </div>
       <div className="ow-list ow-worker-tasks">
         {visible.map(t=><WorkerTaskCard key={t.id} task={t} onSaved={refresh}
@@ -1711,7 +1763,15 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           reviewCycle={(data.time_entries||[]).filter(e=>e.task_id===t.id
             &&['changes_requested','rejected'].includes(e.review_state))
             .map(e=>e.id).sort().join('|')}/>)}
-        {!visible.length&&<p className="ow-muted">کاری برای این بازه ثبت نشده است.</p>}
+        {!visible.length&&<div className="ow-worker-empty" role="status">
+          <strong>{emptyText[taskView]}</strong>
+          <p>برای بررسی وضعیت‌های دیگر، یکی از دسته‌های بالا را انتخاب کنید.</p>
+          {taskView==='action'&&focusCounts.upcoming>0&&<button type="button"
+            className="report-btn report-btn--light"
+            onClick={()=>updateNavigation({taskView:'upcoming'})}>
+            دیدن {n(focusCounts.upcoming)} کار پیش‌رو
+          </button>}
+        </div>}
       </div>
     </section>}
     {section==='availability'&&<section className="report-panel">
