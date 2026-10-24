@@ -84,5 +84,9 @@ export function scopeSelfWorkRows(data, workerId) {
     tasks:scoped(data.tasks),
     weekly_slots:scoped(data.weekly_slots),
     exceptions:scoped(data.exceptions),
+    // Time entries may omit worker_id in the self-scoped RPC just like tasks.
+    // Discard any explicit foreign owner rather than re-labeling it.
+    ...(Object.prototype.hasOwnProperty.call(data,'time_entries')
+      ? {time_entries:scoped(data.time_entries)} : {}),
   }
 }
