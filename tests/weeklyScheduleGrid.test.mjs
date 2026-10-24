@@ -111,3 +111,21 @@ test('authenticated self RPC presence rows without worker_id render and remain o
  assert.throws(()=>scopeSelfWorkRows(null,'SELF'))
  assert.throws(()=>scopeSelfWorkRows(original,''))
 })
+
+test('self-work defensive scope removes explicitly foreign report entries, preserves missing-key self entries',()=>{
+ const serverProjection={
+  tasks:[{id:'self',worker_id:'SELF'},{id:'foreign',worker_id:'OTHER'}],
+  weekly_slots:[],exceptions:[],
+  time_entries:[
+   {id:'e-self',worker_id:'SELF',reported_minutes:20},
+   {id:'e-foreign',worker_id:'OTHER',reported_minutes:90},
+   {id:'e-implicit',reported_minutes:30},
+  ],
+ }
+ const original=JSON.stringify(serverProjection)
+ const scoped=scopeSelfWorkRows(serverProjection,'SELF')
+ assert.deepEqual(scoped.time_entries.map(e=>e.id),['e-self','e-implicit'])
+ assert.ok(scoped.time_entries.every(e=>e.worker_id==='SELF'))
+ assert.equal(JSON.stringify(serverProjection),original,'projection must not modify RPC result')
+ assert.deepEqual(scopeSelfWorkRows({...serverProjection,time_entries:null},'SELF').time_entries,[])
+})
