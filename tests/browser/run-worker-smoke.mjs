@@ -37,6 +37,17 @@ try{
  })
  await page.goto('http://127.0.0.1:4177/tests/browser/worker-smoke.html',{waitUntil:'domcontentloaded'})
  await page.locator('.ow-worker-report-trigger').first().waitFor({state:'visible'})
+ await check('action-first desktop task surface and preserved future drilldown',async()=>{
+  const hub=page.locator('.ow-worker-focus-switch')
+  assert.equal(await hub.locator('button').count(),4)
+  assert.ok((await hub.innerText()).includes('نیازمند اقدام'))
+  assert.ok((await page.locator('.ow-worker-tasks').innerText()).includes('کار نمونهٔ امروز'))
+  await page.screenshot({path:resolve(output,'00-synthetic-action-first-workspace.png')})
+  await hub.locator('button').nth(2).click()
+  assert.ok((await page.locator('.ow-worker-tasks').innerText()).includes('سال آینده'))
+  await hub.locator('button').first().click()
+  assert.ok((await page.locator('.ow-worker-tasks').innerText()).includes('کار نمونهٔ امروز'))
+ })
  await check('task native top-layer, initial focus and desktop viewport',async()=>{
   await page.locator('.ow-worker-report-trigger').first().click()
   assert.ok(await matchesModal('.ow-worker-report-dialog'))
