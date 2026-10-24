@@ -22,7 +22,17 @@ globalThis.__qaWorkerData={
   task('SYNTHETIC-FUTURE','کار نمونهٔ سال آینده','assigned','2099-03-02'),
   task('SYNTHETIC-COMPLETED','کار نمونهٔ تکمیل‌شده','completed','2020-03-02')
  ],
- weekly_slots:[],exceptions:[],time_entries:[],approved_minutes_total:105,
+ weekly_slots:[],exceptions:[],
+ time_entries:[
+  {id:'SYNTHETIC-ENTRY-PENDING',worker_id:workerId,task_id:'SYNTHETIC-TODAY',
+   work_date:today,review_state:'submitted',reported_minutes:30},
+  {id:'SYNTHETIC-ENTRY-REVIEW',worker_id:workerId,task_id:'SYNTHETIC-COMPLETED',
+   work_date:'2020-03-02',review_state:'changes_requested',reported_minutes:45,
+   review_note:'این توضیح یک نظر مدیر کاملاً ساختگی برای بازبینی UI است'},
+  {id:'SYNTHETIC-ENTRY-APPROVED',worker_id:workerId,task_id:'SYNTHETIC-COMPLETED',
+   work_date:'2020-03-01',review_state:'approved',reported_minutes:80,approved_minutes:55,
+   extra_time_reason_text:'دلیل ساختگی درخواست زمان اضافه'},
+ ],approved_minutes_total:105,
 }
 globalThis.__qaProfileRequests=[
  {id:'SYNTHETIC-REQUEST-1',field_code:'major',
