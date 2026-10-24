@@ -1140,7 +1140,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     </section>}
   </div>
 }
-function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
+function WorkerTaskCard({task,onSaved,onReportAccepted,actionLedger,reviewCycle}) {
   const acknowledged=actionLedger.get(task.id)
   const sameReviewCycle=acknowledged?.reviewCycle===reviewCycle
   const [reportOpen,setReportOpen]=useState(false)
@@ -1210,7 +1210,10 @@ function WorkerTaskCard({task,onSaved,actionLedger,reviewCycle}) {
         reviewCycle,
         ...(kind==='report'?{report:true,clientSubmissionId:keyRef.current}:{start:true}),
       })
-      if(kind==='report'){setReportCommitted(true);setReportOpen(false)}
+      if(kind==='report'){
+        setReportCommitted(true);setReportOpen(false)
+        onReportAccepted?.()
+      }
       if(kind==='start')setStartCommitted(true)
       setNotice(kind==='report'?'گزارش در سرور ثبت شد؛ در حال دریافت وضعیت تازه…':
         'شروع کار در سرور ثبت شد؛ در حال دریافت وضعیت تازه…')
@@ -1637,6 +1640,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   if(acknowledgedActions.current.workerId!==profile.worker_id)
     acknowledgedActions.current={workerId:profile.worker_id,items:new Map(),profileRequests:new Map()}
   const [localNavigation,setLocalNavigation]=useState({section:'tasks',taskRange:'today'})
+  const [submissionReceipt,setSubmissionReceipt]=useState(null)
   const selected=navigation||localNavigation
   const updateNavigation=patch=>{
     const fn=previous=>({...previous,...patch})
@@ -1719,6 +1723,18 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     {loading&&<p className="ow-muted" role="status">در حال دریافت برنامه…</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
     {section==='tasks'&&<section className="report-panel ow-worker-task-workspace">
+      {submissionReceipt?.workerId===profile.worker_id&&
+        <div className="ow-worker-submission-receipt" role="status">
+          <div><strong>گزارش انجام کار دریافت شد</strong>
+            <p>گزارش «{submissionReceipt.title}» ثبت شد. ساعت‌ها فقط پس از تأیید مدیر منظور می‌شوند.</p>
+          </div>
+          <div className="ow-worker-submission-receipt__actions">
+            <button type="button" className="report-btn report-btn--light"
+              onClick={()=>updateNavigation({taskView:'pending'})}>پیگیری گزارش</button>
+            <button type="button" className="ow-mini-btn"
+              onClick={()=>setSubmissionReceipt(null)}>بستن پیام</button>
+          </div>
+        </div>}
       <div className="ow-worker-task-intro">
         <div><h2>کارهای من</h2>
           <p>ابتدا کارهای نیازمند اقدام را ببینید؛ سایر وضعیت‌ها و برنامهٔ زمانی در دسترس‌اند.</p>
@@ -1759,6 +1775,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       </div>
       <div className="ow-list ow-worker-tasks">
         {visible.map(t=><WorkerTaskCard key={t.id} task={t} onSaved={refresh}
+          onReportAccepted={()=>setSubmissionReceipt({workerId:profile.worker_id,title:t.title})}
           actionLedger={acknowledgedActions.current.items}
           reviewCycle={(data.time_entries||[]).filter(e=>e.task_id===t.id
             &&['changes_requested','rejected'].includes(e.review_state))
