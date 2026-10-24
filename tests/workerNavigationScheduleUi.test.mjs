@@ -1082,7 +1082,7 @@ test('read-only history shows true current review statuses and never invents tim
   const rows=history.querySelectorAll('.ow-history-entry')
   assert.equal(rows.length,3)
   assert.match(rows[0].textContent,/درخواست‌شده|زمان درخواست‌شده/)
-  assert.match(rows[0].textContent,/هنوز تأیید نشده/)
+  assert.match(rows[0].textContent,/در انتظار بررسی/)
   assert.match(rows[0].textContent,/منتظر تأیید/)
   assert.match(rows[1].textContent,/لطفاً مستندات را کامل کنید/)
   assert.match(rows[2].textContent,/۴۰ دقیقه/)
