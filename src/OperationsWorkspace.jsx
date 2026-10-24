@@ -1721,6 +1721,16 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     }finally{if(sequence===readSequence.current)setLoading(false)}
   }
   useEffect(()=>{void refresh()},[profile.worker_id,refreshRevision])
+  // Returning from Profile/Presence/History should get the latest canonical
+  // server review cycle. Never depend on in-memory array mutation to unlock
+  // a correction or infer that manager approval has happened.
+  const previousSectionRef=useRef(section)
+  useEffect(()=>{
+    const previous=previousSectionRef.current
+    previousSectionRef.current=section
+    if(previous!==section&&(section==='tasks'||section==='history'))
+      void refresh()
+  },[section])
   const records=data.time_entries||[]
   const approved=records.filter(x=>x.review_state==='approved')
   const total=data.approved_minutes_total??approved.reduce(
