@@ -6,7 +6,7 @@
 export const WORKER_REPORT_VIEWS=['all','submitted','changes_requested','rejected','approved']
 const validDate=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)
 const sortableDate=v=>validDate(v)?v:'0000-00-00'
-const validMinute=v=>Number.isFinite(Number(v))&&Number(v)>=0?Number(v):null
+const validMinute=v=>v!==null&&v!==undefined&&v!==''&&typeof v!=='boolean'&&Number.isFinite(Number(v))&&Number(v)>=0?Number(v):null
 export function projectWorkerReportActivity(records=[],tasks=[],view='all') {
  const items=Array.isArray(records)?records:[]
  const allowed=WORKER_REPORT_VIEWS.includes(view)?view:'all'
