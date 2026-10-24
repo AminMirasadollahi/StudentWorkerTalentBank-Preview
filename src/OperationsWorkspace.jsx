@@ -1433,6 +1433,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate}) {
 
 function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal,onNavigate,refreshRevision=0}) {
  const [identity,setIdentity]=useState(null)
+ const [identityOwner,setIdentityOwner]=useState(null)
  const [requests,setRequests]=useState([])
  const [requestsLoading,setRequestsLoading]=useState(true)
  const [requestsError,setRequestsError]=useState('')
@@ -1496,6 +1497,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
        if(item&&item.review_state!=='pending')requestLedger.delete(code)
      }
      setIdentity(personal)
+     setIdentityOwner(profile.worker_id)
      setRequests(items)
      setProfileReadFailed(false)
      setRequestsError('')
@@ -1551,7 +1553,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
     <button type="button" className="report-btn report-btn--light" disabled={requestsLoading}
       onClick={()=>{void refreshProfile()}}>تلاش مجدد برای دریافت مشخصات</button>
   </section>
-  if(!identity)return <section className="report-panel ow-self-profile" role="status">
+  if(!identity||identityOwner!==profile.worker_id)return <section className="report-panel ow-self-profile" role="status">
     <p className="ow-muted">در حال بررسی دسترسی به مشخصات…</p>
   </section>
   return <section className="report-panel ow-self-profile">
