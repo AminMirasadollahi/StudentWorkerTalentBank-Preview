@@ -125,7 +125,7 @@ async function setup(){
 test('one worker tasks tab, range choices and safely preserved selection after unmount/resume',async()=>{
  const ui=await setup()
  try{
-  assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,3)
+  assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,4)
   assert.ok(ui.host.querySelector('.ow-range-switch'))
   assert.equal(ui.host.querySelectorAll('.ow-worker-tasks .ow-item').length,1)
   const reports=ui.host.querySelector('.ow-worker-action-detail')
@@ -137,7 +137,7 @@ test('one worker tasks tab, range choices and safely preserved selection after u
   assert.equal(ui.host.querySelector('.ow-workspace'),null)
   await ui.click('[data-testid="resume"]')
   assert.equal(ui.host.querySelector('[aria-pressed="true"]').textContent,'این هفته')
-  assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,3)
+  assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,4)
  }finally{await ui.dispose()}
 })
 test('seven weekday rows render four independent slots and safe per-day single RPC request',async()=>{
@@ -170,7 +170,7 @@ test('worker exposes This Month and personal profile without permanent password 
   await ui.clickText('پروفایل من')
   assert.ok(ui.host.querySelector('.ow-self-profile'))
   assert.ok(ui.host.textContent.includes('سابقه گزارش‌ها و ساعات'))
-  assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,3)
+  assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,4)
  }finally{await ui.dispose()}
 })
 test('month view edits one dated exception through injected fake RPC only',async()=>{
@@ -948,36 +948,31 @@ test('desktop profile shows a focused request-history dialog without modifying r
   await ui.dispose()
  }
 })
-test('profile activity categories separate current, future and completed work on desktop',async()=>{
+test('profile no longer duplicates task and report lists; direct links open their authoritative sections',async()=>{
  const data=fixture()
- const base=data.tasks[0]
- data.tasks.push(
-  {...base,id:'FAKE-PROFILE-UPCOMING',title:'کار آینده ساختگی',planned_date:'2099-04-01',state:'assigned'},
-  {...base,id:'FAKE-PROFILE-DONE',title:'کار تکمیل‌شده ساختگی',planned_date:'2020-04-01',state:'completed'}
- )
+ data.tasks.push({...data.tasks[0],id:'FAKE-PROFILE-OLD',
+   title:'کار تکمیل‌شده ساختگی',planned_date:'2020-04-01',state:'completed'})
  globalThis.__workerFocusFixture=data
  const ui=await setup()
  try{
   await ui.clickText('پروفایل من')
-  const buttons=ui.host.querySelectorAll('.ow-profile-work-tabs button')
-  assert.equal(buttons.length,3,'a compact category selector replaces three stacked task disclosures')
-  assert.match(ui.host.querySelector('.ow-profile-work-list').textContent,/کار نمونه دانشجوکار/)
-  await act(async()=>buttons[1].click())
-  assert.equal(buttons[1].getAttribute('aria-pressed'),'true')
-  assert.match(ui.host.querySelector('.ow-profile-work-list').textContent,/کار آینده ساختگی/)
-  assert.doesNotMatch(ui.host.querySelector('.ow-profile-work-list').textContent,/کار تکمیل‌شده ساختگی/)
-  await act(async()=>buttons[2].click())
-  assert.match(ui.host.querySelector('.ow-profile-work-list').textContent,/کار تکمیل‌شده ساختگی/)
-  assert.doesNotMatch(ui.host.querySelector('.ow-profile-work-list').textContent,/کار آینده ساختگی/)
-  assert.match(ui.host.textContent,/سابقه گزارش‌ها و ساعات/,
-    'existing independent time-report history is preserved')
+  assert.ok(ui.host.querySelector('.ow-self-profile'))
+  assert.equal(ui.host.querySelector('.ow-profile-work-tabs'),null,
+    'full task category lists belong to the task workspace, not profile')
+  assert.equal(ui.host.querySelector('.ow-profile-fold'),null,
+    'dated report history belongs to the dedicated section')
+  assert.equal(ui.host.querySelectorAll('.ow-profile-activity-links__buttons button').length,2)
+  await act(async()=>ui.host.querySelector('.ow-profile-activity-links__buttons button').click())
+  assert.ok(ui.host.querySelector('.ow-worker-task-workspace'),'task shortcut navigates to canonical action area')
+  await ui.clickText('پروفایل من')
+  await act(async()=>ui.host.querySelectorAll('.ow-profile-activity-links__buttons button')[1].click())
+  assert.ok(ui.host.querySelector('.ow-worker-history-panel'),'history shortcut navigates to read-only report area')
+  assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,4)
  }finally{
   globalThis.__workerFocusFixture=fixture()
   await ui.dispose()
  }
 })
-
-
 test('worker homepage is action-first and preserves the familiar date drilldown',async()=>{
  const data=fixture()
  const template=data.tasks[0]
@@ -1053,6 +1048,61 @@ test('confirmed report receipt stays visible when server moves task out of the a
   globalThis.__workerFocusFixture=fixture()
   globalThis.__workerWorkPlan=[]
   globalThis.__qaAllowWorkerSubmit=false
+  globalThis.__qaSubmitCalls=[]
+  await ui.dispose()
+ }
+})
+
+
+test('read-only history shows true current review statuses and never invents timeline events',async()=>{
+ const data=fixture()
+ const basic=data.tasks[0]
+ data.tasks.push({...basic,id:'FAKE-OTHER-TASK',title:'کار پژوهشی ساختگی',state:'completed'})
+ data.time_entries=[
+  {id:'FAKE-SUBMITTED',worker_id:worker,task_id:'FAKE-TASK',
+   work_date:'2026-10-20',review_state:'submitted',reported_minutes:45,
+   approved_minutes:null},
+  {id:'FAKE-CHANGES',worker_id:worker,task_id:'FAKE-OTHER-TASK',
+   work_date:'2026-10-19',review_state:'changes_requested',
+   reported_minutes:65,approved_minutes:null,review_note:'لطفاً مستندات را کامل کنید'},
+  {id:'FAKE-APPROVED',worker_id:worker,task_id:'FAKE-TASK',
+   work_date:'2026-10-18',review_state:'approved',
+   reported_minutes:50,approved_minutes:40,extra_time_reason_text:'علت آزمایشی زمان اضافه'}
+ ]
+ data.approved_minutes_total=150
+ globalThis.__workerFocusFixture=data
+ globalThis.__qaSubmitCalls=[]
+ const ui=await setup()
+ try{
+  await ui.clickText('سوابق')
+  const history=ui.host.querySelector('.ow-worker-history-panel')
+  assert.ok(history)
+  assert.match(history.textContent,/کل زمان تأییدشده/)
+  assert.match(history.textContent,/۲ ساعت و ۳۰ دقیقه/,'server lifetime total wins over visible 40-minute row')
+  const rows=history.querySelectorAll('.ow-history-entry')
+  assert.equal(rows.length,3)
+  assert.match(rows[0].textContent,/درخواست‌شده|زمان درخواست‌شده/)
+  assert.match(rows[0].textContent,/هنوز تأیید نشده/)
+  assert.match(rows[0].textContent,/منتظر تأیید/)
+  assert.match(rows[1].textContent,/لطفاً مستندات را کامل کنید/)
+  assert.match(rows[2].textContent,/۴۰ دقیقه/)
+  assert.doesNotMatch(rows[2].textContent,/تاریخ تأیید|تاریخ ارسال/,
+   'a true timeline of review events is not provided by current RPC fields')
+  const options=history.querySelectorAll('.ow-history-filter button')
+  assert.equal(options.length,5)
+  await act(async()=>options[3].click())
+  assert.equal(history.querySelectorAll('.ow-history-entry').length,0,
+   'empty review statuses are visibly distinct from pending or approved')
+  await act(async()=>options[1].click())
+  assert.equal(history.querySelectorAll('.ow-history-entry').length,1)
+  assert.match(history.querySelector('.ow-history-entry').textContent,/منتظر تأیید/)
+  await act(async()=>options[2].click())
+  assert.equal(history.querySelectorAll('.ow-history-entry').length,1)
+  await act(async()=>history.querySelector('.ow-history-next-step button').click())
+  assert.ok(ui.host.querySelector('.ow-worker-task-workspace'))
+  assert.equal(globalThis.__qaSubmitCalls.length,0,'history filtering and navigation never writes reports')
+ }finally{
+  globalThis.__workerFocusFixture=fixture()
   globalThis.__qaSubmitCalls=[]
   await ui.dispose()
  }
