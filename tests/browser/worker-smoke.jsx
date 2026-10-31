@@ -67,11 +67,11 @@ function App(){
  const mockSettings=settingsOpen&&<section id="ops-worker-account-settings"
    className="report-panel ops-password-panel ops-account-settings-panel">
    <div className="ops-settings-title"><h2>تنظیمات حساب · تغییر رمز عبور</h2>
-     <button type="button" onClick={()=>setSettingsOpen(false)}>بستن</button></div>
+     <button type="button" className="report-btn report-btn--light" onClick={()=>setSettingsOpen(false)}>بستن</button></div>
    <form onSubmit={event=>{event.preventDefault();globalThis.__qaWriteAttempts++}}>
      <label className="report-field"><span>رمز جدید</span><input type="password" minLength={8}/></label>
      <label className="report-field"><span>تکرار رمز جدید</span><input type="password" minLength={8}/></label>
-     <button type="submit">تغییر رمز ساختگی</button>
+     <button className="report-btn report-btn--primary" type="submit">تغییر رمز ساختگی</button>
    </form>
  </section>
  return <div className="ops-root report-shell ops-worker-b3-view" dir="rtl">

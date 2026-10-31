@@ -1332,16 +1332,6 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 }
 
 
-/* SWTB9: Account settings belong to the content column, not the entire viewport. */
-.ops-worker-b3-view .ow-b3-stage > .ops-account-settings-panel {
- width:min(100%,46rem);max-width:100%;align-self:flex-start;
- margin:0;padding:1.15rem 1.3rem;border-radius:.85rem;
- border:1px solid #d7e5e9;box-shadow:none;background:#fff;
-}
-.ops-worker-b3-view .ow-b3-stage > .ops-account-settings-panel .ops-settings-title {
- border-bottom:1px solid #e1eaee;padding-bottom:.8rem;margin-bottom:1rem;
-}
-.ops-worker-b3-view .ow-b3-stage > .ops-account-settings-panel input {max-width:100%}
 .ow-b3-worker .ow-b3-login-email {max-width:100%;overflow-wrap:anywhere}
 .ow-unit-hours {background:#f8fbfc;border:1px solid #dbe8ea;border-radius:.75rem;
  padding:1rem;margin:1rem 0}
@@ -1360,3 +1350,97 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 .ow-unit-history-filter .report-field {width:min(15rem,100%);margin:0}
 @media(max-width:1050px) {.ow-unit-hours__grid {grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px) {.ow-unit-hours__grid {grid-template-columns:1fr}}
+
+/* SWTB10 — worker-only visual repair. Preserve SWTB9 unit accounting and RPCs.
+   One document scroll for history, balanced density and truthful empty states. */
+.ops-worker-b3-view .ow-worker-history-panel {
+  padding:.85rem 1rem;
+}
+.ow-b3-ledger .ow-history-heading {
+  gap:.65rem;margin-bottom:.25rem;padding:0 0 .35rem;
+  align-items:center;
+}
+.ow-b3-ledger .ow-history-heading h2 {font-size:1.17rem}
+.ow-b3-ledger .ow-history-heading p {font-size:.82rem;line-height:1.6}
+.ow-b3-ledger .ow-history-approved-total {
+  min-width:0;padding:.43rem .7rem;gap:0;border-radius:.65rem;
+}
+.ow-b3-ledger .ow-history-approved-total span,
+.ow-b3-ledger .ow-history-approved-total small {font-size:.79rem;line-height:1.5}
+.ow-b3-ledger .ow-history-approved-total strong {font-size:1.01rem}
+.ow-b3-ledger .ow-unit-hours {
+  margin:.45rem 0 .6rem;padding:.6rem .75rem;border-radius:.65rem;
+}
+.ow-b3-ledger .ow-unit-hours__heading {
+  margin-bottom:.4rem;gap:.3rem .75rem;align-items:center;
+}
+.ow-b3-ledger .ow-unit-hours__heading h3 {font-size:.9rem!important}
+.ow-b3-ledger .ow-unit-hours__heading small {font-size:.8rem}
+.ow-b3-ledger .ow-unit-hours__grid {gap:.4rem}
+.ow-b3-ledger .ow-unit-hours__grid article {
+  padding:.45rem .6rem;gap:0;border-radius:.5rem;
+}
+.ow-b3-ledger .ow-unit-hours__grid article b {font-size:.94rem}
+.ow-b3-ledger .ow-unit-hours__grid article small {font-size:.8rem;line-height:1.55}
+.ow-b3-ledger .ow-unit-hours > p {margin:.3rem 0 0;font-size:.8rem;line-height:1.6}
+.ow-b3-ledger .ow-history-controls {
+  display:flex;align-items:end;justify-content:space-between;
+  flex-wrap:wrap;gap:.45rem .75rem;margin:.15rem 0 .3rem;
+}
+.ow-b3-ledger .ow-unit-history-filter {margin:0;flex:0 1 13.5rem}
+.ow-b3-ledger .ow-unit-history-filter .report-field {width:100%;gap:.2rem}
+.ow-b3-ledger .ow-unit-history-filter select {min-height:2.35rem}
+.ow-b3-ledger .ow-history-filter {
+  min-width:0;max-width:100%;margin:0;padding:.2rem;gap:.12rem;
+}
+.ow-b3-ledger .ow-history-filter button {
+  min-height:2.35rem;padding:.34rem .5rem;font-size:.82rem;gap:.35rem;
+}
+.ow-b3-ledger .ow-history-results-heading {padding:.4rem .15rem .25rem}
+.ow-b3-ledger .ow-b3-ledger-columns {padding:.55rem .7rem}
+.ow-b3-ledger .ow-b3-ledger-row {padding:.55rem .7rem;gap:.5rem}
+.ow-b3-ledger .ow-b3-ledger-row.is-inspected {
+  background:#f2faf8;border-inline-start:3px solid #278e86;
+}
+.ow-b3-ledger .ow-b3-ledger-row .ow-history-entry__identity h4 {font-size:.86rem}
+.ow-b3-ledger .ow-b3-ledger-body--detail {
+  grid-template-columns:minmax(0,1fr) minmax(15.5rem,30%);
+  gap:.65rem;align-items:start;
+}
+.ow-b3-ledger .ow-b3-inspector {
+  position:sticky;top:.75rem;max-height:none;overflow:visible;
+  padding:.75rem;border-radius:.65rem;
+}
+.ow-b3-ledger .ow-b3-inspector h4 {margin:.45rem 0 .25rem;font-size:.94rem}
+.ow-b3-ledger .ow-b3-inspector-facts {margin:.25rem 0;font-size:.81rem;line-height:1.6}
+.ow-b3-ledger .ow-b3-inspector section {margin-top:.5rem;padding:.55rem .65rem}
+.ow-b3-ledger .ow-b3-inspector section p {margin:.2rem 0;line-height:1.65}
+.ow-b3-ledger .ow-history-empty {
+  width:100%;max-width:none;min-height:7rem;box-sizing:border-box;
+  border:0;border-top:1px solid #e3edef;border-radius:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:.25rem;padding:1rem;line-height:1.7;text-align:center;
+  background:#fbfdfd;
+}
+/* Account settings now belong to Account, inside the identity/correction view,
+   not as an unrelated card on top of Tasks. First-login form stays unchanged. */
+.ops-worker-b3-view .ow-self-profile > .ops-account-settings-panel {
+  width:min(100%,34rem);max-width:100%;margin:.85rem 0 .25rem;
+  padding:.75rem .9rem;box-shadow:none;border:1px solid #d7e5e9;
+  border-radius:.7rem;background:#f9fcfc;
+}
+.ops-worker-b3-view .ow-self-profile > .ops-account-settings-panel .ops-settings-title {
+  margin-bottom:.6rem;padding-bottom:.55rem;border-bottom:1px solid #e1eaee;
+}
+.ops-worker-b3-view .ow-self-profile > .ops-account-settings-panel .ops-settings-title h2 {
+  margin:0;font-size:1rem;
+}
+.ops-worker-b3-view .ow-self-profile > .ops-account-settings-panel input {max-width:100%}
+@media(max-width:1230px) {
+  .ow-b3-ledger .ow-b3-ledger-body--detail {grid-template-columns:minmax(0,1fr)}
+  .ow-b3-ledger .ow-b3-inspector {position:static}
+}
+@media(max-width:700px) {
+  .ow-b3-ledger .ow-history-controls {display:grid}
+  .ow-b3-ledger .ow-unit-history-filter {width:100%;max-width:100%}
+}

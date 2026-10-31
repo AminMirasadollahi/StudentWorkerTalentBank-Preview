@@ -41,7 +41,11 @@ try{
    await page.getByRole('button',{name:'تنظیمات حساب'}).click()
    const stage=page.locator('.ow-b3-stage')
    const panel=stage.locator('#ops-worker-account-settings')
-   assert.equal(await panel.count(),1,'settings must be a direct descendant of content stage')
+   assert.equal(await panel.count(),1,'settings must remain inside the B3 content stage')
+   assert.equal(await page.locator('.ow-self-profile #ops-worker-account-settings').count(),1,
+     'password settings must be integrated into Account identity/correction page')
+   assert.equal((await page.locator('.ow-b3-breadcrumb strong').innerText()).trim(),'حساب من',
+     'opening settings from Tasks must activate Account, not leave Tasks behind')
    const rects=await page.evaluate(()=>{
      const stage=document.querySelector('.ow-b3-stage').getBoundingClientRect()
      const aside=document.querySelector('.ow-b3-sidebar').getBoundingClientRect()
@@ -56,6 +60,7 @@ try{
    await panel.getByRole('button',{name:'بستن'}).click()
    assert.equal(await stage.locator('#ops-worker-account-settings').count(),0)
    assert.equal(await page.evaluate(()=>window.__qaWriteAttempts),0)
+   await page.getByRole('button',{name:'کارهای من',exact:true}).click()
  })
  await check('action-first desktop task surface and preserved future drilldown',async()=>{
   const hub=page.locator('.ow-worker-focus-switch')
@@ -183,10 +188,30 @@ try{
   await panel.locator('select[aria-label="فیلتر واحد گزارش‌های من"]').selectOption('')
   assert.equal(await panel.locator('.ow-history-entry').count(),3,'all report rows are restored')
   await page.screenshot({path:resolve(output,'04b-synthetic-report-history.png')})
+  await panel.locator('.ow-history-filter button').nth(1).click()
+  assert.equal(await panel.locator('.ow-history-entry').count(),1)
+  await panel.locator('select[aria-label="فیلتر واحد گزارش‌های من"]').selectOption('research')
+  assert.equal(await panel.locator('.ow-history-entry').count(),0)
+  const empty=panel.locator('.ow-history-empty')
+  assert.ok((await empty.innerText()).includes('گزارشی با وضعیت انتخاب‌شده یافت نشد'))
+  const widths=await page.evaluate(()=>{
+    const list=document.querySelector('.ow-b3-ledger-list').getBoundingClientRect()
+    const empty=document.querySelector('.ow-history-empty').getBoundingClientRect()
+    return {list:list.width,empty:empty.width}
+  })
+  assert.ok(widths.empty>=widths.list-4,'empty state must span the whole ledger')
+  await page.screenshot({path:resolve(output,'04ba-swtb10-empty-state.png')})
+  await panel.locator('select[aria-label="فیلتر واحد گزارش‌های من"]').selectOption('')
   await panel.locator('.ow-history-filter button').nth(2).click()
   assert.equal(await panel.locator('.ow-history-entry').count(),1)
   await panel.locator('.ow-history-entry .ow-b3-inspect-trigger').click()
   assert.ok((await panel.locator('.ow-b3-inspector').innerText()).includes('نظر مدیر'))
+  assert.equal(await panel.locator('.ow-b3-ledger-row.is-inspected').count(),1)
+  const overflow=await panel.locator('#ow-report-inspector').evaluate(node=>({
+    overflow:getComputedStyle(node).overflowY,maxHeight:getComputedStyle(node).maxHeight
+  }))
+  assert.equal(overflow.overflow,'visible','report inspector must not impose nested scrolling')
+  assert.equal(overflow.maxHeight,'none','report inspector must grow naturally')
   await page.screenshot({path:resolve(output,'04c-synthetic-report-inspector.png')})
   await panel.locator('.ow-history-next-step button').click()
   assert.ok(await page.locator('.ow-worker-task-workspace').isVisible())
