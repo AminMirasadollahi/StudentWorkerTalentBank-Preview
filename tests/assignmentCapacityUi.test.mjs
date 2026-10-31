@@ -127,7 +127,7 @@ test('manager sees advisory and must explicitly choose work unit before enabled 
     const unit=host.querySelector('select[aria-label="واحد انجام کار"]')
     await act(async()=>{unit.value='research';unit.dispatchEvent(new window.Event('change',{bubbles:true}))})
     assert.equal(submit.disabled,false,'capacity advice does not block a valid explicit work unit')
-    assert.match(host.textContent,/زمان استاندارد برای هر نفر جداگانه/)
+    assert.match(host.textContent,/واحد انتخاب‌شده به خودِ کار تعلق دارد/)
   }finally{await teardown()}
 })
 test('no-weekday-record is uncertain, never mislabeled as confirmed absence',async()=>{
