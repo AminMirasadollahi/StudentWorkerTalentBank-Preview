@@ -1301,3 +1301,32 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 }
 
 .ow-b3-worker .ow-b3-login-email {overflow-wrap:anywhere;white-space:normal;line-height:1.7;color:#b9d3d8;font-size:.67rem}
+
+
+/* Task row: data, detail and action occupy distinct real grid cells. */
+.ow-b3-stage .ow-worker-task-workspace .ow-worker-tasks>.ow-item {
+ grid-template-columns:minmax(0,1fr) auto auto;
+}
+.ow-b3-stage .ow-worker-task-workspace .ow-worker-tasks>.ow-item .ow-worker-card-main {
+ grid-column:1;grid-row:1;
+}
+.ow-b3-stage .ow-worker-task-workspace .ow-worker-tasks>.ow-item>.ow-b3-inspect-trigger {
+ grid-column:2;grid-row:1;align-self:center;justify-self:start;
+}
+.ow-b3-stage .ow-worker-task-workspace .ow-worker-tasks>.ow-item>.ow-worker-action-launch {
+ grid-column:3;grid-row:1;align-self:center;
+}
+@media(max-width:770px) {
+ .ow-b3-stage .ow-worker-task-workspace .ow-worker-tasks>.ow-item {
+  grid-template-columns:minmax(0,1fr) auto;
+ }
+ .ow-b3-stage .ow-worker-task-workspace .ow-worker-tasks>.ow-item .ow-worker-card-main {
+  grid-column:1/-1;
+ }
+ .ow-b3-stage .ow-worker-task-workspace .ow-worker-tasks>.ow-item>.ow-b3-inspect-trigger {
+  grid-column:1;grid-row:2;
+ }
+ .ow-b3-stage .ow-worker-task-workspace .ow-worker-tasks>.ow-item>.ow-worker-action-launch {
+  grid-column:2;grid-row:2;
+ }
+}
