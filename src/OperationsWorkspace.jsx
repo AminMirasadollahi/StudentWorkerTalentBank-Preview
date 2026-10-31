@@ -541,7 +541,7 @@ function ApprovalCard({entry,task,worker,onDone}) {
       <strong>{task?.title||'کار مرتبط نامشخص'}</strong>
       <span className="ow-status">{committed?'تصمیم ثبت‌شده':missingTask?'نیازمند بررسی پرونده':asksExtra?'درخواست زمان اضافه':'گزارش عادی'}</span>
     </div>
-    <small>{worker?.name||'—'} · {pretty(entry.work_date)} · درخواست: {minutes(requested)}
+    <small>{worker?.name||'—'} · واحد کار: {task?.unit?(unitLabels[task.unit]||task.unit):'نامشخص'} · {pretty(entry.work_date)} · درخواست: {minutes(requested)}
       {asksExtra&&<> · اضافه: {minutes(requested-standard)}</>}
     </small>
     {missingTask&&<p className="ow-warning" role="alert">کار مرتبط در اطلاعات فعلی موجود نیست؛ تصمیم‌گیری تا بررسی پرونده غیرفعال است.</p>}
@@ -613,7 +613,7 @@ async function exportOpsExcel(data, filteredToOneWorker=false) {
     if(includedTaskIds.has(entry.task_id)) continue
     const worker=data.workers?.find(w=>w.id===entry.worker_id)
     sh.addRow({
-      name:worker?.name||'',unit:unitLabels[worker?.unit]||'',
+      name:worker?.name||'',unit:'واحد کار نامشخص',
       task:'کار مرتبط در خروجی موجود نیست',date:pretty(entry.work_date),
       reported:entry.reported_minutes,
       approved:entry.review_state==='approved'?entry.approved_minutes:'',
@@ -977,7 +977,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
               <div className="ow-item-header"><strong>{t.title}</strong>
                 <span className="ow-status">{detail.label}</span>
               </div>
-              <small>{label(t.worker_id,workers)} · {pretty(t.planned_date)} · زمان استاندارد: {minutes(t.estimate_minutes)}</small>
+              <small>{label(t.worker_id,workers)} · واحد کار: {unitLabels[t.unit]||t.unit||'نامشخص'} · {pretty(t.planned_date)} · زمان استاندارد: {minutes(t.estimate_minutes)}</small>
               {(detail.waitingCount>0||detail.approvedMinutes>0)&&<div className="ow-task-progress">
                 {detail.waitingCount>0&&<span>{n(detail.waitingCount)} گزارش منتظر تأیید</span>}
                 {detail.approvedMinutes>0&&<span>زمان تأییدشده: {exactDuration(detail.approvedMinutes)}</span>}
@@ -1270,7 +1270,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
       <div className="ow-item-header"><strong>{task.title}</strong>
         <span className="ow-status">{stateLabels[task.state]||'وضعیت نامشخص'}</span>
       </div>
-      <small>{pretty(task.planned_date)} · زمان استاندارد: {minutes(standard)}</small>
+      <small>واحد فعالیت: {unitLabels[task.unit]||task.unit||'نامشخص'} · {pretty(task.planned_date)} · زمان استاندارد: {minutes(standard)}</small>
       {task.collaborators?.length>0&&<small className="ow-task-collaborators">
         با همکاری: {task.collaborators.map(x=>x.name).join('، ')}
       </small>}
@@ -1300,7 +1300,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
               id={`ow-worker-report-heading-${task.id}`}>
               {task.state==='needs_changes'?'اصلاح و ارسال گزارش':'ثبت انجام کار'}
             </h3>
-            <p className="ow-muted">{task.title} · {pretty(task.planned_date)}</p>
+            <p className="ow-muted">{task.title} · {unitLabels[task.unit]||task.unit||'واحد کار نامشخص'} · {pretty(task.planned_date)}</p>
           </div>
           <button type="button" className="ow-worker-report-dialog__close"
             disabled={busy} aria-label="بستن پنجره ثبت کار"
@@ -1945,7 +1945,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           }}>بستن</button>
         </div>
         <h4>{inspectedTask.title}</h4>
-        <p className="ow-b3-inspector-facts">{stateLabels[inspectedTask.state]||inspectedTask.state}
+        <p className="ow-b3-inspector-facts">واحد کار: {unitLabels[inspectedTask.unit]||inspectedTask.unit||'نامشخص'} · {stateLabels[inspectedTask.state]||inspectedTask.state}
           {' · '}{pretty(inspectedTask.planned_date)}{' · '}
           {minutes(inspectedTask.estimate_minutes)}</p>
         {inspectedTask.instructions
