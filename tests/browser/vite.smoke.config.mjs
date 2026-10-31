@@ -4,6 +4,7 @@ import {defineConfig} from 'vite'
 import react from '@vitejs/plugin-react'
 
 const v2=[
+ 'export const getUnitHourTotals=async()=>({scope:"worker",units:[{unit:"library",name:"کتابخانه",approved_minutes:55,pending_requested_minutes:30,pending_reports:1}]});',
  'export const getMyWorkV2=async()=>globalThis.__qaWorkerData;',
  'export const getMyWorkerProfileV2=async()=>({worker_id:"SWTB_CHROMIUM_SYNTHETIC_WORKER",name:"دانشجوکار ساختگی",major:"رشته ساختگی",entry_year:"1405",unit:"library"});',
  'export const getMyProfileChangeRequests=async()=>globalThis.__qaProfileRequests;',
