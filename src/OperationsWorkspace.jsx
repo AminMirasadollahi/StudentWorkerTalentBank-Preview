@@ -782,10 +782,12 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const historyTo=navigation.historyTo||''
   const historyReview=navigation.historyReview||''
   const taskWorkerId=navigation.taskWorkerId||''
+  const taskUnit=navigation.taskUnit||''
   const taskState=navigation.taskState||''
   const taskSearch=navigation.taskSearch||''
   const taskOrder=navigation.taskOrder||'latest'
   const approvalWorkerId=navigation.approvalWorkerId||''
+  const approvalUnit=navigation.approvalUnit||''
   const approvalKind=navigation.approvalKind||''
   const setListingFilter=(name,value)=>setNavigation(previous=>({...previous,[name]:value}))
   const historyFiltersActive=Boolean(historyWorkerId||historyUnit||historyFrom||historyTo||historyReview)
@@ -817,8 +819,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const [historyShown,setHistoryShown]=useState(100)
   const [tasksShown,setTasksShown]=useState(100)
   const [approvalsShown,setApprovalsShown]=useState(25)
-  useEffect(()=>setTasksShown(100),[taskWorkerId,taskState,taskSearch,taskOrder])
-  useEffect(()=>setApprovalsShown(25),[approvalWorkerId,approvalKind])
+  useEffect(()=>setTasksShown(100),[taskWorkerId,taskUnit,taskState,taskSearch,taskOrder])
+  useEffect(()=>setApprovalsShown(25),[approvalWorkerId,approvalUnit,approvalKind])
   useEffect(()=>{setHistoryShown(100)},[historyWorkerId,historyUnit,historyFrom,historyTo,historyReview])
 
   const refresh=async ()=>{
@@ -857,10 +859,10 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const allTasks=data.tasks||[]
   const taskCounts=summarizeTaskWorkflow(allTasks)
   const matchingTasks=selectManagerTasks(data,{
-    workerId:taskWorkerId,state:taskState,search:taskSearch,order:taskOrder,
+    workerId:taskWorkerId,unit:taskUnit,state:taskState,search:taskSearch,order:taskOrder,
   })
   const visibleApprovals=selectPendingApprovals(data,{
-    workerId:approvalWorkerId,kind:approvalKind,
+    workerId:approvalWorkerId,unit:approvalUnit,kind:approvalKind,
   })
   const reportByTask=new Map()
   for(const entry of data.time_entries||[]){
@@ -947,6 +949,13 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
               {workers.map(w=><option value={w.id} key={w.id}>{w.name}</option>)}
             </select>
           </label>
+          <label className="report-field"><span>واحد انجام کار</span>
+            <select aria-label="فیلتر کارها بر اساس واحد فعالیت" value={taskUnit}
+              onChange={e=>setListingFilter('taskUnit',e.target.value)}>
+              <option value="">همه واحدها</option>
+              {Object.entries(unitLabels).map(([id,name])=><option key={id} value={id}>{name}</option>)}
+            </select>
+          </label>
           <label className="report-field"><span>وضعیت کار</span>
             <select aria-label="فیلتر وضعیت کار" value={taskState}
               onChange={e=>setListingFilter('taskState',e.target.value)}>
@@ -1014,6 +1023,13 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
             onChange={e=>setListingFilter('approvalWorkerId',e.target.value)}>
             <option value="">همه دانشجوکارها</option>
             {workers.map(w=><option value={w.id} key={w.id}>{w.name}</option>)}
+          </select>
+        </label>
+        <label className="report-field"><span>واحد انجام کار</span>
+          <select aria-label="فیلتر تأیید ساعات بر اساس واحد" value={approvalUnit}
+            onChange={e=>setListingFilter('approvalUnit',e.target.value)}>
+            <option value="">همه واحدها</option>
+            {Object.entries(unitLabels).map(([id,name])=><option key={id} value={id}>{name}</option>)}
           </select>
         </label>
         <label className="report-field"><span>نوع درخواست زمان</span>
