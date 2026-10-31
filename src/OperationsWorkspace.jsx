@@ -32,7 +32,7 @@ const unitLabels = {library:'کتابخانه',public_relations:'روابط عم
 
 /** Complete, current-scope server aggregate, independent of bounded task/history rows.
  * Fail closed to an explicit unavailable message instead of displaying false zero totals. */
-function UnitHourSummary({scope,refreshRevision=0}) {
+function UnitHourSummary({scope,approvedTotal=null,refreshRevision=0}) {
  const [result,setResult]=useState({scope:null,units:[],loading:true,error:false})
  useEffect(()=>{
    let active=true
@@ -44,10 +44,14 @@ function UnitHourSummary({scope,refreshRevision=0}) {
    }).catch(()=>{if(active)setResult({scope:null,units:[],loading:false,error:true})})
    return()=>{active=false}
  },[scope,refreshRevision])
- return <section className="ow-unit-hours" aria-label="ساعات تأییدشده به تفکیک واحد">
+ return <section className={scope==='worker'?'ow-unit-hours ow-unit-hours--combined':'ow-unit-hours'}
+   aria-label="مجموع ساعات تأییدشده به تفکیک واحد فعالیت">
    <div className="ow-unit-hours__heading">
-     <h3>ساعات به تفکیک واحد فعالیت</h3>
-     <small>زمان تأییدشده، مستقل از واحد اولیهٔ ثبت‌نام</small>
+     <div><h3>خلاصه ساعات تأییدشده</h3>
+       <small>به تفکیک واحد انجام کار</small></div>
+     {scope==='worker'&&<div className="ow-unit-hours__total">
+       <span>مجموع تأییدشده</span><strong>{approvedTotal===null?'—':exactDuration(approvedTotal)}</strong>
+     </div>}
    </div>
    {result.loading&&<p className="ow-muted" role="status">در حال دریافت جمع ساعات واحدها…</p>}
    {result.error&&<p className="ow-warning" role="status">جمع ساعات واحدها فعلاً در دسترس نیست؛ عدد صفر به‌جای دادهٔ ناموجود نمایش داده نمی‌شود.</p>}
@@ -55,12 +59,12 @@ function UnitHourSummary({scope,refreshRevision=0}) {
      {result.units.map(item=><article key={item.unit}>
        <strong>{item.name||unitLabels[item.unit]||item.unit}</strong>
        <b>{exactDuration(Number(item.approved_minutes)||0)}</b>
-       <small>{Number(item.pending_reports)>0
-         ?`${n(item.pending_reports)} گزارش منتظر بررسی · ${exactDuration(Number(item.pending_requested_minutes)||0)} درخواستی`
-         :'گزارش منتظر بررسی: ۰'}</small>
+       {Number(item.pending_reports)>0&&<small>
+         {n(item.pending_reports)} گزارش منتظر بررسی · {exactDuration(Number(item.pending_requested_minutes)||0)} درخواستی
+       </small>}
      </article>)}
    </div>}
-   <p className="ow-muted">سقف ساعت واحدها هنوز تعریف نشده است؛ این اعداد ماندهٔ سهمیه نیستند.</p>
+   {scope==='admin'&&<p className="ow-muted">سقف ساعت واحدها در سامانه تعریف نشده است.</p>}
  </section>
 }
 
@@ -1424,6 +1428,9 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,refr
  const approved=records.filter(e=>e.review_state==='approved')
  const total=approvedMinutesTotal??approved.reduce(
   (sum,e)=>sum+Number(e.approved_minutes||0),0)
+ useLayoutEffect(()=>{
+   if(detail)document.getElementById('ow-report-inspector')?.focus({preventScroll:true})
+ },[detail?.id])
  useEffect(()=>{
    if(!selectedReportId)return
    const onKeyDown=event=>{
@@ -1445,12 +1452,8 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,refr
      <div><h2>سوابق گزارش‌ها و ساعات</h2>
        <p>دفتر پیگیری گزارش‌های ثبت‌شده؛ تاریخ هر ردیف، تاریخ انجام کار است، نه تاریخ رسیدگی مدیر.</p>
      </div>
-     <div className="ow-history-approved-total">
-       <span>مجموع زمان تأییدشده</span><strong>{exactDuration(total)}</strong>
-       <small>بر اساس مجموع سرور، مستقل از تعداد ردیف‌های فهرست</small>
-     </div>
    </div>
-   <UnitHourSummary scope="worker" refreshRevision={refreshRevision}/>
+   <UnitHourSummary scope="worker" approvedTotal={total} refreshRevision={refreshRevision}/>
    <div className="ow-history-controls">
    <div className="ow-unit-history-filter">
      <label className="report-field"><span>فیلتر واحد انجام کار</span>
@@ -1504,7 +1507,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,refr
        <p>برای مشاهدهٔ سایر گزارش‌ها، فیلتر وضعیت یا واحد را تغییر دهید.</p>
      </div>}
     </div>
-    {detail&&<aside id="ow-report-inspector" className="ow-b3-inspector" aria-label="جزئیات گزارش">
+    {detail&&<aside id="ow-report-inspector" tabIndex={-1} className="ow-b3-inspector" aria-label="جزئیات گزارش">
       <div className="ow-b3-inspector-head">
         <h3>جزئیات گزارش</h3>
         <button type="button" className="ow-mini-btn" onClick={()=>{
@@ -1532,7 +1535,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,refr
  </section>
 }
 
-function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal,onNavigate,refreshRevision=0,settingsPanel=null}) {
+function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal,onNavigate,refreshRevision=0}) {
  const [identity,setIdentity]=useState(null)
  const [identityOwner,setIdentityOwner]=useState(null)
  const [requests,setRequests]=useState([])
@@ -1632,16 +1635,16 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
   const approvedTime=approvedMinutesTotal??approved.reduce(
     (sum,e)=>sum+Number(e.approved_minutes||0),0)
   const openTasks=tasks.filter(t=>!['completed','cancelled'].includes(t.state)).length
-  if(profileReadFailed)return <><section className="report-panel ow-self-profile ow-profile-access-recheck" role="alert">
+  if(profileReadFailed)return <section className="report-panel ow-self-profile ow-profile-access-recheck" role="alert">
     <p>مشخصات شخصی در دسترس نیستند. اطلاعات قبلی تا تأیید دوبارهٔ دسترسی پنهان می‌مانند.</p>
     {requestsError&&<p className="report-alert report-alert--error">{requestsError}</p>}
     {submitNotice&&<p role="status" className="ow-muted">{submitNotice}</p>}
     <button type="button" className="report-btn report-btn--light" disabled={requestsLoading}
       onClick={()=>{void refreshProfile()}}>تلاش مجدد برای دریافت مشخصات</button>
-  </section>{settingsPanel}</>
-  if(!identity||identityOwner!==profile.worker_id)return <><section className="report-panel ow-self-profile" role="status">
+  </section>
+  if(!identity||identityOwner!==profile.worker_id)return <section className="report-panel ow-self-profile" role="status">
     <p className="ow-muted">در حال بررسی دسترسی به مشخصات…</p>
-  </section>{settingsPanel}</>
+  </section>
   return <section className="report-panel ow-self-profile">
     <div className="ow-presence-section-title"><h2>حساب من</h2>
       <span className="ow-status">زمان تأییدشده: {exactDuration(approvedTime)}</span></div>
@@ -1651,7 +1654,6 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
       <div><small>سال ورود</small><strong>{identity?.entry_year||'ثبت نشده'}</strong></div>
       <div><small>واحد اولیهٔ ثبت‌نام</small><strong>{unitLabels[identity?.unit]||identity?.unit||'نامشخص'}</strong></div>
     </div>
-    {settingsPanel}
     <div className="ow-profile-change-launch">
       <button type="button" ref={profileDialogTriggerRef}
         className="report-btn report-btn--light ow-profile-change-trigger"
@@ -1827,6 +1829,9 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const inspectedReport=inspectedTask
     ?records.filter(r=>r.task_id===inspectedTask.id).sort(
       (a,b)=>(b.work_date||'').localeCompare(a.work_date||''))[0]:null
+  useLayoutEffect(()=>{
+    if(inspectedTask)document.getElementById('ow-task-inspector')?.focus({preventScroll:true})
+  },[inspectedTask?.id])
   useEffect(()=>{
     if(!inspectedTask)return
     const onKeyDown=event=>{
@@ -1861,8 +1866,8 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           <small>دانشگاه فرهنگیان</small></div>}
       </div>
       {!sidebarCollapsed&&<p className="ow-b3-sidebar-caption">فضای کاری</p>}
-      <SectionTabs value={section} onChange={next=>{
-        if(settingsOpen&&next!=='profile')onToggleSettings?.()
+      <SectionTabs value={settingsOpen?null:section} onChange={next=>{
+        if(settingsOpen)onToggleSettings?.()
         setSelectedTaskId(null);updateNavigation({section:next})
       }} options={[
         ['tasks','کارهای من'],['availability','زمان حضور'],['history','سوابق گزارش‌ها'],['profile','حساب من'],
@@ -1878,10 +1883,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         <div className="ow-b3-worker-actions">
           <button type="button" onClick={onRefresh} title="به‌روزرسانی" aria-label="به‌روزرسانی">
             <span aria-hidden="true">↻</span>{!sidebarCollapsed&&' به‌روزرسانی'}</button>
-          <button type="button" onClick={()=>{
-            if(!settingsOpen)updateNavigation({section:'profile'})
-            onToggleSettings?.()
-          }} aria-expanded={settingsOpen}
+          <button type="button" onClick={onToggleSettings} aria-expanded={settingsOpen}
             title="تنظیمات حساب" aria-label="تنظیمات حساب">
             <span aria-hidden="true">⚙</span>{!sidebarCollapsed&&' تنظیمات'}</button>
           <button type="button" onClick={onLogout} title="خروج" aria-label="خروج">
@@ -1899,13 +1901,14 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     <div className="ow-b3-stage" id="ow-b3-main" tabIndex={-1}>
       <header className="ow-b3-toolbar">
         <span className="ow-b3-breadcrumb">فضای کاری <span aria-hidden="true">›</span>
-          <strong>{sectionNames[section]}</strong></span>
+          <strong>{settingsOpen?'تنظیمات حساب':sectionNames[section]}</strong></span>
         <span className="ow-b3-online">حساب فعال · اطلاعات عملیاتی</span>
       </header>
       {settingsNotice&&<p className="ops-alert-success" role="status">{settingsNotice}</p>}
+      {settingsOpen&&settingsPanel}
       {loading&&<p className="ow-muted" role="status">در حال دریافت برنامه…</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
-    {section==='tasks'&&<section className="report-panel ow-worker-task-workspace">
+    {!settingsOpen&&section==='tasks'&&<section className="report-panel ow-worker-task-workspace">
       {submissionReceipt?.workerId===profile.worker_id&&
         <div className="ow-worker-submission-receipt" role="status">
           <div><strong>گزارش انجام کار دریافت شد</strong>
@@ -1974,7 +1977,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           </button>}
         </div>}
       </div>
-      {inspectedTask&&<aside className="ow-b3-inspector" aria-label="جزئیات کار انتخابی">
+      {inspectedTask&&<aside id="ow-task-inspector" tabIndex={-1} className="ow-b3-inspector" aria-label="جزئیات کار انتخابی">
         <div className="ow-b3-inspector-head">
           <h3>جزئیات کار</h3>
           <button type="button" className="ow-mini-btn" onClick={()=>{
@@ -1996,16 +1999,16 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       </aside>}
       </div>
     </section>}
-    {section==='availability'&&<section className="report-panel">
+    {!settingsOpen&&section==='availability'&&<section className="report-panel">
       <h2>برنامه حضور</h2>
       <ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
     </section>}
-    {section==='history'&&<WorkerReportHistory tasks={tasks} records={records}
+    {!settingsOpen&&section==='history'&&<WorkerReportHistory tasks={tasks} records={records}
       refreshRevision={refreshRevision} approvedMinutesTotal={data.approved_minutes_total}
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}/>}
-    {section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}
-      settingsPanel={settingsPanel} requestLedger={acknowledgedActions.current.profileRequests}
+    {!settingsOpen&&section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}
+      requestLedger={acknowledgedActions.current.profileRequests}
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}
       approvedMinutesTotal={data.approved_minutes_total} refreshRevision={refreshRevision}/>}
