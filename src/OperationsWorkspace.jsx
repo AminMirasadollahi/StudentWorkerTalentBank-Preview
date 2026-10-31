@@ -1461,9 +1461,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
  const [profileReadFailed,setProfileReadFailed]=useState(false)
  const profileReadSequence=useRef(0)
  const [editing,setEditing]=useState(false)
- const [requestsOpen,setRequestsOpen]=useState(false)
- const requestDialogRef=useRef(null)
- const requestDialogTriggerRef=useRef(null)
+ const [profileTab,setProfileTab]=useState('new')
  const profileDialogRef=useRef(null)
  const profileDialogTriggerRef=useRef(null)
  const [field,setField]=useState('major')
@@ -1488,19 +1486,6 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
      profileDialogTriggerRef.current?.focus()
    }
  },[editing])
- useLayoutEffect(()=>{
-   const dialog=requestDialogRef.current
-   if(!dialog)return
-   if(requestsOpen){
-     if(!dialog.open && typeof dialog.showModal==='function'){
-       try{dialog.showModal()}catch{return}
-     }
-     dialog.querySelector('[data-profile-requests-heading]')?.focus()
-   }else if(dialog.open){
-     dialog.close()
-     requestDialogTriggerRef.current?.focus()
-   }
- },[requestsOpen])
  const hasPendingField=fieldCode=>requestLedger.has(fieldCode)
    ||requests.some(r=>r.field_code===fieldCode&&r.review_state==='pending')
  const refreshProfile=async()=>{
@@ -1578,7 +1563,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
     <p className="ow-muted">در حال بررسی دسترسی به مشخصات…</p>
   </section>
   return <section className="report-panel ow-self-profile">
-    <div className="ow-presence-section-title"><h2>پروفایل من</h2>
+    <div className="ow-presence-section-title"><h2>حساب من</h2>
       <span className="ow-status">زمان تأییدشده: {exactDuration(approvedTime)}</span></div>
     <div className="ow-self-identity">
       <div><small>نام و نام خانوادگی</small><strong>{identity?.name||'نامشخص'}</strong></div>
@@ -1590,7 +1575,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
       <button type="button" ref={profileDialogTriggerRef}
         className="report-btn report-btn--light ow-profile-change-trigger"
         aria-haspopup="dialog" aria-controls="ow-profile-change-dialog"
-        onClick={()=>setEditing(true)}>درخواست اصلاح مشخصات</button>
+        onClick={()=>{setProfileTab('new');setEditing(true)}}>درخواست اصلاح و پیگیری</button>
       <small className="ow-muted">مشخصات فعلی تا بررسی و تأیید مدیر تغییر نمی‌کنند.</small>
     </div>
     <dialog ref={profileDialogRef} id="ow-profile-change-dialog"
@@ -1612,7 +1597,13 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
           disabled={saving} onClick={()=>setEditing(false)}
           aria-label="بستن پنجره اصلاح مشخصات">بستن</button>
       </div>
-      {editing&&
+      {editing&&<div className="ow-b3-profile-tabs" role="group" aria-label="درخواست‌های اصلاح">
+        <button type="button" aria-pressed={profileTab==='new'}
+          onClick={()=>setProfileTab('new')}>درخواست جدید</button>
+        <button type="button" aria-pressed={profileTab==='history'}
+          onClick={()=>setProfileTab('history')}>پیگیری درخواست‌ها · {n(requests.length)}</button>
+      </div>}
+      {editing&&profileTab==='new'&&
       <form onSubmit={submitChange} className="ow-profile-change-form">
         <label className="report-field"><span>مشخصه موردنظر</span>
           <select value={field} onChange={e=>setField(e.target.value)}>
@@ -1635,36 +1626,11 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
           ارسال درخواست</button>
       </form>
       }
-    </dialog>
-    {submitNotice&&<p className="ow-muted" role="status">{submitNotice}</p>}
-    {requestsError&&<div role="alert" className="report-alert report-alert--error">{requestsError}</div>}
-    {requestsLoading&&<p role="status" className="ow-muted">در حال دریافت وضعیت درخواست‌ها…</p>}
-    {requests.length>0&&<div className="ow-profile-requests-launch">
-      <button type="button" ref={requestDialogTriggerRef}
-        className="report-btn report-btn--light"
-        aria-haspopup="dialog" aria-controls="ow-profile-requests-dialog"
-        onClick={()=>setRequestsOpen(true)}>
-        درخواست‌های اصلاح · {n(requests.length)}
-      </button>
-      {requests.some(r=>r.review_state==='pending')&&
-        <small className="ow-status">منتظر تأیید · {n(requests.filter(r=>r.review_state==='pending').length)}</small>}
-    </div>}
-    <dialog ref={requestDialogRef} className="ow-profile-requests-dialog"
-      id="ow-profile-requests-dialog" dir="rtl"
-      onKeyDown={trapModalTab}
-      aria-labelledby="ow-profile-requests-dialog-title"
-      onCancel={event=>{event.preventDefault();setRequestsOpen(false)}}
-      onClose={()=>{if(requestsOpen)setRequestsOpen(false)}}>
-      <div className="ow-profile-requests-dialog__head">
-        <div>
-          <h3 id="ow-profile-requests-dialog-title" data-profile-requests-heading
-            tabIndex={-1}>درخواست‌های اصلاح مشخصات</h3>
-          <p className="ow-muted">وضعیت بررسی درخواست‌ها و نظر مدیر</p>
-        </div>
-        <button type="button" className="ow-mini-btn"
-          onClick={()=>setRequestsOpen(false)}>بستن</button>
-      </div>
-      {requestsOpen&&<div className="ow-profile-requests-list">
+      {editing&&profileTab==='history'&&
+      <section className="ow-b3-profile-history" aria-label="پیگیری درخواست‌های اصلاح">
+        {requestsLoading&&<p role="status">در حال دریافت درخواست‌ها…</p>}
+        {!requestsLoading&&requests.length===0&&<p>درخواست قبلی ثبت نشده است.</p>}
+        <div className="ow-profile-requests-list">
         {requests.map(r=><article className="ow-profile-request-item" key={r.id}>
           <div className="ow-profile-request-item__top">
             <div className="ow-profile-request-item__identity">
@@ -1681,21 +1647,13 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
           {r.review_note&&<div className="ow-profile-request-item__note">
             <strong>نظر مدیر</strong>
             <p>{r.review_note}</p>
-          </div>}
-        </article>)}
-      </div>}
+    
+        </div>
+      </section>}
     </dialog>
-    <section className="ow-profile-activity-links" aria-label="دسترسی به فعالیت‌های من">
-      <div><h3>فعالیت‌های من</h3>
-        <p>فهرست وظایف و سوابق گزارش‌ها در بخش‌های اختصاصی خود در دسترس‌اند.</p>
-      </div>
-      <div className="ow-profile-activity-links__buttons">
-        <button type="button" className="report-btn report-btn--light"
-          onClick={()=>onNavigate?.('tasks','action')}>مشاهده کارها · {n(openTasks)} باز</button>
-        <button type="button" className="report-btn report-btn--light"
-          onClick={()=>onNavigate?.('history')}>سابقه گزارش‌ها و ساعات · {n(records.length)}</button>
-      </div>
-    </section>
+    {submitNotice&&<p className="ow-muted" role="status">{submitNotice}</p>}
+    {requestsError&&<div role="alert" className="report-alert report-alert--error">{requestsError}</div>}
+    {requestsLoading&&<p role="status" className="ow-muted">در حال دریافت وضعیت درخواست‌ها…</p>}
   </section>
 }
 export function WorkerOperations({profile,navigation,setNavigation,refreshRevision=0,
