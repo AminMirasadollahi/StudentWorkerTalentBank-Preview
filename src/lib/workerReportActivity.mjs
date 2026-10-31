@@ -10,13 +10,16 @@ const validMinute=v=>v!==null&&v!==undefined&&v!==''&&typeof v!=='boolean'&&Numb
 export function projectWorkerReportActivity(records=[],tasks=[],view='all') {
  const items=Array.isArray(records)?records:[]
  const allowed=WORKER_REPORT_VIEWS.includes(view)?view:'all'
- const titles=new Map((Array.isArray(tasks)?tasks:[])
-  .filter(t=>t&&t.id!=null).map(t=>[t.id,t.title||'گزارش کار']))
+ const taskMeta=new Map((Array.isArray(tasks)?tasks:[])
+  .filter(t=>t&&t.id!=null).map(t=>[t.id,{
+    title:t.title||'گزارش کار',unit:t.unit||null
+  }]))
  return items.filter(e=>e&&e.id!=null&&(allowed==='all'||e.review_state===allowed))
   .map(e=>({
    id:e.id,
    task_id:e.task_id,
-   title:titles.get(e.task_id)||'گزارش کار',
+   title:taskMeta.get(e.task_id)?.title||'گزارش کار',
+   unit:taskMeta.get(e.task_id)?.unit||null,
    work_date:validDate(e.work_date)?e.work_date:null,
    review_state:e.review_state||'unknown',
    reported_minutes:validMinute(e.reported_minutes),

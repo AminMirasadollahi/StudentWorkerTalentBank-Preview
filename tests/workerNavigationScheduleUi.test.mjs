@@ -33,6 +33,7 @@ const plugin={
  },
  load(id){
     if(id==='\0qa-v2-no-network')return [
+      'export const getUnitHourTotals=async()=>({scope:"worker",units:[{unit:"library",name:"کتابخانه",approved_minutes:55,pending_requested_minutes:0,pending_reports:0}]});',
       'export const getAdminWorkV2=async()=>globalThis.__workerFocusFixture;',
       'export const getMyWorkV2=async()=>{if(globalThis.__workerWorkPlan?.length)return await globalThis.__workerWorkPlan.shift()();if(globalThis.__workerReadDenied)throw Error("worker_access_denied");return globalThis.__workerFocusFixture;};',
       'export const getMyWorkerProfileV2=async()=>{if(globalThis.__qaProfileReadDenied)throw Error("worker_access_denied");return {worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"};};',

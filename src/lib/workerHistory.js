@@ -46,8 +46,9 @@ export function filterWorkerHistory(scoped, filters = {}) {
   const inDate = value => (!from || (validDay(value) && value >= from)) &&
     (!to || (validDay(value) && value <= to))
   const taskById = new Map(tasks.map(task => [task.id, task]))
-  const workerById = new Map(workers.map(worker => [worker.id, worker]))
-  const unitOf = (task, workerId) => task?.unit || workerById.get(workerId)?.unit || ''
+  // Task unit is authoritative. The worker's enrollment unit MUST NOT be
+  // substituted for a missing task: doing so would silently misattribute credit.
+  const unitOf = (task) => task?.unit || ''
   const unitOk = (task, workerId) => !unit || unitOf(task, workerId) === unit
   const taskHasAnyReports = new Set(records.map(entry => entry.task_id))
   const filteredRecords = review === 'without_report' ? [] : records.filter(entry => {

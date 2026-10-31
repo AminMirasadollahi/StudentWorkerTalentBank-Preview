@@ -29,9 +29,10 @@ export function describeTaskWorkflow(task,reports=[]){
 }
 
 export function selectManagerTasks(data,filters={}){
-  const worker=filters.workerId||'',state=filters.state||'',search=String(filters.search||'').trim().toLocaleLowerCase('fa')
+  const worker=filters.workerId||'',unit=filters.unit||'',state=filters.state||'',search=String(filters.search||'').trim().toLocaleLowerCase('fa')
   const tasks=(data?.tasks||[]).filter(task=>
     (!worker||task.worker_id===worker)&&
+    (!unit||task.unit===unit)&&
     (!state||task.state===state)&&
     (!search||String(task.title||'').toLocaleLowerCase('fa').includes(search)))
   const asc=filters.order==='oldest'
@@ -67,10 +68,11 @@ export function classifyTimeRequest(entry,task){
 
 export function selectPendingApprovals(data,filters={}){
   const tasks=new Map((data?.tasks||[]).map(t=>[t.id,t]))
-  const worker=filters.workerId||'',kind=filters.kind||''
+  const worker=filters.workerId||'',unit=filters.unit||'',kind=filters.kind||''
   return [...(data?.time_entries||[])].filter(e=>
     e.review_state==='submitted'&&
     (!worker||e.worker_id===worker)&&
+    (!unit||tasks.get(e.task_id)?.unit===unit)&&
     (!kind||classifyTimeRequest(e,tasks.get(e.task_id))===kind))
     .sort((a,b)=>{
       const x=Date.parse(a.submitted_at||''),y=Date.parse(b.submitted_at||'')

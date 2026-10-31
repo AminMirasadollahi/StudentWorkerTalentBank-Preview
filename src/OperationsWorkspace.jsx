@@ -18,7 +18,7 @@ import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonth
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 import TaskAssignmentEditor from './components/TaskAssignmentEditor'
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
- requestProfileChange,reviewProfileChange } from './lib/operationsV2'
+ requestProfileChange,reviewProfileChange,getUnitHourTotals } from './lib/operationsV2'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -29,6 +29,41 @@ const dateParts = new Intl.DateTimeFormat('en-US',{
 })
 const dayLabels = [[6,'شنبه'],[7,'یکشنبه'],[1,'دوشنبه'],[2,'سه‌شنبه'],[3,'چهارشنبه'],[4,'پنجشنبه'],[5,'جمعه']]
 const unitLabels = {library:'کتابخانه',public_relations:'روابط عمومی',research:'پژوهش'}
+
+/** Complete, current-scope server aggregate, independent of bounded task/history rows.
+ * Fail closed to an explicit unavailable message instead of displaying false zero totals. */
+function UnitHourSummary({scope,refreshRevision=0}) {
+ const [result,setResult]=useState({scope:null,units:[],loading:true,error:false})
+ useEffect(()=>{
+   let active=true
+   setResult({scope:null,units:[],loading:true,error:false})
+   getUnitHourTotals().then(data=>{
+     if(!active)return
+     if(data?.scope!==scope||!Array.isArray(data?.units))throw Error('invalid_unit_hours_scope')
+     setResult({scope,units:data.units,loading:false,error:false})
+   }).catch(()=>{if(active)setResult({scope:null,units:[],loading:false,error:true})})
+   return()=>{active=false}
+ },[scope,refreshRevision])
+ return <section className="ow-unit-hours" aria-label="ساعات تأییدشده به تفکیک واحد">
+   <div className="ow-unit-hours__heading">
+     <h3>ساعات به تفکیک واحد فعالیت</h3>
+     <small>مجموع کل زمان تأییدشده در سرور؛ مستقل از واحد ثبت‌نام دانشجو</small>
+   </div>
+   {result.loading&&<p className="ow-muted" role="status">در حال دریافت جمع ساعات واحدها…</p>}
+   {result.error&&<p className="ow-warning" role="status">جمع ساعات واحدها فعلاً در دسترس نیست؛ عدد صفر به‌جای دادهٔ ناموجود نمایش داده نمی‌شود.</p>}
+   {!result.loading&&!result.error&&<div className="ow-unit-hours__grid">
+     {result.units.map(item=><article key={item.unit}>
+       <strong>{item.name||unitLabels[item.unit]||item.unit}</strong>
+       <b>{exactDuration(Number(item.approved_minutes)||0)}</b>
+       <small>{Number(item.pending_reports)>0
+         ?`${n(item.pending_reports)} گزارش منتظر بررسی · ${exactDuration(Number(item.pending_requested_minutes)||0)} درخواستی`
+         :'گزارش منتظر بررسی: ۰'}</small>
+     </article>)}
+   </div>}
+   <p className="ow-muted">سقف مجاز هر واحد هنوز در سامانه پیکربندی نشده و از این اعداد نباید «ماندهٔ سهمیه» برداشت کرد.</p>
+ </section>
+}
+
 const stateLabels = {
   assigned:'واگذار شده',in_progress:'در حال انجام',submitted:'منتظر تأیید',
   completed:'تکمیل‌شده',needs_changes:'نیازمند اصلاح',cancelled:'لغوشده',
@@ -506,7 +541,7 @@ function ApprovalCard({entry,task,worker,onDone}) {
       <strong>{task?.title||'کار مرتبط نامشخص'}</strong>
       <span className="ow-status">{committed?'تصمیم ثبت‌شده':missingTask?'نیازمند بررسی پرونده':asksExtra?'درخواست زمان اضافه':'گزارش عادی'}</span>
     </div>
-    <small>{worker?.name||'—'} · {pretty(entry.work_date)} · درخواست: {minutes(requested)}
+    <small>{worker?.name||'—'} · واحد کار: {task?.unit?(unitLabels[task.unit]||task.unit):'نامشخص'} · {pretty(entry.work_date)} · درخواست: {minutes(requested)}
       {asksExtra&&<> · اضافه: {minutes(requested-standard)}</>}
     </small>
     {missingTask&&<p className="ow-warning" role="alert">کار مرتبط در اطلاعات فعلی موجود نیست؛ تصمیم‌گیری تا بررسی پرونده غیرفعال است.</p>}
@@ -578,7 +613,7 @@ async function exportOpsExcel(data, filteredToOneWorker=false) {
     if(includedTaskIds.has(entry.task_id)) continue
     const worker=data.workers?.find(w=>w.id===entry.worker_id)
     sh.addRow({
-      name:worker?.name||'',unit:unitLabels[worker?.unit]||'',
+      name:worker?.name||'',unit:'واحد کار نامشخص',
       task:'کار مرتبط در خروجی موجود نیست',date:pretty(entry.work_date),
       reported:entry.reported_minutes,
       approved:entry.review_state==='approved'?entry.approved_minutes:'',
@@ -747,10 +782,12 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const historyTo=navigation.historyTo||''
   const historyReview=navigation.historyReview||''
   const taskWorkerId=navigation.taskWorkerId||''
+  const taskUnit=navigation.taskUnit||''
   const taskState=navigation.taskState||''
   const taskSearch=navigation.taskSearch||''
   const taskOrder=navigation.taskOrder||'latest'
   const approvalWorkerId=navigation.approvalWorkerId||''
+  const approvalUnit=navigation.approvalUnit||''
   const approvalKind=navigation.approvalKind||''
   const setListingFilter=(name,value)=>setNavigation(previous=>({...previous,[name]:value}))
   const historyFiltersActive=Boolean(historyWorkerId||historyUnit||historyFrom||historyTo||historyReview)
@@ -782,8 +819,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const [historyShown,setHistoryShown]=useState(100)
   const [tasksShown,setTasksShown]=useState(100)
   const [approvalsShown,setApprovalsShown]=useState(25)
-  useEffect(()=>setTasksShown(100),[taskWorkerId,taskState,taskSearch,taskOrder])
-  useEffect(()=>setApprovalsShown(25),[approvalWorkerId,approvalKind])
+  useEffect(()=>setTasksShown(100),[taskWorkerId,taskUnit,taskState,taskSearch,taskOrder])
+  useEffect(()=>setApprovalsShown(25),[approvalWorkerId,approvalUnit,approvalKind])
   useEffect(()=>{setHistoryShown(100)},[historyWorkerId,historyUnit,historyFrom,historyTo,historyReview])
 
   const refresh=async ()=>{
@@ -822,10 +859,10 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const allTasks=data.tasks||[]
   const taskCounts=summarizeTaskWorkflow(allTasks)
   const matchingTasks=selectManagerTasks(data,{
-    workerId:taskWorkerId,state:taskState,search:taskSearch,order:taskOrder,
+    workerId:taskWorkerId,unit:taskUnit,state:taskState,search:taskSearch,order:taskOrder,
   })
   const visibleApprovals=selectPendingApprovals(data,{
-    workerId:approvalWorkerId,kind:approvalKind,
+    workerId:approvalWorkerId,unit:approvalUnit,kind:approvalKind,
   })
   const reportByTask=new Map()
   for(const entry of data.time_entries||[]){
@@ -912,6 +949,13 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
               {workers.map(w=><option value={w.id} key={w.id}>{w.name}</option>)}
             </select>
           </label>
+          <label className="report-field"><span>واحد انجام کار</span>
+            <select aria-label="فیلتر کارها بر اساس واحد فعالیت" value={taskUnit}
+              onChange={e=>setListingFilter('taskUnit',e.target.value)}>
+              <option value="">همه واحدها</option>
+              {Object.entries(unitLabels).map(([id,name])=><option key={id} value={id}>{name}</option>)}
+            </select>
+          </label>
           <label className="report-field"><span>وضعیت کار</span>
             <select aria-label="فیلتر وضعیت کار" value={taskState}
               onChange={e=>setListingFilter('taskState',e.target.value)}>
@@ -942,7 +986,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
               <div className="ow-item-header"><strong>{t.title}</strong>
                 <span className="ow-status">{detail.label}</span>
               </div>
-              <small>{label(t.worker_id,workers)} · {pretty(t.planned_date)} · زمان استاندارد: {minutes(t.estimate_minutes)}</small>
+              <small>{label(t.worker_id,workers)} · واحد کار: {unitLabels[t.unit]||t.unit||'نامشخص'} · {pretty(t.planned_date)} · زمان استاندارد: {minutes(t.estimate_minutes)}</small>
               {(detail.waitingCount>0||detail.approvedMinutes>0)&&<div className="ow-task-progress">
                 {detail.waitingCount>0&&<span>{n(detail.waitingCount)} گزارش منتظر تأیید</span>}
                 {detail.approvedMinutes>0&&<span>زمان تأییدشده: {exactDuration(detail.approvedMinutes)}</span>}
@@ -979,6 +1023,13 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
             onChange={e=>setListingFilter('approvalWorkerId',e.target.value)}>
             <option value="">همه دانشجوکارها</option>
             {workers.map(w=><option value={w.id} key={w.id}>{w.name}</option>)}
+          </select>
+        </label>
+        <label className="report-field"><span>واحد انجام کار</span>
+          <select aria-label="فیلتر تأیید ساعات بر اساس واحد" value={approvalUnit}
+            onChange={e=>setListingFilter('approvalUnit',e.target.value)}>
+            <option value="">همه واحدها</option>
+            {Object.entries(unitLabels).map(([id,name])=><option key={id} value={id}>{name}</option>)}
           </select>
         </label>
         <label className="report-field"><span>نوع درخواست زمان</span>
@@ -1033,6 +1084,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         onSaved={refresh} onClose={()=>setAssignmentDialogDate('')}/>
     </dialog>}
     {view==='history'&&<section className="report-panel">
+      <UnitHourSummary scope="admin" refreshRevision={refreshRevision}/>
       <div className="report-panel-heading">
         <h2>سابقه ساعات و خروجی</h2>
         <button className="report-btn report-btn--primary" type="button"
@@ -1234,7 +1286,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
       <div className="ow-item-header"><strong>{task.title}</strong>
         <span className="ow-status">{stateLabels[task.state]||'وضعیت نامشخص'}</span>
       </div>
-      <small>{pretty(task.planned_date)} · زمان استاندارد: {minutes(standard)}</small>
+      <small>واحد فعالیت: {unitLabels[task.unit]||task.unit||'نامشخص'} · {pretty(task.planned_date)} · زمان استاندارد: {minutes(standard)}</small>
       {task.collaborators?.length>0&&<small className="ow-task-collaborators">
         با همکاری: {task.collaborators.map(x=>x.name).join('، ')}
       </small>}
@@ -1264,7 +1316,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
               id={`ow-worker-report-heading-${task.id}`}>
               {task.state==='needs_changes'?'اصلاح و ارسال گزارش':'ثبت انجام کار'}
             </h3>
-            <p className="ow-muted">{task.title} · {pretty(task.planned_date)}</p>
+            <p className="ow-muted">{task.title} · {unitLabels[task.unit]||task.unit||'واحد کار نامشخص'} · {pretty(task.planned_date)}</p>
           </div>
           <button type="button" className="ow-worker-report-dialog__close"
             disabled={busy} aria-label="بستن پنجره ثبت کار"
@@ -1356,11 +1408,14 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
  * Each timeline item is ONE real work report's latest review state, ordered by
  * its work_date; this intentionally does not synthesize approval events/dates.
  */
-function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate}) {
+function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,refreshRevision=0}) {
  const [view,setView]=useState('all')
+ const [unitFilter,setUnitFilter]=useState('')
  const [selectedReportId,setSelectedReportId]=useState(null)
- const counts=summarizeWorkerReportActivity(records)
- const entries=projectWorkerReportActivity(records,tasks,view)
+ const unitByTask=new Map(tasks.map(t=>[t.id,t.unit||'']))
+ const unitRecords=unitFilter?records.filter(r=>unitByTask.get(r.task_id)===unitFilter):records
+ const counts=summarizeWorkerReportActivity(unitRecords)
+ const entries=projectWorkerReportActivity(unitRecords,tasks,view)
  const detail=entries.find(r=>r.id===selectedReportId)
  const options=[
   ['all','همه'],['submitted','منتظر بررسی'],
@@ -1395,6 +1450,16 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate}) {
        <small>بر اساس مجموع سرور، مستقل از تعداد ردیف‌های فهرست</small>
      </div>
    </div>
+   <UnitHourSummary scope="worker" refreshRevision={refreshRevision}/>
+   <div className="ow-unit-history-filter">
+     <label className="report-field"><span>فیلتر واحد انجام کار</span>
+       <select aria-label="فیلتر واحد گزارش‌های من" value={unitFilter}
+         onChange={e=>{setUnitFilter(e.target.value);setSelectedReportId(null)}}>
+         <option value="">تمام واحدها</option>
+         {Object.entries(unitLabels).map(([id,name])=><option key={id} value={id}>{name}</option>)}
+       </select>
+     </label>
+   </div>
    <div className="ow-history-filter" role="group" aria-label="فیلتر وضعیت گزارش‌ها">
      {options.map(([id,label])=><button type="button" key={id}
        className={view===id?'is-selected':''} aria-pressed={view===id}
@@ -1414,7 +1479,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate}) {
      {entries.map(entry=><article className="ow-history-entry ow-b3-ledger-row" role="listitem" key={entry.id}>
        <div className="ow-history-entry__identity">
          <h4>{entry.title}</h4>
-         <small>{entry.work_date?pretty(entry.work_date):'تاریخ انجام کار نامشخص'}</small>
+         <small>واحد کار: {unitLabels[entry.unit]||entry.unit||'نامشخص'} · {entry.work_date?pretty(entry.work_date):'تاریخ انجام کار نامشخص'}</small>
        </div>
        <span className={'ow-history-status ow-history-status--'+
          (['submitted','changes_requested','rejected','approved'].includes(entry.review_state)
@@ -1444,6 +1509,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate}) {
         }}>بستن</button>
       </div>
       <h4>{detail.title}</h4>
+      <p className="ow-b3-inspector-facts">واحد انجام کار: {unitLabels[detail.unit]||detail.unit||'نامشخص'}</p>
       <p className="ow-b3-inspector-facts">تاریخ انجام: {detail.work_date?pretty(detail.work_date):'نامشخص'}</p>
       <p className="ow-b3-inspector-facts">وضعیت: {reviewLabels[detail.review_state]||'نامشخص'}</p>
       <section><strong>زمان درخواست‌شده</strong><p>{detail.reported_minutes===null?'ثبت نشده':minutes(detail.reported_minutes)}</p>
@@ -1579,7 +1645,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
       <div><small>نام و نام خانوادگی</small><strong>{identity?.name||'نامشخص'}</strong></div>
       <div><small>رشته تحصیلی</small><strong>{identity?.major||'ثبت نشده'}</strong></div>
       <div><small>سال ورود</small><strong>{identity?.entry_year||'ثبت نشده'}</strong></div>
-      <div><small>واحد همکاری</small><strong>{unitLabels[identity?.unit]||identity?.unit||'نامشخص'}</strong></div>
+      <div><small>واحد اولیهٔ ثبت‌نام</small><strong>{unitLabels[identity?.unit]||identity?.unit||'نامشخص'}</strong></div>
     </div>
     <div className="ow-profile-change-launch">
       <button type="button" ref={profileDialogTriggerRef}
@@ -1669,7 +1735,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
   </section>
 }
 export function WorkerOperations({profile,navigation,setNavigation,refreshRevision=0,
-  workerName='',workerUnit='',loginEmail='',onLogout,onRefresh,onToggleSettings,settingsOpen=false}) {
+  workerName='',loginEmail='',settingsPanel=null,settingsNotice='',onLogout,onRefresh,onToggleSettings,settingsOpen=false}) {
   // The protected worker projection must never be rendered for a new principal
   // while its new server read is pending. Same-component account replacement
   // may otherwise expose the previous worker for one React paint.
@@ -1799,7 +1865,6 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         <div className="ow-b3-worker" title={workerName}>
           <span className="ow-b3-worker__avatar" aria-hidden="true">{workerName?.trim()?.[0]||'د'}</span>
           {!sidebarCollapsed&&<div><strong>{workerName}</strong>
-            <small>{workerUnit}</small>
             {loginEmail&&<small className="ow-b3-login-email">
               ایمیل ورود: <bdi dir="ltr">{loginEmail}</bdi></small>}
           </div>}
@@ -1828,6 +1893,8 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           <strong>{sectionNames[section]}</strong></span>
         <span className="ow-b3-online">حساب فعال · اطلاعات عملیاتی</span>
       </header>
+      {settingsPanel}
+      {settingsNotice&&<p className="ops-alert-success" role="status">{settingsNotice}</p>}
       {loading&&<p className="ow-muted" role="status">در حال دریافت برنامه…</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
     {section==='tasks'&&<section className="report-panel ow-worker-task-workspace">
@@ -1907,7 +1974,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           }}>بستن</button>
         </div>
         <h4>{inspectedTask.title}</h4>
-        <p className="ow-b3-inspector-facts">{stateLabels[inspectedTask.state]||inspectedTask.state}
+        <p className="ow-b3-inspector-facts">واحد کار: {unitLabels[inspectedTask.unit]||inspectedTask.unit||'نامشخص'} · {stateLabels[inspectedTask.state]||inspectedTask.state}
           {' · '}{pretty(inspectedTask.planned_date)}{' · '}
           {minutes(inspectedTask.estimate_minutes)}</p>
         {inspectedTask.instructions
@@ -1926,7 +1993,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       <ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
     </section>}
     {section==='history'&&<WorkerReportHistory tasks={tasks} records={records}
-      approvedMinutesTotal={data.approved_minutes_total}
+      refreshRevision={refreshRevision} approvedMinutesTotal={data.approved_minutes_total}
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}/>}
     {section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}
