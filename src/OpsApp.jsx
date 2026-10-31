@@ -318,7 +318,7 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
           <button className="report-btn report-btn--ghost" type="button" onClick={onLogout}>خروج</button>
         </div>
       </header>}
-      {passwordEstablished&&message&&<p className="ops-alert-success" role="status">{message}</p>
+      {passwordEstablished&&message&&<p className="ops-alert-success" role="status">{message}</p>}
       {(!passwordEstablished||settingsOpen)&&<section id="ops-worker-account-settings"
         className={`report-panel ops-password-panel ${!passwordEstablished ? 'ops-password-panel--required' : 'ops-account-settings-panel'}`}>
         {passwordEstablished
