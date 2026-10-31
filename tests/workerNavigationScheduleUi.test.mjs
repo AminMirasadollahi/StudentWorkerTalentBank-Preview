@@ -169,7 +169,7 @@ test('worker exposes This Month and personal profile without permanent password 
   assert.equal(ui.host.querySelector('[aria-pressed="true"]').textContent,'این ماه')
   await ui.clickText('حساب من')
   assert.ok(ui.host.querySelector('.ow-self-profile'))
-  assert.ok(ui.host.textContent.includes('سابقه گزارش‌ها و ساعات'))
+  assert.ok(ui.host.textContent.includes('سوابق گزارش‌ها'))
   assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,4)
  }finally{await ui.dispose()}
 })
@@ -234,7 +234,7 @@ test('personal profile change only queues a synthetic manager-reviewed proposal'
   await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
   assert.equal(globalThis.__profileChangeCalls.length,1)
   assert.equal(globalThis.__profileChangeCalls[0].field,'major')
-  assert.match(ui.host.textContent,/منتظر تأیید/)
+  assert.match(ui.host.textContent,/برای رسیدگی مدیر/)
   assert.match(ui.host.textContent,/پژوهش/,'approved value must not be silently replaced')
  }finally{await ui.dispose()}
 })
@@ -441,7 +441,7 @@ test('failed correction-history scope also hides self identity until successful 
   globalThis.__qaProfileHistoryDenied=false
   await ui.clickText('تلاش مجدد برای دریافت مشخصات')
   assert.equal(ui.host.querySelector('.ow-profile-access-recheck'),null)
-  assert.match(ui.host.querySelector('.ow-self-profile').textContent,/درخواست‌های اصلاح/)
+  assert.match(ui.host.querySelector('.ow-self-profile').textContent,/درخواست اصلاح و پیگیری/)
   assert.match(ui.host.querySelector('.ow-self-profile').textContent,/نمونه غیرواقعی/)
  }finally{
   globalThis.__qaProfileHistoryDenied=false
@@ -606,7 +606,7 @@ test('successful correction followed by profile-history denial never implies ser
   globalThis.__qaProfileReadDeniedAfterSubmit=false
   await ui.clickText('تلاش مجدد برای دریافت مشخصات')
   assert.equal(ui.host.querySelector('.ow-profile-access-recheck'),null)
-  assert.match(ui.host.textContent,/درخواست‌های اصلاح/)
+  assert.match(ui.host.textContent,/درخواست اصلاح و پیگیری/)
  }finally{
   globalThis.__qaProfileReadDeniedAfterSubmit=false
   globalThis.__qaProfileHistoryDenied=false
