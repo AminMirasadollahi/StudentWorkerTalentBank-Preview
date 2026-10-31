@@ -1112,3 +1112,136 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-history-timeline {padding-inline-start:1.15rem}
  .ow-history-entry::before {inset-inline-start:-1.64rem}
 }
+
+
+/* SWTB8 B3 Worker UI shell -- presentation-only; never style Manager/Admin. */
+.ops-worker-b3-view.report-shell {max-width:none;width:100%;padding:0;min-height:100vh}
+.ops-worker-b3-view .ow-b3-layout {
+ --b3-navy:#102f43;--b3-accent:#0e766f;--b3-line:#dbe5e9;
+ --b3-muted:#5f7685;--b3-bg:#f4f7f8;
+ display:grid;grid-template-columns:226px minmax(0,1fr);
+ direction:rtl;gap:0;align-items:stretch;min-height:100vh;background:var(--b3-bg);
+ color:#173244;
+}
+.ow-b3-layout .ow-b3-skip {position:fixed;top:-100px;right:1rem;z-index:80;
+ background:white;padding:.7rem 1rem;border-radius:.5rem}
+.ow-b3-layout .ow-b3-skip:focus {top:.5rem}
+.ow-b3-layout.ow-b3-is-collapsed {grid-template-columns:74px minmax(0,1fr)}
+.ow-b3-layout .ow-b3-sidebar {
+ position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;min-width:0;
+ background:var(--b3-navy);color:#d8e8ee;display:flex;flex-direction:column;
+ border-left:1px solid #23495a;
+}
+.ow-b3-brand {display:flex;align-items:center;gap:.75rem;min-height:5.5rem;
+ padding:1rem;border-bottom:1px solid #ffffff21;min-width:0}
+.ow-b3-brand__icon {display:grid;place-items:center;min-width:2.2rem;height:2.2rem;
+ border-radius:.6rem;background:#178981;color:white;font-size:1.25rem}
+.ow-b3-brand div {min-width:0}
+.ow-b3-brand strong {display:block;font-size:.91rem;line-height:1.5;color:#f4ffff}
+.ow-b3-brand small {display:block;color:#b8d3da;font-size:.73rem}
+.ow-b3-sidebar-caption {margin:1rem 1rem .3rem;color:#a8c9d0;font-size:.76rem;font-weight:750}
+.ow-b3-sidebar .ow-tabs {border:0;display:flex;flex-direction:column;
+ gap:.25rem;padding:.35rem .55rem;align-items:stretch}
+.ow-b3-sidebar .ow-tab {display:block;min-height:2.85rem;width:100%;
+ text-align:right;color:#d8e8ee;background:transparent;border:1px solid transparent;
+ border-radius:.6rem;font-size:.87rem;font-weight:700;padding:.7rem .85rem}
+.ow-b3-sidebar .ow-tab:hover {background:#ffffff17;color:#fff}
+.ow-b3-sidebar .ow-tab.is-selected {background:#176d76;color:white;border-color:#419797}
+.ow-b3-is-collapsed .ow-b3-sidebar .ow-tab {font-size:.7rem;line-height:1.5;
+ text-align:center;padding:.55rem .2rem;overflow-wrap:anywhere}
+.ow-b3-sidebar__footer {margin-top:auto;border-top:1px solid #ffffff24;
+ padding:.85rem .7rem}
+.ow-b3-worker {display:flex;align-items:center;gap:.65rem;
+ background:#ffffff0b;border:1px solid #ffffff26;padding:.65rem;
+ border-radius:.7rem;min-width:0}
+.ow-b3-worker__avatar {display:grid;place-items:center;flex-shrink:0;
+ background:#d9f4ed;color:#07564d;width:2.1rem;height:2.1rem;
+ border-radius:50%;font-weight:850}
+.ow-b3-worker div {min-width:0}
+.ow-b3-worker strong {display:block;color:#f4ffff;font-size:.8rem;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ow-b3-worker small {display:block;color:#c1d8dd;font-size:.74rem}
+.ow-b3-worker-actions {display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.65rem}
+.ow-b3-worker-actions button,.ow-b3-collapse {font:inherit;cursor:pointer;
+ min-height:2.2rem;padding:.35rem .55rem;background:#ffffff10;border:1px solid #ffffff2b;
+ color:#ecf9fa;border-radius:.5rem}
+.ow-b3-worker-actions button {flex:1 1 auto;font-size:.72rem}
+.ow-b3-collapse {display:block;width:100%;margin-top:.4rem;font-size:.79rem}
+.ow-b3-worker-actions button:hover,.ow-b3-collapse:hover {background:#ffffff23}
+.ow-b3-layout :is(button,a,summary):focus-visible {outline:3px solid #67d1c9;outline-offset:2px}
+.ow-b3-layout .ow-b3-stage {min-width:0;max-width:100%;padding:0 1.6rem 2rem;
+ display:flex;flex-direction:column;gap:1rem}
+.ow-b3-layout .ow-b3-toolbar {height:4.6rem;display:flex;align-items:center;
+ justify-content:space-between;gap:1rem;padding:.6rem 0;margin:0;
+ border-bottom:1px solid var(--b3-line)}
+.ow-b3-breadcrumb {font-size:.84rem;color:var(--b3-muted)}
+.ow-b3-breadcrumb strong {color:#173244;margin-right:.3rem}
+.ow-b3-online {font-size:.74rem;color:#186b5a;border-radius:5rem;
+ background:#e8f7f0;padding:.3rem .65rem}
+.ow-b3-stage>.report-panel {border:1px solid var(--b3-line);
+ border-radius:.85rem;background:white;box-shadow:none;padding:1.1rem}
+.ow-b3-stage .ow-worker-task-intro h1 {font-size:1.48rem;line-height:1.55;
+ margin:0;color:#102f43}
+.ow-b3-stage .ow-worker-task-intro p {font-size:.88rem;line-height:1.7}
+.ow-b3-current-count {display:inline-flex;border-radius:.5rem;padding:.4rem .65rem;
+ background:#f3f8f9;border:1px solid var(--b3-line);font-size:.8rem;align-self:start}
+.ow-b3-stage .ow-worker-focus-switch {display:flex;flex-wrap:wrap;gap:.35rem;
+ margin:0;padding:.4rem;border:1px solid var(--b3-line);border-radius:.7rem;
+ background:#f5f8f9}
+.ow-b3-stage .ow-worker-focus-switch button {display:inline-flex;align-items:center;gap:.5rem;
+ width:auto;min-height:2.65rem;padding:.5rem .75rem;
+ background:transparent;border-color:transparent;border-radius:.5rem}
+.ow-b3-stage .ow-worker-focus-switch button.is-selected {background:white;
+ border-color:#b2d6d2;box-shadow:none;color:#07584e}
+.ow-b3-stage .ow-worker-focus-switch small {display:none}
+.ow-b3-stage .ow-worker-focus-switch strong {font-size:.81rem;
+ border-radius:50%;width:1.4rem;height:1.4rem;display:grid;
+ place-items:center;background:#ecf3f5}
+.ow-b3-stage .ow-worker-date-tools {margin:0;padding:.5rem 0;border-top:0}
+.ow-b3-stage .ow-worker-task-workspace .ow-worker-tasks {display:grid;
+ grid-template-columns:minmax(0,1fr);gap:0;min-width:0;margin:0}
+.ow-b3-stage .ow-worker-task-workspace .ow-worker-tasks>.ow-item {
+ width:100%;min-height:4.5rem;display:grid;
+ grid-template-columns:minmax(0,1fr) auto;gap:.35rem 1rem;
+ border:0;border-bottom:1px solid #e6eff1;border-radius:0;
+ padding:.8rem .6rem;background:#fff}
+.ow-b3-stage .ow-worker-tasks .ow-item:hover {background:#f8fbfb}
+.ow-b3-stage .ow-worker-task-workspace .ow-item-header {display:flex;align-items:center}
+.ow-b3-stage .ow-worker-task-workspace .ow-item-header strong {font-size:.92rem}
+.ow-b3-stage .ow-b3-inspect-trigger {margin:.25rem 0;display:inline-flex;
+ border:1px solid #b7d9d7;border-radius:.5rem;background:#effaf8;
+ color:#086a62;padding:.42rem .65rem;cursor:pointer;font:inherit;
+ font-size:.83rem;font-weight:750}
+.ow-b3-stage .ow-worker-tasks .ow-item .ow-b3-inspect-trigger {grid-column:2;
+ grid-row:1 / span 2;align-self:center}
+.ow-b3-stage .ow-worker-tasks .ow-item .ow-worker-card-main {
+ display:flex;flex-direction:column;min-width:0}
+.ow-b3-stage .ow-worker-tasks .ow-worker-action-launch {grid-column:2;grid-row:auto}
+.ow-b3-task-body {min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:.85rem}
+.ow-b3-task-body--inspecting {grid-template-columns:minmax(0,1fr) minmax(260px,34%)}
+.ow-b3-inspector {min-width:0;align-self:start;background:#f8fbfb;
+ border:1px solid var(--b3-line);border-radius:.8rem;padding:1rem;
+ line-height:1.8;max-height:min(74vh,760px);overflow:auto}
+.ow-b3-inspector-head {display:flex;align-items:center;justify-content:space-between;gap:.75rem;
+ border-bottom:1px solid var(--b3-line);padding-bottom:.55rem}
+.ow-b3-inspector-head h3 {margin:0!important;font-size:1rem!important}
+.ow-b3-inspector h4 {margin:.8rem 0 .35rem;font-size:1.03rem;overflow-wrap:anywhere}
+.ow-b3-inspector-facts {color:#486e7b;font-size:.85rem}
+.ow-b3-inspector section {margin-top:.85rem;padding:.65rem;
+ background:#fff;border:1px solid var(--b3-line);border-radius:.55rem}
+.ow-b3-inspector section p {font-size:.85rem;overflow-wrap:anywhere}
+.ow-b3-inspector-note {border-right:3px solid #0e766f!important}
+@media(max-width:1050px) {
+ .ow-b3-layout .ow-b3-stage {padding:0 .9rem 1.25rem}
+ .ow-b3-task-body--inspecting {grid-template-columns:minmax(0,1fr)}
+ .ow-b3-task-body--inspecting .ow-b3-inspector {max-height:none}
+}
+@media(max-width:700px) {
+ .ops-worker-b3-view .ow-b3-layout {grid-template-columns:74px minmax(0,1fr)}
+ .ow-b3-layout .ow-b3-sidebar .ow-tab {font-size:.69rem;padding:.5rem .2rem;
+ text-align:center}
+ .ow-b3-brand div,.ow-b3-sidebar-caption,.ow-b3-worker div {display:none}
+ .ow-b3-layout .ow-b3-stage {padding:0 .5rem 1rem}
+ .ow-b3-layout .ow-b3-toolbar {height:auto;min-height:3.5rem;flex-wrap:wrap}
+ .ow-b3-stage .ow-worker-focus-switch {display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+}
