@@ -1659,7 +1659,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
   </section>
 }
 export function WorkerOperations({profile,navigation,setNavigation,refreshRevision=0,
-  workerName='',workerUnit='',onLogout,onRefresh,onToggleSettings,settingsOpen=false}) {
+  workerName='',workerUnit='',loginEmail='',onLogout,onRefresh,onToggleSettings,settingsOpen=false}) {
   // The protected worker projection must never be rendered for a new principal
   // while its new server read is pending. Same-component account replacement
   // may otherwise expose the previous worker for one React paint.
@@ -1778,7 +1778,11 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       <div className="ow-b3-sidebar__footer">
         <div className="ow-b3-worker" title={workerName}>
           <span className="ow-b3-worker__avatar" aria-hidden="true">{workerName?.trim()?.[0]||'د'}</span>
-          {!sidebarCollapsed&&<div><strong>{workerName}</strong><small>{workerUnit}</small></div>}
+          {!sidebarCollapsed&&<div><strong>{workerName}</strong>
+            <small>{workerUnit}</small>
+            {loginEmail&&<small className="ow-b3-login-email">
+              ایمیل ورود: <bdi dir="ltr">{loginEmail}</bdi></small>}
+          </div>}
         </div>
         <div className="ow-b3-worker-actions">
           <button type="button" onClick={onRefresh} title="به‌روزرسانی" aria-label="به‌روزرسانی">
