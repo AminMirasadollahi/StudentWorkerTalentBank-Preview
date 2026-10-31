@@ -90,6 +90,9 @@ try{
   assert.ok(taskDock&&taskDock.y>=0&&taskDock.y<160,
     'task inspector immediately visible near top of viewport')
   assert.ok(taskDock.x>=0&&taskDock.x+taskDock.width<=1441)
+  const taskArea=await page.locator('.ow-worker-task-workspace').boundingBox()
+  assert.ok(taskArea && taskDock.x+taskDock.width+10<=taskArea.x,
+    'task inspector has reserved lane without covering task panel')
   await page.screenshot({path:resolve(output,'00b-synthetic-task-inspector.png')})
   await page.keyboard.press('Escape')
   assert.equal(await page.locator('.ow-b3-inspector').count(),0)
@@ -232,6 +235,9 @@ try{
   assert.ok(reportDock&&reportDock.y>=0&&reportDock.y<160,
     'report inspector immediately visible near top of viewport')
   assert.ok(reportDock.x>=0&&reportDock.x+reportDock.width<=1441)
+  const reportArea=await panel.boundingBox()
+  assert.ok(reportArea && reportDock.x+reportDock.width+10<=reportArea.x,
+    'report inspector has reserved lane without covering hours and filters')
   await page.screenshot({path:resolve(output,'04c-synthetic-report-inspector.png')})
   await panel.locator('.ow-history-next-step button').click()
   assert.ok(await page.locator('.ow-worker-task-workspace').isVisible())
