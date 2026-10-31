@@ -48,16 +48,16 @@ jobs:
       # SWTB7: one real-browser smoke only on the isolated worker redesign PR.
       # No public Pages deployment, no production auth or real Supabase calls.
       - name: Install Chromium smoke dependencies (draft worker branch only)
-        if: github.event_name == 'pull_request' && (github.head_ref == 'feat/worker-desktop-ux-stage1-2026-10-23' || github.head_ref == 'feat/swtb7-action-first-worker-desk-2026-10-24')
+        if: github.event_name == 'pull_request' && (github.head_ref == 'feat/worker-desktop-ux-stage1-2026-10-23' || (github.head_ref == 'feat/swtb7-action-first-worker-desk-2026-10-24' || github.head_ref == 'feat/swtb8-worker-workspace-b3-react-2026-10-31'))
         run: npm install --no-save --no-package-lock --no-audit --no-fund jsdom@26.1.0 playwright@1.56.1
       - name: Use preinstalled Chrome on GitHub Ubuntu runner for isolated smoke
-        if: github.event_name == 'pull_request' && (github.head_ref == 'feat/worker-desktop-ux-stage1-2026-10-23' || github.head_ref == 'feat/swtb7-action-first-worker-desk-2026-10-24')
+        if: github.event_name == 'pull_request' && (github.head_ref == 'feat/worker-desktop-ux-stage1-2026-10-23' || (github.head_ref == 'feat/swtb7-action-first-worker-desk-2026-10-24' || github.head_ref == 'feat/swtb8-worker-workspace-b3-react-2026-10-31'))
         run: google-chrome --version
       - name: Smoke native worker dialogs and calendar with fake data (NO NETWORK / NO DEPLOY)
-        if: github.event_name == 'pull_request' && (github.head_ref == 'feat/worker-desktop-ux-stage1-2026-10-23' || github.head_ref == 'feat/swtb7-action-first-worker-desk-2026-10-24')
+        if: github.event_name == 'pull_request' && (github.head_ref == 'feat/worker-desktop-ux-stage1-2026-10-23' || (github.head_ref == 'feat/swtb7-action-first-worker-desk-2026-10-24' || github.head_ref == 'feat/swtb8-worker-workspace-b3-react-2026-10-31'))
         run: node tests/browser/run-worker-smoke.mjs
       - name: Attach synthetic-only Chromium screenshots for PR review
-        if: always() && github.event_name == 'pull_request' && (github.head_ref == 'feat/worker-desktop-ux-stage1-2026-10-23' || github.head_ref == 'feat/swtb7-action-first-worker-desk-2026-10-24')
+        if: always() && github.event_name == 'pull_request' && (github.head_ref == 'feat/worker-desktop-ux-stage1-2026-10-23' || (github.head_ref == 'feat/swtb7-action-first-worker-desk-2026-10-24' || github.head_ref == 'feat/swtb8-worker-workspace-b3-react-2026-10-31'))
         uses: actions/upload-artifact@v4
         with:
           name: swtb7-isolated-desktop-chromium

@@ -62,7 +62,7 @@ const stub = {
       return [
         'import React from "react";',
         'export function AdminOperations({refreshRevision=0}){React.useEffect(()=>{globalThis.__qaAdminMounts=(globalThis.__qaAdminMounts||0)+1},[]);React.useEffect(()=>{globalThis.__qaAdminReads=(globalThis.__qaAdminReads||0)+1},[refreshRevision]);return React.createElement("div", {"data-testid":"admin-work"}, "ADMIN_WORK_MOUNTED")}',
-        'export function WorkerOperations({refreshRevision=0}){React.useEffect(()=>{globalThis.__qaWorkerReads=(globalThis.__qaWorkerReads||0)+1},[refreshRevision]);return React.createElement("div", {"data-testid":"worker-work"}, "WORKER_WORK_MOUNTED")}',
+        'export function WorkerOperations({refreshRevision=0,loginEmail="",onRefresh}){React.useEffect(()=>{globalThis.__qaWorkerReads=(globalThis.__qaWorkerReads||0)+1},[refreshRevision]);return React.createElement("div", {"data-testid":"worker-work"}, React.createElement("span",null,"WORKER_WORK_MOUNTED ",loginEmail), React.createElement("button",{type:"button",onClick:onRefresh},"به‌روزرسانی"))}',
       ].join('\n')
     }
   },
