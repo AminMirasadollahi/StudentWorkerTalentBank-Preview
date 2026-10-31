@@ -1822,7 +1822,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         </button>
       </div>
     </aside>
-    <main className="ow-b3-stage" id="ow-b3-main">
+    <div className="ow-b3-stage" id="ow-b3-main" tabIndex={-1}>
       <header className="ow-b3-toolbar">
         <span className="ow-b3-breadcrumb">فضای کاری <span aria-hidden="true">›</span>
           <strong>{sectionNames[section]}</strong></span>
@@ -1934,6 +1934,6 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}
       approvedMinutesTotal={data.approved_minutes_total} refreshRevision={refreshRevision}/>}
-    </main>
+    </div>
   </div>
 }
