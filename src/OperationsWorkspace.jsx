@@ -1231,9 +1231,6 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
   }
   return <article className={`ow-item ow-worker-task--${task.state}`}>
     <div className="ow-worker-card-main">
-      <button type="button" className="ow-b3-inspect-trigger"
-        data-task-inspect={task.id} aria-expanded={inspected}
-        onClick={onInspect}>مشاهدهٔ جزئیات</button>
       <div className="ow-item-header"><strong>{task.title}</strong>
         <span className="ow-status">{stateLabels[task.state]||'وضعیت نامشخص'}</span>
       </div>
@@ -1242,6 +1239,9 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
         با همکاری: {task.collaborators.map(x=>x.name).join('، ')}
       </small>}
     </div>
+    <button type="button" className="ow-b3-inspect-trigger"
+      data-task-inspect={task.id} aria-expanded={inspected}
+      onClick={onInspect}>مشاهدهٔ جزئیات</button>
     {ready&&<>
       <div className="ow-worker-action-launch">
         <button type="button" ref={reportTriggerRef}
@@ -1894,7 +1894,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           ?<section><strong>شرح وظیفه</strong><p>{inspectedTask.instructions}</p></section>
           :<p className="ow-muted">توضیح دیگری برای این کار ثبت نشده است.</p>}
         {inspectedReport?.review_note&&<section className="ow-b3-inspector-note">
-          <strong>آخرین نظر مدیر دربارهٔ گزارش</strong>
+          <strong>نظر مدیر دربارهٔ گزارش مرتبط</strong>
           <p>{inspectedReport.review_note}</p>
         </section>}
         <p className="ow-muted">برای انجام یا اصلاح گزارش، از دکمهٔ همان ردیف استفاده کنید.</p>
