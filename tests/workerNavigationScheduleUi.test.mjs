@@ -666,7 +666,7 @@ test('worker lifetime approved minutes come from server total beyond clipped rep
  const ui=await setup()
  try{
   await ui.clickText('سوابق گزارش‌ها')
-  assert.match(ui.host.querySelector('.ow-history-approved-total').textContent,/۲۷۵ ساعت/)
+  assert.match(ui.host.querySelector('.ow-unit-hours__total').textContent,/۲۷۵ ساعت/)
   await ui.clickText('حساب من')
   assert.match(ui.host.querySelector('.ow-self-profile').textContent,
     /زمان تأییدشده: ۲۷۵ ساعت/)
@@ -1077,7 +1077,7 @@ test('read-only history shows true current review statuses and never invents tim
   await ui.clickText('سوابق گزارش‌ها')
   const history=ui.host.querySelector('.ow-worker-history-panel')
   assert.ok(history)
-  assert.match(history.textContent,/مجموع زمان تأییدشده/)
+  assert.match(history.textContent,/مجموع تأییدشده/)
   assert.match(history.textContent,/۲ ساعت و ۳۰ دقیقه/,'server lifetime total wins over visible 40-minute row')
   const rows=history.querySelectorAll('.ow-history-entry')
   assert.equal(rows.length,3)

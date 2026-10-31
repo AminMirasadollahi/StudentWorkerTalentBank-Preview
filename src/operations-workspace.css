@@ -1422,20 +1422,6 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
   gap:.25rem;padding:1rem;line-height:1.7;text-align:center;
   background:#fbfdfd;
 }
-/* Account settings now belong to Account, inside the identity/correction view,
-   not as an unrelated card on top of Tasks. First-login form stays unchanged. */
-.ops-worker-b3-view .ow-self-profile > .ops-account-settings-panel {
-  width:min(100%,34rem);max-width:100%;margin:.85rem 0 .25rem;
-  padding:.75rem .9rem;box-shadow:none;border:1px solid #d7e5e9;
-  border-radius:.7rem;background:#f9fcfc;
-}
-.ops-worker-b3-view .ow-self-profile > .ops-account-settings-panel .ops-settings-title {
-  margin-bottom:.6rem;padding-bottom:.55rem;border-bottom:1px solid #e1eaee;
-}
-.ops-worker-b3-view .ow-self-profile > .ops-account-settings-panel .ops-settings-title h2 {
-  margin:0;font-size:1rem;
-}
-.ops-worker-b3-view .ow-self-profile > .ops-account-settings-panel input {max-width:100%}
 @media(max-width:1230px) {
   .ow-b3-ledger .ow-b3-ledger-body--detail {grid-template-columns:minmax(0,1fr)}
   .ow-b3-ledger .ow-b3-inspector {position:static}
@@ -1443,4 +1429,112 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 @media(max-width:700px) {
   .ow-b3-ledger .ow-history-controls {display:grid}
   .ow-b3-ledger .ow-unit-history-filter {width:100%;max-width:100%}
+}
+
+/* SWTB11 — preserve B3 Account unchanged; settings are a separate stage view.
+   Worker details dock in the current viewport without pushing the page down. */
+.ops-worker-b3-view .ow-b3-stage > .ops-account-settings-panel {
+ width:min(100%,36rem);max-width:100%;margin:0;align-self:flex-start;
+ border:1px solid #d7e5e9;border-radius:.75rem;padding:.9rem 1rem;
+ background:#fff;box-shadow:none;
+}
+.ops-worker-b3-view .ow-b3-stage > .ops-account-settings-panel .ops-settings-title {
+ border-bottom:1px solid #e1eaee;padding-bottom:.6rem;margin-bottom:.65rem;
+}
+.ops-worker-b3-view .ow-b3-stage > .ops-account-settings-panel input {max-width:100%}
+.ow-b3-ledger .ow-history-heading {padding:0;margin-bottom:.35rem}
+.ow-b3-ledger .ow-unit-hours--combined {
+ padding:.65rem .9rem;margin:.35rem 0 .65rem;
+ border:1px solid #cfe1df;border-radius:.7rem;background:#f7fbfa;
+}
+.ow-b3-ledger .ow-unit-hours--combined .ow-unit-hours__heading {
+ display:flex;justify-content:space-between;gap:.7rem;
+ align-items:center;margin-bottom:.4rem;
+}
+.ow-b3-ledger .ow-unit-hours--combined .ow-unit-hours__heading h3 {font-size:.9rem!important}
+.ow-b3-ledger .ow-unit-hours--combined .ow-unit-hours__total {
+ display:flex;align-items:center;flex-wrap:wrap;gap:.3rem .6rem;
+}
+.ow-b3-ledger .ow-unit-hours__total span {font-size:.76rem;color:#516b70}
+.ow-b3-ledger .ow-unit-hours__total strong {font-size:1.05rem;color:#116852}
+.ow-b3-ledger .ow-unit-hours--combined .ow-unit-hours__grid {
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;
+ padding-top:.42rem;border-top:1px solid #dbe9e7;
+}
+.ow-b3-ledger .ow-unit-hours--combined .ow-unit-hours__grid article {
+ display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;
+ gap:0 .35rem;padding:.25rem .6rem;background:transparent;
+ border:0;border-radius:0;min-width:0;
+}
+.ow-b3-ledger .ow-unit-hours--combined .ow-unit-hours__grid article+article {
+ border-inline-start:1px solid #d8e6e5;
+}
+.ow-b3-ledger .ow-unit-hours--combined .ow-unit-hours__grid article strong {
+ font-size:.78rem;color:#214758;
+}
+.ow-b3-ledger .ow-unit-hours--combined .ow-unit-hours__grid article b {
+ font-size:.89rem;color:#116d5b;
+}
+.ow-b3-ledger .ow-unit-hours--combined .ow-unit-hours__grid article small {
+ flex:0 0 100%;font-size:.72rem;color:#526c76;
+}
+@media(min-width:1231px) {
+ .ow-worker-workspace .ow-b3-task-body--inspecting,
+ .ow-worker-workspace .ow-b3-ledger-body--detail {
+   grid-template-columns:minmax(0,1fr) minmax(17.5rem,34%);
+ }
+}
+.ow-worker-workspace .ow-b3-task-body--inspecting > .ow-b3-inspector,
+.ow-worker-workspace .ow-b3-ledger-body--detail > .ow-b3-inspector {
+ position:fixed;inset-inline-end:clamp(.65rem,1.6vw,1.5rem);
+ inset-block-start:clamp(4.5rem,9vh,6rem);
+ width:min(29vw,24rem);box-sizing:border-box;z-index:25;
+ max-height:calc(100dvh - 7rem);overflow-y:auto;
+ box-shadow:0 10px 32px #16384e24;background:#fbfdfc;
+ padding:.75rem .85rem;border:1px solid #c6dcdb;
+}
+.ow-worker-workspace .ow-b3-inspector:focus {outline:none}
+.ow-worker-workspace .ow-b3-inspector:focus-visible {
+ outline:3px solid #2eaaa3;outline-offset:2px;
+}
+@media(max-width:1230px) {
+ .ow-worker-workspace .ow-b3-task-body--inspecting,
+ .ow-worker-workspace .ow-b3-ledger-body--detail {
+   grid-template-columns:minmax(0,1fr);
+ }
+ .ow-worker-workspace .ow-b3-task-body--inspecting > .ow-b3-inspector,
+ .ow-worker-workspace .ow-b3-ledger-body--detail > .ow-b3-inspector {
+   position:fixed;inset-inline-end:.75rem;inset-inline-start:.75rem;
+   top:clamp(4rem,8vh,5rem);width:auto;max-width:28rem;
+   margin-inline-end:auto;max-height:calc(100dvh - 6rem);
+ }
+}
+@media(max-width:700px) {
+ .ow-b3-ledger .ow-unit-hours--combined .ow-unit-hours__grid {grid-template-columns:1fr}
+ .ow-b3-ledger .ow-unit-hours--combined .ow-unit-hours__grid article+article {
+   border-inline-start:0;border-top:1px solid #d8e6e5;
+ }
+ .ow-b3-ledger .ow-unit-hours__total {justify-content:flex-start}
+}
+
+/* SWTB11 visual review correction: reserve a real left inspector lane.
+   Do not obscure headings, hours or filters beneath a fixed detail surface. */
+@media(min-width:1120px) {
+ .ow-worker-workspace .ow-worker-task-workspace:has(#ow-task-inspector),
+ .ow-worker-workspace .ow-worker-history-panel:has(#ow-report-inspector) {
+   margin-inline-end:calc(min(29vw,24rem) + 2rem);
+ }
+ .ow-worker-workspace .ow-b3-task-body--inspecting,
+ .ow-worker-workspace .ow-b3-ledger-body--detail {
+   grid-template-columns:minmax(0,1fr);
+ }
+ .ow-worker-workspace .ow-b3-ledger-body--detail .ow-b3-ledger-columns {
+   display:none;
+ }
+ .ow-worker-workspace .ow-b3-ledger-body--detail .ow-b3-ledger-row {
+   grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;
+   gap:.4rem;
+ }
+ .ow-worker-workspace .ow-b3-ledger-body--detail .ow-b3-ledger-row
+ .ow-history-entry__identity {grid-column:1/-1}
 }

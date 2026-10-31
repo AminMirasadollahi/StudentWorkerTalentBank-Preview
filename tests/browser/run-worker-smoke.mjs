@@ -42,10 +42,12 @@ try{
    const stage=page.locator('.ow-b3-stage')
    const panel=stage.locator('#ops-worker-account-settings')
    assert.equal(await panel.count(),1,'settings must remain inside the B3 content stage')
-   assert.equal(await page.locator('.ow-self-profile #ops-worker-account-settings').count(),1,
-     'password settings must be integrated into Account identity/correction page')
-   assert.equal((await page.locator('.ow-b3-breadcrumb strong').innerText()).trim(),'حساب من',
-     'opening settings from Tasks must activate Account, not leave Tasks behind')
+   assert.equal(await page.locator('.ow-self-profile #ops-worker-account-settings').count(),0,
+     'B3 Account remains structurally untouched')
+   assert.equal(await page.locator('.ow-self-profile').count(),0,
+     'settings is an independent stage view, not injected into Tasks or Account')
+   assert.equal((await page.locator('.ow-b3-breadcrumb strong').innerText()).trim(),'تنظیمات حساب',
+     'Settings receives its own stage heading')
    const rects=await page.evaluate(()=>{
      const stage=document.querySelector('.ow-b3-stage').getBoundingClientRect()
      const aside=document.querySelector('.ow-b3-sidebar').getBoundingClientRect()
@@ -60,6 +62,11 @@ try{
    await panel.getByRole('button',{name:'بستن'}).click()
    assert.equal(await stage.locator('#ops-worker-account-settings').count(),0)
    assert.equal(await page.evaluate(()=>window.__qaWriteAttempts),0)
+   assert.ok(await page.locator('.ow-worker-task-workspace').isVisible(),
+     'closing settings returns to the original Tasks workspace')
+   await page.getByRole('button',{name:'حساب من',exact:true}).click()
+   assert.equal(await page.locator('.ow-self-profile').count(),1)
+   assert.equal(await page.locator('.ow-self-profile .ops-account-settings-panel').count(),0)
    await page.getByRole('button',{name:'کارهای من',exact:true}).click()
  })
  await check('action-first desktop task surface and preserved future drilldown',async()=>{
@@ -79,6 +86,13 @@ try{
   await trigger.click()
   await page.locator('.ow-b3-inspector').waitFor({state:'visible'})
   assert.ok((await page.locator('.ow-b3-inspector').innerText()).includes('جزئیات کار'))
+  const taskDock=await page.locator('#ow-task-inspector').boundingBox()
+  assert.ok(taskDock&&taskDock.y>=0&&taskDock.y<160,
+    'task inspector immediately visible near top of viewport')
+  assert.ok(taskDock.x>=0&&taskDock.x+taskDock.width<=1441)
+  const taskArea=await page.locator('.ow-worker-task-workspace').boundingBox()
+  assert.ok(taskArea && taskDock.x+taskDock.width+10<=taskArea.x,
+    'task inspector has reserved lane without covering task panel')
   await page.screenshot({path:resolve(output,'00b-synthetic-task-inspector.png')})
   await page.keyboard.press('Escape')
   assert.equal(await page.locator('.ow-b3-inspector').count(),0)
@@ -179,7 +193,13 @@ try{
   const panel=page.locator('.ow-worker-history-panel')
   await panel.waitFor({state:'visible'})
   assert.equal(await panel.locator('.ow-history-entry').count(),3)
-  assert.ok((await panel.innerText()).includes('مجموع زمان تأییدشده'))
+  assert.equal(await panel.locator('.ow-unit-hours--combined').count(),1)
+  assert.equal(await panel.locator('.ow-history-approved-total').count(),0,
+    'no duplicate lifetime total card')
+  assert.equal(await panel.locator('.ow-unit-hours__grid article').count(),3)
+  assert.ok((await panel.locator('.ow-unit-hours--combined').innerText()).includes('مجموع تأییدشده'))
+  assert.ok(!(await panel.innerText()).includes('سقف ساعت'),
+    'internal quota configuration must not appear in worker view')
   assert.ok((await panel.innerText()).includes('در انتظار بررسی'))
   assert.equal(await panel.locator('.ow-history-filter button').count(),5)
   await panel.locator('select[aria-label="فیلتر واحد گزارش‌های من"]').selectOption('research')
@@ -210,8 +230,14 @@ try{
   const overflow=await panel.locator('#ow-report-inspector').evaluate(node=>({
     overflow:getComputedStyle(node).overflowY,maxHeight:getComputedStyle(node).maxHeight
   }))
-  assert.equal(overflow.overflow,'visible','report inspector must not impose nested scrolling')
-  assert.equal(overflow.maxHeight,'none','report inspector must grow naturally')
+  assert.ok(['auto','visible'].includes(overflow.overflow))
+  const reportDock=await panel.locator('#ow-report-inspector').boundingBox()
+  assert.ok(reportDock&&reportDock.y>=0&&reportDock.y<160,
+    'report inspector immediately visible near top of viewport')
+  assert.ok(reportDock.x>=0&&reportDock.x+reportDock.width<=1441)
+  const reportArea=await panel.boundingBox()
+  assert.ok(reportArea && reportDock.x+reportDock.width+10<=reportArea.x,
+    'report inspector has reserved lane without covering hours and filters')
   await page.screenshot({path:resolve(output,'04c-synthetic-report-inspector.png')})
   await panel.locator('.ow-history-next-step button').click()
   assert.ok(await page.locator('.ow-worker-task-workspace').isVisible())
