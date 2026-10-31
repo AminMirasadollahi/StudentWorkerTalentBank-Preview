@@ -1394,9 +1394,12 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
  */
 function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,refreshRevision=0}) {
  const [view,setView]=useState('all')
+ const [unitFilter,setUnitFilter]=useState('')
  const [selectedReportId,setSelectedReportId]=useState(null)
- const counts=summarizeWorkerReportActivity(records)
- const entries=projectWorkerReportActivity(records,tasks,view)
+ const unitByTask=new Map(tasks.map(t=>[t.id,t.unit||'']))
+ const unitRecords=unitFilter?records.filter(r=>unitByTask.get(r.task_id)===unitFilter):records
+ const counts=summarizeWorkerReportActivity(unitRecords)
+ const entries=projectWorkerReportActivity(unitRecords,tasks,view)
  const detail=entries.find(r=>r.id===selectedReportId)
  const options=[
   ['all','همه'],['submitted','منتظر بررسی'],
@@ -1432,6 +1435,15 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,refr
      </div>
    </div>
    <UnitHourSummary scope="worker" refreshRevision={refreshRevision}/>
+   <div className="ow-unit-history-filter">
+     <label className="report-field"><span>فیلتر واحد انجام کار</span>
+       <select aria-label="فیلتر واحد گزارش‌های من" value={unitFilter}
+         onChange={e=>{setUnitFilter(e.target.value);setSelectedReportId(null)}}>
+         <option value="">تمام واحدها</option>
+         {Object.entries(unitLabels).map(([id,name])=><option key={id} value={id}>{name}</option>)}
+       </select>
+     </label>
+   </div>
    <div className="ow-history-filter" role="group" aria-label="فیلتر وضعیت گزارش‌ها">
      {options.map(([id,label])=><button type="button" key={id}
        className={view===id?'is-selected':''} aria-pressed={view===id}
@@ -1451,7 +1463,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,refr
      {entries.map(entry=><article className="ow-history-entry ow-b3-ledger-row" role="listitem" key={entry.id}>
        <div className="ow-history-entry__identity">
          <h4>{entry.title}</h4>
-         <small>{entry.work_date?pretty(entry.work_date):'تاریخ انجام کار نامشخص'}</small>
+         <small>واحد کار: {unitLabels[entry.unit]||entry.unit||'نامشخص'} · {entry.work_date?pretty(entry.work_date):'تاریخ انجام کار نامشخص'}</small>
        </div>
        <span className={'ow-history-status ow-history-status--'+
          (['submitted','changes_requested','rejected','approved'].includes(entry.review_state)
@@ -1481,6 +1493,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,refr
         }}>بستن</button>
       </div>
       <h4>{detail.title}</h4>
+      <p className="ow-b3-inspector-facts">واحد انجام کار: {unitLabels[detail.unit]||detail.unit||'نامشخص'}</p>
       <p className="ow-b3-inspector-facts">تاریخ انجام: {detail.work_date?pretty(detail.work_date):'نامشخص'}</p>
       <p className="ow-b3-inspector-facts">وضعیت: {reviewLabels[detail.review_state]||'نامشخص'}</p>
       <section><strong>زمان درخواست‌شده</strong><p>{detail.reported_minutes===null?'ثبت نشده':minutes(detail.reported_minutes)}</p>
