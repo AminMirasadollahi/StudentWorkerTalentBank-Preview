@@ -18,7 +18,7 @@ import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonth
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 import TaskAssignmentEditor from './components/TaskAssignmentEditor'
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
- requestProfileChange,reviewProfileChange } from './lib/operationsV2'
+ requestProfileChange,reviewProfileChange,getUnitHourTotals } from './lib/operationsV2'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -29,6 +29,41 @@ const dateParts = new Intl.DateTimeFormat('en-US',{
 })
 const dayLabels = [[6,'شنبه'],[7,'یکشنبه'],[1,'دوشنبه'],[2,'سه‌شنبه'],[3,'چهارشنبه'],[4,'پنجشنبه'],[5,'جمعه']]
 const unitLabels = {library:'کتابخانه',public_relations:'روابط عمومی',research:'پژوهش'}
+
+/** Complete, current-scope server aggregate, independent of bounded task/history rows.
+ * Fail closed to an explicit unavailable message instead of displaying false zero totals. */
+function UnitHourSummary({scope,refreshRevision=0}) {
+ const [result,setResult]=useState({scope:null,units:[],loading:true,error:false})
+ useEffect(()=>{
+   let active=true
+   setResult({scope:null,units:[],loading:true,error:false})
+   getUnitHourTotals().then(data=>{
+     if(!active)return
+     if(data?.scope!==scope||!Array.isArray(data?.units))throw Error('invalid_unit_hours_scope')
+     setResult({scope,units:data.units,loading:false,error:false})
+   }).catch(()=>{if(active)setResult({scope:null,units:[],loading:false,error:true})})
+   return()=>{active=false}
+ },[scope,refreshRevision])
+ return <section className="ow-unit-hours" aria-label="ساعات تأییدشده به تفکیک واحد">
+   <div className="ow-unit-hours__heading">
+     <h3>ساعات به تفکیک واحد فعالیت</h3>
+     <small>مجموع کل زمان تأییدشده در سرور؛ مستقل از واحد ثبت‌نام دانشجو</small>
+   </div>
+   {result.loading&&<p className="ow-muted" role="status">در حال دریافت جمع ساعات واحدها…</p>}
+   {result.error&&<p className="ow-warning" role="status">جمع ساعات واحدها فعلاً در دسترس نیست؛ عدد صفر به‌جای دادهٔ ناموجود نمایش داده نمی‌شود.</p>}
+   {!result.loading&&!result.error&&<div className="ow-unit-hours__grid">
+     {result.units.map(item=><article key={item.unit}>
+       <strong>{item.name||unitLabels[item.unit]||item.unit}</strong>
+       <b>{exactDuration(Number(item.approved_minutes)||0)}</b>
+       <small>{Number(item.pending_reports)>0
+         ?`${n(item.pending_reports)} گزارش منتظر بررسی · ${exactDuration(Number(item.pending_requested_minutes)||0)} درخواستی`
+         :'گزارش منتظر بررسی: ۰'}</small>
+     </article>)}
+   </div>}
+   <p className="ow-muted">سقف مجاز هر واحد هنوز در سامانه پیکربندی نشده و از این اعداد نباید «ماندهٔ سهمیه» برداشت کرد.</p>
+ </section>
+}
+
 const stateLabels = {
   assigned:'واگذار شده',in_progress:'در حال انجام',submitted:'منتظر تأیید',
   completed:'تکمیل‌شده',needs_changes:'نیازمند اصلاح',cancelled:'لغوشده',
@@ -1033,6 +1068,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         onSaved={refresh} onClose={()=>setAssignmentDialogDate('')}/>
     </dialog>}
     {view==='history'&&<section className="report-panel">
+      <UnitHourSummary scope="admin" refreshRevision={refreshRevision}/>
       <div className="report-panel-heading">
         <h2>سابقه ساعات و خروجی</h2>
         <button className="report-btn report-btn--primary" type="button"
@@ -1356,7 +1392,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
  * Each timeline item is ONE real work report's latest review state, ordered by
  * its work_date; this intentionally does not synthesize approval events/dates.
  */
-function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate}) {
+function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,refreshRevision=0}) {
  const [view,setView]=useState('all')
  const [selectedReportId,setSelectedReportId]=useState(null)
  const counts=summarizeWorkerReportActivity(records)
@@ -1395,6 +1431,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate}) {
        <small>بر اساس مجموع سرور، مستقل از تعداد ردیف‌های فهرست</small>
      </div>
    </div>
+   <UnitHourSummary scope="worker" refreshRevision={refreshRevision}/>
    <div className="ow-history-filter" role="group" aria-label="فیلتر وضعیت گزارش‌ها">
      {options.map(([id,label])=><button type="button" key={id}
        className={view===id?'is-selected':''} aria-pressed={view===id}
@@ -1927,7 +1964,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       <ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
     </section>}
     {section==='history'&&<WorkerReportHistory tasks={tasks} records={records}
-      approvedMinutesTotal={data.approved_minutes_total}
+      refreshRevision={refreshRevision} approvedMinutesTotal={data.approved_minutes_total}
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}/>}
     {section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}
