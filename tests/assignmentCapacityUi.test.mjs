@@ -121,7 +121,7 @@ test('manager sees advisory and must explicitly choose work unit before enabled 
     assert.match(host.textContent,/هشدار بیش‌ازظرفیت/)
     assert.match(host.textContent,/مجموع کارهای ثبت‌شده از ظرفیت اعلام‌شده/)
     assert.match(host.textContent,/ظرفیت نفرات انتخابی/)
-    const submit=Array.from(host.querySelectorAll('button')).find(x=>x.textContent==='واگذاری کار')
+    const submit=host.querySelector('form.ow-assignment-form button[type="submit"]')
     assert.ok(submit)
     assert.equal(submit.disabled,true,'assignment must not assume the enrollment unit')
     const unit=host.querySelector('select[aria-label="واحد انجام کار"]')
