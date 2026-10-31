@@ -1245,3 +1245,57 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-b3-layout .ow-b3-toolbar {height:auto;min-height:3.5rem;flex-wrap:wrap}
  .ow-b3-stage .ow-worker-focus-switch {display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* SWTB8 factual report ledger, distinct from actionable task rows. */
+.ow-b3-ledger .ow-history-heading {padding:.25rem .3rem .85rem;margin-bottom:.5rem}
+.ow-b3-ledger .ow-history-approved-total {background:#eaf6f1;border-color:#bce1d3}
+.ow-b3-ledger .ow-history-filter {border-radius:.6rem;gap:.3rem}
+.ow-b3-ledger .ow-history-results-heading {margin-top:.25rem}
+.ow-b3-ledger-body {display:grid;grid-template-columns:minmax(0,1fr);gap:.9rem;min-width:0}
+.ow-b3-ledger-body--detail {grid-template-columns:minmax(0,1fr) minmax(260px,32%)}
+.ow-b3-ledger-list {min-width:0;border:1px solid #dce8ec;border-radius:.65rem;overflow:hidden}
+.ow-b3-ledger-columns,.ow-b3-ledger .ow-b3-ledger-row {
+ display:grid;grid-template-columns:minmax(200px,2fr) minmax(100px,1fr)
+ minmax(95px,.9fr) minmax(95px,1fr) minmax(80px,.6fr);
+ align-items:center;gap:.65rem;min-width:0;
+}
+.ow-b3-ledger-columns {padding:.75rem .85rem;background:#f4f8f9;
+ color:#526f7d;font-size:.79rem;font-weight:750}
+.ow-b3-ledger .ow-b3-ledger-row {max-width:none;padding:.75rem .85rem;
+ border:0;border-top:1px solid #e8eff1;border-radius:0;margin:0;
+ background:white;box-shadow:none}
+.ow-b3-ledger .ow-b3-ledger-row:nth-child(odd) {background:#fcfdfd}
+.ow-b3-ledger .ow-b3-ledger-row::before {display:none}
+.ow-b3-ledger .ow-b3-ledger-row .ow-history-entry__identity h4 {
+ font-size:.89rem;line-height:1.65;margin:0}
+.ow-b3-ledger .ow-b3-ledger-row .ow-history-entry__identity small {display:block;font-size:.77rem}
+.ow-b3-ledger-value {font-size:.84rem;line-height:1.6;color:#214458}
+.ow-b3-ledger .ow-b3-ledger-row .ow-history-status {justify-self:start;font-size:.75rem}
+.ow-b3-ledger .ow-b3-inspect-trigger {font-size:.78rem;white-space:nowrap}
+.ow-b3-ledger .ow-b3-inspector {max-height:75vh}
+.ow-b3-profile-tabs {display:flex;gap:.45rem;margin:.7rem 0 1rem;
+ border-bottom:1px solid #dbe5e9;padding-bottom:.5rem}
+.ow-b3-profile-tabs button {font:inherit;border-radius:.55rem;border:1px solid #d3e3e6;
+ padding:.5rem .75rem;background:#f7fafb;color:#16445a;cursor:pointer;font-weight:700}
+.ow-b3-profile-tabs button[aria-pressed="true"] {background:#e8f6f2;
+ border-color:#459a93;color:#08625b}
+.ow-b3-profile-history {max-height:53vh;overflow:auto}
+.ow-b3-profile-history .ow-profile-request-item {margin-bottom:.6rem}
+.ow-b3-profile-history .ow-profile-request-item__note {background:#f8fbfb;
+ margin-top:.6rem;padding:.5rem .75rem;border-radius:.55rem}
+.ow-b3-profile-history .ow-profile-request-item__note summary {cursor:pointer;font-weight:700;
+ color:#16655d}
+.ow-b3-profile-history .ow-profile-request-item__note p {line-height:1.7}
+.ow-b3-stage .ow-self-profile .ow-profile-change-launch {margin-top:1rem}
+@media(max-width:1230px) {
+ .ow-b3-ledger-body--detail {grid-template-columns:minmax(0,1fr)}
+ .ow-b3-ledger-columns {display:none}
+ .ow-b3-ledger .ow-b3-ledger-row {grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;
+ gap:.5rem}
+ .ow-b3-ledger .ow-b3-ledger-row .ow-history-entry__identity {grid-column:1/-1}
+}
+@media(max-width:700px) {
+ .ow-b3-ledger .ow-b3-ledger-row {grid-template-columns:minmax(0,1fr)}
+ .ow-b3-ledger .ow-b3-ledger-row .ow-b3-inspect-trigger {justify-self:start}
+}
