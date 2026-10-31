@@ -299,8 +299,8 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
   }
 
   return (
-    <main className="report-shell report-shell--dashboard ops-root" dir="rtl">
-      <header className="report-header">
+    <main className={`report-shell report-shell--dashboard ops-root ${passwordEstablished?'ops-worker-b3-view':''}`} dir="rtl">
+      {!passwordEstablished&&<header className="report-header">
         <div>
           <span className="report-eyebrow">پنل اختصاصی دانشجوکار</span>
           <h1>سلام، {profile.name}</h1>
@@ -317,8 +317,8 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
             onClick={()=>{setSettingsOpen(open=>!open);setPasswordError('');setMessage('')}}>تنظیمات حساب</button>}
           <button className="report-btn report-btn--ghost" type="button" onClick={onLogout}>خروج</button>
         </div>
-      </header>
-      {passwordEstablished&&message&&<p className="ops-alert-success" role="status">{message}</p>}
+      </header>}
+      {passwordEstablished&&message&&<p className="ops-alert-success" role="status">{message}</p>
       {(!passwordEstablished||settingsOpen)&&<section id="ops-worker-account-settings"
         className={`report-panel ops-password-panel ${!passwordEstablished ? 'ops-password-panel--required' : 'ops-account-settings-panel'}`}>
         {passwordEstablished
@@ -349,6 +349,11 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
         </form>
       </section>}
       {passwordEstablished && <WorkerOperations profile={profile} navigation={navigation} setNavigation={setNavigation}
+        workerName={profile.name} workerUnit={unitLabels[profile.unit]||profile.unit}
+        onLogout={onLogout}
+        onRefresh={()=>setManualRefreshRevision(v=>v+1)}
+        onToggleSettings={()=>{setSettingsOpen(open=>!open);setPasswordError('');setMessage('')}}
+        settingsOpen={settingsOpen}
         refreshRevision={refreshRevision+manualRefreshRevision}/>}
     </main>
   )
