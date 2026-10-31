@@ -1631,23 +1631,25 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
         {requestsLoading&&<p role="status">در حال دریافت درخواست‌ها…</p>}
         {!requestsLoading&&requests.length===0&&<p>درخواست قبلی ثبت نشده است.</p>}
         <div className="ow-profile-requests-list">
-        {requests.map(r=><article className="ow-profile-request-item" key={r.id}>
-          <div className="ow-profile-request-item__top">
-            <div className="ow-profile-request-item__identity">
-              <small>مشخصهٔ درخواستی</small>
-              <strong>{r.field_code==='major'?'رشته تحصیلی':'نام و نام خانوادگی'}</strong>
-              <p>{r.proposed_value}</p>
-            </div>
-            <span className={'ow-profile-request-status ow-profile-request-status--'+
+          {requests.map(r=><article className="ow-profile-request-item" key={r.id}>
+            <div className="ow-profile-request-item__top">
+              <div className="ow-profile-request-item__identity">
+                <small>مشخصهٔ درخواستی</small>
+                <strong>{r.field_code==='major'?'رشته تحصیلی':'نام و نام خانوادگی'}</strong>
+                <p>{r.proposed_value}</p>
+              </div>
+              <span className={'ow-profile-request-status ow-profile-request-status--'+
                 (['pending','approved','rejected'].includes(r.review_state)?r.review_state:'other')}>
-              {r.review_state==='pending'?'منتظر تأیید':
-               r.review_state==='approved'?'تأیید شد':'رد شد'}
-            </span>
-          </div>
-          {r.review_note&&<div className="ow-profile-request-item__note">
-            <strong>نظر مدیر</strong>
-            <p>{r.review_note}</p>
-    
+                {r.review_state==='pending'?'منتظر تأیید':
+                 r.review_state==='approved'?'تأیید شد':'رد شد'}
+              </span>
+            </div>
+            <details className="ow-profile-request-item__note">
+              <summary>مشاهدهٔ جزئیات درخواست</summary>
+              <p><strong>مقدار پیشنهادی:</strong> {r.proposed_value}</p>
+              <p><strong>نظر مدیر:</strong> {r.review_note||'هنوز نظری ثبت نشده است.'}</p>
+            </details>
+          </article>)}
         </div>
       </section>}
     </dialog>
