@@ -14,6 +14,7 @@ const today=[parts.year,parts.month,parts.day].join('-')
 const workerId='SWTB_CHROMIUM_SYNTHETIC_WORKER'
 const basic={worker_id:workerId,planned_date:today,estimate_minutes:60}
 const task=(id,title,state,date)=>({...basic,id,title,state,planned_date:date,
+ unit:id==='SYNTHETIC-COMPLETED'?'research':'library',
  instructions:'شرح نمونهٔ کاملاً ساختگی برای بررسی رابط کاربری',
  collaborators:[]})
 globalThis.__qaWorkerData={
@@ -51,6 +52,7 @@ globalThis.__qaWriteAttempts=0
 function App(){
  const [nav,setNav]=useState({section:'tasks',taskRange:'today'})
  const [frozen,setFrozen]=useState(false)
+ const [settingsOpen,setSettingsOpen]=useState(false)
  const curtainRef=useRef(null)
  useLayoutEffect(()=>{
   const curtain=curtainRef.current
@@ -62,11 +64,25 @@ function App(){
   globalThis.__qaSetFrozen=setFrozen
   return ()=>{delete globalThis.__qaSetFrozen}
  },[])
- return <div className="ops-root report-shell" dir="rtl">
+ const mockSettings=settingsOpen&&<section id="ops-worker-account-settings"
+   className="report-panel ops-password-panel ops-account-settings-panel">
+   <div className="ops-settings-title"><h2>تنظیمات حساب · تغییر رمز عبور</h2>
+     <button type="button" onClick={()=>setSettingsOpen(false)}>بستن</button></div>
+   <form onSubmit={event=>{event.preventDefault();globalThis.__qaWriteAttempts++}}>
+     <label className="report-field"><span>رمز جدید</span><input type="password" minLength={8}/></label>
+     <label className="report-field"><span>تکرار رمز جدید</span><input type="password" minLength={8}/></label>
+     <button type="submit">تغییر رمز ساختگی</button>
+   </form>
+ </section>
+ return <div className="ops-root report-shell ops-worker-b3-view" dir="rtl">
   <div className={frozen?'ops-recheck-frozen':undefined}
        inert={frozen} aria-hidden={frozen?'true':undefined}>
    <WorkerOperations profile={{worker_id:workerId}} navigation={nav}
-      setNavigation={setNav}/>
+      workerName="دانشجوکار ساختگی" loginEmail="synthetic@example.invalid"
+      settingsPanel={mockSettings} settingsOpen={settingsOpen}
+      onToggleSettings={()=>setSettingsOpen(open=>!open)}
+      onRefresh={()=>{}} onLogout={()=>{}}
+      setNavigation={setNav}/> 
   </div>
   <dialog className="ops-recheck-curtain ops-root" ref={curtainRef}
     aria-label="بررسی مجدد دسترسی" role="status">
