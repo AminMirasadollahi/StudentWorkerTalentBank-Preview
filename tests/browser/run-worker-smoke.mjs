@@ -82,7 +82,7 @@ try{
   await waitFocus('.ow-worker-report-trigger')
  })
  await check('profile correction dialog, retained draft and no submission',async()=>{
-  await page.getByRole('button',{name:'پروفایل من'}).click()
+  await page.getByRole('button',{name:'حساب من'}).click()
   await page.locator('.ow-profile-change-trigger').click()
   assert.ok(await matchesModal('.ow-profile-action-dialog'))
   await waitFocus('[data-profile-dialog-heading]')
@@ -106,35 +106,41 @@ try{
    'same protected dialog should remain in session after safe recheck')
   await page.getByRole('button',{name:'بستن پنجره اصلاح مشخصات'}).click()
  })
- await check('profile request history is read-only, with dedicated activity links',async()=>{
-  await page.locator('.ow-profile-requests-launch button').click()
-  assert.ok(await matchesModal('.ow-profile-requests-dialog'))
-  assert.ok((await page.locator('.ow-profile-requests-dialog').innerText()).includes('رشتهٔ آزمایشی'))
+ await check('unified profile correction and history modal preserves server status without writes',async()=>{
+  await page.locator('.ow-profile-change-trigger').click()
+  assert.ok(await matchesModal('.ow-profile-action-dialog'))
+  await page.locator('.ow-b3-profile-tabs button').nth(1).click()
+  assert.ok((await page.locator('.ow-profile-action-dialog').innerText()).includes('رشتهٔ آزمایشی'))
   assert.equal(await page.locator('.ow-profile-request-item').count(),3)
   for(const state of ['pending','approved','rejected']){
    const badge=page.locator('.ow-profile-request-status--'+state)
-   assert.equal(await badge.count(),1,'separate request status must remain visible: '+state)
+   assert.equal(await badge.count(),1,'manager review state: '+state)
   }
   assert.equal(await page.locator('.ow-profile-request-item__note').count(),3)
-  await bound('.ow-profile-requests-dialog')
+  await page.locator('.ow-profile-request-item__note summary').first().click()
+  await bound('.ow-profile-action-dialog')
   await page.screenshot({path:resolve(output,'04-synthetic-request-history.png')})
-  await page.locator('.ow-profile-requests-dialog__head button').click()
-  assert.equal(await page.locator('.ow-profile-work-tabs').count(),0,
-   'do not duplicate task list in worker identity')
-  assert.equal(await page.locator('.ow-profile-activity-links__buttons button').count(),2)
+  await page.locator('.ow-b3-profile-tabs button').first().click()
+  assert.equal(await page.locator('.ow-profile-change-form input').inputValue(),
+   'پیشنهاد اصلاح آزمایشی','unsent draft persists across tabs')
+  await page.getByRole('button',{name:'بستن پنجره اصلاح مشخصات'}).click()
+  assert.equal(await page.locator('.ow-profile-activity-links').count(),0,
+   'profile must not repeat canonical sidebar sections')
  })
  await check('dedicated activity history shows actual status, credit and review feedback',async()=>{
-  await page.getByRole('button',{name:'سوابق'}).click()
+  await page.getByRole('button',{name:'سوابق گزارش‌ها'}).click()
   const panel=page.locator('.ow-worker-history-panel')
   await panel.waitFor({state:'visible'})
   assert.equal(await panel.locator('.ow-history-entry').count(),3)
-  assert.ok((await panel.innerText()).includes('کل زمان تأییدشده'))
-  assert.ok((await panel.innerText()).includes('نظر مدیر'))
+  assert.ok((await panel.innerText()).includes('مجموع زمان تأییدشده'))
   assert.ok((await panel.innerText()).includes('در انتظار بررسی'))
   assert.equal(await panel.locator('.ow-history-filter button').count(),5)
   await page.screenshot({path:resolve(output,'04b-synthetic-report-history.png')})
   await panel.locator('.ow-history-filter button').nth(2).click()
   assert.equal(await panel.locator('.ow-history-entry').count(),1)
+  await panel.locator('.ow-history-entry .ow-b3-inspect-trigger').click()
+  assert.ok((await panel.locator('.ow-b3-inspector').innerText()).includes('نظر مدیر'))
+  await page.screenshot({path:resolve(output,'04c-synthetic-report-inspector.png')})
   await panel.locator('.ow-history-next-step button').click()
   assert.ok(await page.locator('.ow-worker-task-workspace').isVisible())
  })
@@ -156,7 +162,7 @@ try{
   await page.keyboard.press('Escape')
  })
  await check('future tasks are findable and write/network counters remain zero',async()=>{
-  await page.getByRole('button',{name:'کارها'}).click()
+  await page.getByRole('button',{name:'کارهای من'}).click()
   await page.getByRole('button',{name:'آینده'}).click()
   assert.ok((await page.locator('.ow-worker-tasks').innerText()).includes('سال آینده'))
   assert.equal(await page.evaluate(()=>window.__qaWriteAttempts),0,
