@@ -46,6 +46,7 @@ const plugin={
   },
   load(id){
     if(id==='\0qa-v2-no-network')return [
+      'export const getUnitHourTotals=async()=>({scope:"admin",units:[{unit:"library",name:"کتابخانه",approved_minutes:55,pending_requested_minutes:0,pending_reports:0}]});',
       'export const getAdminWorkV2=async()=>{if(globalThis.__managerReadDenied)throw Error("operations_access_denied");return globalThis.__taskReviewFixture;};',
       'export const getMyWorkV2=async()=>globalThis.__taskReviewFixture;',
       'export const getMyWorkerProfileV2=async()=>({worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"});',
