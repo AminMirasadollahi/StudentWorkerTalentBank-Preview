@@ -350,6 +350,7 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
       </section>}
       {passwordEstablished && <WorkerOperations profile={profile} navigation={navigation} setNavigation={setNavigation}
         workerName={profile.name} workerUnit={unitLabels[profile.unit]||profile.unit}
+        loginEmail={loginEmail}
         onLogout={onLogout}
         onRefresh={()=>setManualRefreshRevision(v=>v+1)}
         onToggleSettings={()=>{setSettingsOpen(open=>!open);setPasswordError('');setMessage('')}}
