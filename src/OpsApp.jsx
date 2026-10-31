@@ -298,28 +298,8 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
     setConfirmation('')
   }
 
-  return (
-    <main className={`report-shell report-shell--dashboard ops-root ${passwordEstablished?'ops-worker-b3-view':''}`} dir="rtl">
-      {!passwordEstablished&&<header className="report-header">
-        <div>
-          <span className="report-eyebrow">پنل اختصاصی دانشجوکار</span>
-          <h1>سلام، {profile.name}</h1>
-          <p>{unitLabels[profile.unit] || profile.unit} · حساب فعال</p>
-          {loginEmail && <p className="ops-worker-login-email" title={loginEmail}>
-            ایمیل ورود: <bdi dir="ltr">{loginEmail}</bdi>
-          </p>}
-        </div>
-        <div className="report-header-actions">
-          {passwordEstablished&&<button className="report-btn report-btn--ghost" type="button"
-            onClick={()=>setManualRefreshRevision(v=>v+1)}>به‌روزرسانی</button>}
-          {passwordEstablished&&<button className="report-btn report-btn--ghost" type="button"
-            aria-expanded={settingsOpen} aria-controls="ops-worker-account-settings"
-            onClick={()=>{setSettingsOpen(open=>!open);setPasswordError('');setMessage('')}}>تنظیمات حساب</button>}
-          <button className="report-btn report-btn--ghost" type="button" onClick={onLogout}>خروج</button>
-        </div>
-      </header>}
-      {passwordEstablished&&message&&<p className="ops-alert-success" role="status">{message}</p>}
-      {(!passwordEstablished||settingsOpen)&&<section id="ops-worker-account-settings"
+  const accountSettingsPanel=(
+<section id="ops-worker-account-settings"
         className={`report-panel ops-password-panel ${!passwordEstablished ? 'ops-password-panel--required' : 'ops-account-settings-panel'}`}>
         {passwordEstablished
           ? <div className="ops-settings-title"><h2>تنظیمات حساب · تغییر رمز عبور</h2>
@@ -347,10 +327,35 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
             {saving ? 'در حال ذخیره…' : 'تغییر رمز'}
           </button>
         </form>
-      </section>}
+      </section>
+  )
+  return (
+    <main className={`report-shell report-shell--dashboard ops-root ${passwordEstablished?'ops-worker-b3-view':''}`} dir="rtl">
+      {!passwordEstablished&&<header className="report-header">
+        <div>
+          <span className="report-eyebrow">پنل اختصاصی دانشجوکار</span>
+          <h1>سلام، {profile.name}</h1>
+          <p>{unitLabels[profile.unit] || profile.unit} · حساب فعال</p>
+          {loginEmail && <p className="ops-worker-login-email" title={loginEmail}>
+            ایمیل ورود: <bdi dir="ltr">{loginEmail}</bdi>
+          </p>}
+        </div>
+        <div className="report-header-actions">
+          {passwordEstablished&&<button className="report-btn report-btn--ghost" type="button"
+            onClick={()=>setManualRefreshRevision(v=>v+1)}>به‌روزرسانی</button>}
+          {passwordEstablished&&<button className="report-btn report-btn--ghost" type="button"
+            aria-expanded={settingsOpen} aria-controls="ops-worker-account-settings"
+            onClick={()=>{setSettingsOpen(open=>!open);setPasswordError('');setMessage('')}}>تنظیمات حساب</button>}
+          <button className="report-btn report-btn--ghost" type="button" onClick={onLogout}>خروج</button>
+        </div>
+      </header>}
+      {!passwordEstablished&&message&&<p className="ops-alert-success" role="status">{message}</p>}
+      {!passwordEstablished&&accountSettingsPanel}
       {passwordEstablished && <WorkerOperations profile={profile} navigation={navigation} setNavigation={setNavigation}
         workerName={profile.name} workerUnit={unitLabels[profile.unit]||profile.unit}
         loginEmail={loginEmail}
+        settingsPanel={settingsOpen?accountSettingsPanel:null}
+        settingsNotice={message}
         onLogout={onLogout}
         onRefresh={()=>setManualRefreshRevision(v=>v+1)}
         onToggleSettings={()=>{setSettingsOpen(open=>!open);setPasswordError('');setMessage('')}}
