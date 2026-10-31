@@ -48,6 +48,28 @@ try{
   await hub.locator('button').first().click()
   assert.ok((await page.locator('.ow-worker-tasks').innerText()).includes('کار نمونهٔ امروز'))
  })
+ await check('B3 contextual task inspector opens on demand and Escape restores keyboard focus',async()=>{
+  assert.equal(await page.locator('.ow-b3-inspector').count(),0)
+  const trigger=page.locator('.ow-worker-task-workspace .ow-b3-inspect-trigger').first()
+  await trigger.click()
+  await page.locator('.ow-b3-inspector').waitFor({state:'visible'})
+  assert.ok((await page.locator('.ow-b3-inspector').innerText()).includes('جزئیات کار'))
+  await page.screenshot({path:resolve(output,'00b-synthetic-task-inspector.png')})
+  await page.keyboard.press('Escape')
+  assert.equal(await page.locator('.ow-b3-inspector').count(),0)
+  assert.ok(await trigger.evaluate(node=>document.activeElement===node),'row trigger recovers focus')
+ })
+ await check('B3 1280 desktop list does not overflow with contextual inspector',async()=>{
+  await page.setViewportSize({width:1280,height:900})
+  await page.locator('.ow-worker-task-workspace .ow-b3-inspect-trigger').first().click()
+  const width=await page.evaluate(()=>({
+   scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth
+  }))
+  assert.ok(width.scroll<=width.client+2,'desktop content must not horizontally overflow: '+JSON.stringify(width))
+  await page.screenshot({path:resolve(output,'00c-synthetic-task-inspector-1280.png')})
+  await page.keyboard.press('Escape')
+  await page.setViewportSize({width:1440,height:900})
+ })
  await check('task native top-layer, initial focus and desktop viewport',async()=>{
   await page.locator('.ow-worker-report-trigger').first().click()
   assert.ok(await matchesModal('.ow-worker-report-dialog'))
