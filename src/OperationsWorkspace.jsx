@@ -47,8 +47,8 @@ function UnitHourSummary({scope,approvedTotal=null,refreshRevision=0}) {
  return <section className={scope==='worker'?'ow-unit-hours ow-unit-hours--combined':'ow-unit-hours'}
    aria-label="مجموع ساعات تأییدشده به تفکیک واحد فعالیت">
    <div className="ow-unit-hours__heading">
-     <div><h3>خلاصه ساعات تأییدشده</h3>
-       <small>به تفکیک واحد انجام کار</small></div>
+     <div><h3>{scope==='worker'?'خلاصه ساعات تأییدشده':'ساعات به تفکیک واحد فعالیت'}</h3>
+       <small>{scope==='worker'?'به تفکیک واحد انجام کار':'مجموع کل زمان تأییدشده در سرور؛ مستقل از واحد ثبت‌نام دانشجو'}</small></div>
      {scope==='worker'&&<div className="ow-unit-hours__total">
        <span>مجموع تأییدشده</span><strong>{approvedTotal===null?'—':exactDuration(approvedTotal)}</strong>
      </div>}
@@ -59,8 +59,10 @@ function UnitHourSummary({scope,approvedTotal=null,refreshRevision=0}) {
      {result.units.map(item=><article key={item.unit}>
        <strong>{item.name||unitLabels[item.unit]||item.unit}</strong>
        <b>{exactDuration(Number(item.approved_minutes)||0)}</b>
-       {Number(item.pending_reports)>0&&<small>
-         {n(item.pending_reports)} گزارش منتظر بررسی · {exactDuration(Number(item.pending_requested_minutes)||0)} درخواستی
+       {(scope==='admin'||Number(item.pending_reports)>0)&&<small>
+         {Number(item.pending_reports)>0
+           ?`${n(item.pending_reports)} گزارش منتظر بررسی · ${exactDuration(Number(item.pending_requested_minutes)||0)} درخواستی`
+           :'گزارش منتظر بررسی: ۰'}
        </small>}
      </article>)}
    </div>}
