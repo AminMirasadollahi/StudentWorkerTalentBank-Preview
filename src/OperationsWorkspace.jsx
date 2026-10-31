@@ -1579,7 +1579,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
       <div><small>نام و نام خانوادگی</small><strong>{identity?.name||'نامشخص'}</strong></div>
       <div><small>رشته تحصیلی</small><strong>{identity?.major||'ثبت نشده'}</strong></div>
       <div><small>سال ورود</small><strong>{identity?.entry_year||'ثبت نشده'}</strong></div>
-      <div><small>واحد همکاری</small><strong>{unitLabels[identity?.unit]||identity?.unit||'نامشخص'}</strong></div>
+      <div><small>واحد اولیهٔ ثبت‌نام</small><strong>{unitLabels[identity?.unit]||identity?.unit||'نامشخص'}</strong></div>
     </div>
     <div className="ow-profile-change-launch">
       <button type="button" ref={profileDialogTriggerRef}
@@ -1669,7 +1669,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
   </section>
 }
 export function WorkerOperations({profile,navigation,setNavigation,refreshRevision=0,
-  workerName='',workerUnit='',loginEmail='',onLogout,onRefresh,onToggleSettings,settingsOpen=false}) {
+  workerName='',loginEmail='',settingsPanel=null,settingsNotice='',onLogout,onRefresh,onToggleSettings,settingsOpen=false}) {
   // The protected worker projection must never be rendered for a new principal
   // while its new server read is pending. Same-component account replacement
   // may otherwise expose the previous worker for one React paint.
@@ -1799,7 +1799,6 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         <div className="ow-b3-worker" title={workerName}>
           <span className="ow-b3-worker__avatar" aria-hidden="true">{workerName?.trim()?.[0]||'د'}</span>
           {!sidebarCollapsed&&<div><strong>{workerName}</strong>
-            <small>{workerUnit}</small>
             {loginEmail&&<small className="ow-b3-login-email">
               ایمیل ورود: <bdi dir="ltr">{loginEmail}</bdi></small>}
           </div>}
@@ -1828,6 +1827,8 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           <strong>{sectionNames[section]}</strong></span>
         <span className="ow-b3-online">حساب فعال · اطلاعات عملیاتی</span>
       </header>
+      {settingsPanel}
+      {settingsNotice&&<p className="ops-alert-success" role="status">{settingsNotice}</p>}
       {loading&&<p className="ow-muted" role="status">در حال دریافت برنامه…</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
     {section==='tasks'&&<section className="report-panel ow-worker-task-workspace">
