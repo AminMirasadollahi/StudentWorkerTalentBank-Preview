@@ -1516,3 +1516,25 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  }
  .ow-b3-ledger .ow-unit-hours__total {justify-content:flex-start}
 }
+
+/* SWTB11 visual review correction: reserve a real left inspector lane.
+   Do not obscure headings, hours or filters beneath a fixed detail surface. */
+@media(min-width:1120px) {
+ .ow-worker-workspace .ow-worker-task-workspace:has(#ow-task-inspector),
+ .ow-worker-workspace .ow-worker-history-panel:has(#ow-report-inspector) {
+   margin-inline-end:calc(min(29vw,24rem) + 2rem);
+ }
+ .ow-worker-workspace .ow-b3-task-body--inspecting,
+ .ow-worker-workspace .ow-b3-ledger-body--detail {
+   grid-template-columns:minmax(0,1fr);
+ }
+ .ow-worker-workspace .ow-b3-ledger-body--detail .ow-b3-ledger-columns {
+   display:none;
+ }
+ .ow-worker-workspace .ow-b3-ledger-body--detail .ow-b3-ledger-row {
+   grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;
+   gap:.4rem;
+ }
+ .ow-worker-workspace .ow-b3-ledger-body--detail .ow-b3-ledger-row
+ .ow-history-entry__identity {grid-column:1/-1}
+}
