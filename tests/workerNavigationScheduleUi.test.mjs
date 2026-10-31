@@ -666,7 +666,7 @@ test('worker lifetime approved minutes come from server total beyond clipped rep
  const ui=await setup()
  try{
   await ui.clickText('سوابق گزارش‌ها')
-  assert.match(ui.host.querySelector('.ow-history-approved-total').textContent,/۲۷۵ ساعت/)
+  assert.match(ui.host.querySelector('.ow-unit-hours__total').textContent,/۲۷۵ ساعت/)
   await ui.clickText('حساب من')
   assert.match(ui.host.querySelector('.ow-self-profile').textContent,
     /زمان تأییدشده: ۲۷۵ ساعت/)
