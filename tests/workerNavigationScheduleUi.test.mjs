@@ -167,7 +167,7 @@ test('worker exposes This Month and personal profile without permanent password 
   assert.ok(ui.host.querySelector('.ow-range-switch'))
   await ui.clickText('این ماه')
   assert.equal(ui.host.querySelector('[aria-pressed="true"]').textContent,'این ماه')
-  await ui.clickText('پروفایل من')
+  await ui.clickText('حساب من')
   assert.ok(ui.host.querySelector('.ow-self-profile'))
   assert.ok(ui.host.textContent.includes('سابقه گزارش‌ها و ساعات'))
   assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,4)
@@ -214,7 +214,7 @@ test('overdue unfinished task remains actionable when Today is selected',async()
 test('personal profile change only queues a synthetic manager-reviewed proposal',async()=>{
  const ui=await setup()
  try{
-  await ui.clickText('پروفایل من')
+  await ui.clickText('حساب من')
   assert.match(ui.host.textContent,/رشته تحصیلی/)
   assert.match(ui.host.textContent,/پژوهش/)
   const open=ui.host.querySelector('.ow-profile-change-trigger')
@@ -417,7 +417,7 @@ test('worker self-profile independently hides cached identity after denied profi
  globalThis.__qaProfileReadDenied=true
  const ui=await setup()
  try{
-  await ui.clickText('پروفایل من')
+  await ui.clickText('حساب من')
   assert.ok(ui.host.querySelector('.ow-profile-access-recheck'))
   assert.doesNotMatch(ui.host.querySelector('.ow-self-profile').textContent,/نمونه غیرواقعی|پژوهش/)
   globalThis.__qaProfileReadDenied=false
@@ -435,7 +435,7 @@ test('failed correction-history scope also hides self identity until successful 
   proposed_value:'رشتهٔ آزمون',review_state:'pending'}]
  const ui=await setup()
  try{
-  await ui.clickText('پروفایل من')
+  await ui.clickText('حساب من')
   assert.ok(ui.host.querySelector('.ow-profile-access-recheck'))
   assert.doesNotMatch(ui.host.querySelector('.ow-self-profile').textContent,/نمونه غیرواقعی|رشتهٔ آزمون/)
   globalThis.__qaProfileHistoryDenied=false
@@ -459,7 +459,7 @@ test('report acknowledgement persists while worker switches presence and work ta
   await submitSyntheticWorkerReport(ui)
   assert.equal(globalThis.__qaSubmitCalls.length,1)
   await ui.clickText('زمان حضور')
-  await ui.clickText('کارها')
+  await ui.clickText('کارهای من')
   const report=ui.host.querySelector('.ow-worker-action-detail button[type="submit"]')
   assert.ok(report)
   assert.equal(report.disabled,true,'tab remount must not clear accepted report receipt')
@@ -488,7 +488,7 @@ test('fresh changes_requested review cycle reopens report with a new submission 
    id:'SYNTHETIC-REVIEW-CYCLE',task_id:'FAKE-TASK',
    review_state:'changes_requested',work_date:day(),reported_minutes:60,
   })
-  await ui.clickText('کارها')
+  await ui.clickText('کارهای من')
   const submit=ui.host.querySelector('.ow-worker-action-detail button[type="submit"]')
   assert.ok(submit)
   await submitSyntheticWorkerReport(ui)
@@ -510,13 +510,13 @@ test('manager rejected report opens a new cycle rather than permanently blocking
  try{
   await submitSyntheticWorkerReport(ui)
   const initial=globalThis.__qaSubmitCalls[0].clientSubmissionId
-  await ui.clickText('پروفایل من')
+  await ui.clickText('حساب من')
   globalThis.__workerFocusFixture.tasks[0].state='needs_changes'
   globalThis.__workerFocusFixture.time_entries.push({
    id:'SYNTHETIC-REJECTED-REPORT',task_id:'FAKE-TASK',
    review_state:'rejected',work_date:day(),reported_minutes:60,
   })
-  await ui.clickText('کارها')
+  await ui.clickText('کارهای من')
   const button=ui.host.querySelector('.ow-worker-action-detail button[type="submit"]')
   assert.ok(button)
   await submitSyntheticWorkerReport(ui)
@@ -531,7 +531,7 @@ test('manager rejected report opens a new cycle rather than permanently blocking
 })
 
 async function openSyntheticProfileChange(ui){
- await ui.clickText('پروفایل من')
+ await ui.clickText('حساب من')
  const open=ui.host.querySelector('.ow-profile-change-trigger')
  assert.ok(open)
  await act(async()=>open.dispatchEvent(
@@ -664,10 +664,9 @@ test('worker lifetime approved minutes come from server total beyond clipped rep
  globalThis.__workerFocusFixture={...fixture(),approved_minutes_total:16500}
  const ui=await setup()
  try{
-  const summary=ui.host.querySelectorAll('.ow-summary article')
-  assert.equal(summary.length,3)
-  assert.match(summary[2].textContent,/۲۷۵ ساعت/)
-  await ui.clickText('پروفایل من')
+  await ui.clickText('سوابق گزارش‌ها')
+  assert.match(ui.host.querySelector('.ow-history-approved-total').textContent,/۲۷۵ ساعت/)
+  await ui.clickText('حساب من')
   assert.match(ui.host.querySelector('.ow-self-profile').textContent,
     /زمان تأییدشده: ۲۷۵ ساعت/)
   assert.equal(globalThis.__workerFocusFixture.time_entries.length,0,
@@ -881,8 +880,8 @@ test('upcoming worker filter surfaces next-month assignments without mixing over
   assert.doesNotMatch(current,/وظیفه ساختگی ماه‌های آینده/)
   assert.match(current,/کار قدیمی نیازمند اقدام/)
   await ui.clickText('آینده')
-  await ui.clickText('پروفایل من')
-  await ui.clickText('کارها')
+  await ui.clickText('حساب من')
+  await ui.clickText('کارهای من')
   assert.equal(ui.host.querySelector('.ow-range-switch [aria-pressed="true"]').textContent,'آینده',
     'future task filter persists across worker navigation')
  }finally{
@@ -920,7 +919,7 @@ test('calendar date selection opens a focused native detail surface; past dates 
 })
 
 
-test('desktop profile shows a focused request-history dialog without modifying requests',async()=>{
+test('profile correction and request history share one native modal without business writes',async()=>{
  globalThis.__profileChangeRequests=[{
   id:'FAKE-PROFILE-REQUEST',field_code:'major',
   proposed_value:'رشته آزمایشی نمونه',review_state:'pending',
@@ -929,49 +928,49 @@ test('desktop profile shows a focused request-history dialog without modifying r
  globalThis.__profileChangeCalls=[]
  const ui=await setup()
  try{
-  await ui.clickText('پروفایل من')
-  const trigger=ui.host.querySelector('.ow-profile-requests-launch button')
-  const dialog=ui.host.querySelector('dialog.ow-profile-requests-dialog')
-  assert.ok(trigger && dialog)
-  assert.equal(trigger.getAttribute('aria-haspopup'),'dialog')
-  assert.equal(dialog.getAttribute('aria-labelledby'),'ow-profile-requests-dialog-title')
-  assert.match(ui.host.querySelector('.ow-profile-requests-launch').textContent,/منتظر تأیید/)
+  await ui.clickText('حساب من')
+  const trigger=ui.host.querySelector('.ow-profile-change-trigger')
+  const dialog=ui.host.querySelector('dialog.ow-profile-action-dialog')
+  assert.ok(trigger&&dialog)
+  assert.equal(ui.host.querySelectorAll('.ow-self-profile dialog').length,1,
+    'only one profile correction and history window should exist')
   await act(async()=>trigger.click())
+  const tabs=dialog.querySelectorAll('.ow-b3-profile-tabs button')
+  assert.equal(tabs.length,2)
+  await act(async()=>tabs[1].click())
   assert.match(dialog.textContent,/رشته آزمایشی نمونه/)
-  await act(async()=>dialog.querySelector('.ow-profile-requests-dialog__head button').click())
-  assert.equal(dialog.querySelector('.ow-profile-requests-list'),null,
-    'request history details are not kept interactive after dismiss')
-  assert.equal(globalThis.__profileChangeCalls.length,0,'view-only history does not request changes')
+  const details=dialog.querySelector('.ow-profile-request-item__note')
+  assert.ok(details)
+  await act(async()=>details.querySelector('summary').click())
+  assert.match(details.textContent,/در انتظار نتیجه/)
+  await act(async()=>tabs[0].click())
+  assert.ok(dialog.querySelector('.ow-profile-change-form'))
+  await act(async()=>dialog.querySelector('.ow-profile-action-dialog__close').click())
+  assert.equal(dialog.querySelector('.ow-profile-requests-list'),null)
+  assert.equal(globalThis.__profileChangeCalls.length,0,
+    'read-only review and dismiss never submits a profile correction')
  }finally{
   globalThis.__profileChangeRequests=[]
   globalThis.__profileChangeCalls=[]
   await ui.dispose()
  }
 })
-test('profile no longer duplicates task and report lists; direct links open their authoritative sections',async()=>{
- const data=fixture()
- data.tasks.push({...data.tasks[0],id:'FAKE-PROFILE-OLD',
-   title:'کار تکمیل‌شده ساختگی',planned_date:'2020-04-01',state:'completed'})
- globalThis.__workerFocusFixture=data
+test('profile contains identity and one correction entry; canonical task/history sections remain in sidebar',async()=>{
  const ui=await setup()
  try{
-  await ui.clickText('پروفایل من')
+  await ui.clickText('حساب من')
   assert.ok(ui.host.querySelector('.ow-self-profile'))
-  assert.equal(ui.host.querySelector('.ow-profile-work-tabs'),null,
-    'full task category lists belong to the task workspace, not profile')
-  assert.equal(ui.host.querySelector('.ow-profile-fold'),null,
-    'dated report history belongs to the dedicated section')
-  assert.equal(ui.host.querySelectorAll('.ow-profile-activity-links__buttons button').length,2)
-  await act(async()=>ui.host.querySelector('.ow-profile-activity-links__buttons button').click())
-  assert.ok(ui.host.querySelector('.ow-worker-task-workspace'),'task shortcut navigates to canonical action area')
-  await ui.clickText('پروفایل من')
-  await act(async()=>ui.host.querySelectorAll('.ow-profile-activity-links__buttons button')[1].click())
-  assert.ok(ui.host.querySelector('.ow-worker-history-panel'),'history shortcut navigates to read-only report area')
+  assert.equal(ui.host.querySelector('.ow-profile-work-tabs'),null)
+  assert.equal(ui.host.querySelector('.ow-profile-fold'),null)
+  assert.equal(ui.host.querySelector('.ow-profile-activity-links'),null,
+    'redundant navigation must not be repeated in profile')
+  assert.equal(ui.host.querySelectorAll('.ow-self-profile dialog').length,1)
+  await ui.clickText('کارهای من')
+  assert.ok(ui.host.querySelector('.ow-worker-task-workspace'))
+  await ui.clickText('سوابق گزارش‌ها')
+  assert.ok(ui.host.querySelector('.ow-worker-history-panel'))
   assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,4)
- }finally{
-  globalThis.__workerFocusFixture=fixture()
-  await ui.dispose()
- }
+ }finally{await ui.dispose()}
 })
 test('worker homepage is action-first and preserves the familiar date drilldown',async()=>{
  const data=fixture()
@@ -1006,8 +1005,8 @@ test('worker homepage is action-first and preserves the familiar date drilldown'
   assert.match(ui.host.querySelector('.ow-worker-tasks').textContent,/وظیفه تکمیل‌شده دیگر/)
   await ui.clickText('این ماه')
   assert.equal(ui.host.querySelector('.ow-range-switch button[aria-pressed="true"]').textContent,'این ماه')
-  await ui.clickText('پروفایل من')
-  await ui.clickText('کارها')
+  await ui.clickText('حساب من')
+  await ui.clickText('کارهای من')
   assert.equal(ui.host.querySelector('.ow-range-switch button[aria-pressed="true"]').textContent,'این ماه',
     'date drilldown must survive section navigation')
   await act(async()=>ui.host.querySelector('.ow-worker-focus-switch button').click())
@@ -1074,17 +1073,17 @@ test('read-only history shows true current review statuses and never invents tim
  globalThis.__qaSubmitCalls=[]
  const ui=await setup()
  try{
-  await ui.clickText('سوابق')
+  await ui.clickText('سوابق گزارش‌ها')
   const history=ui.host.querySelector('.ow-worker-history-panel')
   assert.ok(history)
-  assert.match(history.textContent,/کل زمان تأییدشده/)
+  assert.match(history.textContent,/مجموع زمان تأییدشده/)
   assert.match(history.textContent,/۲ ساعت و ۳۰ دقیقه/,'server lifetime total wins over visible 40-minute row')
   const rows=history.querySelectorAll('.ow-history-entry')
   assert.equal(rows.length,3)
-  assert.match(rows[0].textContent,/درخواست‌شده|زمان درخواست‌شده/)
+  assert.match(rows[0].textContent,/۴۵ دقیقه/)
   assert.match(rows[0].textContent,/در انتظار بررسی/)
   assert.match(rows[0].textContent,/منتظر تأیید/)
-  assert.match(rows[1].textContent,/لطفاً مستندات را کامل کنید/)
+  assert.match(rows[1].textContent,/نیازمند اصلاح/)
   assert.match(rows[2].textContent,/۴۰ دقیقه/)
   assert.doesNotMatch(rows[2].textContent,/تاریخ تأیید|تاریخ ارسال/,
    'a true timeline of review events is not provided by current RPC fields')
@@ -1098,6 +1097,8 @@ test('read-only history shows true current review statuses and never invents tim
   assert.match(history.querySelector('.ow-history-entry').textContent,/منتظر تأیید/)
   await act(async()=>options[2].click())
   assert.equal(history.querySelectorAll('.ow-history-entry').length,1)
+  await act(async()=>history.querySelector('.ow-history-entry .ow-b3-inspect-trigger').click())
+  assert.match(history.querySelector('.ow-b3-inspector').textContent,/لطفاً مستندات را کامل کنید/)
   await act(async()=>history.querySelector('.ow-history-next-step button').click())
   assert.ok(ui.host.querySelector('.ow-worker-task-workspace'))
   assert.equal(globalThis.__qaSubmitCalls.length,0,'history filtering and navigation never writes reports')
