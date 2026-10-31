@@ -1116,7 +1116,7 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 
 /* SWTB8 B3 Worker UI shell -- presentation-only; never style Manager/Admin. */
 .ops-worker-b3-view.report-shell {max-width:none;width:100%;padding:0;min-height:100vh}
-.ops-worker-b3-view .ow-b3-layout {
+.ow-b3-layout {
  --b3-navy:#102f43;--b3-accent:#0e766f;--b3-line:#dbe5e9;
  --b3-muted:#5f7685;--b3-bg:#f4f7f8;
  display:grid;grid-template-columns:226px minmax(0,1fr);
@@ -1237,7 +1237,7 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-b3-task-body--inspecting .ow-b3-inspector {max-height:none}
 }
 @media(max-width:700px) {
- .ops-worker-b3-view .ow-b3-layout {grid-template-columns:74px minmax(0,1fr)}
+ .ow-b3-layout {grid-template-columns:74px minmax(0,1fr)}
  .ow-b3-layout .ow-b3-sidebar .ow-tab {font-size:.69rem;padding:.5rem .2rem;
  text-align:center}
  .ow-b3-brand div,.ow-b3-sidebar-caption,.ow-b3-worker div {display:none}
