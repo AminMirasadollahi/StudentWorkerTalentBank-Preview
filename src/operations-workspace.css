@@ -1299,3 +1299,5 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-b3-ledger .ow-b3-ledger-row {grid-template-columns:minmax(0,1fr)}
  .ow-b3-ledger .ow-b3-ledger-row .ow-b3-inspect-trigger {justify-self:start}
 }
+
+.ow-b3-worker .ow-b3-login-email {overflow-wrap:anywhere;white-space:normal;line-height:1.7;color:#b9d3d8;font-size:.67rem}
