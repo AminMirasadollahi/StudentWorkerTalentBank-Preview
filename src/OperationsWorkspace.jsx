@@ -1369,6 +1369,16 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate}) {
  const approved=records.filter(e=>e.review_state==='approved')
  const total=approvedMinutesTotal??approved.reduce(
   (sum,e)=>sum+Number(e.approved_minutes||0),0)
+ useEffect(()=>{
+   if(!selectedReportId)return
+   const onKeyDown=event=>{
+     if(event.key!=='Escape'||document.querySelector('dialog[open]'))return
+     document.querySelector(`[data-report-inspect="${selectedReportId}"]`)?.focus()
+     setSelectedReportId(null)
+   }
+   document.addEventListener('keydown',onKeyDown)
+   return()=>document.removeEventListener('keydown',onKeyDown)
+ },[selectedReportId])
  const approvalDisplay=entry=>entry.review_state==='approved'
    ?(entry.approved_minutes===null?'مقدار تأییدشده ثبت نشده':minutes(entry.approved_minutes))
    :entry.review_state==='rejected'?'تأیید نشد'
@@ -1746,6 +1756,16 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const inspectedReport=inspectedTask
     ?records.filter(r=>r.task_id===inspectedTask.id).sort(
       (a,b)=>(b.work_date||'').localeCompare(a.work_date||''))[0]:null
+  useEffect(()=>{
+    if(!inspectedTask)return
+    const onKeyDown=event=>{
+      if(event.key!=='Escape'||document.querySelector('dialog[open]'))return
+      document.querySelector(`[data-task-inspect="${inspectedTask.id}"]`)?.focus()
+      setSelectedTaskId(null)
+    }
+    document.addEventListener('keydown',onKeyDown)
+    return()=>document.removeEventListener('keydown',onKeyDown)
+  },[inspectedTask?.id])
   const sectionNames={tasks:'کارهای من',availability:'زمان حضور',
     history:'سوابق گزارش‌ها',profile:'حساب من'}
   const emptyText={
