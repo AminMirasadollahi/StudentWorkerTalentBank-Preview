@@ -115,7 +115,7 @@ async function fill(field,value){
   await act(async()=>{setter.call(field,value);field.dispatchEvent(new window.Event('input',{bubbles:true}))})
 }
 
-test('manager sees exact read-only overbooking warning and retains enabled assignment action',async()=>{
+test('manager sees advisory and must explicitly choose work unit before enabled assignment',async()=>{
   const {host,teardown}=await setup()
   try{
     assert.match(host.textContent,/هشدار بیش‌ازظرفیت/)
@@ -123,7 +123,10 @@ test('manager sees exact read-only overbooking warning and retains enabled assig
     assert.match(host.textContent,/ظرفیت نفرات انتخابی/)
     const submit=Array.from(host.querySelectorAll('button')).find(x=>x.textContent==='واگذاری کار')
     assert.ok(submit)
-    assert.equal(submit.disabled,false,'advice must not silently change server/business policy')
+    assert.equal(submit.disabled,true,'assignment must not assume the enrollment unit')
+    const unit=host.querySelector('select[aria-label="واحد انجام کار"]')
+    await act(async()=>{unit.value='research';unit.dispatchEvent(new window.Event('change',{bubbles:true}))})
+    assert.equal(submit.disabled,false,'capacity advice does not block a valid explicit work unit')
     assert.match(host.textContent,/زمان استاندارد برای هر نفر جداگانه/)
   }finally{await teardown()}
 })
@@ -197,6 +200,8 @@ test('group assignment submits a single atomic manager RPC with one standard dur
   await fill(title,'مرتب‌سازی گروهی منابع کتابخانه')
   const short=labeledField(host,'علت واگذاری امروز یا فردا')
   await fill(short,'آماده‌سازی سریع و هماهنگ منابع امروز')
+  const unit=host.querySelector('select[aria-label="واحد انجام کار"]')
+  await act(async()=>{unit.value='public_relations';unit.dispatchEvent(new window.Event('change',{bubbles:true}))})
   const form=host.querySelector('.ow-assignment-form')
   await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
   assert.equal(globalThis.__qaGroupCalls.length,1)
@@ -204,6 +209,7 @@ test('group assignment submits a single atomic manager RPC with one standard dur
   assert.deepEqual(new Set(payload.workerIds),new Set([worker,'FAKE-WORKER-SECOND']))
   assert.equal(payload.minutes,'60')
   assert.equal(payload.title,'مرتب‌سازی گروهی منابع کتابخانه')
+  assert.equal(payload.unit,'public_relations','unit comes from manager selection not either member signup unit')
  }finally{await teardown()}
 })
 
@@ -227,6 +233,8 @@ test('committed group assignment cannot be submitted twice when post-save refres
   await act(async()=>second.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
   await fill(labeledField(host,'عنوان کار'),'وظیفه مشترک کاملاً ساختگی')
   await fill(labeledField(host,'علت واگذاری امروز یا فردا'),'دلیل ساختگی قابل قبول برای واگذاری سریع')
+  const unit=host.querySelector('select[aria-label="واحد انجام کار"]')
+  await act(async()=>{unit.value='library';unit.dispatchEvent(new window.Event('change',{bubbles:true}))})
   const form=host.querySelector('form.ow-assignment-form')
   await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
   assert.equal(globalThis.__qaGroupCalls.length,1)
