@@ -17,9 +17,12 @@ export const requestProfileChange=({field,value,reason})=>rpc('ops_request_profi
 export const reviewProfileChange=({requestId,decision,note})=>rpc('ops_review_profile_change',{
  p_request_id:requestId,p_decision:decision,p_note:note||null,
 })
-export const assignGroupTask=({workerIds,title,instructions,date,minutes,shortNoticeReason})=>
- rpc('ops_assign_group_task',{
-  p_worker_ids:workerIds,p_title:title,p_instructions:instructions,
+// Unit belongs to the assigned work, NEVER inferred from the worker's enrollment unit.
+// New RPC preserves atomic group assignment and manager-only authorization.
+export const assignGroupTask=({workerIds,unit,title,instructions,date,minutes,shortNoticeReason})=>
+ rpc('ops_assign_group_task_for_unit',{
+  p_worker_ids:workerIds,p_unit_code:unit,p_title:title,p_instructions:instructions,
   p_planned_date:date,p_estimate_minutes:Number(minutes),
   p_short_notice_reason:shortNoticeReason||null,
  })
+export const getUnitHourTotals=()=>rpc('ops_get_unit_hour_totals_v1')
