@@ -19,6 +19,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const [title,setTitle]=useState('')
  const [instructions,setInstructions]=useState('')
  const [estimate,setEstimate]=useState('60')
+ const [taskUnit,setTaskUnit]=useState('')
  const [reason,setReason]=useState('')
  const [busy,setBusy]=useState(false)
  const [committed,setCommitted]=useState(false)
@@ -34,22 +35,22 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const toggle=id=>setWorkerIds(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id])
  const submit=async event=>{
   event.preventDefault()
-  if(busy||committed||selected.length===0||selected.length!==workerIds.length||date<localToday())return
+  if(busy||committed||!Object.hasOwn(unitNames,taskUnit)||selected.length===0||selected.length!==workerIds.length||date<localToday())return
   setBusy(true);setError('');setNotice('')
   try {
     if(selected.length===1){
-      await assignWorkerTask({workerId:selected[0].id,unit:selected[0].unit,
+      await assignWorkerTask({workerId:selected[0].id,unit:taskUnit,
         title,instructions,date,minutes:estimate,shortNoticeReason:reason})
     } else {
-      await assignGroupTask({workerIds:selected.map(w=>w.id),title,instructions,date,
+      await assignGroupTask({workerIds:selected.map(w=>w.id),unit:taskUnit,title,instructions,date,
         minutes:estimate,shortNoticeReason:reason})
     }
     // The server mutation is committed; a failed refresh must not be reported
     // as a failed assignment (or allow a second, duplicate submission).
     setCommitted(true)
     setTitle('');setInstructions('');setReason('')
-    setNotice(selected.length===1?'کار به دانشجوکار واگذار شد.':
-      `کار گروهی برای ${fa.format(selected.length)} نفر ثبت شد؛ تأیید ساعت هر نفر مستقل است.`)
+    setNotice(selected.length===1?`کار در حوزهٔ ${unitNames[taskUnit]} واگذار شد.`:
+      `کار گروهی در حوزهٔ ${unitNames[taskUnit]} برای ${fa.format(selected.length)} نفر ثبت شد؛ ساعت هر نفر مستقل بررسی می‌شود.`)
     try {
       await onSaved?.()
       onClose?.()
@@ -61,6 +62,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
     setError(message.includes('short_notice_reason_required')?'علت واگذاری نزدیک ضروری است.':
       message.includes('worker_not_active')?'یکی از افراد دیگر فعال نیست.':
       message.includes('invalid_group_members')?'برای واگذاری گروهی ۲ تا ۲۰ دانشجوکار لازم است.':
+      message.includes('invalid_unit')?'واحد فعالیت معتبر یا فعال نیست.':
       'واگذاری انجام نشد. اطلاعات را بررسی کنید؛ انتخاب‌ها و توضیحات حفظ شده‌اند.')
   } finally{setBusy(false)}
  }
@@ -79,13 +81,20 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
           <div className="ow-worker-option-list">
             {options.map(w=><label key={w.id}>
               <input type="checkbox" checked={workerIds.includes(w.id)} onChange={()=>toggle(w.id)}/>
-              <span>{w.name} · {unitNames[w.unit]||w.unit}</span>
+              <span>{w.name}</span>
             </label>)}
             {!options.length&&<span>دانشجوکار فعالی یافت نشد.</span>}
           </div>
         </div>
       </details>
     </div>
+    <label className="report-field"><span>واحد انجام این کار (الزامی)</span>
+      <select required aria-label="واحد انجام کار" value={taskUnit}
+        onChange={e=>setTaskUnit(e.target.value)}>
+        <option value="">انتخاب واحد فعالیت</option>
+        {Object.entries(unitNames).map(([code,name])=><option key={code} value={code}>{name}</option>)}
+      </select>
+    </label>
     <div className="report-field"><span>تاریخ اجرا (شمسی)</span>
       <JalaliDatePicker value={date} min={localToday()} onChange={setDate} ariaLabel="تاریخ اجرای کار"/>
     </div>
@@ -127,13 +136,13 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
       </div>)}
     </div>
   </details>}
-  <p className="ow-muted">در کار گروهی، زمان استاندارد برای هر نفر جداگانه ثبت و گزارش هر نفر مستقل تأیید می‌شود.</p>
+  <p className="ow-muted">واحد انتخاب‌شده به خودِ کار تعلق دارد، نه به واحد اولیهٔ ثبت‌نام دانشجو. ساعت گزارش‌شده و تأییدشدهٔ هر نفر زیر همین واحد محاسبه می‌شود. در کار گروهی، یک واحد برای همهٔ اعضای آن کار در نظر گرفته می‌شود.</p>
   {error&&<p role="alert" className="report-alert report-alert--error">{error}</p>}
   {notice&&<p role="status" className="ops-alert-success">{notice}</p>}
   <div className="ow-actions">
     {onClose&&<button type="button" className="report-btn report-btn--light" onClick={onClose}>انصراف</button>}
     <button type="submit" className="report-btn report-btn--primary"
-      disabled={busy||committed||!selected.length||selected.length!==workerIds.length||date<localToday()}>
+      disabled={busy||committed||!Object.hasOwn(unitNames,taskUnit)||!selected.length||selected.length!==workerIds.length||date<localToday()}>
       {busy?'در حال ثبت…':selected.length>1?'واگذاری گروهی':'واگذاری کار'}
     </button>
   </div>
