@@ -1358,8 +1358,10 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
  */
 function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate}) {
  const [view,setView]=useState('all')
+ const [selectedReportId,setSelectedReportId]=useState(null)
  const counts=summarizeWorkerReportActivity(records)
  const entries=projectWorkerReportActivity(records,tasks,view)
+ const detail=entries.find(r=>r.id===selectedReportId)
  const options=[
   ['all','همه'],['submitted','منتظر بررسی'],
   ['changes_requested','نیازمند اصلاح'],['rejected','ردشده'],['approved','تأییدشده']
@@ -1367,69 +1369,85 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate}) {
  const approved=records.filter(e=>e.review_state==='approved')
  const total=approvedMinutesTotal??approved.reduce(
   (sum,e)=>sum+Number(e.approved_minutes||0),0)
- return <section className="report-panel ow-worker-history-panel" aria-label="سابقه گزارش‌ها و ساعات">
+ const approvalDisplay=entry=>entry.review_state==='approved'
+   ?(entry.approved_minutes===null?'مقدار تأییدشده ثبت نشده':minutes(entry.approved_minutes))
+   :entry.review_state==='rejected'?'تأیید نشد'
+   :entry.review_state==='changes_requested'?'در انتظار اصلاح گزارش'
+   :entry.review_state==='submitted'?'در انتظار بررسی':'تأییدشده نیست'
+ return <section className="report-panel ow-worker-history-panel ow-b3-ledger"
+   aria-label="سابقه گزارش‌ها و ساعات">
    <div className="ow-history-heading">
      <div><h2>سوابق گزارش‌ها و ساعات</h2>
-       <p>هر مورد یک گزارش ثبت‌شده است؛ تاریخ نمایش‌داده‌شده تاریخ انجام کار و وضعیت، آخرین وضعیت ثبت‌شده در سامانه است.</p>
+       <p>دفتر پیگیری گزارش‌های ثبت‌شده؛ تاریخ هر ردیف، تاریخ انجام کار است، نه تاریخ رسیدگی مدیر.</p>
      </div>
      <div className="ow-history-approved-total">
-       <span>کل زمان تأییدشده</span><strong>{exactDuration(total)}</strong>
-       <small>براساس جمع سروری، نه صرفاً ردیف‌های فهرست</small>
+       <span>مجموع زمان تأییدشده</span><strong>{exactDuration(total)}</strong>
+       <small>بر اساس مجموع سرور، مستقل از تعداد ردیف‌های فهرست</small>
      </div>
    </div>
    <div className="ow-history-filter" role="group" aria-label="فیلتر وضعیت گزارش‌ها">
      {options.map(([id,label])=><button type="button" key={id}
        className={view===id?'is-selected':''} aria-pressed={view===id}
-       onClick={()=>setView(id)}>
+       onClick={()=>{setSelectedReportId(null);setView(id)}}>
        <span>{label}</span><b>{n(counts[id])}</b>
      </button>)}
    </div>
    <div className="ow-history-results-heading">
-     <h3>{options.find(item=>item[0]===view)?.[1]||'همه گزارش‌ها'}</h3>
-     <span role="status">{n(entries.length)} گزارش</span>
+     <h3>دفتر گزارش‌ها</h3><span role="status">{n(entries.length)} گزارش</span>
    </div>
-   <div className="ow-history-timeline" role="list">
-     {entries.map((entry)=><article className="ow-history-entry" role="listitem" key={entry.id}>
+   <div className={`ow-b3-ledger-body ${detail?'ow-b3-ledger-body--detail':''}`}>
+    <div className="ow-b3-ledger-list" role="list" aria-label="گزارش‌های ثبت‌شده">
+     <div className="ow-b3-ledger-columns" aria-hidden="true">
+       <span>کار / تاریخ انجام</span><span>وضعیت</span>
+       <span>درخواستی</span><span>تأییدشده</span><span>جزئیات</span>
+     </div>
+     {entries.map(entry=><article className="ow-history-entry ow-b3-ledger-row" role="listitem" key={entry.id}>
+       <div className="ow-history-entry__identity">
+         <h4>{entry.title}</h4>
+         <small>{entry.work_date?pretty(entry.work_date):'تاریخ انجام کار نامشخص'}</small>
+       </div>
        <span className={'ow-history-status ow-history-status--'+
          (['submitted','changes_requested','rejected','approved'].includes(entry.review_state)
            ?entry.review_state:'other')}>
          {reviewLabels[entry.review_state]||'وضعیت نامشخص'}
        </span>
-       <div className="ow-history-entry__head">
-         <div className="ow-history-entry__identity">
-           <h4>{entry.title}</h4>
-           <small>{entry.work_date?pretty(entry.work_date):'تاریخ انجام کار نامشخص'}</small>
-         </div>
+       <div className="ow-b3-ledger-value" aria-label="زمان درخواست‌شده">
+         {entry.reported_minutes===null?'ثبت نشده':minutes(entry.reported_minutes)}
        </div>
-       <div className="ow-history-entry__minutes">
-         <div><span>زمان درخواست‌شده</span>
-           <strong>{entry.reported_minutes===null?'ثبت نشده':minutes(entry.reported_minutes)}</strong>
-         </div>
-         <div><span>زمان تأییدشده</span>
-           <strong>{entry.review_state==='approved'
-             ?(entry.approved_minutes===null?'مقدار تأییدشده ثبت نشده':minutes(entry.approved_minutes))
-             :entry.review_state==='rejected'?'تأیید نشد'
-             :entry.review_state==='changes_requested'?'در انتظار اصلاح گزارش'
-             :entry.review_state==='submitted'?'در انتظار بررسی'
-             :'تأییدشده نیست'}</strong>
-         </div>
-       </div>
-       {entry.review_note&&<div className="ow-history-feedback">
-         <strong>نظر مدیر</strong><p>{entry.review_note}</p>
-       </div>}
-       {entry.extra_time_reason_text&&<details className="ow-history-extra">
-         <summary>علت درخواست زمان اضافه</summary><p>{entry.extra_time_reason_text}</p>
-       </details>}
-       {['changes_requested','rejected'].includes(entry.review_state)&&<div className="ow-history-next-step">
-         <p>برای بررسی امکان اصلاح و ارسال دوباره، وضعیت این کار را در «کارها» ببینید.</p>
-         <button type="button" className="report-btn report-btn--light"
-           onClick={()=>onNavigate?.('tasks','action')}>رفتن به کارهای نیازمند اقدام</button>
-       </div>}
+       <div className="ow-b3-ledger-value" aria-label="زمان تأییدشده">{approvalDisplay(entry)}</div>
+       <button type="button" data-report-inspect={entry.id}
+         className="ow-b3-inspect-trigger"
+         aria-expanded={selectedReportId===entry.id}
+         onClick={()=>setSelectedReportId(entry.id)}>جزئیات</button>
      </article>)}
      {!entries.length&&<div className="ow-history-empty" role="status">
        <strong>{view==='all'?'هنوز گزارشی در سوابق ثبت نشده است.':'گزارشی با این وضعیت پیدا نشد.'}</strong>
        <p>وضعیت‌های دیگر را از فیلتر بالا بررسی کنید.</p>
      </div>}
+    </div>
+    {detail&&<aside className="ow-b3-inspector" aria-label="جزئیات گزارش">
+      <div className="ow-b3-inspector-head">
+        <h3>جزئیات گزارش</h3>
+        <button type="button" className="ow-mini-btn" onClick={()=>{
+          setSelectedReportId(null)
+          document.querySelector(`[data-report-inspect="${detail.id}"]`)?.focus()
+        }}>بستن</button>
+      </div>
+      <h4>{detail.title}</h4>
+      <p className="ow-b3-inspector-facts">تاریخ انجام: {detail.work_date?pretty(detail.work_date):'نامشخص'}</p>
+      <p className="ow-b3-inspector-facts">وضعیت: {reviewLabels[detail.review_state]||'نامشخص'}</p>
+      <section><strong>زمان درخواست‌شده</strong><p>{detail.reported_minutes===null?'ثبت نشده':minutes(detail.reported_minutes)}</p>
+        <strong>زمان تأییدشده</strong><p>{approvalDisplay(detail)}</p></section>
+      {detail.review_note&&<section className="ow-b3-inspector-note">
+        <strong>نظر مدیر</strong><p>{detail.review_note}</p></section>}
+      {detail.extra_time_reason_text&&<section>
+        <strong>دلیل ثبت‌شده برای زمان اضافه</strong><p>{detail.extra_time_reason_text}</p></section>}
+      {['changes_requested','rejected'].includes(detail.review_state)&&
+       <section className="ow-history-next-step"><p>برای بررسی امکان اصلاح، به فهرست کارهای نیازمند اقدام بروید.</p>
+        <button type="button" className="report-btn report-btn--light"
+          onClick={()=>onNavigate?.('tasks','action')}>رفتن به کارهای نیازمند اقدام</button>
+       </section>}
+    </aside>}
    </div>
  </section>
 }
