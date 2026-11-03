@@ -45,6 +45,9 @@ const plugin={
   },
   load(id){
     if(id==='\0qa-v2-no-network')return [
+      'export const getLibraryDeskShifts=async()=>{if(globalThis.__qaDeskReadFail)throw Error("FAKE_READ_FAILED");return {ok:true,shifts:globalThis.__qaDeskShifts||[]};};',
+      'export const assignLibraryDeskShift=async args=>{if(!globalThis.__qaPermitDesk)throw Error("QA_NO_BOOKING");(globalThis.__qaDeskCalls??=[]).push(args);return {ok:true};};',
+      'export const cancelLibraryDeskShift=async args=>{if(!globalThis.__qaPermitDeskCancel)throw Error("QA_NO_CANCELLATION");globalThis.__qaDeskCancels.push(args);globalThis.__qaDeskShifts=globalThis.__qaDeskShifts.map(s=>s.id===args.shiftId?{...s,state:"cancelled"}:s);return {ok:true,state:"cancelled"};};',
       'export const getUnitHourTotals=async()=>({scope:"admin",units:[{unit:"library",name:"کتابخانه",approved_minutes:55,pending_requested_minutes:0,pending_reports:0}]});',
       'export const getAdminWorkV2=async()=>globalThis.__qaCapacityData;',
       'export const getMyWorkV2=async()=>globalThis.__qaCapacityData;',
@@ -98,6 +101,12 @@ function Wrapper({start}){
 async function setup({start='tasks',data=sample()}={}){
   globalThis.__qaCapacityData=data
   globalThis.__qaGroupCalls=[]
+  globalThis.__qaDeskCalls=[]
+  globalThis.__qaDeskCancels=[]
+  globalThis.__qaPermitDeskCancel=false
+  globalThis.__qaDeskShifts=[]
+  globalThis.__qaPermitDesk=false
+  globalThis.__qaDeskReadFail=false
   const host=document.createElement('div')
   document.body.append(host)
   const root=createRoot(host)
@@ -229,9 +238,10 @@ test('library desk template requires explicit duration and blocks >2 in one grou
   await act(async()=>template.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
   assert.match(labeledField(host,'عنوان کار').value,/خدمات جاری/)
   assert.match(labeledField(host,'شرح مورد انتظار').value,/ثبت امانت/)
-  assert.equal(labeledField(host,'زمان استاندارد هر نفر').value,'',
-   'daily staffing duration must not be prefilled to 60 minutes')
-  assert.match(host.textContent,/هم‌پوشانی نوبت‌های قبلی/)
+  assert.equal(host.querySelector('.ow-estimate-input'),null,
+   'routine duration is derived from explicit start/end, never a guessed hour')
+  assert.match(host.textContent,/نوبت‌های ثبت‌شده همین روز/)
+  assert.equal(host.querySelector('.ow-desk-duration strong').textContent,'پس از تعیین ساعت')
   const thirdParty=Array.from(host.querySelectorAll('.ow-worker-option-list input[type="checkbox"]'))
   assert.equal(thirdParty.length,3)
   await act(async()=>{
@@ -245,10 +255,52 @@ test('library desk template requires explicit duration and blocks >2 in one grou
   await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
   assert.equal(globalThis.__qaGroupCalls.length,0,'no group task must be created')
   await act(async()=>thirdParty[2].dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-  await fill(labeledField(host,'زمان استاندارد هر نفر'),'180')
-  assert.equal(submit.disabled,false,'two workers with explicit duration are eligible for manual review')
+  const start=host.querySelector('input[aria-label="شروع نوبت کتابخانه"]')
+  const end=host.querySelector('input[aria-label="پایان نوبت کتابخانه"]')
+  await fill(start,'09:00')
+  await fill(end,'12:00')
+  assert.match(host.textContent,/۱۸۰ دقیقه/)
+  assert.equal(submit.disabled,false,'two workers with validated times can be submitted to the desk booking RPC')
   assert.equal(globalThis.__qaGroupCalls.length,0)
+  globalThis.__qaPermitDesk=true
+  await fill(labeledField(host,'علت واگذاری امروز یا فردا'),'آزمایش واگذاری نوبت امروز به دانشجوکارها')
+  await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__qaDeskCalls.length,1)
+  assert.deepEqual(globalThis.__qaDeskCalls[0].workerIds,[worker,'FAKE-B'])
+  assert.equal(globalThis.__qaDeskCalls[0].startMinute,540)
+  assert.equal(globalThis.__qaDeskCalls[0].endMinute,720)
+  assert.equal(globalThis.__qaGroupCalls.length,0,'the generic group RPC must NEVER be called for desk shifts')
  }finally{await teardown()}
+})
+
+test('routine booking fails closed when server shift read fails or the same worker has an overlapping shift',async()=>{
+ const {host,teardown}=await setup()
+ try{
+  const unit=host.querySelector('select[aria-label="واحد انجام کار"]')
+  await act(async()=>{unit.value='library';unit.dispatchEvent(new window.Event('change',{bubbles:true}))})
+  const template=host.querySelector('.ow-library-template-panel button')
+  await act(async()=>template.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  const start=host.querySelector('input[aria-label="شروع نوبت کتابخانه"]')
+  const end=host.querySelector('input[aria-label="پایان نوبت کتابخانه"]')
+  await fill(start,'09:00')
+  await fill(end,'10:00')
+  const submit=host.querySelector('form.ow-assignment-form button[type="submit"]')
+  assert.equal(submit.disabled,false)
+  globalThis.__qaDeskShifts=[{id:'FAKE-SHIFT',worker_id:worker,state:'scheduled',
+    start_minute:540,end_minute:600}]
+  await act(async()=>host.querySelector('.ow-library-template-panel button').dispatchEvent(
+    new window.MouseEvent('click',{bubbles:true})))
+  await fill(host.querySelector('input[aria-label="شروع نوبت کتابخانه"]'),'09:00')
+  await fill(host.querySelector('input[aria-label="پایان نوبت کتابخانه"]'),'10:00')
+  assert.equal(submit.disabled,true,'client must reject clearly conflicting existing shift')
+  globalThis.__qaDeskReadFail=true
+  await act(async()=>host.querySelector('.ow-library-template-panel button').dispatchEvent(
+    new window.MouseEvent('click',{bubbles:true})))
+  assert.match(host.textContent,/دریافت نوبت‌ها ممکن نیست/)
+  assert.equal(submit.disabled,true,'missing RPC blocks the booking path')
+  assert.equal(globalThis.__qaDeskCalls.length,0)
+  assert.equal(globalThis.__qaGroupCalls.length,0)
+ } finally{await teardown()}
 })
 
 test('committed group assignment cannot be submitted twice when post-save refresh fails',async()=>{

@@ -26,3 +26,19 @@ export const assignGroupTask=({workerIds,unit,title,instructions,date,minutes,sh
   p_short_notice_reason:shortNoticeReason||null,
  })
 export const getUnitHourTotals=()=>rpc('ops_get_unit_hour_totals_v1')
+
+// SWTB17: only manager-verified RPCs may create or cancel routine desk shifts.
+// A read failure must fail closed in the editor: never fall back to generic
+// task assignment because it lacks time bounds and concurrent seat checks.
+export const getLibraryDeskShifts=({from,to})=>rpc('ops_get_library_desk_shifts',{
+ p_from:from,p_to:to,
+})
+export const assignLibraryDeskShift=({workerIds,date,startMinute,endMinute,title,instructions,shortNoticeReason})=>
+ rpc('ops_assign_library_desk_shift',{
+  p_worker_ids:workerIds,p_shift_date:date,
+  p_start_minute:startMinute,p_end_minute:endMinute,
+  p_title:title,p_instructions:instructions,
+  p_short_notice_reason:shortNoticeReason||null,
+ })
+export const cancelLibraryDeskShift=({shiftId,reason})=>
+ rpc('ops_cancel_library_desk_shift',{p_shift_id:shiftId,p_reason:reason})
