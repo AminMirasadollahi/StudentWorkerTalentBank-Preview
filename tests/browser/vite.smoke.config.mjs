@@ -4,6 +4,9 @@ import {defineConfig} from 'vite'
 import react from '@vitejs/plugin-react'
 
 const v2=[
+ 'export const getLibraryDeskShifts=async()=>({ok:true,shifts:globalThis.__qaDeskShifts||[]});',
+ 'export const assignLibraryDeskShift=async args=>{if(!globalThis.__qaPermitDesk)throw Error("QA_NO_BOOKING");(globalThis.__qaDeskCalls??=[]).push(args);return {ok:true};};',
+ 'export const cancelLibraryDeskShift=async()=>{throw Error("QA_NO_CANCELLATION")};',
  'export const getUnitHourTotals=async()=>({scope:"worker",units:[{unit:"library",name:"کتابخانه",approved_minutes:0,pending_requested_minutes:30,pending_reports:1},{unit:"public_relations",name:"روابط عمومی و رسانه",approved_minutes:50,pending_requested_minutes:0,pending_reports:0},{unit:"research",name:"پژوهش",approved_minutes:55,pending_requested_minutes:45,pending_reports:1}]});',
  'export const getMyWorkV2=async()=>globalThis.__qaWorkerData;',
  'export const getMyWorkerProfileV2=async()=>({worker_id:"SWTB_CHROMIUM_SYNTHETIC_WORKER",name:"دانشجوکار ساختگی",major:"رشته ساختگی",entry_year:"1405",unit:"library"});',
