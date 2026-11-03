@@ -100,11 +100,21 @@ export function WorkerGuideSpotlight({scope,currentSection,onNavigate,onClose}){
   const target=document.querySelector(elementSelector)
   const observer=typeof ResizeObserver==='function'?new ResizeObserver(scheduled):null
   if(target)observer?.observe(target)
+  // Async profile/hour summaries may mount after the section navigation.
+  // Retry when that specific target appears instead of showing a permanent
+  // "missing element" step. No polling or external service is involved.
+  const missing=(!target&&typeof MutationObserver==='function')
+    ?new MutationObserver(()=>{
+      if(document.querySelector(elementSelector)){missing.disconnect();scheduled()}
+     }):null
+  if(missing)missing.observe(document.getElementById('ow-b3-main')||document.body,
+    {childList:true,subtree:true})
   window.addEventListener('resize',scheduled)
   window.addEventListener('scroll',scheduled,true)
   return()=>{
    cancelAnimationFrame(frame)
    observer?.disconnect()
+   missing?.disconnect()
    window.removeEventListener('resize',scheduled)
    window.removeEventListener('scroll',scheduled,true)
   }
