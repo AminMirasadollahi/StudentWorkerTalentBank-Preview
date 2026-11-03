@@ -1580,3 +1580,37 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-library-template-panel .report-btn {flex:1 1 100%}
  .ow-manager-inbox-heading .report-btn {margin-inline-start:0}
 }
+
+/* SWTB17 — time-bounded library desk coverage, scoped only to manager editor. */
+.ow-desk-shift-editor {margin:.6rem 0;padding:.7rem .85rem;background:#f7fbfa;
+ border:1px solid #cadddf;border-radius:.7rem;display:grid;gap:.6rem}
+.ow-desk-shift-heading,.ow-desk-coverage-heading {
+ display:flex;justify-content:space-between;gap:.4rem 1rem;align-items:center;flex-wrap:wrap
+}
+.ow-desk-shift-heading strong,.ow-desk-coverage-heading strong {font-size:.86rem;color:#174e60}
+.ow-desk-shift-heading span,.ow-desk-coverage-heading span {font-size:.73rem;color:#627e88}
+.ow-desk-clock-fields {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem;align-items:end}
+.ow-desk-clock-fields .report-field {min-width:0;margin:0}
+.ow-desk-clock-fields input[type=time] {width:100%;direction:ltr;text-align:center;
+ font:inherit;font-variant-numeric:tabular-nums}
+.ow-desk-duration {display:grid;gap:.4rem;border:1px solid #d5e5e5;
+ border-radius:.55rem;padding:.5rem .65rem;background:#fff;min-height:4.2rem}
+.ow-desk-duration small {font-size:.72rem;color:#607987}
+.ow-desk-duration strong {font-size:.86rem;color:#11756b}
+.ow-desk-coverage {display:grid;gap:.5rem}
+.ow-desk-coverage p {margin:0;line-height:1.8;font-size:.77rem}
+.ow-desk-coverage .ow-capacity-warning {display:flex;align-items:center;gap:.6rem;
+ flex-wrap:wrap;line-height:1.8;font-size:.8rem}
+.ow-desk-bookings {list-style:none;margin:0;padding:0;display:grid;gap:.3rem;
+ max-height:10.5rem;overflow-y:auto}
+.ow-desk-bookings li {display:flex;justify-content:space-between;gap:.45rem 1rem;
+ border:1px solid #e0eaec;border-radius:.48rem;padding:.4rem .6rem;background:#fff;
+ font-size:.78rem;color:#335a6a}
+.ow-desk-bookings li span:first-child {direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+.ow-desk-cover-ok,.ow-desk-cover-block {border-radius:.5rem;padding:.5rem .7rem}
+.ow-desk-cover-ok {background:#e9f7f0;color:#12644f}
+.ow-desk-cover-block {background:#fff2e5;color:#985018}
+@media(max-width:680px){
+ .ow-desk-clock-fields {grid-template-columns:repeat(2,minmax(0,1fr))}
+ .ow-desk-duration {grid-column:1/-1;min-height:0}
+}
