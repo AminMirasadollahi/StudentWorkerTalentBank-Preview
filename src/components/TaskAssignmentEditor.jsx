@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react'
 import JalaliDatePicker from './JalaliDatePicker'
 import {assignWorkerTask} from '../lib/operations'
-import {assignGroupTask,assignLibraryDeskShift,getLibraryDeskShifts} from '../lib/operationsV2'
+import {assignGroupTask,assignLibraryDeskShift,cancelLibraryDeskShift,getLibraryDeskShifts} from '../lib/operationsV2'
 import {assessAssignmentCapacity} from '../lib/assignmentCapacity.mjs'
 import {LIBRARY_DESK_TEMPLATE,canDraftLibraryDeskGroup} from '../lib/libraryDeskTemplate.mjs'
 import {deskInterval,minuteClock,projectDeskCoverage,visibleDeskShifts} from '../lib/libraryDeskShifts.mjs'
@@ -28,6 +28,10 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const [deskEnd,setDeskEnd]=useState('')
  const [deskRevision,setDeskRevision]=useState(0)
  const [deskRead,setDeskRead]=useState({date:'',state:'idle',shifts:[]})
+ const [cancelDraft,setCancelDraft]=useState(null)
+ const [cancelBusy,setCancelBusy]=useState(false)
+ const [cancelError,setCancelError]=useState('')
+ const cancelLock=useRef(false)
  const submitLock=useRef(false)
  const [reason,setReason]=useState('')
  const [busy,setBusy]=useState(false)
@@ -44,6 +48,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const deskCoverage=projectDeskCoverage(
    deskRead.shifts,selected.map(w=>w.id),
    interval?.startMinute,interval?.endMinute)
+ useEffect(()=>{setCancelDraft(null);setCancelError('')},[date])
  const deskCanSubmit=!libraryTemplateSelected||
    (deskVerified&&interval!==null&&deskCoverage.allowed)
  useEffect(()=>{
@@ -83,7 +88,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const toggle=id=>setWorkerIds(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id])
  const submit=async event=>{
   event.preventDefault()
-  if(submitLock.current||busy||committed||!Object.hasOwn(unitNames,taskUnit)||
+  if(submitLock.current||cancelLock.current||busy||committed||!Object.hasOwn(unitNames,taskUnit)||
     selected.length===0||selected.length!==workerIds.length||date<localToday()||
     !routineGroupOk||!estimateValid||!deskCanSubmit)return
   submitLock.current=true
@@ -135,6 +140,31 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
         'واگذاری انجام نشد. اطلاعات را بررسی کنید؛ انتخاب‌ها و توضیحات حفظ شده‌اند.')
     if(libraryTemplateSelected)setDeskRevision(v=>v+1)
   } finally{submitLock.current=false;setBusy(false)}
+ }
+ const confirmCancel=async shiftId=>{
+  const draft=cancelDraft
+  const reasonText=String(draft?.reason||'').trim()
+  if(!deskVerified||busy||cancelLock.current||!draft||
+     draft.id!==shiftId||reasonText.length<5||reasonText.length>500)return
+  cancelLock.current=true;setCancelBusy(true);setCancelError('')
+  try{
+   const result=await cancelLibraryDeskShift({shiftId,reason:reasonText})
+   if(result?.ok!==true)throw Error('shift_cancel_not_confirmed')
+   setCancelDraft(null)
+   setNotice('نوبت و وظیفه مرتبط لغو شدند؛ ظرفیت آزادشده پس از بازخوانی نمایش داده می‌شود.')
+   setDeskRevision(v=>v+1)
+   // Database commit already succeeded; failure to refresh parent is not a
+   // cancellation error and must never retry the mutation.
+   try{await onSaved?.()}catch{/* retry a read, never the cancellation */}
+  }catch(err){
+   const message=String(err?.message||'')
+   setCancelError(message.includes('reported_or_started_shift_cannot_be_cancelled')?
+    'این نوبت شروع شده یا گزارش دارد و از این مسیر قابل لغو نیست.':
+    message.includes('shift_not_available')?
+    'نوبت قبلاً لغو شده یا دیگر برای لغو در دسترس نیست.':
+    'تأیید لغو دریافت نشد؛ فهرست نوبت‌ها را بازخوانی و پیش از اقدام دوباره بررسی کنید.')
+   setDeskRevision(v=>v+1)
+  }finally{cancelLock.current=false;setCancelBusy(false)}
  }
  const options=workers.filter(w=>w.state==='active'&&
   (w.name||'').toLocaleLowerCase('fa-IR').includes(filter.toLocaleLowerCase('fa-IR')))
@@ -231,11 +261,36 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
         {visibleDeskShifts(deskRead.shifts).length===0?
           <p className="ow-muted">هنوز نوبتی برای این روز ثبت نشده است.</p>:
           <ul className="ow-desk-bookings">
-            {visibleDeskShifts(deskRead.shifts).map(s=><li key={s.id}>
-              <span>{minuteClock(s.start_minute)} تا {minuteClock(s.end_minute)}</span>
+            {visibleDeskShifts(deskRead.shifts).map(s=><li key={s.id} className="ow-desk-booking">
+              <span>{clockFa(s.start_minute)} تا {clockFa(s.end_minute)}</span>
               <span>{workers.find(w=>w.id===s.worker_id)?.name||'دانشجوکار'}</span>
+              <button type="button" className="ow-desk-cancel-trigger"
+                aria-expanded={cancelDraft?.id===s.id} disabled={cancelBusy||busy}
+                onClick={()=>{setCancelError('');setCancelDraft(prev=>
+                  prev?.id===s.id?null:{id:s.id,reason:''})}}>
+                لغو نوبت
+              </button>
+              {cancelDraft?.id===s.id&&<div className="ow-desk-cancel-confirm">
+                <label className="report-field"><span>علت لغو (الزامی، حداقل ۵ حرف)</span>
+                  <input type="text" maxLength={500} aria-label="علت لغو نوبت"
+                    value={cancelDraft.reason} onChange={e=>
+                      setCancelDraft(prev=>prev?.id===s.id?{...prev,reason:e.target.value}:prev)}
+                    placeholder="دلیل لغو را ثبت کنید"/>
+                </label>
+                <small>تنها نوبت‌های فاقد شروع کار یا گزارش قابل لغو هستند.</small>
+                <div className="ow-desk-cancel-actions">
+                  <button type="button" className="report-btn report-btn--light"
+                    disabled={cancelBusy} onClick={()=>setCancelDraft(null)}>بازگشت</button>
+                  <button type="button" className="report-btn report-btn--primary"
+                    disabled={cancelBusy||cancelDraft.reason.trim().length<5}
+                    onClick={()=>{void confirmCancel(s.id)}}>
+                    {cancelBusy?'در حال لغو…':'تأیید لغو نوبت'}
+                  </button>
+                </div>
+              </div>}
             </li>)}
           </ul>}
+        {cancelError&&<p className="ow-capacity-warning" role="alert">{cancelError}</p>}
         <p className="ow-desk-coverage-limit">این ظرفیت فقط نوبت‌های مصوبِ ثبت‌شده در همین قالب را نشان می‌دهد؛ سایر وظایف و برنامه حضور باید جداگانه هماهنگ شوند.</p>
         {interval&&<p className={deskCoverage.allowed?'ow-desk-cover-ok':'ow-desk-cover-block'}>
           {deskCoverage.workerOverlap?
@@ -285,7 +340,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
   <div className="ow-actions">
     {onClose&&<button type="button" className="report-btn report-btn--light" onClick={onClose}>انصراف</button>}
     <button type="submit" className="report-btn report-btn--primary"
-      disabled={busy||committed||!Object.hasOwn(unitNames,taskUnit)||!selected.length||selected.length!==workerIds.length||date<localToday()||!routineGroupOk||!estimateValid||!deskCanSubmit}>
+      disabled={busy||cancelBusy||committed||!Object.hasOwn(unitNames,taskUnit)||!selected.length||selected.length!==workerIds.length||date<localToday()||!routineGroupOk||!estimateValid||!deskCanSubmit}>
       {busy?'در حال ثبت…':selected.length>1?'واگذاری گروهی':'واگذاری کار'}
     </button>
   </div>
