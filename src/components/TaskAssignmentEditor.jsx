@@ -262,7 +262,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
         </div>
         {visibleDeskShifts(deskRead.shifts).length===0?
           <p className="ow-muted">هنوز نوبتی برای این روز ثبت نشده است.</p>:
-          <ul className="ow-desk-bookings">
+          <ul className={cancelDraft?'ow-desk-bookings ow-desk-bookings--editing':'ow-desk-bookings'}>
             {visibleDeskShifts(deskRead.shifts).map(s=><li key={s.id} className="ow-desk-booking">
               <span>{clockFa(s.start_minute)} تا {clockFa(s.end_minute)}</span>
               <span>{workers.find(w=>w.id===s.worker_id)?.name||'دانشجوکار'}</span>
