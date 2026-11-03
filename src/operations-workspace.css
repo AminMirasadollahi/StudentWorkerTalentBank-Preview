@@ -69,6 +69,19 @@
 .ow-standard-credit small { color:var(--report-muted); font-size:0.72rem; line-height:1.7; }
 .ow-extra-toggle { padding:0.58rem 0.72rem; border:1px dashed #77b6b0;
  background:#f3faf9; border-radius:0.65rem; cursor:pointer; }
+/* Inline, optional explanation: information never toggles the extra-time checkbox. */
+.ow-extra-toggle-row {display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .55rem;margin:.5rem 0}
+.ow-extra-toggle-row .ow-extra-toggle {margin:0;flex:0 1 auto}
+.ow-extra-help-trigger {font:inherit;display:inline-flex;align-items:center;gap:.32rem;
+ min-height:2.15rem;padding:.25rem .6rem;cursor:pointer;
+ border-radius:.5rem;border:1px solid #cee2e5;background:#fff;color:#116e70;
+ font-size:.76rem;font-weight:700}
+.ow-extra-help-trigger span[aria-hidden] {font-size:1.1rem;line-height:1}
+.ow-extra-help-trigger:hover,.ow-extra-help-trigger[aria-expanded="true"] {background:#e7f6f3}
+.ow-extra-help-trigger:focus-visible {outline:3px solid #258d87;outline-offset:2px}
+.ow-extra-help-note:not([hidden]) {flex:1 0 100%;margin:.15rem 0 .2rem;padding:.65rem .8rem;
+ border:1px solid #c7e0e1;border-radius:.55rem;background:#f5fbfb;color:#385765;
+ line-height:1.9;font-size:.77rem}
 .ow-extra-panel { padding:0.7rem 0.8rem; border:1px solid #bedbd6; border-radius:0.7rem;
  background:#f6fbfa; }
 .ow-extra-panel .ow-fields { margin:0.6rem 0; }
