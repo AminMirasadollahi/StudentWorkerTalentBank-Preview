@@ -1858,6 +1858,37 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   },[inspectedTask?.id])
   const sectionNames={tasks:'کارهای من',availability:'زمان حضور',
     history:'سوابق گزارش‌ها',profile:'حساب من'}
+  // Offer once per authenticated worker/version only after an authorized read.
+  useEffect(()=>{
+    if(guideOfferedFor.current===profile.worker_id||loading||readFailed||
+      workSnapshot.workerId!==profile.worker_id||settingsOpen)return
+    guideOfferedFor.current=profile.worker_id
+    const key=workerGuideStorageKey(profile.worker_id)
+    try{if(key&&window.localStorage.getItem(key)==='seen')return}catch{}
+    if(typeof HTMLDialogElement!=='undefined'&&typeof HTMLDialogElement.prototype.showModal==='function')
+      setGuideWelcomeOpen(true)
+  },[profile.worker_id,workSnapshot.workerId,loading,readFailed,settingsOpen])
+  const rememberGuideOffer=()=>{
+    const key=workerGuideStorageKey(profile.worker_id)
+    try{if(key)window.localStorage.setItem(key,'seen')}catch{}
+  }
+  const openWorkerGuide=scope=>{
+    rememberGuideOffer()
+    setGuideWelcomeOpen(false)
+    setSelectedTaskId(null)
+    guideReturnSection.current=section
+    if(settingsOpen)onToggleSettings?.()
+    updateNavigation({section:scope==='all'?'tasks':scope})
+    setGuideScope(scope)
+  }
+  const closeWorkerGuide=()=>{
+    const previousScope=guideScope
+    setGuideScope(null)
+    updateNavigation({section:guideReturnSection.current})
+    requestAnimationFrame(()=>document.querySelector(
+      `[data-swtb-guide="help-${previousScope==='all'?'global':previousScope}"]`
+    )?.focus({preventScroll:true}))
+  }
   const emptyText={
     action:'اکنون کاری که نیازمند اقدام شما باشد وجود ندارد.',
     pending:'گزارش منتظر بررسی در فهرست کارها وجود ندارد.',
@@ -1887,6 +1918,11 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         ['tasks','کارهای من'],['availability','زمان حضور'],['history','سوابق گزارش‌ها'],['profile','حساب من'],
       ]}/>
       <div className="ow-b3-sidebar__footer">
+        <button type="button" className="swtb-guide-launch" data-swtb-guide="help-global"
+          title="راهنمای تصویری سامانه" aria-label="راهنمای سامانه"
+          onClick={()=>openWorkerGuide('all')}>
+          <span aria-hidden="true">؟</span>{!sidebarCollapsed&&' راهنمای سامانه'}
+        </button>
         <div className="ow-b3-worker" title={workerName}>
           <span className="ow-b3-worker__avatar" aria-hidden="true">{workerName?.trim()?.[0]||'د'}</span>
           {!sidebarCollapsed&&<div><strong>{workerName}</strong>
@@ -1939,9 +1975,13 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         <div><h1>کارهای من</h1>
           <p>ابتدا کارهایی که نیاز به اقدام شما دارند؛ سایر وضعیت‌ها و برنامهٔ زمانی در دسترس‌اند.</p>
         </div>
-        <span className="ow-b3-current-count">{n(tasks.length)} کار در فهرست</span>
+        <div className="ow-b3-guide-heading">
+          <span className="ow-b3-current-count">{n(tasks.length)} کار در فهرست</span>
+          <button type="button" className="swtb-guide-launch" data-swtb-guide="help-tasks"
+            onClick={()=>openWorkerGuide('tasks')}>؟ راهنمای این بخش</button>
+        </div>
       </div>
-      <div className="ow-worker-focus-switch" role="group" aria-label="وضعیت کارهای من">
+      <div className="ow-worker-focus-switch" data-swtb-guide="tasks-status" role="group" aria-label="وضعیت کارهای من">
         {focusOptions.map(([id,title])=>
           <button type="button" key={id} aria-current={taskView===id?'true':undefined}
             className={taskView===id?'is-selected':''}
@@ -1972,7 +2012,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         <span className="ow-worker-results-count" role="status">{n(visible.length)} کار</span>
       </div>
       <div className={`ow-b3-task-body ${inspectedTask?'ow-b3-task-body--inspecting':''}`}>
-      <div className="ow-list ow-worker-tasks">
+      <div className="ow-list ow-worker-tasks" data-swtb-guide="tasks-list">
         {visible.map(t=><WorkerTaskCard key={t.id} task={t} onSaved={refresh}
           onInspect={()=>setSelectedTaskId(t.id)}
           inspected={selectedTaskId===t.id}
@@ -2014,18 +2054,29 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       </div>
     </section>}
     {!settingsOpen&&section==='availability'&&<section className="report-panel">
-      <h2>برنامه حضور</h2>
+      <div className="ow-b3-guide-heading">
+        <h2>برنامه حضور</h2>
+        <button type="button" className="swtb-guide-launch" data-swtb-guide="help-availability"
+          onClick={()=>openWorkerGuide('availability')}>؟ راهنمای این بخش</button>
+      </div>
       <ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
     </section>}
     {!settingsOpen&&section==='history'&&<WorkerReportHistory tasks={tasks} records={records}
-      refreshRevision={refreshRevision} approvedMinutesTotal={data.approved_minutes_total}
+      onGuide={openWorkerGuide} refreshRevision={refreshRevision} approvedMinutesTotal={data.approved_minutes_total}
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}/>}
     {!settingsOpen&&section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}
-      requestLedger={acknowledgedActions.current.profileRequests}
+      onGuide={openWorkerGuide} requestLedger={acknowledgedActions.current.profileRequests}
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}
       approvedMinutesTotal={data.approved_minutes_total} refreshRevision={refreshRevision}/>}
     </div>
+    {guideWelcomeOpen&&<WorkerGuideWelcome
+      onBegin={()=>openWorkerGuide('all')}
+      onSkip={()=>{rememberGuideOffer();setGuideWelcomeOpen(false)}}/>}
+    {guideScope&&<WorkerGuideSpotlight key={guideScope} scope={guideScope}
+      currentSection={section}
+      onNavigate={next=>updateNavigation({section:next})}
+      onClose={closeWorkerGuide}/>}
   </div>
 }
