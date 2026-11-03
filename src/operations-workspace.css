@@ -1551,3 +1551,32 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-worker-workspace .ow-b3-ledger-body--detail .ow-b3-ledger-row
  .ow-history-entry__identity {grid-column:1/-1}
 }
+
+/* SWTB15: manager first-use affordances; no change to worker panel. */
+.ow-library-template-panel {
+ display:flex;align-items:center;flex-wrap:wrap;gap:.45rem .8rem;
+ padding:.65rem .8rem;margin:0 0 .55rem;
+ border:1px solid #c4ddd9;border-radius:.68rem;background:#f5fbf9;
+}
+.ow-library-template-panel > div:first-child {display:grid;gap:.13rem;flex:1 1 16rem;min-width:0}
+.ow-library-template-panel strong {font-size:.86rem;color:#145b59}
+.ow-library-template-panel small {color:#5a7380;font-size:.76rem;line-height:1.7}
+.ow-library-template-panel .report-btn {flex:0 1 auto;margin:0;font-size:.77rem}
+.ow-library-template-advisory {flex:1 0 100%;margin:.25rem 0 0;
+ font-size:.76rem;line-height:1.8;color:#335c64}
+.ow-summary--actionable article {padding:0;overflow:hidden}
+.ow-summary--actionable article:not(:has(button)) {padding:.5rem .65rem}
+.ow-manager-kpi-action {display:grid;justify-items:start;text-align:start;gap:.12rem;
+ width:100%;height:100%;border:0;background:transparent;cursor:pointer;
+ padding:.5rem .65rem;font:inherit;color:inherit}
+.ow-manager-kpi-action:hover {background:#eaf7f5}
+.ow-manager-kpi-action:focus-visible {outline:3px solid #278f89;outline-offset:-3px}
+.ow-manager-kpi-action span {font-size:.73rem;color:var(--report-muted)}
+.ow-manager-kpi-action b {font-size:1.04rem;color:var(--report-navy);margin:.05rem 0}
+.ow-manager-kpi-action small {font-size:.68rem;color:#24756e}
+.ow-manager-inbox-heading {display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}
+.ow-manager-inbox-heading .report-btn {margin-inline-start:auto}
+@media(max-width:650px) {
+ .ow-library-template-panel .report-btn {flex:1 1 100%}
+ .ow-manager-inbox-heading .report-btn {margin-inline-start:0}
+}
