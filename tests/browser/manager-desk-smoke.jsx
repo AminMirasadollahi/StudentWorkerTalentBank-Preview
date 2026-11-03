@@ -2,6 +2,7 @@
 import React from 'react'
 import {createRoot} from 'react-dom/client'
 import TaskAssignmentEditor from '../../src/components/TaskAssignmentEditor.jsx'
+import '../../src/operations-workspace.css'
 import '../../src/report.css'
 import '../../src/ops.css'
 import '../../src/typography.css'
