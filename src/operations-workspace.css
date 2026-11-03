@@ -1597,6 +1597,7 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  border-radius:.55rem;padding:.5rem .65rem;background:#fff;min-height:4.2rem}
 .ow-desk-duration small {font-size:.72rem;color:#607987}
 .ow-desk-duration strong {font-size:.86rem;color:#11756b}
+.ow-desk-duration span {font-size:.72rem;color:#365f69}
 .ow-desk-coverage {display:grid;gap:.5rem}
 .ow-desk-coverage p {margin:0;line-height:1.8;font-size:.77rem}
 .ow-desk-coverage .ow-capacity-warning {display:flex;align-items:center;gap:.6rem;
