@@ -4,6 +4,7 @@
  */
 import {useEffect,useLayoutEffect,useRef,useState} from 'react'
 import {getWorkerGuideSteps} from './lib/workerGuide.mjs'
+import {trapModalTab} from './lib/dialogFocusTrap.mjs'
 import './worker-guide.css'
 
 function openModal(node){
@@ -28,7 +29,7 @@ export function WorkerGuideWelcome({onBegin,onSkip}){
   return()=>closeModal(modal.current)
  },[])
  return <dialog className="swtb-guide-welcome" ref={modal} dir="rtl"
-   aria-labelledby="swtb-guide-welcome-title"
+   aria-labelledby="swtb-guide-welcome-title" onKeyDown={trapModalTab}
    onCancel={e=>{e.preventDefault();onSkip()}}>
    <div className="swtb-guide-welcome__eyebrow">راهنمای آغاز کار</div>
    <h2 id="swtb-guide-welcome-title" tabIndex={-1}>به پنل دانشجوکار خوش آمدید</h2>
@@ -143,6 +144,7 @@ export function WorkerGuideSpotlight({scope,currentSection,onNavigate,onClose}){
    aria-labelledby="swtb-guide-step-title"
    onCancel={event=>{event.preventDefault();onClose()}}
    onKeyDown={event=>{
+    trapModalTab(event)
     // In RTL, left arrow follows the visual forward direction.
     if(event.target?.tagName==='BUTTON')return
     if(event.key==='ArrowLeft'){event.preventDefault();if(!last)move(1)}
