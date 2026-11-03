@@ -110,14 +110,17 @@ export function WorkerGuideSpotlight({scope,currentSection,onNavigate,onClose}){
   }
  },[scope,index,activeSection,currentSection,elementSelector])
  useLayoutEffect(()=>{
-  if(activeSection!==currentSection)return
+  if(activeSection!==currentSection||!layout?.cut&&!layout?.missing)return
   heading.current?.focus({preventScroll:true})
- },[index,activeSection,currentSection,layout?.missing])
+ },[index,activeSection,currentSection,Boolean(layout?.cut),Boolean(layout?.missing)])
  if(!active)return null
  const last=index===steps.length-1
- const mask=layout?.cut
-   ?`M0 0H${layout.vw}V${layout.vh}H0Z M${layout.cut.x} ${layout.cut.y}h${layout.cut.w}v${layout.cut.h}h-${layout.cut.w}Z`
-   :`M0 0H${layout?.vw||0}V${layout?.vh||0}H0Z`
+ const viewportWidth=layout?.vw||window.innerWidth
+ const viewportHeight=layout?.vh||window.innerHeight
+ const ready=activeSection===currentSection&&Boolean(layout?.cut||layout?.missing)
+ const mask=ready&&layout?.cut
+   ?`M0 0H${viewportWidth}V${viewportHeight}H0Z M${layout.cut.x} ${layout.cut.y}h${layout.cut.w}v${layout.cut.h}h-${layout.cut.w}Z`
+   :`M0 0H${viewportWidth}V${viewportHeight}H0Z`
  const move=delta=>{
   const next=clamp(index+delta,0,steps.length-1)
   if(next===index)return
@@ -136,13 +139,13 @@ export function WorkerGuideSpotlight({scope,currentSection,onNavigate,onClose}){
     if(event.key==='ArrowRight'){event.preventDefault();move(-1)}
    }}>
    <svg aria-hidden="true" className="swtb-guide-shade"
-     width={layout?.vw||'100%'} height={layout?.vh||'100%'}
-     viewBox={`0 0 ${layout?.vw||1} ${layout?.vh||1}`}>
+     width={viewportWidth} height={viewportHeight}
+     viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}>
      <path d={mask} fillRule="evenodd" fill="rgba(10,32,45,.66)"/>
    </svg>
-   <section className="swtb-guide-popover"
-     style={layout?.missing?{left:'50%',top:'50%',transform:'translate(-50%,-50%)'}
-      :{left:layout?.left??12,top:layout?.top??12,width:layout?.pw??356}}
+   <section className="swtb-guide-popover" data-guide-ready={ready?'true':'false'}
+     style={layout?.missing?{left:'50%',top:'50%',transform:'translate(-50%,-50%)',visibility:ready?'visible':'hidden'}
+      :{left:layout?.left??12,top:layout?.top??12,width:layout?.pw??356,visibility:ready?'visible':'hidden'}}
      aria-label="مرحله راهنما">
      <div className="swtb-guide-popover__top">
        <span>راهنمای {scope==='all'?'سامانه':'این بخش'}</span>
