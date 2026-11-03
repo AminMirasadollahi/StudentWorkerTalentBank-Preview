@@ -907,11 +907,24 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   </div>
 
   return <div className="ow-workspace">
-    <div className="ow-summary">
-      <article><span>دانشجوکار فعال</span><b>{n(active.length)}</b></article>
-      <article><span>کار برنامه‌ریزی‌شده امروز</span><b>{n(todayTasks.length)}</b></article>
-      <article><span>گزارش منتظر تأیید</span><b>{n(pending.length)}</b></article>
-      <article><span>کل ساعات تأییدشده</span><b>{exactDuration(approvedMinutes)}</b></article>
+    <div className="ow-summary ow-summary--actionable">
+      <article><button type="button" className="ow-manager-kpi-action"
+        onClick={()=>setView('profiles')} aria-label="نمایش پرونده‌های دانشجوکارها">
+        <span>دانشجوکار فعال</span><b>{n(active.length)}</b>
+        <small>مشاهده پرونده‌ها</small>
+      </button></article>
+      <article><button type="button" className="ow-manager-kpi-action"
+        onClick={()=>setView('tasks')} aria-label="رفتن به فهرست و واگذاری کارها">
+        <span>کار برنامه‌ریزی‌شده امروز</span><b>{n(todayTasks.length)}</b>
+        <small>مدیریت کارها</small>
+      </button></article>
+      <article><button type="button" className="ow-manager-kpi-action"
+        onClick={()=>setView('approvals')} aria-label="رفتن به صف بررسی گزارش‌های ساعات">
+        <span>گزارش منتظر تأیید</span><b>{n(pending.length)}</b>
+        <small>رسیدگی به گزارش‌ها</small>
+      </button></article>
+      <article><span>مجموع ساعات تأییدشده · همه دوره‌ها</span>
+        <b>{exactDuration(approvedMinutes)}</b></article>
     </div>
     <SectionTabs value={view} onChange={setView} options={[
       ['inbox','کارتابل'],['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],['profiles','پروفایل‌ها'],
@@ -920,9 +933,11 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     <Message error={error} notice={notice}/>
 
     {view==='inbox'&&<section className="report-panel">
-      <div className="ow-presence-section-title">
+      <div className="ow-presence-section-title ow-manager-inbox-heading">
         <h2>کارتابل رسیدگی</h2>
         <small>{n(pending.length)} گزارش · {n(pendingProfileChanges.length)} درخواست اصلاح</small>
+        <button type="button" className="report-btn report-btn--light"
+          onClick={()=>setView('tasks')}>+ واگذاری کار جدید</button>
       </div>
       {pending.length===0&&pendingProfileChanges.length===0&&
         <p className="ow-muted">درخواستی برای رسیدگی وجود ندارد.</p>}
