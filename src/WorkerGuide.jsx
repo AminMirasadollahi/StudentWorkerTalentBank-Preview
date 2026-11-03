@@ -155,7 +155,7 @@ export function WorkerGuideSpotlight({scope,currentSection,onNavigate,onClose}){
      viewBox={`0 0 ${viewportWidth} ${viewportHeight}`}>
      <path d={mask} fillRule="evenodd" fill="rgba(10,32,45,.66)"/>
    </svg>
-   <section className="swtb-guide-popover" data-guide-ready={ready?'true':'false'}
+   <section key={`${scope}-${index}`} className="swtb-guide-popover" data-guide-ready={ready?'true':'false'}
      style={layout?.missing?{left:'50%',top:'50%',transform:'translate(-50%,-50%)',visibility:ready?'visible':'hidden'}
       :{left:layout?.left??12,top:layout?.top??12,width:layout?.pw??356,visibility:ready?'visible':'hidden'}}
      aria-label="مرحله راهنما">
