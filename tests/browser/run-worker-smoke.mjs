@@ -325,8 +325,11 @@ try{
    await page.locator('[data-swtb-guide="help-'+scope+'"]').click()
    const tour=page.locator('dialog.swtb-guide-spotlight')
    await tour.waitFor({state:'visible'})
-   assert.ok((await tour.locator('.swtb-guide-progress').innerText()).includes('از 3'))
+   await page.waitForFunction(()=>document.querySelector('.swtb-guide-popover')?.dataset.guideReady==='true')
+   assert.ok((await tour.locator('.swtb-guide-progress').innerText()).includes('از 3'),
+     'local scope '+scope+' must have exactly three guided steps')
    await tour.getByRole('button',{name:'بعدی'}).click()
+   await page.waitForFunction(()=>document.querySelector('.swtb-guide-popover')?.dataset.guideReady==='true')
    assert.ok((await tour.locator('.swtb-guide-progress').innerText()).includes('مرحله 2 از 3'))
    await page.keyboard.press('Escape')
    assert.equal(await tour.count(),0)
