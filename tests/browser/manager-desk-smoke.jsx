@@ -18,6 +18,8 @@ const workers=[
 globalThis.__qaDeskShifts=[{id:'SYNTH-SHIFT-01',task_id:'SYNTH-TASK-01',
  worker_id:'SYNTH-B',state:'scheduled',shift_date:today,start_minute:780,end_minute:900}]
 globalThis.__qaDeskCalls=[]
+globalThis.__qaDeskCancels=[]
+globalThis.__qaPermitDeskCancel=true
 globalThis.__qaPermitDesk=false
 globalThis.__qaWriteAttempts=0
 createRoot(document.getElementById('root')).render(
