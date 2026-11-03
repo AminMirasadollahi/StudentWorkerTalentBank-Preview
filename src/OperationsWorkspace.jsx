@@ -1364,14 +1364,26 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
         <textarea maxLength={2000} rows={2} value={note} onChange={e=>setNote(e.target.value)}
           placeholder="مثلاً تعداد منابع ثبت‌شده یا نتیجه کار"/>
       </label>
-      <label className="ow-checkbox ow-extra-toggle">
-        <input type="checkbox" checked={requestExtra} onChange={e=>{
-          const checked=e.target.checked
-          setRequestExtra(checked)
-          if(!checked){setRequested(String(standard));setReasonCode('');setReasonText('')}
-        }}/>
-        درخواست زمان بیشتر
-      </label>
+      <div className="ow-extra-toggle-row">
+        <label className="ow-checkbox ow-extra-toggle">
+          <input type="checkbox" checked={requestExtra} onChange={e=>{
+            const checked=e.target.checked
+            setRequestExtra(checked)
+            if(!checked){setRequested(String(standard));setReasonCode('');setReasonText('')}
+          }}/>
+          درخواست زمان بیشتر
+        </label>
+        <details className="ow-extra-help">
+          <summary title="راهنمای درخواست زمان بیشتر">
+            <span aria-hidden="true">ⓘ</span>
+            <span className="ow-extra-help-label">چه زمانی؟</span>
+          </summary>
+          <p>فقط وقتی زمان استاندارد برای انجام همین کار کافی نبوده است، این گزینه را انتخاب کنید؛
+          مثلاً حجم واقعی کار یا مانع پیش‌بینی‌نشده باعث طولانی‌شدن آن شده باشد.
+          زمان کل موردنیاز و علت را وارد کنید. زمان اضافه صرفاً پس از بررسی و تأیید مدیر منظور می‌شود؛
+          حضور در محل به‌تنهایی دلیل درخواست زمان بیشتر نیست.</p>
+        </details>
+      </div>
       {requestExtra&&<div className="ow-extra-panel">
         <p>مجموع زمان و علت افزایش را وارد کنید؛ تأیید نهایی با مدیر است.</p>
         <div className="ow-fields ow-fields--two">
