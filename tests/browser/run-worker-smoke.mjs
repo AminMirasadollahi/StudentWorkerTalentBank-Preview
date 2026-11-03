@@ -37,6 +37,17 @@ try{
  })
  await page.goto('http://127.0.0.1:4177/tests/browser/worker-smoke.html',{waitUntil:'domcontentloaded'})
  await page.locator('.ow-worker-report-trigger').first().waitFor({state:'visible'})
+ await check('SWTB13 optional first-login welcome is accessible and skippable',async()=>{
+  const welcome=page.locator('dialog.swtb-guide-welcome')
+  await welcome.waitFor({state:'visible'})
+  assert.equal(await welcome.evaluate(node=>node.matches(':modal')),true)
+  assert.ok((await welcome.innerText()).includes('پنل دانشجوکار'))
+  await page.screenshot({path:resolve(output,'07-guide-first-login-welcome.png')})
+  await welcome.getByRole('button',{name:'فعلاً نه'}).click()
+  assert.equal(await page.locator('dialog.swtb-guide-welcome').count(),0)
+  const state=await page.evaluate(()=>localStorage.getItem('swtb-worker-guide:v1:SWTB_CHROMIUM_SYNTHETIC_WORKER'))
+  assert.equal(state,'seen')
+ })
  await check('SWTB9 settings live in B3 content column rather than above whole viewport',async()=>{
    await page.getByRole('button',{name:'تنظیمات حساب'}).click()
    const stage=page.locator('.ow-b3-stage')
@@ -266,6 +277,65 @@ try{
   assert.equal(await page.evaluate(()=>window.__qaWriteAttempts),0,
     'browser fixture must never issue a write, even to mock storage')
   assert.equal(blocked,0,'browser fixture must never attempt external network requests')
+ })
+ await check('SWTB13 full guide follows all existing sections without stateful actions',async()=>{
+  await page.locator('[data-swtb-guide="help-global"]').click()
+  const tour=page.locator('dialog.swtb-guide-spotlight')
+  await tour.waitFor({state:'visible'})
+  assert.ok(await matchesModal('dialog.swtb-guide-spotlight'))
+  assert.equal(await page.locator('dialog.ow-worker-report-dialog:modal').count(),0)
+  const anchors=[
+   'nav-tasks','tasks-status','tasks-list',
+   'nav-availability','availability-week','availability-month',
+   'nav-history','history-summary','history-controls',
+   'nav-profile','profile-details','profile-correction',
+  ]
+  for(let i=0;i<anchors.length;i++){
+   await page.waitForFunction(anchor=>{
+    const popup=document.querySelector('.swtb-guide-popover')
+    return popup?.offsetWidth>0 && !!document.querySelector('[data-swtb-guide="'+anchor+'"]')
+      && document.querySelector('dialog.swtb-guide-spotlight')?.matches(':modal')
+   },anchors[i])
+   const progress=(await tour.locator('.swtb-guide-progress').innerText()).trim()
+   assert.ok(progress.includes('مرحله '+(i+1)+' از '+anchors.length),progress)
+   assert.ok((await tour.locator('.swtb-guide-popover h2').innerText()).trim().length>2)
+   const frame=await tour.locator('.swtb-guide-popover').boundingBox()
+   assert.ok(frame&&frame.x>=0&&frame.y>=0&&frame.x+frame.width<=1441
+    &&frame.y+frame.height<=901,'guide popover must fit viewport: '+JSON.stringify(frame))
+   if(i===0||i===5||i===8||i===11)
+    await page.screenshot({path:resolve(output,'07b-full-guide-'+String(i+1).padStart(2,'0')+'.png')})
+   if(i===anchors.length-1)
+    await tour.getByRole('button',{name:'شروع کار با سامانه'}).click()
+   else await tour.getByRole('button',{name:'بعدی'}).click()
+  }
+  assert.equal(await tour.count(),0)
+  assert.ok(await page.locator('.ow-worker-task-workspace').isVisible(),
+   'closing the full tour restores the previous Tasks screen')
+  assert.equal(await page.evaluate(()=>window.__qaWriteAttempts),0)
+ })
+ await check('SWTB13 local help can be replayed independently without a full tour',async()=>{
+  const scopes=[
+   ['tasks','کارهای من'],['availability','زمان حضور'],
+   ['history','سوابق گزارش‌ها'],['profile','حساب من'],
+  ]
+  for(const [scope,caption] of scopes){
+   await page.getByRole('button',{name:caption,exact:true}).click()
+   await page.locator('[data-swtb-guide="help-'+scope+'"]').click()
+   const tour=page.locator('dialog.swtb-guide-spotlight')
+   await tour.waitFor({state:'visible'})
+   assert.ok((await tour.locator('.swtb-guide-progress').innerText()).includes('از 3'))
+   await tour.getByRole('button',{name:'بعدی'}).click()
+   assert.ok((await tour.locator('.swtb-guide-progress').innerText()).includes('مرحله 2 از 3'))
+   await page.keyboard.press('Escape')
+   assert.equal(await tour.count(),0)
+   assert.ok(await page.locator('[data-swtb-guide="help-'+scope+'"]').isVisible())
+  }
+  await page.reload({waitUntil:'domcontentloaded'})
+  await page.locator('.ow-worker-task-workspace').waitFor({state:'visible'})
+  assert.equal(await page.locator('.swtb-guide-welcome').count(),0,
+   'skipped or finished intro must not prompt again in same account')
+  assert.equal(await page.evaluate(()=>window.__qaWriteAttempts),0)
+  assert.equal(blocked,0,'guide must remain usable with no external network')
  })
  console.log('PASS: SWTB7 Chromium native-desktop smoke, isolated fake data, no backend/network writes')
 }catch(error){
