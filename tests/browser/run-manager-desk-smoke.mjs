@@ -1,0 +1,66 @@
+/* One native Chrome manager desk test, synthetic only. No real credentials, no external network. */
+import assert from 'node:assert/strict'
+import {mkdir} from 'node:fs/promises'
+import {resolve} from 'node:path'
+import {createServer} from 'vite'
+import {chromium} from 'playwright'
+const output=resolve('test-results/swtb17-manager-desk')
+await mkdir(output,{recursive:true})
+let server,browser,page,blocked=0
+try {
+ server=await createServer({configFile:resolve('tests/browser/vite.smoke.config.mjs')})
+ await server.listen()
+ browser=await chromium.launch({headless:true,channel:'chrome',args:['--no-sandbox']})
+ page=await browser.newPage({viewport:{width:1440,height:900},locale:'fa-IR'})
+ page.on('pageerror',error=>{process.stderr.write('JS '+error.message+'\n')})
+ await page.route('**/*',route=>{
+  const target=new URL(route.request().url())
+  if(target.hostname==='127.0.0.1'||target.hostname==='localhost')return route.continue()
+  blocked++
+  return route.abort('blockedbyclient')
+ })
+ await page.goto('http://127.0.0.1:4177/tests/browser/manager-desk-smoke.html',{waitUntil:'domcontentloaded'})
+ const form=page.locator('form.ow-assignment-form')
+ await form.waitFor({state:'visible'})
+ await form.locator('select[aria-label="واحد انجام کار"]').selectOption('library')
+ await form.getByRole('button',{name:'استفاده از شرح وظیفه آماده'}).click()
+ const read=page.locator('.ow-desk-coverage-heading')
+ await read.waitFor({state:'visible'})
+ const button=form.locator('button[type="submit"]')
+ assert.equal(await button.isDisabled(),true,'time range must be explicit')
+ assert.ok((await form.locator('.ow-desk-bookings').innerText()).includes('دانشجوی آزمایشی دوم'))
+ await form.locator('input[aria-label="شروع نوبت کتابخانه"]').fill('13:00')
+ await form.locator('input[aria-label="پایان نوبت کتابخانه"]').fill('15:00')
+ assert.ok((await form.locator('.ow-desk-duration').innerText()).includes('۱۲۰'))
+ assert.equal(await button.isDisabled(),false,'one second seat is still available')
+ await page.screenshot({path:resolve(output,'01-library-desk-one-seat-available.png'),fullPage:true})
+ await form.locator('.ow-multi-picker summary').click()
+ const options=form.locator('.ow-worker-option-list input[type="checkbox"]')
+ await options.nth(2).check()
+ assert.equal(await button.isDisabled(),true,'two new + one existing must be forbidden')
+ await page.screenshot({path:resolve(output,'02-library-desk-3rd-seat-blocked.png'),fullPage:true})
+ await options.nth(2).uncheck()
+ await options.nth(1).check()
+ assert.equal(await button.isDisabled(),true,'same worker cannot be assigned twice')
+ await options.nth(1).uncheck()
+ await form.locator('input[aria-label="شروع نوبت کتابخانه"]').fill('15:00')
+ await form.locator('input[aria-label="پایان نوبت کتابخانه"]').fill('16:00')
+ assert.equal(await button.isDisabled(),false,'adjacent booking must be permitted')
+ await page.screenshot({path:resolve(output,'03-library-desk-adjacent-slot.png'),fullPage:true})
+ await form.locator('input[maxlength="300"]').fill('هماهنگی کوتاه‌مدت برای خدمات میز کتابخانه')
+ await page.evaluate(()=>{globalThis.__qaPermitDesk=true})
+ await button.click()
+ await page.waitForFunction(()=>globalThis.__qaDeskCalls.length===1)
+ const payload=await page.evaluate(()=>globalThis.__qaDeskCalls[0])
+ assert.equal(payload.startMinute,900)
+ assert.equal(payload.endMinute,960)
+ assert.deepEqual(payload.workerIds,['SYNTH-A'])
+ assert.ok(await button.isDisabled(),'committed must block resubmit')
+ assert.equal(await page.evaluate(()=>globalThis.__qaWriteAttempts),0)
+ assert.equal(blocked,0)
+ process.stdout.write('PASS browser: SWTB17 native manager desk booking, precise overlap, no real network writes\n')
+} finally {
+ await page?.close().catch(()=>{})
+ await browser?.close().catch(()=>{})
+ await server?.close().catch(()=>{})
+}
