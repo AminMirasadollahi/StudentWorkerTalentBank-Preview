@@ -135,6 +135,8 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
         'حداقل یکی از افراد انتخاب‌شده قبلاً در همین ساعت نوبت کتابخانه دارد.':
       message.includes('invalid_library_desk_interval')?
         'ساعت شروع و پایان نوبت معتبر نیست.':
+      message.includes('library_desk_shift_already_started')?
+        'ساعت شروع نوبت امروز گذشته است. یک بازه آینده انتخاب کنید.':
       libraryTemplateSelected?
         'تأیید ثبت نوبت دریافت نشد؛ پیش از ارسال دوباره، فهرست نوبت‌ها را بررسی کنید.':
         'واگذاری انجام نشد. اطلاعات را بررسی کنید؛ انتخاب‌ها و توضیحات حفظ شده‌اند.')
