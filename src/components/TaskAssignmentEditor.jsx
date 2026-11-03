@@ -223,6 +223,8 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
         <div className="ow-desk-coverage-heading">
           <strong>نوبت‌های ثبت‌شده همین روز</strong>
           <span>{fa.format(visibleDeskShifts(deskRead.shifts).length)} واگذاری</span>
+          <button type="button" className="ow-desk-refresh" aria-label="بازخوانی ظرفیت نوبت‌ها"
+            onClick={()=>setDeskRevision(v=>v+1)}>↻ به‌روزرسانی</button>
         </div>
         {visibleDeskShifts(deskRead.shifts).length===0?
           <p className="ow-muted">هنوز نوبتی برای این روز ثبت نشده است.</p>:
@@ -232,6 +234,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
               <span>{workers.find(w=>w.id===s.worker_id)?.name||'دانشجوکار'}</span>
             </li>)}
           </ul>}
+        <p className="ow-desk-coverage-limit">این ظرفیت فقط نوبت‌های مصوبِ ثبت‌شده در همین قالب را نشان می‌دهد؛ سایر وظایف و برنامه حضور باید جداگانه هماهنگ شوند.</p>
         {interval&&<p className={deskCoverage.allowed?'ow-desk-cover-ok':'ow-desk-cover-block'}>
           {deskCoverage.workerOverlap?
             'حداقل یکی از افراد انتخابی در این بازه نوبت دارد.':
