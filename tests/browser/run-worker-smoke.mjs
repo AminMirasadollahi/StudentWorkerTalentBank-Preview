@@ -346,8 +346,14 @@ try{
   await page.screenshot({path:resolve(output,'07c-guide-contextual-1280.png')})
   for(let i=0;i<5;i++){
    await page.keyboard.press('Tab')
-   assert.ok(await page.evaluate(()=>!!document.activeElement?.closest('dialog.swtb-guide-spotlight')),
-     'Tab focus must remain within the tour dialog')
+   const focused=await page.evaluate(()=>{
+     const node=document.activeElement
+     return {inside:!!(node?.matches?.('dialog.swtb-guide-spotlight')||
+        node?.closest?.('dialog.swtb-guide-spotlight')),
+        tag:node?.tagName,className:node?.className,
+        text:node?.textContent?.trim()?.slice(0,45)}
+   })
+   assert.ok(focused.inside,'native guide modal focus target: '+JSON.stringify(focused))
   }
   await page.keyboard.press('Escape')
   await page.setViewportSize({width:1440,height:900})
