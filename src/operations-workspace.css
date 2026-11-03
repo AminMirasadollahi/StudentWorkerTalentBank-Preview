@@ -1637,3 +1637,5 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 .ow-desk-cancel-confirm small {color:#6f7883;font-size:.7rem}
 .ow-desk-cancel-actions {display:flex;gap:.45rem;align-items:center;justify-content:flex-start;flex-wrap:wrap}
 .ow-desk-coverage .ow-capacity-warning[role=alert] {margin:0}
+
+.ow-desk-bookings--editing {max-height:none;overflow:visible}
