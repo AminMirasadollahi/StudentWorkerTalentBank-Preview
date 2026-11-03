@@ -293,7 +293,9 @@ try{
   for(let i=0;i<anchors.length;i++){
    await page.waitForFunction(anchor=>{
     const popup=document.querySelector('.swtb-guide-popover')
-    return popup?.offsetWidth>0 && !!document.querySelector('[data-swtb-guide="'+anchor+'"]')
+    return popup?.offsetWidth>0 && popup.dataset.guideReady==='true'
+      && !!document.querySelector('[data-swtb-guide="'+anchor+'"]')
+      && !document.querySelector('.swtb-guide-error')
       && document.querySelector('dialog.swtb-guide-spotlight')?.matches(':modal')
    },anchors[i])
    const progress=(await tour.locator('.swtb-guide-progress').innerText()).trim()
@@ -330,6 +332,22 @@ try{
    assert.equal(await tour.count(),0)
    assert.ok(await page.locator('[data-swtb-guide="help-'+scope+'"]').isVisible())
   }
+  await page.setViewportSize({width:1280,height:800})
+  await page.getByRole('button',{name:'زمان حضور',exact:true}).click()
+  await page.locator('[data-swtb-guide="help-availability"]').click()
+  const mobileWidthTour=page.locator('dialog.swtb-guide-spotlight')
+  await page.waitForFunction(()=>document.querySelector('.swtb-guide-popover')?.dataset.guideReady==='true')
+  const narrowerFrame=await mobileWidthTour.locator('.swtb-guide-popover').boundingBox()
+  assert.ok(narrowerFrame&&narrowerFrame.x>=0&&narrowerFrame.y>=0
+    &&narrowerFrame.x+narrowerFrame.width<=1281&&narrowerFrame.y+narrowerFrame.height<=801)
+  await page.screenshot({path:resolve(output,'07c-guide-contextual-1280.png')})
+  for(let i=0;i<5;i++){
+   await page.keyboard.press('Tab')
+   assert.ok(await page.evaluate(()=>!!document.activeElement?.closest('dialog.swtb-guide-spotlight')),
+     'Tab focus must remain within the tour dialog')
+  }
+  await page.keyboard.press('Escape')
+  await page.setViewportSize({width:1440,height:900})
   await page.reload({waitUntil:'domcontentloaded'})
   await page.locator('.ow-worker-task-workspace').waitFor({state:'visible'})
   assert.equal(await page.locator('.swtb-guide-welcome').count(),0,
