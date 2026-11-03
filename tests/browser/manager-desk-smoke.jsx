@@ -10,13 +10,16 @@ const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{
  timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'
 }).formatToParts(new Date()).map(x=>[x.type,x.value]))
 const today=[p.year,p.month,p.day].join('-')
+const d=new Date(today+'T00:00:00Z')
+d.setUTCDate(d.getUTCDate()+1)
+const safeFutureDay=d.toISOString().slice(0,10)
 const workers=[
  {id:'SYNTH-A',name:'دانشجوی آزمایشی اول',unit:'library',state:'active'},
  {id:'SYNTH-B',name:'دانشجوی آزمایشی دوم',unit:'research',state:'active'},
  {id:'SYNTH-C',name:'دانشجوی آزمایشی سوم',unit:'public_relations',state:'active'},
 ]
 globalThis.__qaDeskShifts=[{id:'SYNTH-SHIFT-01',task_id:'SYNTH-TASK-01',
- worker_id:'SYNTH-B',state:'scheduled',shift_date:today,start_minute:780,end_minute:900}]
+ worker_id:'SYNTH-B',state:'scheduled',shift_date:safeFutureDay,start_minute:780,end_minute:900}]
 globalThis.__qaDeskCalls=[]
 globalThis.__qaDeskCancels=[]
 globalThis.__qaPermitDeskCancel=true
@@ -28,7 +31,7 @@ createRoot(document.getElementById('root')).render(
    <h2>واگذاری کار · پیش‌نمایش ایزوله</h2>
    <TaskAssignmentEditor workers={workers}
     data={{workers,tasks:[],weekly_slots:[],exceptions:[],time_entries:[]}}
-    defaultWorkerId="SYNTH-A" defaultDate={today}
+    defaultWorkerId="SYNTH-A" defaultDate={safeFutureDay}
     onSaved={async()=>{}}/>
   </section>
  </div>)
