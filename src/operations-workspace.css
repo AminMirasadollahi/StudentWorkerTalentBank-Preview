@@ -1614,3 +1614,9 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-desk-clock-fields {grid-template-columns:repeat(2,minmax(0,1fr))}
  .ow-desk-duration {grid-column:1/-1;min-height:0}
 }
+
+.ow-desk-refresh {border:1px solid #c8dcdf;border-radius:.45rem;background:white;
+ padding:.28rem .55rem;font:inherit;font-size:.72rem;cursor:pointer;color:#176c72}
+.ow-desk-refresh:hover {background:#eaf7f6}
+.ow-desk-refresh:focus-visible {outline:3px solid #258d87;outline-offset:2px}
+.ow-desk-coverage .ow-desk-coverage-limit {color:#667b87;font-size:.73rem;line-height:1.65}
