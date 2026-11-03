@@ -1,9 +1,10 @@
-import {useMemo,useState} from 'react'
+import {useEffect,useMemo,useRef,useState} from 'react'
 import JalaliDatePicker from './JalaliDatePicker'
 import {assignWorkerTask} from '../lib/operations'
-import {assignGroupTask} from '../lib/operationsV2'
+import {assignGroupTask,assignLibraryDeskShift,getLibraryDeskShifts} from '../lib/operationsV2'
 import {assessAssignmentCapacity} from '../lib/assignmentCapacity.mjs'
 import {LIBRARY_DESK_TEMPLATE,canDraftLibraryDeskGroup} from '../lib/libraryDeskTemplate.mjs'
+import {deskInterval,minuteClock,projectDeskCoverage,visibleDeskShifts} from '../lib/libraryDeskShifts.mjs'
 
 const fa=new Intl.NumberFormat('fa-IR')
 const persianDate=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'})
@@ -22,6 +23,11 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const [estimate,setEstimate]=useState('60')
  const [taskUnit,setTaskUnit]=useState('')
  const [libraryTemplateSelected,setLibraryTemplateSelected]=useState(false)
+ const [deskStart,setDeskStart]=useState('')
+ const [deskEnd,setDeskEnd]=useState('')
+ const [deskRevision,setDeskRevision]=useState(0)
+ const [deskRead,setDeskRead]=useState({date:'',state:'idle',shifts:[]})
+ const submitLock=useRef(false)
  const [reason,setReason]=useState('')
  const [busy,setBusy]=useState(false)
  const [committed,setCommitted]=useState(false)
@@ -30,8 +36,31 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const selected=workers.filter(w=>workerIds.includes(w.id)&&w.state==='active')
  const shortNotice=date<dayAfter(localToday(),2)
  const routineGroupOk=canDraftLibraryDeskGroup(taskUnit,libraryTemplateSelected,selected.length)
- const estimateInt=Number(estimate)
+ const interval=libraryTemplateSelected?deskInterval(deskStart,deskEnd):null
+ const estimateInt=libraryTemplateSelected?(interval?.minutes??NaN):Number(estimate)
  const estimateValid=Number.isInteger(estimateInt)&&estimateInt>=1&&estimateInt<=1440
+ const deskVerified=libraryTemplateSelected&&deskRead.date===date&&deskRead.state==='ready'
+ const deskCoverage=projectDeskCoverage(
+   deskRead.shifts,selected.map(w=>w.id),
+   interval?.startMinute,interval?.endMinute)
+ const deskCanSubmit=!libraryTemplateSelected||
+   (deskVerified&&interval!==null&&deskCoverage.allowed)
+ useEffect(()=>{
+  if(!libraryTemplateSelected||taskUnit!=='library'||!date){
+    setDeskRead({date:'',state:'idle',shifts:[]})
+    return
+  }
+  let active=true
+  setDeskRead({date,state:'loading',shifts:[]})
+  getLibraryDeskShifts({from:date,to:date}).then(result=>{
+    if(!active)return
+    if(result?.ok!==true||!Array.isArray(result.shifts))throw Error('invalid_shift_read')
+    setDeskRead({date,state:'ready',shifts:result.shifts})
+  }).catch(()=>{
+    if(active)setDeskRead({date,state:'error',shifts:[]})
+  })
+  return ()=>{active=false}
+ },[date,libraryTemplateSelected,taskUnit,deskRevision])
  const applyLibraryTemplate=()=>{
   setTaskUnit(LIBRARY_DESK_TEMPLATE.unit)
   setTitle(LIBRARY_DESK_TEMPLATE.title)
@@ -39,21 +68,35 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
   // A desk shift is not an arbitrary 60-minute task. Require the manager
   // to enter the actual planned per-person duration explicitly.
   setEstimate('')
+  setDeskStart('')
+  setDeskEnd('')
+  setDeskRevision(v=>v+1)
   setLibraryTemplateSelected(true)
   setCommitted(false)
  }
  const capacity=useMemo(()=>selected.map(w=>({
   id:w.id,name:w.name,
-  result:assessAssignmentCapacity(data,{workerId:w.id,date,estimateMinutes:Number(estimate)})
- })),[data,date,estimate,workers,workerIds])
+  result:assessAssignmentCapacity(data,{workerId:w.id,date,estimateMinutes:Number.isInteger(estimateInt)?estimateInt:0})
+ })),[data,date,estimateInt,workers,workerIds])
  const issues=capacity.filter(c=>['overbooked','unavailable','not_configured','unknown'].includes(c.result.code))
  const toggle=id=>setWorkerIds(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id])
  const submit=async event=>{
   event.preventDefault()
-  if(busy||committed||!Object.hasOwn(unitNames,taskUnit)||selected.length===0||selected.length!==workerIds.length||date<localToday()||!routineGroupOk||!estimateValid)return
+  if(submitLock.current||busy||committed||!Object.hasOwn(unitNames,taskUnit)||
+    selected.length===0||selected.length!==workerIds.length||date<localToday()||
+    !routineGroupOk||!estimateValid||!deskCanSubmit)return
+  submitLock.current=true
   setBusy(true);setError('');setNotice('')
   try {
-    if(selected.length===1){
+    if(libraryTemplateSelected){
+      // No generic-task fallback: the server must atomically reserve seats
+      // and create the underlying worker tasks with the exact interval.
+      await assignLibraryDeskShift({
+        workerIds:selected.map(w=>w.id),date,
+        startMinute:interval.startMinute,endMinute:interval.endMinute,
+        title,instructions,shortNoticeReason:reason,
+      })
+    }else if(selected.length===1){
       await assignWorkerTask({workerId:selected[0].id,unit:taskUnit,
         title,instructions,date,minutes:estimate,shortNoticeReason:reason})
     } else {
@@ -64,7 +107,9 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
     // as a failed assignment (or allow a second, duplicate submission).
     setCommitted(true)
     setTitle('');setInstructions('');setReason('')
-    setNotice(selected.length===1?`کار در حوزهٔ ${unitNames[taskUnit]} واگذار شد.`:
+    setNotice(libraryTemplateSelected?
+      `نوبت ${deskStart} تا ${deskEnd} برای ${fa.format(selected.length)} نفر ثبت شد؛ ساعات پس از بررسی گزارش محاسبه می‌شوند.`:
+      selected.length===1?`کار در حوزهٔ ${unitNames[taskUnit]} واگذار شد.`:
       `کار گروهی در حوزهٔ ${unitNames[taskUnit]} برای ${fa.format(selected.length)} نفر ثبت شد؛ ساعت هر نفر مستقل بررسی می‌شود.`)
     try {
       await onSaved?.()
@@ -78,8 +123,17 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
       message.includes('worker_not_active')?'یکی از افراد دیگر فعال نیست.':
       message.includes('invalid_group_members')?'برای واگذاری گروهی ۲ تا ۲۰ دانشجوکار لازم است.':
       message.includes('invalid_unit')?'واحد فعالیت معتبر یا فعال نیست.':
-      'واگذاری انجام نشد. اطلاعات را بررسی کنید؛ انتخاب‌ها و توضیحات حفظ شده‌اند.')
-  } finally{setBusy(false)}
+      message.includes('library_desk_capacity_exceeded')?
+        'در این بازه ظرفیت دو نفر تکمیل شده است. زمان یا نفرات را اصلاح کنید.':
+      message.includes('library_desk_worker_overlap')?
+        'حداقل یکی از افراد انتخاب‌شده قبلاً در همین ساعت نوبت کتابخانه دارد.':
+      message.includes('invalid_library_desk_interval')?
+        'ساعت شروع و پایان نوبت معتبر نیست.':
+      libraryTemplateSelected?
+        'تأیید ثبت نوبت دریافت نشد؛ پیش از ارسال دوباره، فهرست نوبت‌ها را بررسی کنید.':
+        'واگذاری انجام نشد. اطلاعات را بررسی کنید؛ انتخاب‌ها و توضیحات حفظ شده‌اند.')
+    if(libraryTemplateSelected)setDeskRevision(v=>v+1)
+  } finally{submitLock.current=false;setBusy(false)}
  }
  const options=workers.filter(w=>w.state==='active'&&
   (w.name||'').toLocaleLowerCase('fa-IR').includes(filter.toLocaleLowerCase('fa-IR')))
@@ -94,9 +148,8 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
       {libraryTemplateSelected?'بازنشانی شرح وظیفه ثابت':'استفاده از شرح وظیفه آماده'}
     </button>
     {libraryTemplateSelected&&<p className="ow-library-template-advisory" role="status">
-      قالب اعمال شد. مدت نوبت هر نفر را خودتان تعیین کنید. برای کار روتین در یک نوبت، بیش از دو نفر انتخاب نکنید.
-      هنوز بررسی هم‌پوشانی نوبت‌های قبلی در سامانه فعال نیست؛ پیش از واگذاری، برنامه حضور را بررسی کنید.
-      واگذاری این کار به‌تنهایی ساعت تأییدشده ایجاد نمی‌کند.
+      زمان شروع و پایان نوبت را مشخص کنید؛ ظرفیت نوبت‌های ثبت‌شده برای همان روز بررسی می‌شود.
+      اعلام آمادگی حضور، معادل واگذاری کار نیست و فقط گزارش تأییدشده به ساعات قابل‌احتساب اضافه می‌شود.
     </p>}
   </div>}
   <div className="ow-assignment-fields">
@@ -128,16 +181,67 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
     <div className="report-field"><span>تاریخ اجرا (شمسی)</span>
       <JalaliDatePicker value={date} min={localToday()} onChange={setDate} ariaLabel="تاریخ اجرای کار"/>
     </div>
-    <label className="report-field ow-estimate-input"><span>زمان استاندارد هر نفر (دقیقه)</span>
+    {!libraryTemplateSelected&&<label className="report-field ow-estimate-input"><span>زمان استاندارد هر نفر (دقیقه)</span>
       <input type="number" required min="1" max="1440" value={estimate}
         onChange={e=>setEstimate(e.target.value)}/>
-    </label>
+    </label>}
     <label className="report-field"><span>عنوان کار</span><input required minLength={3} maxLength={160}
       value={title} onChange={e=>setTitle(e.target.value)} placeholder="عنوان کوتاه و مشخص"/></label>
     <label className="report-field"><span>شرح مورد انتظار</span>
       <input maxLength={3000} value={instructions} onChange={e=>setInstructions(e.target.value)}
         placeholder="خروجی مدنظر"/></label>
   </div>
+  {libraryTemplateSelected&&taskUnit==='library'&&<section className="ow-desk-shift-editor" aria-label="تعیین و بررسی نوبت کتابخانه">
+    <div className="ow-desk-shift-heading">
+      <strong>نوبت کاری مشخص</strong>
+      <span>مبنای ظرفیت: هم‌پوشانی واقعی ساعت‌ها، حداکثر دو نفر</span>
+    </div>
+    <div className="ow-desk-clock-fields">
+      <label className="report-field">
+        <span>شروع نوبت</span>
+        <input type="time" aria-label="شروع نوبت کتابخانه" required
+          value={deskStart} onChange={e=>setDeskStart(e.target.value)}/>
+      </label>
+      <label className="report-field">
+        <span>پایان نوبت</span>
+        <input type="time" aria-label="پایان نوبت کتابخانه" required
+          value={deskEnd} onChange={e=>setDeskEnd(e.target.value)}/>
+      </label>
+      <div className="ow-desk-duration" aria-live="polite">
+        <small>زمان استاندارد هر نفر</small>
+        <strong>{interval?`${fa.format(interval.minutes)} دقیقه`:'پس از تعیین ساعت'}</strong>
+      </div>
+    </div>
+    <div className="ow-desk-coverage" aria-live="polite" aria-atomic="true">
+      {deskRead.state==='loading'&&<p role="status">در حال بررسی نوبت‌های این روز…</p>}
+      {deskRead.state==='error'&&<div className="ow-capacity-warning" role="alert">
+        دریافت نوبت‌ها ممکن نیست. تا اطمینان از ظرفیت واقعی، ثبت مسئولیت ثابت غیرفعال است.
+        <button type="button" className="report-btn report-btn--light"
+          onClick={()=>setDeskRevision(v=>v+1)}>تلاش مجدد</button>
+      </div>}
+      {deskVerified&&<>
+        <div className="ow-desk-coverage-heading">
+          <strong>نوبت‌های ثبت‌شده همین روز</strong>
+          <span>{fa.format(visibleDeskShifts(deskRead.shifts).length)} واگذاری</span>
+        </div>
+        {visibleDeskShifts(deskRead.shifts).length===0?
+          <p className="ow-muted">هنوز نوبتی برای این روز ثبت نشده است.</p>:
+          <ul className="ow-desk-bookings">
+            {visibleDeskShifts(deskRead.shifts).map(s=><li key={s.id}>
+              <span>{minuteClock(s.start_minute)} تا {minuteClock(s.end_minute)}</span>
+              <span>{workers.find(w=>w.id===s.worker_id)?.name||'دانشجوکار'}</span>
+            </li>)}
+          </ul>}
+        {interval&&<p className={deskCoverage.allowed?'ow-desk-cover-ok':'ow-desk-cover-block'}>
+          {deskCoverage.workerOverlap?
+            'حداقل یکی از افراد انتخابی در این بازه نوبت دارد.':
+            deskCoverage.allowed?
+              `ظرفیت بازه مناسب است: حداکثر ${fa.format(deskCoverage.maxOccupied)} نفر ثبت‌شده، ${fa.format(selected.length)} نفر پیشنهادی.`:
+              'ظرفیت این بازه برای نفرات انتخاب‌شده کافی نیست؛ ساعت یا انتخاب‌ها را تغییر دهید.'}
+        </p>}
+      </>}
+    </div>
+  </section>}
   {shortNotice&&<label className="report-field ow-short-notice">
     <span>علت واگذاری امروز یا فردا (الزامی)</span>
     <input required maxLength={300} value={reason} onChange={e=>setReason(e.target.value)}/>
@@ -176,7 +280,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
   <div className="ow-actions">
     {onClose&&<button type="button" className="report-btn report-btn--light" onClick={onClose}>انصراف</button>}
     <button type="submit" className="report-btn report-btn--primary"
-      disabled={busy||committed||!Object.hasOwn(unitNames,taskUnit)||!selected.length||selected.length!==workerIds.length||date<localToday()||!routineGroupOk||!estimateValid}>
+      disabled={busy||committed||!Object.hasOwn(unitNames,taskUnit)||!selected.length||selected.length!==workerIds.length||date<localToday()||!routineGroupOk||!estimateValid||!deskCanSubmit}>
       {busy?'در حال ثبت…':selected.length>1?'واگذاری گروهی':'واگذاری کار'}
     </button>
   </div>
