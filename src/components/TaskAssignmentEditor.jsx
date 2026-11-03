@@ -3,6 +3,7 @@ import JalaliDatePicker from './JalaliDatePicker'
 import {assignWorkerTask} from '../lib/operations'
 import {assignGroupTask} from '../lib/operationsV2'
 import {assessAssignmentCapacity} from '../lib/assignmentCapacity.mjs'
+import {LIBRARY_DESK_TEMPLATE,canDraftLibraryDeskGroup} from '../lib/libraryDeskTemplate.mjs'
 
 const fa=new Intl.NumberFormat('fa-IR')
 const persianDate=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'})
@@ -20,6 +21,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const [instructions,setInstructions]=useState('')
  const [estimate,setEstimate]=useState('60')
  const [taskUnit,setTaskUnit]=useState('')
+ const [libraryTemplateSelected,setLibraryTemplateSelected]=useState(false)
  const [reason,setReason]=useState('')
  const [busy,setBusy]=useState(false)
  const [committed,setCommitted]=useState(false)
@@ -27,6 +29,19 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const [notice,setNotice]=useState('')
  const selected=workers.filter(w=>workerIds.includes(w.id)&&w.state==='active')
  const shortNotice=date<dayAfter(localToday(),2)
+ const routineGroupOk=canDraftLibraryDeskGroup(taskUnit,libraryTemplateSelected,selected.length)
+ const estimateInt=Number(estimate)
+ const estimateValid=Number.isInteger(estimateInt)&&estimateInt>=1&&estimateInt<=1440
+ const applyLibraryTemplate=()=>{
+  setTaskUnit(LIBRARY_DESK_TEMPLATE.unit)
+  setTitle(LIBRARY_DESK_TEMPLATE.title)
+  setInstructions(LIBRARY_DESK_TEMPLATE.instructions)
+  // A desk shift is not an arbitrary 60-minute task. Require the manager
+  // to enter the actual planned per-person duration explicitly.
+  setEstimate('')
+  setLibraryTemplateSelected(true)
+  setCommitted(false)
+ }
  const capacity=useMemo(()=>selected.map(w=>({
   id:w.id,name:w.name,
   result:assessAssignmentCapacity(data,{workerId:w.id,date,estimateMinutes:Number(estimate)})
@@ -35,7 +50,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const toggle=id=>setWorkerIds(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id])
  const submit=async event=>{
   event.preventDefault()
-  if(busy||committed||!Object.hasOwn(unitNames,taskUnit)||selected.length===0||selected.length!==workerIds.length||date<localToday())return
+  if(busy||committed||!Object.hasOwn(unitNames,taskUnit)||selected.length===0||selected.length!==workerIds.length||date<localToday()||!routineGroupOk||!estimateValid)return
   setBusy(true);setError('');setNotice('')
   try {
     if(selected.length===1){
@@ -69,6 +84,21 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const options=workers.filter(w=>w.state==='active'&&
   (w.name||'').toLocaleLowerCase('fa-IR').includes(filter.toLocaleLowerCase('fa-IR')))
  return <form className="ow-assignment-form" onSubmit={submit}>
+  {taskUnit==='library'&&<div className="ow-library-template-panel" aria-label="قالب خدمات جاری کتابخانه">
+    <div>
+      <strong>مسئولیت ثابت کتابخانه</strong>
+      <small>برای پاسخ‌گویی به مراجعان، راهنمایی جست‌وجوی دستی و ثبت موقت امانت و بازگشت کتاب</small>
+    </div>
+    <button type="button" className="report-btn report-btn--light"
+      onClick={applyLibraryTemplate} disabled={busy||committed}>
+      {libraryTemplateSelected?'بازنشانی شرح وظیفه ثابت':'استفاده از شرح وظیفه آماده'}
+    </button>
+    {libraryTemplateSelected&&<p className="ow-library-template-advisory" role="status">
+      قالب اعمال شد. مدت نوبت هر نفر را خودتان تعیین کنید. برای کار روتین در یک نوبت، بیش از دو نفر انتخاب نکنید.
+      هنوز بررسی هم‌پوشانی نوبت‌های قبلی در سامانه فعال نیست؛ پیش از واگذاری، برنامه حضور را بررسی کنید.
+      واگذاری این کار به‌تنهایی ساعت تأییدشده ایجاد نمی‌کند.
+    </p>}
+  </div>}
   <div className="ow-assignment-fields">
     <div className="report-field ow-multi-picker">
       <span>دانشجوکارها · {fa.format(selected.length)} نفر انتخاب‌شده</span>
@@ -90,7 +120,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
     </div>
     <label className="report-field"><span>واحد انجام این کار (الزامی)</span>
       <select required aria-label="واحد انجام کار" value={taskUnit}
-        onChange={e=>setTaskUnit(e.target.value)}>
+        onChange={e=>{setTaskUnit(e.target.value);setLibraryTemplateSelected(false)}}>
         <option value="">انتخاب واحد فعالیت</option>
         {Object.entries(unitNames).map(([code,name])=><option key={code} value={code}>{name}</option>)}
       </select>
@@ -112,6 +142,10 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
     <span>علت واگذاری امروز یا فردا (الزامی)</span>
     <input required maxLength={300} value={reason} onChange={e=>setReason(e.target.value)}/>
   </label>}
+  {!routineGroupOk&&<div className="ow-capacity-warning" role="alert">
+    این قالب تنها برای حداکثر دو نفر در یک نوبتِ مسئولیت جاری کتابخانه قابل واگذاری است.
+    برای نفرات بیشتر، کار مستقل و مشخص جداگانه تعریف کنید. هم‌پوشانی با سایر واگذاری‌ها فعلاً باید دستی کنترل شود.
+  </div>}
   {issues.length>0&&<div className="ow-capacity-warning" role="status">
     {issues.map(c=><p key={c.id}>
       {selected.length>1&&<b>{c.name}: </b>}
@@ -142,7 +176,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
   <div className="ow-actions">
     {onClose&&<button type="button" className="report-btn report-btn--light" onClick={onClose}>انصراف</button>}
     <button type="submit" className="report-btn report-btn--primary"
-      disabled={busy||committed||!Object.hasOwn(unitNames,taskUnit)||!selected.length||selected.length!==workerIds.length||date<localToday()}>
+      disabled={busy||committed||!Object.hasOwn(unitNames,taskUnit)||!selected.length||selected.length!==workerIds.length||date<localToday()||!routineGroupOk||!estimateValid}>
       {busy?'در حال ثبت…':selected.length>1?'واگذاری گروهی':'واگذاری کار'}
     </button>
   </div>

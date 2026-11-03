@@ -213,6 +213,44 @@ test('group assignment submits a single atomic manager RPC with one standard dur
  }finally{await teardown()}
 })
 
+test('library desk template requires explicit duration and blocks >2 in one group without backend writes',async()=>{
+ const data=sample()
+ data.workers.push(
+  {id:'FAKE-B',name:'دانشجو نمونه دوم',unit:'research',state:'active'},
+  {id:'FAKE-C',name:'دانشجو نمونه سوم',unit:'public_relations',state:'active'},
+ )
+ const {host,teardown}=await setup({data})
+ try{
+  const unit=host.querySelector('select[aria-label="واحد انجام کار"]')
+  await act(async()=>{unit.value='library';unit.dispatchEvent(new window.Event('change',{bubbles:true}))})
+  const template=Array.from(host.querySelectorAll('.ow-library-template-panel button'))
+    .find(el=>el.textContent.includes('استفاده از شرح وظیفه آماده'))
+  assert.ok(template)
+  await act(async()=>template.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.match(labeledField(host,'عنوان کار').value,/خدمات جاری/)
+  assert.match(labeledField(host,'شرح مورد انتظار').value,/ثبت امانت/)
+  assert.equal(labeledField(host,'زمان استاندارد هر نفر').value,'',
+   'daily staffing duration must not be prefilled to 60 minutes')
+  assert.match(host.textContent,/هم‌پوشانی نوبت‌های قبلی/)
+  const thirdParty=Array.from(host.querySelectorAll('.ow-worker-option-list input[type="checkbox"]'))
+  assert.equal(thirdParty.length,3)
+  await act(async()=>{
+   thirdParty[1].dispatchEvent(new window.MouseEvent('click',{bubbles:true}))
+   thirdParty[2].dispatchEvent(new window.MouseEvent('click',{bubbles:true}))
+  })
+  assert.match(host.textContent,/حداکثر دو نفر/)
+  const form=host.querySelector('.ow-assignment-form')
+  const submit=form.querySelector('button[type="submit"]')
+  assert.equal(submit.disabled,true)
+  await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
+  assert.equal(globalThis.__qaGroupCalls.length,0,'no group task must be created')
+  await act(async()=>thirdParty[2].dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  await fill(labeledField(host,'زمان استاندارد هر نفر'),'180')
+  assert.equal(submit.disabled,false,'two workers with explicit duration are eligible for manual review')
+  assert.equal(globalThis.__qaGroupCalls.length,0)
+ }finally{await teardown()}
+})
+
 test('committed group assignment cannot be submitted twice when post-save refresh fails',async()=>{
  const host=document.createElement('div')
  document.body.append(host)
