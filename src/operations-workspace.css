@@ -1621,3 +1621,19 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 .ow-desk-refresh:hover {background:#eaf7f6}
 .ow-desk-refresh:focus-visible {outline:3px solid #258d87;outline-offset:2px}
 .ow-desk-coverage .ow-desk-coverage-limit {color:#667b87;font-size:.73rem;line-height:1.65}
+
+/* SWTB17: cancellation is a deliberate inline second step, not an accidental
+   click on a destructive row action. Keep full context within the panel. */
+.ow-desk-bookings li.ow-desk-booking {flex-wrap:wrap;align-items:center}
+.ow-desk-cancel-trigger {border:1px solid #efceb8;border-radius:.42rem;
+ background:#fffaf7;color:#905533;cursor:pointer;font:inherit;font-size:.72rem;
+ padding:.28rem .5rem}
+.ow-desk-cancel-trigger:disabled {opacity:.5;cursor:not-allowed}
+.ow-desk-cancel-trigger:focus-visible {outline:3px solid #b57b46;outline-offset:2px}
+.ow-desk-cancel-confirm {flex-basis:100%;display:grid;gap:.45rem;
+ border-top:1px solid #e8ddda;padding-top:.55rem}
+.ow-desk-cancel-confirm .report-field {min-width:0;margin:0}
+.ow-desk-cancel-confirm input {width:100%}
+.ow-desk-cancel-confirm small {color:#6f7883;font-size:.7rem}
+.ow-desk-cancel-actions {display:flex;gap:.45rem;align-items:center;justify-content:flex-start;flex-wrap:wrap}
+.ow-desk-coverage .ow-capacity-warning[role=alert] {margin:0}
