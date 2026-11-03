@@ -1665,7 +1665,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
       <div><small>واحد اولیهٔ ثبت‌نام</small><strong>{unitLabels[identity?.unit]||identity?.unit||'نامشخص'}</strong></div>
     </div>
     <div className="ow-profile-change-launch" data-swtb-guide="profile-correction">
-      <button type="button" ref={profileDialogTriggerRef>
+      <button type="button" ref={profileDialogTriggerRef}>
         className="report-btn report-btn--light ow-profile-change-trigger"
         aria-haspopup="dialog" aria-controls="ow-profile-change-dialog"
         onClick={()=>{setProfileTab('new');setEditing(true)}}>درخواست اصلاح و پیگیری</button>
