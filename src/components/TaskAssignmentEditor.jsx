@@ -7,6 +7,7 @@ import {LIBRARY_DESK_TEMPLATE,canDraftLibraryDeskGroup} from '../lib/libraryDesk
 import {deskInterval,minuteClock,projectDeskCoverage,visibleDeskShifts} from '../lib/libraryDeskShifts.mjs'
 
 const fa=new Intl.NumberFormat('fa-IR')
+const clockFa=minute=>minuteClock(minute).replace(/[0-9]/g,digit=>'۰۱۲۳۴۵۶۷۸۹'[Number(digit)])
 const persianDate=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'})
 const localToday=()=>{
  const parts=Object.fromEntries(persianDate.formatToParts(new Date()).map(x=>[x.type,x.value]))
@@ -208,8 +209,9 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
           value={deskEnd} onChange={e=>setDeskEnd(e.target.value)}/>
       </label>
       <div className="ow-desk-duration" aria-live="polite">
-        <small>زمان استاندارد هر نفر</small>
-        <strong>{interval?`${fa.format(interval.minutes)} دقیقه`:'پس از تعیین ساعت'}</strong>
+        <small>بازه ۲۴ساعته و مدت استاندارد هر نفر</small>
+        <strong>{interval?`${clockFa(interval.startMinute)} تا ${clockFa(interval.endMinute)}`:'پس از تعیین ساعت'}</strong>
+        {interval&&<span>{fa.format(interval.minutes)} دقیقه</span>}
       </div>
     </div>
     <div className="ow-desk-coverage" aria-live="polite" aria-atomic="true">
