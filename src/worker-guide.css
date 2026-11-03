@@ -54,6 +54,15 @@
  padding:.86rem 1rem;box-sizing:border-box;
  box-shadow:0 12px 35px #05243866;line-height:1.65;
 }
+/* Subtle step-to-step arrival: animate the card, never scroll the page or
+   continuously move the spotlight cutout while the underlying view changes. */
+.swtb-guide-popover[data-guide-ready="true"] {
+ animation:swtb-guide-step-appear 175ms cubic-bezier(.2,.75,.3,1) both;
+}
+@keyframes swtb-guide-step-appear {
+ from {opacity:.32;scale:.985}
+ to {opacity:1;scale:1}
+}
 .swtb-guide-popover__top {
  display:flex;align-items:center;justify-content:space-between;gap:.6rem;
  font-size:.76rem;color:#52727a;font-weight:750;
