@@ -17,7 +17,6 @@ export const deskInterval=(start,end)=>{
  return a===null||b===null||a>=b||a>1439?null:{startMinute:a,endMinute:b,minutes:b-a}
 }
 const intersects=(aStart,aEnd,bStart,bEnd)=>aStart<bEnd&&aEnd>bStart
-const overlap=(a,b)=>a.start_minute<b.end_minute&&a.end_minute>b.start_minute
 
 export const projectDeskCoverage=(rows,workerIds,startMinute,endMinute)=>{
  if(!Array.isArray(rows)||!Number.isInteger(startMinute)||
