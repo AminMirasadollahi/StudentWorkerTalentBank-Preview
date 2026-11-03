@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
+import {workerGuideStorageKey} from './lib/workerGuide.mjs'
 import { trapModalTab } from './lib/dialogFocusTrap.mjs'
 import { selectWorkerTaskFocus, summarizeWorkerTaskFocus } from './lib/workerTaskFocus.mjs'
 import {projectWorkerReportActivity,summarizeWorkerReportActivity} from './lib/workerReportActivity.mjs'
@@ -45,6 +47,7 @@ function UnitHourSummary({scope,approvedTotal=null,refreshRevision=0}) {
    return()=>{active=false}
  },[scope,refreshRevision])
  return <section className={scope==='worker'?'ow-unit-hours ow-unit-hours--combined':'ow-unit-hours'}
+   data-swtb-guide={scope==='worker'?'history-summary':undefined}
    aria-label="مجموع ساعات تأییدشده به تفکیک واحد فعالیت">
    <div className="ow-unit-hours__heading">
      <div><h3>{scope==='worker'?'خلاصه ساعات تأییدشده':'ساعات به تفکیک واحد فعالیت'}</h3>
@@ -147,6 +150,7 @@ function SectionTabs({value,onChange,options}) {
   return <nav className="ow-tabs" aria-label="بخش‌های عملیاتی">
     {options.map(([id,title])=><button key={id} type="button"
       className={value===id?'ow-tab is-selected':'ow-tab'}
+      data-swtb-guide={'nav-'+id}
       aria-current={value===id?'page':undefined}
       onClick={()=>onChange(id)}>{title}</button>)}
   </nav>
@@ -311,7 +315,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
   )
   if(!workerId)return <p className="ow-muted">یک دانشجوکار انتخاب کنید.</p>
   return <div className="ow-presence-hub">
-    <section className="ow-presence-week" aria-label="برنامه ثابت هفتگی">
+    <section className="ow-presence-week" data-swtb-guide="availability-week" aria-label="برنامه ثابت هفتگی">
       <div className="ow-presence-section-title">
         <h3>برنامه ثابت هفتگی</h3>
         <details className="ow-quiet-details"><summary>تاریخ اعمال</summary>
@@ -373,7 +377,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
       </div>
       <small className="ow-muted">هر روز مستقل ذخیره می‌شود. خانه خالی یعنی برنامه نامشخص، نه غیبت قطعی.</small>
     </section>
-    <section className="ow-presence-month" aria-label="تقویم حضور و استثناهای روزانه">
+    <section className="ow-presence-month" data-swtb-guide="availability-month" aria-label="تقویم حضور و استثناهای روزانه">
       <div className="ow-presence-section-title ow-month-heading">
         <h3>تقویم ماهانه · {month.title}</h3>
         <div className="ow-month-navigation">
@@ -1414,7 +1418,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
  * Each timeline item is ONE real work report's latest review state, ordered by
  * its work_date; this intentionally does not synthesize approval events/dates.
  */
-function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,refreshRevision=0}) {
+function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGuide,refreshRevision=0}) {
  const [view,setView]=useState('all')
  const [unitFilter,setUnitFilter]=useState('')
  const [selectedReportId,setSelectedReportId]=useState(null)
@@ -1450,13 +1454,15 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,refr
    :entry.review_state==='submitted'?'در انتظار بررسی':'تأییدشده نیست'
  return <section className="report-panel ow-worker-history-panel ow-b3-ledger"
    aria-label="سابقه گزارش‌ها و ساعات">
-   <div className="ow-history-heading">
+   <div className="ow-history-heading ow-b3-guide-heading ow-b3-guide-heading--history">
      <div><h2>سوابق گزارش‌ها و ساعات</h2>
        <p>دفتر پیگیری گزارش‌های ثبت‌شده؛ تاریخ هر ردیف، تاریخ انجام کار است، نه تاریخ رسیدگی مدیر.</p>
      </div>
+     <button type="button" className="swtb-guide-launch" data-swtb-guide="help-history"
+       onClick={()=>onGuide?.('history')}>؟ راهنمای این بخش</button>
    </div>
    <UnitHourSummary scope="worker" approvedTotal={total} refreshRevision={refreshRevision}/>
-   <div className="ow-history-controls">
+   <div className="ow-history-controls" data-swtb-guide="history-controls">
    <div className="ow-unit-history-filter">
      <label className="report-field"><span>فیلتر واحد انجام کار</span>
        <select aria-label="فیلتر واحد گزارش‌های من" value={unitFilter}
@@ -1537,7 +1543,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,refr
  </section>
 }
 
-function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal,onNavigate,refreshRevision=0}) {
+function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal,onNavigate,onGuide,refreshRevision=0}) {
  const [identity,setIdentity]=useState(null)
  const [identityOwner,setIdentityOwner]=useState(null)
  const [requests,setRequests]=useState([])
@@ -1648,16 +1654,18 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
     <p className="ow-muted">در حال بررسی دسترسی به مشخصات…</p>
   </section>
   return <section className="report-panel ow-self-profile">
-    <div className="ow-presence-section-title"><h2>حساب من</h2>
-      <span className="ow-status">زمان تأییدشده: {exactDuration(approvedTime)}</span></div>
-    <div className="ow-self-identity">
+    <div className="ow-presence-section-title ow-b3-guide-heading--profile"><h2>حساب من</h2>
+      <span className="ow-status">زمان تأییدشده: {exactDuration(approvedTime)}</span>
+      <button type="button" className="swtb-guide-launch" data-swtb-guide="help-profile"
+        onClick={()=>onGuide?.('profile')}>؟ راهنمای این بخش</button></div>
+    <div className="ow-self-identity" data-swtb-guide="profile-details">
       <div><small>نام و نام خانوادگی</small><strong>{identity?.name||'نامشخص'}</strong></div>
       <div><small>رشته تحصیلی</small><strong>{identity?.major||'ثبت نشده'}</strong></div>
       <div><small>سال ورود</small><strong>{identity?.entry_year||'ثبت نشده'}</strong></div>
       <div><small>واحد اولیهٔ ثبت‌نام</small><strong>{unitLabels[identity?.unit]||identity?.unit||'نامشخص'}</strong></div>
     </div>
-    <div className="ow-profile-change-launch">
-      <button type="button" ref={profileDialogTriggerRef}
+    <div className="ow-profile-change-launch" data-swtb-guide="profile-correction">
+      <button type="button" ref={profileDialogTriggerRef>
         className="report-btn report-btn--light ow-profile-change-trigger"
         aria-haspopup="dialog" aria-controls="ow-profile-change-dialog"
         onClick={()=>{setProfileTab('new');setEditing(true)}}>درخواست اصلاح و پیگیری</button>
@@ -1760,6 +1768,10 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const [submissionReceipt,setSubmissionReceipt]=useState(null)
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
   const [selectedTaskId,setSelectedTaskId]=useState(null)
+  const [guideWelcomeOpen,setGuideWelcomeOpen]=useState(false)
+  const [guideScope,setGuideScope]=useState(null)
+  const guideOfferedFor=useRef(null)
+  const guideReturnSection=useRef('tasks')
   const selected=navigation||localNavigation
   const updateNavigation=patch=>{
     const fn=previous=>({...previous,...patch})
