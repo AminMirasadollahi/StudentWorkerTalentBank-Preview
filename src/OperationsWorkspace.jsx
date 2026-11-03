@@ -1211,6 +1211,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
   const reportTriggerRef=useRef(null)
   const [date,setDate]=useState(today())
   const [requestExtra,setRequestExtra]=useState(false)
+  const [extraHelpOpen,setExtraHelpOpen]=useState(false)
   const [requested,setRequested]=useState(String(task.estimate_minutes))
   const [reasonCode,setReasonCode]=useState('')
   const [reasonText,setReasonText]=useState('')
@@ -1373,16 +1374,19 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
           }}/>
           درخواست زمان بیشتر
         </label>
-        <details className="ow-extra-help">
-          <summary title="راهنمای درخواست زمان بیشتر">
-            <span aria-hidden="true">ⓘ</span>
-            <span className="ow-extra-help-label">چه زمانی؟</span>
-          </summary>
-          <p>فقط وقتی زمان استاندارد برای انجام همین کار کافی نبوده است، این گزینه را انتخاب کنید؛
+        <button type="button" className="ow-extra-help-trigger"
+          aria-expanded={extraHelpOpen}
+          aria-controls={`ow-extra-help-${task.id}`}
+          aria-label="چه زمانی درخواست زمان بیشتر لازم است؟"
+          onClick={()=>setExtraHelpOpen(open=>!open)}>
+          <span aria-hidden="true">ⓘ</span> چه زمانی؟
+        </button>
+        <p id={`ow-extra-help-${task.id}`} className="ow-extra-help-note" hidden={!extraHelpOpen}>
+          فقط وقتی زمان استاندارد برای انجام همین کار کافی نبوده است، این گزینه را انتخاب کنید؛
           مثلاً حجم واقعی کار یا مانع پیش‌بینی‌نشده باعث طولانی‌شدن آن شده باشد.
           زمان کل موردنیاز و علت را وارد کنید. زمان اضافه صرفاً پس از بررسی و تأیید مدیر منظور می‌شود؛
-          حضور در محل به‌تنهایی دلیل درخواست زمان بیشتر نیست.</p>
-        </details>
+          حضور در محل به‌تنهایی دلیل درخواست زمان بیشتر نیست.
+        </p>
       </div>
       {requestExtra&&<div className="ow-extra-panel">
         <p>مجموع زمان و علت افزایش را وارد کنید؛ تأیید نهایی با مدیر است.</p>
