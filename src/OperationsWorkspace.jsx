@@ -19,6 +19,7 @@ import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persian
 import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonthBounds } from './lib/persianMonthCalendar.mjs'
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 import TaskAssignmentEditor from './components/TaskAssignmentEditor'
+import TeamScheduleOverview from './components/TeamScheduleOverview'
 import TermBudgetPanel from './components/TermBudgetPanel'
 // Load the optional manager surface ONLY after backend rollout explicitly enables it.
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
@@ -496,28 +497,6 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
       {saveState&&<p role="status" className="ow-muted">{saveState}</p>}
     </div>
   </div>
-}
-function AllWorkerTimeline({data}) {
- const workers=(data?.workers||[]).filter(w=>w.state==='active')
- const slots=data?.weekly_slots||[]
- return <div className="ow-all-workers-timeline" aria-label="نمای حضور هفتگی همه دانشجوکارها">
-   {dayLabels.map(([id,name])=>{
-     const date=firstMatchingWeekday(today(),id)
-     const entries=workers.flatMap(w=>selectedWeeklyWindows(slots,w.id,id,date)
-       .map(slot=>({key:w.id+'-'+slot.start,name:w.name,unit:w.unit,...slot})))
-       .sort((a,b)=>a.start.localeCompare(b.start)||a.name.localeCompare(b.name,'fa'))
-     return <div className="ow-team-day" key={id}>
-       <b>{name}</b>
-       <div className="ow-team-intervals">
-         {entries.map(e=><span className="ow-team-interval" key={e.key}>
-           <span dir="ltr">{e.start}–{e.end}</span>
-           <strong>{e.name}</strong>
-         </span>)}
-         {!entries.length&&<small>برنامه ثبت‌شده‌ای برای این روز موجود نیست.</small>}
-       </div>
-     </div>
-   })}
- </div>
 }
 function ApprovalCard({entry,task,worker,onDone}) {
   const standard=Number(task?.estimate_minutes ?? entry.reported_minutes)
@@ -1098,12 +1077,13 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       <h2>ظرفیت و برنامه دانشجوکارها</h2>
       <label className="report-field ow-worker-selector"><span>دانشجوکار</span>
         <select value={workerId} onChange={e=>setWorkerId(e.target.value)}>
-          <option value="">همه دانشجوکارها · تایم‌لاین هفتگی</option>
+          <option value="">همه دانشجوکارها · هفتگی و ماهانه</option>
           {active.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
       </label>
       {workerId?<ScheduleEditor key={workerId} workerId={workerId} data={data}
-        onSaved={refresh} onPlanAssignment={setAssignmentDialogDate}/>:<AllWorkerTimeline data={data}/>}
+        onSaved={refresh} onPlanAssignment={setAssignmentDialogDate}/>:<TeamScheduleOverview
+           data={data} todayIso={today()} onPlanAssignment={setAssignmentDialogDate}/>}
 
     </section>}
 
