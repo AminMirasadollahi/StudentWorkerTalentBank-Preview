@@ -20,6 +20,7 @@ import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonth
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 import TaskAssignmentEditor from './components/TaskAssignmentEditor'
 import TermBudgetPanel from './components/TermBudgetPanel'
+import TermMembershipPanel from './components/TermMembershipPanel'
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
  requestProfileChange,reviewProfileChange,getUnitHourTotals } from './lib/operationsV2'
 
@@ -32,6 +33,8 @@ const dateParts = new Intl.DateTimeFormat('en-US',{
 })
 const dayLabels = [[6,'شنبه'],[7,'یکشنبه'],[1,'دوشنبه'],[2,'سه‌شنبه'],[3,'چهارشنبه'],[4,'پنجشنبه'],[5,'جمعه']]
 const unitLabels = {library:'کتابخانه',public_relations:'روابط عمومی',research:'پژوهش'}
+// Safe default OFF until SWTB21A/B reviewed backend migrations are installed.
+const termMembershipUIEnabled=import.meta.env?.VITE_SWTB21_TERM_MEMBERSHIP_UI==='true'
 
 /** Complete, current-scope server aggregate, independent of bounded task/history rows.
  * Fail closed to an explicit unavailable message instead of displaying false zero totals. */
@@ -929,11 +932,14 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     </div>
     <SectionTabs value={view} onChange={setView} options={[
       ['inbox','کارتابل'],['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],['profiles','پروفایل‌ها'],['terms','نیمسال و سهمیه'],
+      ...(termMembershipUIEnabled?[['termMemberships','مجوز همکاری']]:[]),
     ]}/>
     {loading&&<p className="ow-muted">در حال دریافت اطلاعات…</p>}
     <Message error={error} notice={notice}/>
 
     {view==='terms'&&<TermBudgetPanel workers={workers} refreshRevision={refreshRevision}/>}
+    {termMembershipUIEnabled&&view==='termMemberships'&&<TermMembershipPanel
+      workers={workers} refreshRevision={refreshRevision}/>}
     {view==='inbox'&&<section className="report-panel">
       <div className="ow-presence-section-title ow-manager-inbox-heading">
         <h2>کارتابل رسیدگی</h2>
