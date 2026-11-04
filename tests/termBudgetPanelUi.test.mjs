@@ -20,7 +20,7 @@ const fixture=()=>({
 const fakePlugin={
  name:'swtb18-no-network-term-mount',enforce:'pre',
  resolveId(source,importer){
-  if(importer?.endsWith('/src/components/TermBudgetPanel.jsx')&&
+  if((importer?.endsWith('/src/components/TermBudgetPanel.jsx')||importer?.endsWith('/src/components/BudgetPoolEditor.jsx'))&&
      source==='../lib/operationsV2')return '\0fake-swtb18'
  },
  load(id){
@@ -28,6 +28,7 @@ const fakePlugin={
    'export const getOperationsTermDashboard=async a=>{globalThis.__termReads.push(a);if(globalThis.__termFail)throw Error("SYNTHETIC_NO_DATA");return globalThis.__termFixture};',
    'export const saveOperationsTerm=async a=>{globalThis.__termWrites.push(a);return {ok:true,term_id:"TERM-NEW"};};',
    'export const saveOperationsAllocation=async a=>{globalThis.__termWrites.push(a);return {ok:true};};',
+   'export const saveOperationsBudgetPool=async a=>{globalThis.__termWrites.push(a);return {ok:true};};',
   ].join('\n')
  }
 }
@@ -76,7 +77,7 @@ test('term explorer shows authoritative approved, pending and unknown quota with
  }finally{await teardown()}
 })
 test('no active term and missing API data cannot silently show fake financial amounts',async()=>{
- const empty={ok:true,term:null,terms:[],units:[],workers:[],weeks:[]}
+ const empty={ok:true,term:null,terms:[],units:[],workers:[],weeks:[],pools:[]}
  const {host,teardown}=await mount(empty)
  try{
   assert.match(host.textContent,/هنوز نیمسال فعال/)
