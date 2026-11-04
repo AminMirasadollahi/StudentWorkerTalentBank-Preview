@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
 import {workerGuideStorageKey} from './lib/workerGuide.mjs'
 import { trapModalTab } from './lib/dialogFocusTrap.mjs'
@@ -20,7 +20,8 @@ import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonth
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 import TaskAssignmentEditor from './components/TaskAssignmentEditor'
 import TermBudgetPanel from './components/TermBudgetPanel'
-import TermMembershipPanel from './components/TermMembershipPanel'
+// Load the optional manager surface ONLY after backend rollout explicitly enables it.
+const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
  requestProfileChange,reviewProfileChange,getUnitHourTotals } from './lib/operationsV2'
 
@@ -938,8 +939,9 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     <Message error={error} notice={notice}/>
 
     {view==='terms'&&<TermBudgetPanel workers={workers} refreshRevision={refreshRevision}/>}
-    {termMembershipUIEnabled&&view==='termMemberships'&&<TermMembershipPanel
-      workers={workers} refreshRevision={refreshRevision}/>}
+    {termMembershipUIEnabled&&view==='termMemberships'&&<Suspense fallback={<p className="ow-muted">در حال آماده‌سازی مجوزهای نیمسال…</p>}>
+      <TermMembershipPanel workers={workers} refreshRevision={refreshRevision}/>
+    </Suspense>}
     {view==='inbox'&&<section className="report-panel">
       <div className="ow-presence-section-title ow-manager-inbox-heading">
         <h2>کارتابل رسیدگی</h2>
