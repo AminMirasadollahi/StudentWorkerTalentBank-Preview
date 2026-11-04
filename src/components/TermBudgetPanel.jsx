@@ -2,6 +2,9 @@ import {useEffect,useMemo,useState} from 'react'
 import JalaliDatePicker from './JalaliDatePicker'
 import {getOperationsTermDashboard,saveOperationsTerm} from '../lib/operationsV2'
 import BudgetPoolEditor from './BudgetPoolEditor'
+import TermStatusDialog from './TermStatusDialog'
+import ManagerSettingsDialog from './ManagerSettingsDialog'
+import {AUTO_TERM_REASON,termChanged} from '../lib/termSettingsInput.mjs'
 import {faMinutes,poolTermTotals,allocationRatio,weekRows} from '../lib/termBudgetView.mjs'
 
 const fa=new Intl.NumberFormat('fa-IR')
@@ -9,68 +12,69 @@ const dateFa=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{dateStyle:'medium',ti
 const pretty=date=>date?dateFa.format(new Date(date+'T12:00:00Z')):'—'
 const unitName={library:'کتابخانه',research:'پژوهش',public_relations:'روابط عمومی'}
 const termStateName={draft:'پیش‌نویس',active:'فعال',closed:'بسته‌شده'}
-const updateTitle='علت تنظیم یا تغییر (برای ثبت در تاریخچه)'
 
 function TermEditor({term,onSave,onClose}){
  const editing=Boolean(term)
  const [label,setLabel]=useState(term?.label||'')
  const [start,setStart]=useState(term?.start_date||'')
  const [end,setEnd]=useState(term?.end_date||'')
- const [state,setState]=useState(term?.state||'draft')
  const [reason,setReason]=useState('')
  const [busy,setBusy]=useState(false)
  const [error,setError]=useState('')
  const locked=term?.state==='closed'
- const valid=label.trim().length>=4&&start&&end&&end>start&&reason.trim().length>=5
+ const modified=termChanged(term,{label,start,end})
+ const valid=label.trim().length>=4&&label.trim().length<=100&&start&&end&&
+  end>start&&(!editing||(modified&&reason.trim().length>=5))
  const submit=async event=>{
   event.preventDefault()
   if(busy||locked||!valid)return
   setBusy(true);setError('')
   try{
-   const response=await saveOperationsTerm({
+   const r=await saveOperationsTerm({
     termId:term?.id||null,label:label.trim(),startDate:start,endDate:end,
-    state:editing?state:'draft',reason:reason.trim(),
+    state:term?.state||'draft',reason:editing?reason.trim():AUTO_TERM_REASON,
    })
-   if(response?.ok!==true)throw Error('term_write_not_confirmed')
-   await onSave(response.term_id||term?.id)
-  }catch{setError('تأیید ذخیره نیمسال دریافت نشد. قبل از تلاش مجدد فهرست نیمسال‌ها را بازخوانی کنید.')}
-  finally{setBusy(false)}
+   if(r?.ok!==true)throw Error('term_write_unconfirmed')
+   await onSave(r.term_id||term?.id)
+  }catch{
+   setError('ذخیره نیمسال تأیید نشد. ابتدا فهرست را بازخوانی کنید و سپس دوباره اقدام کنید.')
+  }finally{setBusy(false)}
  }
- return <form className="ow-term-editor" onSubmit={submit} aria-label={editing?'ویرایش نیمسال':'تعریف نیمسال جدید'}>
-  <div className="ow-term-editor__title">
-   <strong>{editing?'ویرایش نیمسال':'تعریف نیمسال جدید'}</strong>
-   <button type="button" className="report-btn report-btn--light" onClick={onClose} disabled={busy}>بستن</button>
-  </div>
-  {locked&&<p className="ow-muted">نیمسال بسته‌شده فقط قابل مشاهده است و تنظیمات آن تغییر نمی‌کنند.</p>}
-  <div className="ow-term-fields">
+ return <ManagerSettingsDialog title={editing?'ویرایش مشخصات نیمسال':'تعریف نیمسال جدید'}
+    busy={busy} onClose={onClose}>
+  <form className="ow-compact-form" onSubmit={submit}>
+   {locked&&<p className="ow-muted">نیمسال بسته‌شده فقط قابل مشاهده است.</p>}
+   {!editing&&<p className="ow-muted">نیمسال ابتدا به‌صورت پیش‌نویس ثبت می‌شود تا پیش از فعال‌سازی بتوانید تاریخ‌ها و سهمیه‌ها را تعیین کنید.</p>}
    <label className="report-field"><span>عنوان نیمسال</span>
     <input required minLength={4} maxLength={100} disabled={locked||busy}
      value={label} onChange={e=>setLabel(e.target.value)} placeholder="مثلاً ۱۴۰۵–۱۴۰۶ / نیمسال اول"/>
    </label>
-   <div className="report-field"><span>شروع نیمسال (شمسی)</span>
-    <JalaliDatePicker value={start} onChange={setStart} ariaLabel="تاریخ شروع نیمسال" disabled={locked||busy||term?.state==='active'}/>
+   <div className="ow-term-fields ow-term-dates">
+    <div className="report-field"><span>شروع نیمسال (شمسی)</span>
+     <JalaliDatePicker value={start} onChange={setStart}
+       ariaLabel="تاریخ شروع نیمسال" disabled={locked||busy||term?.state==='active'}/>
+    </div>
+    <div className="report-field"><span>پایان نیمسال (شمسی)</span>
+     <JalaliDatePicker value={end} onChange={setEnd}
+       ariaLabel="تاریخ پایان نیمسال" disabled={locked||busy||term?.state==='active'}/>
+    </div>
    </div>
-   <div className="report-field"><span>پایان نیمسال (شمسی)</span>
-    <JalaliDatePicker value={end} onChange={setEnd} ariaLabel="تاریخ پایان نیمسال" disabled={locked||busy||term?.state==='active'}/>
-   </div>
-   {editing&&<label className="report-field"><span>وضعیت نیمسال</span>
-    <select value={state} disabled={locked||busy} onChange={e=>setState(e.target.value)}>
-     <option value="draft">پیش‌نویس</option>
-     {(term.state==='active'||term.state==='draft')&&<option value="active">فعال</option>}
-     {term.state==='active'&&<option value="closed">بسته‌شده</option>}
-    </select>
+   {term?.state==='active'&&<p className="ow-muted">تاریخ‌های نیمسال فعال برای حفظ انتساب سوابق قفل شده‌اند.</p>}
+   {editing&&modified&&<label className="report-field"><span>علت اصلاح مشخصات</span>
+    <input required minLength={5} maxLength={500} value={reason} disabled={locked||busy}
+     onChange={e=>setReason(e.target.value)} placeholder="مثلاً اصلاح تاریخ پایان طبق ابلاغ"/>
    </label>}
-  </div>
-  {term?.state==='active'&&<p className="ow-muted">تاریخ شروع و پایان نیمسال فعال قفل است؛ بستن نیمسال، تنظیمات سهمیه آن را فقط‌خواندنی می‌کند.</p>}
-  <label className="report-field"><span>{updateTitle}</span>
-   <input required minLength={5} maxLength={500} value={reason} disabled={locked||busy}
-    onChange={e=>setReason(e.target.value)} placeholder="مبنای تصمیم یا اصلاح را بنویسید"/>
-  </label>
-  {error&&<p role="alert" className="report-alert report-alert--error">{error}</p>}
-  {!locked&&<button className="report-btn report-btn--primary" type="submit" disabled={busy||!valid}>
-    {busy?'در حال ثبت…':'ذخیره نیمسال'}
-   </button>}
- </form>
+   {!editing&&<p className="ow-compact-hint">ایجاد اولیه همراه با نام مدیر و زمان ثبت، خودکار در سوابق ذخیره می‌شود.</p>}
+   {editing&&!modified&&<p className="ow-compact-hint">هنوز تغییری برای ذخیره انجام نشده است.</p>}
+   {error&&<p role="alert" className="report-alert report-alert--error">{error}</p>}
+   <div className="ow-compact-form-actions">
+    <button type="button" className="report-btn report-btn--light" onClick={onClose} disabled={busy}>انصراف</button>
+    {!locked&&<button type="submit" className="report-btn report-btn--primary" disabled={busy||!valid}>
+      {busy?'در حال ثبت…':editing?'ذخیره تغییرات':'ثبت پیش‌نویس'}
+    </button>}
+   </div>
+  </form>
+ </ManagerSettingsDialog>
 }
 
 export default function TermBudgetPanel({workers=[],refreshRevision=0}){
@@ -81,6 +85,7 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
  const [load,setLoad]=useState({state:'loading',data:null})
  const [termEditor,setTermEditor]=useState(undefined)
  const [editPool,setEditPool]=useState(undefined)
+ const [termStatus,setTermStatus]=useState(null)
  const [notice,setNotice]=useState('')
  useEffect(()=>{
   let alive=true
@@ -106,7 +111,7 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
  const userNames=new Map(workers.map(w=>[w.id,w.name]))
  const canChange=term&&term.state!=='closed'&&!workerId
  const finish=async nextId=>{
-   setTermEditor(undefined);setEditPool(undefined)
+   setTermEditor(undefined);setEditPool(undefined);setTermStatus(null)
    if(nextId){setTermId(nextId)}
    setRevision(v=>v+1)
    setNotice('تغییر ثبت شد؛ آمار از سرور بازخوانی می‌شود.')
@@ -124,7 +129,7 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
   </div>
   <div className="ow-term-filters">
    <label className="report-field"><span>نیمسال</span>
-    <select aria-label="فیلتر نیمسال" value={termId} onChange={e=>{setTermId(e.target.value);setTermEditor(undefined);setEditPool(undefined)}}>
+    <select aria-label="فیلتر نیمسال" value={termId} onChange={e=>{setTermId(e.target.value);setTermEditor(undefined);setEditPool(undefined);setTermStatus(null)}}>
      <option value="">نیمسال فعال (در صورت تعریف)</option>
      {(data?.terms||[]).map(t=><option key={t.id} value={t.id}>{t.label} · {termStateName[t.state]||t.state}</option>)}
     </select>
@@ -150,6 +155,8 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
   </div>}
   {termEditor!==undefined&&<TermEditor key={termEditor?.id||'new'} term={termEditor}
     onClose={()=>setTermEditor(undefined)} onSave={finish}/>}
+  {termStatus&&term&&<TermStatusDialog key={term.id+'-'+termStatus}
+    term={term} pools={pools} onSaved={finish} onClose={()=>setTermStatus(null)}/>}
   {load.state==='ready'&&!term&&<div className="ow-term-empty">
    <strong>هنوز نیمسال فعال برای گزارش‌گیری تعیین نشده است.</strong>
    <p className="ow-muted">یک نیمسال با تاریخ‌های رسمی تعریف کنید؛ پس از آن می‌توانید سهمیه واحدها را ثبت و آمار واقعی دوره را ببینید. ارقام نمونه به‌طور خودکار ثبت نمی‌شوند.</p>
@@ -157,10 +164,28 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
   {term&&load.state==='ready'&&<>
    <div className="ow-term-context">
     <div><strong>{term.label}</strong>
-      <small>{pretty(term.start_date)} تا {pretty(term.end_date)} · {termStateName[term.state]||term.state}</small></div>
-    <button type="button" className="report-btn report-btn--light"
-      onClick={()=>{setEditPool(undefined);setTermEditor(term)}}>تنظیمات نیمسال</button>
+      <small>{pretty(term.start_date)} تا {pretty(term.end_date)}</small>
+      <small className="ow-term-status-explainer">
+       {term.state==='draft'?'پیش‌نویس · هنوز فعال نیست؛ تاریخ‌ها و سهمیه‌ها قابل تنظیم‌اند.':
+        term.state==='active'?'فعال · تاریخ‌ها و عضویت واحدها قفل شده‌اند.':
+        'بسته‌شده · اطلاعات فقط قابل مشاهده‌اند.'}
+      </small>
+    </div>
+    <div className="ow-term-context-actions">
+     <span className={'ow-term-status-pill ow-term-status-pill--'+term.state}>
+      {termStateName[term.state]||term.state}</span>
+     <button type="button" className="report-btn report-btn--light"
+       onClick={()=>{setEditPool(undefined);setTermStatus(null);setTermEditor(term)}}>ویرایش نیمسال</button>
+     {term.state==='draft'&&!workerId&&<button type="button" className="report-btn report-btn--primary"
+       disabled={pools.length===0} title={pools.length===0?'ابتدا سهمیه را تعریف کنید':''}
+       onClick={()=>{setTermEditor(undefined);setEditPool(undefined);setTermStatus('active')}}>فعال‌سازی نیمسال</button>}
+     {term.state==='active'&&!workerId&&<button type="button" className="report-btn report-btn--light"
+       onClick={()=>{setTermEditor(undefined);setEditPool(undefined);setTermStatus('closed')}}>بستن نیمسال</button>}
+    </div>
    </div>
+   {term.state==='draft'&&pools.length===0&&<p className="ow-compact-hint">
+      پس از ثبت سهمیه‌ها و تأیید تاریخ پایان، می‌توانید نیمسال را فعال کنید.
+   </p>}
    {workerId&&<p role="status" className="ow-term-warning">نمای فردی فعال است؛ سهمیه واحد به کل دانشجوکارها تعلق دارد، بنابراین «مانده سهمیه واحد» برای یک نفر محاسبه نمی‌شود.</p>}
    <div className="ow-term-kpis" aria-label="شاخص‌های نیمسال">
     <article><small>ساعات تأییدشده</small><strong>{faMinutes(total.approved)}</strong></article>
@@ -172,12 +197,12 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
     </article>
    </div>
    <div className="ow-term-section-title">
-    <h3>گروه‌های سهمیه مصوب</h3>
+    <h3>سهمیه‌های مصوب</h3>
     <small>هر گروه یک سقف دارد؛ مصرف تمام واحدهای عضو از همان سقف کسر می‌شود</small>
     {canChange&&<button type="button" className="report-btn report-btn--light"
-      onClick={()=>{setTermEditor(undefined);setEditPool(null)}}>+ تعریف گروه سهمیه</button>}
+      onClick={()=>{setTermEditor(undefined);setEditPool(null)}}>+ تعریف سهمیه</button>}
    </div>
-   {pools.length===0&&<p className="ow-muted">برای این نیمسال هنوز گروه سهمیه تعریف نشده است. مثلاً می‌توانید یک گروه مشترک برای کتابخانه و پژوهش و یک گروه مستقل برای روابط عمومی ایجاد کنید.</p>}
+   {pools.length===0&&<p className="ow-muted">برای این نیمسال هنوز سهمیه‌ای ثبت نشده است. هنگام افزودن سهمیه، یک یا چند واحد را انتخاب کنید؛ نام سهمیه خودکار ساخته می‌شود.</p>}
    <div className="ow-term-pools">
     {pools.map(p=><article key={p.id} className="ow-term-pool">
      <div className="ow-term-unit-head">
