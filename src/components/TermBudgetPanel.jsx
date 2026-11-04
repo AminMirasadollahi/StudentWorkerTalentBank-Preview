@@ -1,7 +1,8 @@
 import {useEffect,useMemo,useState} from 'react'
 import JalaliDatePicker from './JalaliDatePicker'
-import {getOperationsTermDashboard,saveOperationsTerm,saveOperationsAllocation} from '../lib/operationsV2'
-import {faMinutes,fromHourMinuteInputs,toHourMinuteInputs,termTotals,allocationRatio,weekRows} from '../lib/termBudgetView.mjs'
+import {getOperationsTermDashboard,saveOperationsTerm} from '../lib/operationsV2'
+import BudgetPoolEditor from './BudgetPoolEditor'
+import {faMinutes,poolTermTotals,allocationRatio,weekRows} from '../lib/termBudgetView.mjs'
 
 const fa=new Intl.NumberFormat('fa-IR')
 const dateFa=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{dateStyle:'medium',timeZone:'UTC'})
@@ -72,70 +73,6 @@ function TermEditor({term,onSave,onClose}){
  </form>
 }
 
-function AllocationEditor({term,unit,onSave,onClose}){
- const initial=toHourMinuteInputs(unit.allocated_minutes)
- const [hours,setHours]=useState(initial.hours)
- const [minutes,setMinutes]=useState(initial.minutes)
- const [reason,setReason]=useState('')
- const [removeConfirm,setRemoveConfirm]=useState(false)
- const [busy,setBusy]=useState(false)
- const [error,setError]=useState('')
- const computed=fromHourMinuteInputs(hours,minutes)
- const send=async remove=>{
-  if(busy||reason.trim().length<5||(!remove&&computed===null))return
-  setBusy(true);setError('')
-  try{
-   const r=await saveOperationsAllocation({
-    termId:term.id,unit:unit.unit,minutes:remove?null:computed,reason:reason.trim(),
-   })
-   if(r?.ok!==true)throw Error('allocation_write_not_confirmed')
-   await onSave()
-  }catch{setError('نتیجه تغییر سهمیه روشن نیست. ابتدا داده‌ها را بازخوانی کنید و سپس دوباره اقدام کنید.')}
-  finally{setBusy(false)}
- }
- return <div className="ow-term-editor ow-term-allocation-editor" aria-label={'تنظیم سهمیه '+unit.name}>
-  <div className="ow-term-editor__title"><strong>سهمیه {unit.name||unitName[unit.unit]}</strong>
-   <button className="report-btn report-btn--light" type="button" onClick={onClose} disabled={busy}>بستن</button>
-  </div>
-  <p className="ow-muted">سهمیه به دقیقه در دیتابیس ذخیره می‌شود. خالی‌بودن سهمیه با مقدار صفر متفاوت است.</p>
-  <div className="ow-term-fields ow-term-budget-hours">
-   <label className="report-field"><span>ساعت</span>
-    <input type="number" aria-label="ساعت سهمیه" min={0} max={33333} step={1}
-     value={hours} disabled={busy} onChange={e=>setHours(e.target.value)}/>
-   </label>
-   <label className="report-field"><span>دقیقه (۰ تا ۵۹)</span>
-    <input type="number" aria-label="دقیقه سهمیه" min={0} max={59} step={1}
-     value={minutes} disabled={busy} onChange={e=>setMinutes(e.target.value)}/>
-   </label>
-   <div className="ow-term-allocation-result">
-    <small>سهمیه پیشنهادی</small>
-    <strong>{computed===null?'—':faMinutes(computed)}</strong>
-   </div>
-  </div>
-  <label className="report-field"><span>{updateTitle}</span>
-   <input minLength={5} maxLength={500} value={reason} disabled={busy}
-    onChange={e=>setReason(e.target.value)} placeholder="مثلاً بر اساس ابلاغ سهمیه این نیمسال"/>
-  </label>
-  {error&&<p role="alert" className="report-alert report-alert--error">{error}</p>}
-  <div className="ow-term-actions">
-   <button type="button" className="report-btn report-btn--primary"
-    disabled={busy||computed===null||reason.trim().length<5} onClick={()=>{void send(false)}}>
-    {busy?'در حال ثبت…':'ثبت سهمیه'}
-   </button>
-   {unit.allocated_minutes!==null&&unit.allocated_minutes!==undefined&&
-    <button type="button" className="report-btn report-btn--light"
-      disabled={busy} onClick={()=>setRemoveConfirm(v=>!v)}>
-      حذف سهمیه تعریف‌شده
-    </button>}
-  </div>
-  {removeConfirm&&<div className="ow-term-remove-confirm">
-   <p>با حذف سهمیه، مقدار آن «تعریف‌نشده» می‌شود؛ ساعات تأییدشده دانشجوکارها حذف نمی‌شوند.</p>
-   <button type="button" className="report-btn report-btn--light"
-    disabled={busy||reason.trim().length<5} onClick={()=>{void send(true)}}>تأیید حذف سهمیه</button>
-  </div>}
- </div>
-}
-
 export default function TermBudgetPanel({workers=[],refreshRevision=0}){
  const [termId,setTermId]=useState('')
  const [unitFilter,setUnitFilter]=useState('')
@@ -143,7 +80,7 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
  const [revision,setRevision]=useState(0)
  const [load,setLoad]=useState({state:'loading',data:null})
  const [termEditor,setTermEditor]=useState(undefined)
- const [editAllocation,setEditAllocation]=useState(null)
+ const [editPool,setEditPool]=useState(undefined)
  const [notice,setNotice]=useState('')
  useEffect(()=>{
   let alive=true
@@ -152,7 +89,8 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
    .then(r=>{
     if(!alive)return
     if(r?.ok!==true||!Array.isArray(r.terms)||!Array.isArray(r.units)||
-       !Array.isArray(r.weeks)||!Array.isArray(r.workers))throw Error('invalid_term_summary')
+       !Array.isArray(r.weeks)||!Array.isArray(r.workers)||
+       !Array.isArray(r.pools))throw Error('invalid_term_summary')
     setLoad({state:'ready',data:r})
    }).catch(()=>{if(alive)setLoad({state:'error',data:null})})
   return()=>{alive=false}
@@ -160,13 +98,15 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
  const data=load.data
  const term=data?.term||null
  const unitRows=data?.units||[]
- const total=termTotals(unitRows,Boolean(workerId))
+ const pools=data?.pools||[]
+ const pooledUnits=new Map(pools.flatMap(p=>(p.units||[]).map(unit=>[unit,p])))
+ const total=poolTermTotals(unitRows,pools,{workerSlice:Boolean(workerId),unitFilter:Boolean(unitFilter)})
  const weeks=useMemo(()=>weekRows(data?.weeks||[]),[data])
  const maxWeek=Math.max(1,...weeks.map(w=>w.minutes))
  const userNames=new Map(workers.map(w=>[w.id,w.name]))
  const canChange=term&&term.state!=='closed'&&!workerId
  const finish=async nextId=>{
-   setTermEditor(undefined);setEditAllocation(null)
+   setTermEditor(undefined);setEditPool(undefined)
    if(nextId){setTermId(nextId)}
    setRevision(v=>v+1)
    setNotice('تغییر ثبت شد؛ آمار از سرور بازخوانی می‌شود.')
@@ -179,12 +119,12 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
    <div className="ow-term-heading-actions">
     <button type="button" className="report-btn report-btn--light" onClick={()=>setRevision(v=>v+1)}>بازخوانی</button>
     <button type="button" className="report-btn report-btn--primary"
-     onClick={()=>{setEditAllocation(null);setTermEditor(null)}}>+ تعریف نیمسال</button>
+     onClick={()=>{setEditPool(undefined);setTermEditor(null)}}>+ تعریف نیمسال</button>
    </div>
   </div>
   <div className="ow-term-filters">
    <label className="report-field"><span>نیمسال</span>
-    <select aria-label="فیلتر نیمسال" value={termId} onChange={e=>{setTermId(e.target.value);setTermEditor(undefined);setEditAllocation(null)}}>
+    <select aria-label="فیلتر نیمسال" value={termId} onChange={e=>{setTermId(e.target.value);setTermEditor(undefined);setEditPool(undefined)}}>
      <option value="">نیمسال فعال (در صورت تعریف)</option>
      {(data?.terms||[]).map(t=><option key={t.id} value={t.id}>{t.label} · {termStateName[t.state]||t.state}</option>)}
     </select>
@@ -219,7 +159,7 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
     <div><strong>{term.label}</strong>
       <small>{pretty(term.start_date)} تا {pretty(term.end_date)} · {termStateName[term.state]||term.state}</small></div>
     <button type="button" className="report-btn report-btn--light"
-      onClick={()=>{setEditAllocation(null);setTermEditor(term)}}>تنظیمات نیمسال</button>
+      onClick={()=>{setEditPool(undefined);setTermEditor(term)}}>تنظیمات نیمسال</button>
    </div>
    {workerId&&<p role="status" className="ow-term-warning">نمای فردی فعال است؛ سهمیه واحد به کل دانشجوکارها تعلق دارد، بنابراین «مانده سهمیه واحد» برای یک نفر محاسبه نمی‌شود.</p>}
    <div className="ow-term-kpis" aria-label="شاخص‌های نیمسال">
@@ -228,38 +168,67 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
     <article><small>کارِ بدون گزارش (برآورد)</small><strong>{faMinutes(total.planned)}</strong></article>
     <article><small>مانده نسبت به سهمیه</small>
      <strong>{total.remaining===null?'—':faMinutes(total.remaining)}</strong>
-     {total.remaining===null&&<small>{workerId?'فقط در نمای همه دانشجوکارها':'حداقل یک واحد بدون سهمیه'}</small>}
+     {total.remaining===null&&<small>{workerId?'مانده جمعی برای یک نفر تعریف نمی‌شود':unitFilter?'جمع کل در فیلتر یک واحد قابل محاسبه نیست':'حداقل یک واحد بدون سهمیه'}</small>}
     </article>
    </div>
-   <div className="ow-term-section-title"><h3>سهمیه و مصرف به تفکیک واحد</h3>
-    <small>دقیقه‌های تأییدشده منبع رسمی مصرف هستند</small>
+   <div className="ow-term-section-title">
+    <h3>گروه‌های سهمیه مصوب</h3>
+    <small>هر گروه یک سقف دارد؛ مصرف تمام واحدهای عضو از همان سقف کسر می‌شود</small>
+    {canChange&&<button type="button" className="report-btn report-btn--light"
+      onClick={()=>{setTermEditor(undefined);setEditPool(null)}}>+ تعریف گروه سهمیه</button>}
    </div>
-   <div className="ow-term-units">
-    {unitRows.map(u=><article key={u.unit}>
-      <div className="ow-term-unit-head"><strong>{u.name||unitName[u.unit]||u.unit}</strong>
-       {canChange&&<button type="button" className="ow-mini-btn"
-         onClick={()=>{setTermEditor(undefined);setEditAllocation(u.unit)}}>تنظیم سهمیه</button>}
+   {pools.length===0&&<p className="ow-muted">برای این نیمسال هنوز گروه سهمیه تعریف نشده است. مثلاً می‌توانید یک گروه مشترک برای کتابخانه و پژوهش و یک گروه مستقل برای روابط عمومی ایجاد کنید.</p>}
+   <div className="ow-term-pools">
+    {pools.map(p=><article key={p.id} className="ow-term-pool">
+     <div className="ow-term-unit-head">
+      <div><strong>{p.label}</strong>
+       <small>واحدهای عضو: {(p.units||[]).map(u=>unitName[u]||u).join(' + ')}</small>
       </div>
-      <div className="ow-term-unit-figures">
-       <div><small>سهمیه</small><strong>{u.allocated_minutes===null?'تعریف نشده':faMinutes(u.allocated_minutes)}</strong></div>
-       <div><small>تأییدشده</small><strong>{faMinutes(u.approved_minutes)}</strong></div>
-       <div><small>مانده</small><strong>{u.remaining_minutes===null?'—':faMinutes(u.remaining_minutes)}</strong></div>
-      </div>
-      {allocationRatio(u.approved_minutes,u.allocated_minutes)!==null&&!workerId&&
-       <div className="ow-term-progress" aria-label={'درصد مصرف سهمیه '+u.name}>
-        <span style={{width:allocationRatio(u.approved_minutes,u.allocated_minutes)+'%'}}/>
+      {canChange&&<button type="button" className="ow-mini-btn"
+        onClick={()=>{setTermEditor(undefined);setEditPool(p)}}>ویرایش سهمیه</button>}
+     </div>
+     <div className="ow-term-unit-figures">
+      <div><small>سهمیه کل گروه</small><strong>{faMinutes(p.allocated_minutes)}</strong></div>
+      <div><small>زمان تأییدشده گروه</small><strong>{faMinutes(p.approved_minutes)}</strong></div>
+      <div><small>مانده گروه</small><strong>{p.remaining_minutes===null?'—':faMinutes(p.remaining_minutes)}</strong></div>
+     </div>
+     {allocationRatio(p.approved_minutes,p.allocated_minutes)!==null&&!workerId&&
+       <div className="ow-term-progress" aria-label={'درصد مصرف سهمیه مشترک '+p.label}>
+        <span style={{width:allocationRatio(p.approved_minutes,p.allocated_minutes)+'%'}}/>
        </div>}
-      <small>{fa.format(u.pending_reports)} گزارش منتظر بررسی · {faMinutes(u.pending_minutes)} درخواستی</small>
-      <small>{fa.format(u.unreported_tasks)} کار بدون گزارش · برآورد {faMinutes(u.unreported_estimate_minutes)}</small>
+     <small>{fa.format(p.pending_reports)} گزارش منتظر بررسی · {faMinutes(p.pending_minutes)} درخواستی</small>
+     <small>{fa.format(p.unreported_tasks)} کار بدون گزارش · {faMinutes(p.unreported_estimate_minutes)} برآورد</small>
+     {Boolean(unitFilter)&&!workerId&&<small className="ow-pool-shared-notice">اعداد مصرف و مانده این گروه، مجموع تمام واحدهای عضو هستند؛ فقط به واحد فیلترشده محدود نشده‌اند.</small>}
+     {Boolean(workerId)&&<small className="ow-pool-shared-notice">زمان مصرف‌شده مربوط به دانشجوکار انتخابی است؛ مانده سهمیه جمعی نمایش داده نمی‌شود.</small>}
     </article>)}
    </div>
-   {canChange&&editAllocation&&unitRows.some(u=>u.unit===editAllocation)&&<AllocationEditor
-    key={term.id+'-'+editAllocation}
-    term={term} unit={unitRows.find(u=>u.unit===editAllocation)}
-    onClose={()=>setEditAllocation(null)} onSave={()=>finish(null)}/>}
+   {canChange&&editPool!==undefined&&<BudgetPoolEditor
+     key={term.id+'-'+(editPool?.id||'new')} term={term} pool={editPool}
+     allPools={pools} onSaved={()=>finish(null)} onClose={()=>setEditPool(undefined)}/>}
+   <div className="ow-term-section-title">
+    <h3>سهم هر واحد در مصرف ساعات</h3>
+    <small>تفکیک فعالیت واحدها؛ بدون تکرار سهمیه مشترک</small>
+   </div>
+   <div className="ow-term-units">
+    {unitRows.map(u=>{
+      const pool=pooledUnits.get(u.unit)
+      return <article key={u.unit}>
+       <div className="ow-term-unit-head"><strong>{u.name||unitName[u.unit]||u.unit}</strong></div>
+       <small>{pool?'عضو سهمیه مشترک «'+pool.label+'»':
+         u.allocated_minutes===null?'بدون سهمیه تعریف‌شده':'سهمیه مستقل: '+faMinutes(u.allocated_minutes)}</small>
+       <div className="ow-term-unit-figures">
+        <div><small>تأییدشده این واحد</small><strong>{faMinutes(u.approved_minutes)}</strong></div>
+        <div><small>در انتظار بررسی</small><strong>{faMinutes(u.pending_minutes)}</strong></div>
+        <div><small>کار بدون گزارش</small><strong>{faMinutes(u.unreported_estimate_minutes)}</strong></div>
+       </div>
+       {!pool&&u.allocated_minutes!==null&&u.allocated_minutes!==undefined&&
+         <small>مانده سهمیه مستقل: {u.remaining_minutes===null?'—':faMinutes(u.remaining_minutes)}</small>}
+      </article>
+    })}
+   </div>
    <details className="ow-term-context-help"><summary>مبنای محاسبات و تفاوت وضعیت‌ها</summary>
     <p>«تأییدشده» مجموع دقایق مصوب مدیر بر اساس تاریخ واقعی انجام و واحد همان وظیفه است؛ «در انتظار» فقط زمان درخواست‌شده برای گزارش‌های ثبت‌شده و هنوز تأییدنشده است. «بدون گزارش» برآورد وظایفی است که هنوز گزارشی برای آن‌ها ثبت نشده. وضعیت‌های ردشده و نیازمند اصلاح، مصرف قطعی نیستند.</p>
-    <p>مقدار صفر سهمیه، تصمیم صریح مدیریتی است؛ سهمیه تعریف‌نشده اطلاعات ناموجود محسوب می‌شود. این نسخه سقف سهمیه را خودکار روی واگذاری یا تأیید ساعت اعمال نمی‌کند.</p>
+    <p>مقدار صفر سهمیه تصمیم صریح است؛ نبود سهمیه یعنی اطلاعات ناموجود. سهمیه گروه مشترک برای هر واحد تکرار نمی‌شود. در فیلتر یک واحد، مانده گروه مشترک همچنان با احتساب مصرف تمام اعضای گروه محاسبه می‌شود. این نسخه سقف را خودکار روی واگذاری یا تأیید ساعت اعمال نمی‌کند.</p>
    </details>
    <div className="ow-term-section-title"><h3>روند ساعات تأییدشده</h3><small>تجمیع هفتگی از روز شنبه</small></div>
    {weeks.length===0?<p className="ow-muted">هنوز ساعتی در این محدوده تأیید نشده است.</p>:
