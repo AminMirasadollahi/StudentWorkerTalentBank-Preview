@@ -1,0 +1,46 @@
+name: SWTB20 native Chrome manager-dialog acceptance (synthetic only)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/TermBudgetPanel.jsx'
+      - 'src/components/BudgetPoolEditor.jsx'
+      - 'src/components/TermStatusDialog.jsx'
+      - 'src/components/ManagerSettingsDialog.jsx'
+      - 'src/components/JalaliDatePicker.jsx'
+      - 'src/lib/termSettingsInput.mjs'
+      - 'src/operations-workspace.css'
+      - 'tests/browser/*manager-term*'
+      - 'tests/browser/vite.smoke.config.mjs'
+      - '.github/workflows/swtb20-manager-visual.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install existing preview dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install one-run-only Playwright and jsdom (not app dependencies)
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1 jsdom@26.1.0
+      - name: Verify synthetic-only native Chrome manager flows
+        run: node tests/browser/run-manager-term-smoke.mjs
+      - name: Upload fake-only visual acceptance images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swtb20-manager-dialogs-synthetic
+          path: test-results/swtb20-manager-dialogs/*.png
+          if-no-files-found: ignore
+          retention-days: 5
+      - name: Confirm no real project credentials required
+        run: echo "Synthetic fixtures only; no real Supabase connection and no deployment."
