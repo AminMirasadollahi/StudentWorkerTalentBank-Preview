@@ -1802,3 +1802,66 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-membership-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
  .ow-membership-head { align-items:flex-start; }
 }
+
+
+/* SWTB21-C: team calendar — same weekly/monthly visual grammar as a worker,
+   but density-aware summaries and a viewport-accessible drilldown. */
+.ow-teamcal .ow-presence-section-title {
+  display:flex; gap:.6rem; align-items:center; justify-content:space-between; flex-wrap:wrap;
+}
+.ow-teamcal .ow-presence-section-title>div:first-child { min-width:0; }
+.ow-teamcal .ow-presence-section-title h3 { margin:0 0 .18rem; }
+.ow-teamcal .ow-month-navigation { display:flex; gap:.28rem; flex-wrap:wrap; }
+.ow-teamcal-weekdays { display:grid; gap:.35rem; }
+.ow-teamcal-week-row {
+  width:100%; padding:.55rem .65rem; text-align:start;
+  border:1px solid var(--report-border, #dbe5ea); border-radius:.65rem;
+  background:#fff; display:grid; grid-template-columns:minmax(5rem,6.8rem) minmax(0,1fr);
+  align-items:center; gap:.7rem; color:inherit; cursor:pointer;
+}
+.ow-teamcal-week-row:is(:hover,:focus-visible) {
+  outline:2px solid rgba(15,136,133,.32); outline-offset:1px;
+  background:#f6fbfa;
+}
+.ow-teamcal-week-row.is-today { border-color:rgba(15,136,133,.5); }
+.ow-teamcal-week-date,.ow-teamcal-week-content { min-width:0; display:grid; gap:.2rem; }
+.ow-teamcal-week-date small { color:var(--report-muted,#667b88); font-size:.7rem; }
+.ow-teamcal-counts { font-size:.76rem; font-weight:700; color:var(--report-navy,#12364d); }
+.ow-teamcal-chip-list { display:flex; flex-wrap:wrap; gap:.25rem; min-width:0; }
+.ow-teamcal-chip-list small { color:var(--report-muted,#667b88); font-size:.68rem; }
+.ow-teamcal-chip {
+  max-width:11rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  padding:.13rem .4rem; border-radius:.4rem; background:#eaf6f4;
+  color:#115e5c; font-size:.68rem;
+}
+.ow-teamcal-month-grid .ow-month-day { min-height:4.3rem; padding:.4rem .25rem; }
+.ow-teamcal-month-grid .ow-month-day b { font-size:.85rem; }
+.ow-teamcal-day-planned { font-weight:600; color:#10746e; }
+.ow-teamcal-day .ow-day-task { max-width:100%; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; }
+.ow-teamcal-dialog { width:min(46rem,calc(100vw - 2rem)); max-height:calc(100dvh - 2rem); overflow-y:auto; }
+.ow-teamcal-detail { display:grid; gap:.75rem; }
+.ow-teamcal-dialog .ow-presence-section-title { align-items:center; }
+.ow-teamcal-show-all { display:flex; align-items:center; gap:.5rem; font-size:.8rem; cursor:pointer; }
+.ow-teamcal-person-list { display:grid; gap:.5rem; }
+.ow-teamcal-person {
+  border:1px solid var(--report-border,#dbe5ea); border-radius:.65rem;
+  padding:.65rem .75rem; display:grid; gap:.45rem;
+}
+.ow-teamcal-person>div:first-child { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.45rem; }
+.ow-teamcal-person>div:first-child small { color:var(--report-muted,#667b88); }
+.ow-teamcal-person>p { margin:0; font-size:.78rem; overflow-wrap:anywhere; }
+.ow-teamcal-person-tasks { display:grid; gap:.35rem; }
+.ow-teamcal-person-tasks>div { display:flex; gap:.5rem; align-items:baseline; flex-wrap:wrap;
+ padding:.42rem .6rem; border-radius:.45rem; background:#f1f7f8; }
+.ow-teamcal-person-tasks strong { font-size:.76rem; }
+.ow-teamcal-person-tasks small { font-size:.7rem; color:var(--report-muted,#667b88); }
+.ow-teamcal-dialog-actions { display:flex; justify-content:flex-start; }
+@media(max-width:1000px) {
+  .ow-teamcal { grid-template-columns:1fr; }
+}
+@media(max-width:480px) {
+  .ow-teamcal-week-row { grid-template-columns:minmax(4.5rem,5rem) minmax(0,1fr);gap:.35rem; }
+  .ow-teamcal-month-grid .ow-month-day { min-height:3.7rem; }
+  .ow-teamcal-day .ow-day-task { font-size:.55rem; }
+  .ow-teamcal-chip { max-width:7rem; }
+}
