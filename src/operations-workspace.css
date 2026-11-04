@@ -1775,3 +1775,30 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-term-dates{grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){.ow-manager-dialog{scroll-behavior:auto}}
+
+
+/* SWTB21B — compact, deliberate worker-term eligibility management.
+ * Loaded only after explicitly enabling the preview feature flag. */
+.ow-membership .ow-worker-selector { max-width: 29rem; margin: 0 0 1rem; }
+.ow-membership-head { display:flex; justify-content:space-between; align-items:center; gap:1rem;
+  padding:.75rem 1rem; border:1px solid var(--line, #d7e2e7); border-radius:.75rem; }
+.ow-membership-head > div { display:grid; gap:.35rem; }
+.ow-membership-head small { color:var(--muted, #536779); }
+.ow-membership-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.55rem; margin:.75rem 0; }
+.ow-membership-metrics article { display:grid; gap:.4rem; padding:.7rem .85rem;
+  border:1px solid var(--line, #d7e2e7); border-radius:.7rem; min-width:0; }
+.ow-membership-metrics article small { color:var(--muted, #536779); }
+.ow-membership-metrics article b { font-size:1.15rem; }
+.ow-membership-explainer { max-width:85ch; line-height:1.85; }
+.ow-membership-actions { display:flex; gap:.7rem; align-items:center; flex-wrap:wrap; margin:1rem 0; }
+.ow-membership-table-wrap { overflow-x:auto; border:1px solid var(--line,#d7e2e7); border-radius:.75rem; }
+.ow-membership-table { width:100%; border-collapse:collapse; min-width:36rem; text-align:right; }
+.ow-membership-table th,.ow-membership-table td { padding:.75rem .85rem; border-bottom:1px solid var(--line,#d7e2e7); vertical-align:middle; }
+.ow-membership-table thead { background:rgba(126,157,172,.07); }
+.ow-membership-table tbody tr:last-child td { border-bottom:0; }
+.ow-membership-ack { display:flex; gap:.6rem; align-items:center; cursor:pointer; line-height:1.8; }
+.ow-membership-ack input { flex:none; }
+@media(max-width:800px){
+ .ow-membership-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .ow-membership-head { align-items:flex-start; }
+}
