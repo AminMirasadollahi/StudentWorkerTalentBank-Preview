@@ -70,7 +70,7 @@ function UnitHourSummary({scope,approvedTotal=null,refreshRevision=0}) {
        </small>}
      </article>)}
    </div>}
-   {scope==='admin'&&<p className="ow-muted">سقف ساعت واحدها در سامانه تعریف نشده است.</p>}
+   {scope==='admin'&&<p className="ow-muted">برای مشاهده مصرف هر نیمسال و تنظیم سهمیه‌ها، تب «نیمسال و سهمیه» را انتخاب کنید.</p>}
  </section>
 }
 
