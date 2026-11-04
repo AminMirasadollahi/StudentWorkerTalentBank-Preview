@@ -34,8 +34,10 @@ const dateParts = new Intl.DateTimeFormat('en-US',{
 })
 const dayLabels = [[6,'شنبه'],[7,'یکشنبه'],[1,'دوشنبه'],[2,'سه‌شنبه'],[3,'چهارشنبه'],[4,'پنجشنبه'],[5,'جمعه']]
 const unitLabels = {library:'کتابخانه',public_relations:'روابط عمومی',research:'پژوهش'}
-// Safe default OFF until SWTB21A/B reviewed backend migrations are installed.
-const termMembershipUIEnabled=import.meta.env?.VITE_SWTB21_TERM_MEMBERSHIP_UI==='true'
+// SWTB21A/B are now installed in the sole Supabase project, with enforcement
+// in observation mode. Show the admin-only permissions view by default; a
+// build-time 'false' remains an emergency UI rollback without schema changes.
+const termMembershipUIEnabled=import.meta.env?.VITE_SWTB21_TERM_MEMBERSHIP_UI!=='false'
 
 /** Complete, current-scope server aggregate, independent of bounded task/history rows.
  * Fail closed to an explicit unavailable message instead of displaying false zero totals. */
