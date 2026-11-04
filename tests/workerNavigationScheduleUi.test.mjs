@@ -136,7 +136,8 @@ async function setup(){
 test('one worker tasks tab, range choices and safely preserved selection after unmount/resume',async()=>{
  const ui=await setup()
  try{
-  assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,4)
+  assert.deepEqual([...ui.host.querySelectorAll('.ow-tabs button')].map(b=>b.textContent.trim()),
+    ['کارهای من','فرصت‌های کاری','زمان حضور','سوابق گزارش‌ها','حساب من'])
   assert.ok(ui.host.querySelector('.ow-range-switch'))
   assert.equal(ui.host.querySelectorAll('.ow-worker-tasks .ow-item').length,1)
   const reports=ui.host.querySelector('.ow-worker-action-detail')
@@ -148,7 +149,8 @@ test('one worker tasks tab, range choices and safely preserved selection after u
   assert.equal(ui.host.querySelector('.ow-workspace'),null)
   await ui.click('[data-testid="resume"]')
   assert.equal(ui.host.querySelector('[aria-pressed="true"]').textContent,'این هفته')
-  assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,4)
+  assert.deepEqual([...ui.host.querySelectorAll('.ow-tabs button')].map(b=>b.textContent.trim()),
+    ['کارهای من','فرصت‌های کاری','زمان حضور','سوابق گزارش‌ها','حساب من'])
  }finally{await ui.dispose()}
 })
 test('seven weekday rows render four independent slots and safe per-day single RPC request',async()=>{
@@ -181,7 +183,8 @@ test('worker exposes This Month and personal profile without permanent password 
   await ui.clickText('حساب من')
   assert.ok(ui.host.querySelector('.ow-self-profile'))
   assert.ok(ui.host.textContent.includes('سوابق گزارش‌ها'))
-  assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,4)
+  assert.deepEqual([...ui.host.querySelectorAll('.ow-tabs button')].map(b=>b.textContent.trim()),
+    ['کارهای من','فرصت‌های کاری','زمان حضور','سوابق گزارش‌ها','حساب من'])
  }finally{await ui.dispose()}
 })
 test('month view edits one dated exception through injected fake RPC only',async()=>{
@@ -980,7 +983,8 @@ test('profile contains identity and one correction entry; canonical task/history
   assert.ok(ui.host.querySelector('.ow-worker-task-workspace'))
   await ui.clickText('سوابق گزارش‌ها')
   assert.ok(ui.host.querySelector('.ow-worker-history-panel'))
-  assert.equal(ui.host.querySelectorAll('.ow-tabs button').length,4)
+  assert.deepEqual([...ui.host.querySelectorAll('.ow-tabs button')].map(b=>b.textContent.trim()),
+    ['کارهای من','فرصت‌های کاری','زمان حضور','سوابق گزارش‌ها','حساب من'])
  }finally{await ui.dispose()}
 })
 test('worker homepage is action-first and preserves the familiar date drilldown',async()=>{
