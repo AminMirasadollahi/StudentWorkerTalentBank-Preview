@@ -190,7 +190,7 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
      <div className="ow-term-unit-figures">
       <div><small>سهمیه کل گروه</small><strong>{faMinutes(p.allocated_minutes)}</strong></div>
       <div><small>زمان تأییدشده گروه</small><strong>{faMinutes(p.approved_minutes)}</strong></div>
-      <div><small>مانده گروه</small><strong>{p.remaining_minutes===null?'—':faMinutes(p.remaining_minutes)}</strong></div>
+      <div><small>مانده گروه</small><strong>{workerId||p.remaining_minutes===null?'—':faMinutes(p.remaining_minutes)}</strong></div>
      </div>
      {allocationRatio(p.approved_minutes,p.allocated_minutes)!==null&&!workerId&&
        <div className="ow-term-progress" aria-label={'درصد مصرف سهمیه مشترک '+p.label}>
