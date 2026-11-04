@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {faMinutes,fromHourMinuteInputs,toHourMinuteInputs,termTotals,allocationRatio,weekRows} from '../src/lib/termBudgetView.mjs'
+import {faMinutes,fromHourMinuteInputs,toHourMinuteInputs,termTotals,allocationRatio,weekRows,poolTermTotals} from '../src/lib/termBudgetView.mjs'
 
 test('exact minutes, negative remaining, zero, unset are distinct',()=>{
  assert.equal(faMinutes(null),'—')
@@ -36,4 +36,22 @@ test('weekly chart groups backend units without double counting',()=>{
   {week_start:'2030-01-05',unit:'research',approved_minutes:25},
   {week_start:'2030-01-12',unit:'library',approved_minutes:40},
  ]),[{date:'2030-01-05',minutes:85},{date:'2030-01-12',minutes:40}])
+})
+
+test('a combined library/research allowance is not counted twice',()=>{
+ const units=[
+  {unit:'library',approved_minutes:9000,allocated_minutes:null},
+  {unit:'research',approved_minutes:4200,allocated_minutes:null},
+  {unit:'public_relations',approved_minutes:3000,allocated_minutes:null},
+ ]
+ const pools=[
+  {id:'combined',units:['library','research'],allocated_minutes:24660},
+  {id:'pr',units:['public_relations'],allocated_minutes:6000},
+ ]
+ const whole=poolTermTotals(units,pools)
+ assert.equal(whole.allocated,30660)
+ assert.equal(whole.approved,16200)
+ assert.equal(whole.remaining,14460)
+ assert.equal(poolTermTotals(units,pools,{workerSlice:true}).remaining,null)
+ assert.equal(poolTermTotals(units.slice(0,1),pools,{unitFilter:true}).remaining,null)
 })

@@ -8,9 +8,10 @@ const v2=[
  'export const assignLibraryDeskShift=async args=>{if(!globalThis.__qaPermitDesk)throw Error("QA_NO_BOOKING");(globalThis.__qaDeskCalls??=[]).push(args);return {ok:true};};',
  'export const cancelLibraryDeskShift=async args=>{if(!globalThis.__qaPermitDeskCancel)throw Error("QA_NO_CANCELLATION");globalThis.__qaDeskCancels.push(args);globalThis.__qaDeskShifts=globalThis.__qaDeskShifts.map(s=>s.id===args.shiftId?{...s,state:"cancelled"}:s);return {ok:true,state:"cancelled"};};',
  'export const getUnitHourTotals=async()=>({scope:"worker",units:[{unit:"library",name:"کتابخانه",approved_minutes:0,pending_requested_minutes:30,pending_reports:1},{unit:"public_relations",name:"روابط عمومی و رسانه",approved_minutes:50,pending_requested_minutes:0,pending_reports:0},{unit:"research",name:"پژوهش",approved_minutes:55,pending_requested_minutes:45,pending_reports:1}]});',
- 'export const getOperationsTermDashboard=async()=>({ok:true,term:null,terms:[],units:[],workers:[],weeks:[]});',
+ 'export const getOperationsTermDashboard=async()=>({ok:true,term:null,terms:[],units:[],workers:[],weeks:[],pools:[]});',
  'export const saveOperationsTerm=async()=>{throw Error("BROWSER_TERM_WRITE_FORBIDDEN")};',
  'export const saveOperationsAllocation=async()=>{throw Error("BROWSER_BUDGET_WRITE_FORBIDDEN")};',
+ 'export const saveOperationsBudgetPool=async()=>{throw Error("BROWSER_POOL_WRITE_FORBIDDEN")};',
  'export const getMyWorkV2=async()=>globalThis.__qaWorkerData;',
  'export const getMyWorkerProfileV2=async()=>({worker_id:"SWTB_CHROMIUM_SYNTHETIC_WORKER",name:"دانشجوکار ساختگی",major:"رشته ساختگی",entry_year:"1405",unit:"library"});',
  'export const getMyProfileChangeRequests=async()=>globalThis.__qaProfileRequests;',
@@ -33,7 +34,7 @@ const isolates={
    if(source==='./lib/operationsV2')return '\0swtb7-fake-v2'
    if(source==='./lib/operations')return '\0swtb7-fake-legacy'
   }
-  if(from.endsWith('/src/components/TermBudgetPanel.jsx')&&source==='../lib/operationsV2')
+  if((from.endsWith('/src/components/TermBudgetPanel.jsx')||from.endsWith('/src/components/BudgetPoolEditor.jsx'))&&source==='../lib/operationsV2')
     return '\0swtb7-fake-v2'
   if(from.endsWith('/src/components/TaskAssignmentEditor.jsx')){
    if(source==='../lib/operationsV2')return '\0swtb7-fake-v2'

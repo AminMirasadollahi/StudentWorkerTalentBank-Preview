@@ -7,10 +7,20 @@ import {createServer} from 'vite'
 const fixture=()=>({
  ok:true,term:{id:'TERM-SYNTH',label:'نیمسال آزمایشی',start_date:'2030-01-01',end_date:'2030-06-30',state:'active'},
  terms:[{id:'TERM-SYNTH',label:'نیمسال آزمایشی',start_date:'2030-01-01',end_date:'2030-06-30',state:'active'}],
+ pools:[
+  {id:'G1',label:'کتابخانه و پژوهش',units:['library','research'],allocated_minutes:24660,
+   approved_minutes:165,pending_minutes:60,pending_reports:1,unreported_tasks:1,
+   unreported_estimate_minutes:90,remaining_minutes:24495},
+  {id:'G2',label:'روابط عمومی',units:['public_relations'],allocated_minutes:6000,
+   approved_minutes:0,pending_minutes:0,pending_reports:0,unreported_tasks:0,
+   unreported_estimate_minutes:0,remaining_minutes:6000},
+ ],
  units:[
   {unit:'library',name:'کتابخانه',allocated_minutes:600,approved_minutes:120,pending_minutes:60,
    pending_reports:1,unreported_tasks:1,unreported_estimate_minutes:90,remaining_minutes:480},
   {unit:'research',name:'پژوهش',allocated_minutes:null,approved_minutes:45,pending_minutes:0,
+   pending_reports:0,unreported_tasks:0,unreported_estimate_minutes:0,remaining_minutes:null},
+  {unit:'public_relations',name:'روابط عمومی',allocated_minutes:null,approved_minutes:0,pending_minutes:0,
    pending_reports:0,unreported_tasks:0,unreported_estimate_minutes:0,remaining_minutes:null},
  ],
  workers:[{worker_id:'FAKE-A',unit:'library',approved_minutes:120,pending_minutes:0}],
@@ -20,7 +30,7 @@ const fixture=()=>({
 const fakePlugin={
  name:'swtb18-no-network-term-mount',enforce:'pre',
  resolveId(source,importer){
-  if(importer?.endsWith('/src/components/TermBudgetPanel.jsx')&&
+  if((importer?.endsWith('/src/components/TermBudgetPanel.jsx')||importer?.endsWith('/src/components/BudgetPoolEditor.jsx'))&&
      source==='../lib/operationsV2')return '\0fake-swtb18'
  },
  load(id){
@@ -28,6 +38,7 @@ const fakePlugin={
    'export const getOperationsTermDashboard=async a=>{globalThis.__termReads.push(a);if(globalThis.__termFail)throw Error("SYNTHETIC_NO_DATA");return globalThis.__termFixture};',
    'export const saveOperationsTerm=async a=>{globalThis.__termWrites.push(a);return {ok:true,term_id:"TERM-NEW"};};',
    'export const saveOperationsAllocation=async a=>{globalThis.__termWrites.push(a);return {ok:true};};',
+   'export const saveOperationsBudgetPool=async a=>{globalThis.__termWrites.push(a);return {ok:true};};',
   ].join('\n')
  }
 }
@@ -64,7 +75,9 @@ test('term explorer shows authoritative approved, pending and unknown quota with
  try{
   assert.match(host.textContent,/نیمسال آزمایشی/)
   assert.match(host.textContent,/در انتظار بررسی/)
-  assert.match(host.textContent,/تعریف نشده/)
+  assert.match(host.textContent,/کتابخانه و پژوهش/)
+  assert.match(host.textContent,/۴۱۱ ساعت/)
+  assert.match(host.textContent,/۱۰۰ ساعت/)
   assert.match(host.textContent,/سهمیه/)
   assert.equal(globalThis.__termWrites.length,0)
   const select=host.querySelector('[aria-label="فیلتر دانشجوکار بودجه"]')
@@ -76,7 +89,7 @@ test('term explorer shows authoritative approved, pending and unknown quota with
  }finally{await teardown()}
 })
 test('no active term and missing API data cannot silently show fake financial amounts',async()=>{
- const empty={ok:true,term:null,terms:[],units:[],workers:[],weeks:[]}
+ const empty={ok:true,term:null,terms:[],units:[],workers:[],weeks:[],pools:[]}
  const {host,teardown}=await mount(empty)
  try{
   assert.match(host.textContent,/هنوز نیمسال فعال/)

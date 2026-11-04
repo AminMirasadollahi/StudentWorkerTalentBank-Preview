@@ -59,3 +59,9 @@ export const saveOperationsAllocation=({termId,unit,minutes,reason})=>
   p_term_id:termId,p_unit_code:unit,p_allocated_minutes:minutes,
   p_reason:reason,
  })
+
+export const saveOperationsBudgetPool=({id=null,termId,label,units,minutes,reason})=>
+ rpc('ops_save_operations_budget_pool',{
+  p_id:id||null,p_term_id:termId,p_label:label,p_unit_codes:units,
+  p_allocated_minutes:minutes,p_reason:reason,
+ })

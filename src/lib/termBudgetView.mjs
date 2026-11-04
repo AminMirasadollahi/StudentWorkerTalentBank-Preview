@@ -48,3 +48,20 @@ export const weekRows=(weeks=[])=>{
  }
  return [...map.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([date,minutes])=>({date,minutes}))
 }
+
+/** Topline remains deliberately unknown for partial unit/person slicers.
+ * Pooled allocations count ONCE, no matter how many member work units exist.
+ * Stand-alone quotas count only for units that are not pooled. */
+export const poolTermTotals=(unitRows=[],pools=[],{workerSlice=false,unitFilter=false}={})=>{
+ const usage=termTotals(unitRows,workerSlice)
+ const pooledUnits=new Set(pools.flatMap(p=>p.units||[]))
+ const uncovered=unitRows.filter(u=>!pooledUnits.has(u.unit)&&
+   (u.allocated_minutes===null||u.allocated_minutes===undefined))
+ const shared=pools.reduce((sum,p)=>sum+(Number(p.allocated_minutes)||0),0)
+ const standalone=unitRows.filter(u=>!pooledUnits.has(u.unit))
+  .reduce((sum,u)=>sum+(Number(u.allocated_minutes)||0),0)
+ const complete=!workerSlice&&!unitFilter&&!uncovered.length
+ const allocation=complete?shared+standalone:null
+ return {...usage,allocated:allocation,remaining:complete?allocation-usage.approved:null,
+   allocationPartial:!complete,pooledUnits:[...pooledUnits]}
+}

@@ -1700,3 +1700,22 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-term-unit-figures {grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media(prefers-reduced-motion:reduce){.ow-term-progress span {transition:none}}
+
+/* SWTB19 budget pools: one allocation can fund several work units. */
+.ow-term-pools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem}
+.ow-term-pool{border:1px solid #b5ddd8;border-radius:.7rem;background:#f8fcfb;
+  padding:.88rem;display:grid;gap:.65rem;min-width:0}
+.ow-term-pool .ow-term-unit-head>div{display:grid;gap:.3rem}
+.ow-term-pool .ow-term-unit-head small{color:#527479;font-size:.75rem}
+.ow-term-pool>small{color:#526d75;font-size:.75rem}
+.ow-pool-shared-notice{border-right:3px solid #218b83;padding-right:.65rem;
+  font-size:.75rem!important;color:#315a5d!important;line-height:1.9}
+.ow-pool-unit-fieldset{border:1px solid #dae6e9;border-radius:.6rem;padding:.8rem;min-width:0}
+.ow-pool-unit-fieldset legend{font-size:.82rem;font-weight:650;padding:0 .3rem}
+.ow-pool-unit-choices{display:flex;gap:.7rem;flex-wrap:wrap}
+.ow-pool-unit-choice{display:flex;align-items:center;gap:.35rem;border:1px solid #d9e5e8;
+  border-radius:.55rem;padding:.55rem .65rem;font-size:.84rem}
+.ow-pool-unit-choice small{color:#8a5551;font-size:.7rem}
+.ow-pool-unit-choice:has(:disabled){opacity:.75}
+.ow-term-units .ow-term-unit-figures strong{font-size:.85rem}
+@media(max-width:850px){.ow-term-pools{grid-template-columns:minmax(0,1fr)}}
