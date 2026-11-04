@@ -101,7 +101,11 @@ export default function JalaliDatePicker({
         aria-haspopup="dialog"
         onClick={() => setOpened(o => !o)}
         onKeyDown={e => {
-          if (e.key === 'Escape') setOpened(false)
+          if (e.key === 'Escape' && opened) {
+            e.preventDefault()
+            e.stopPropagation()
+            setOpened(false)
+          }
         }}
       >
         <span>{value ? selectedFormatter.format(toDate(value)) : 'انتخاب تاریخ'}</span>
@@ -112,7 +116,14 @@ export default function JalaliDatePicker({
       </button>
       {opened && (
         <div className="jd-popup" role="dialog" aria-label="انتخاب تاریخ از تقویم شمسی" dir="rtl"
-          onKeyDown={e => { if (e.key === 'Escape') setOpened(false) }}>
+          onKeyDown={e => {
+            if (e.key === 'Escape') {
+              e.preventDefault()
+              e.stopPropagation()
+              setOpened(false)
+              containerRef.current?.querySelector('.jd-control')?.focus()
+            }
+          }}>
           <div className="jd-heading">
             <button type="button" className="jd-arrow" aria-label="ماه قبل" onClick={() => stepMonth(-1)}>‹</button>
             <strong>{titleFormatter.format(toDate(base))}</strong>
