@@ -35,7 +35,9 @@ jobs:
         run: npm install --no-save --no-package-lock --no-audit --no-fund jsdom@26.1.0
       - name: Verify protected public baselines and synthetic task/history/React tests
         run: node --test tests/*.test.mjs
-      - name: Build EXACT public Vite entrypoint — without any deployment
+      - name: Build EXACT public Vite entrypoint with SWTB21B manager UI — without deployment
+        env:
+          VITE_SWTB21_TERM_MEMBERSHIP_UI: 'true'
         run: npm run build
       - name: Confirm normal HTML entry does not load synthetic QA
         run: |
