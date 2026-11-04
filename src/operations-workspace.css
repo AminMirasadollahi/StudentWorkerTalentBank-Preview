@@ -1865,3 +1865,21 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
   .ow-teamcal-day .ow-day-task { font-size:.55rem; }
   .ow-teamcal-chip { max-width:7rem; }
 }
+
+
+/* SWTB21-C3: worker self/team switch, consistent with compact B3 design.
+   Coworker surface remains read-only; only self presence editor has writes. */
+.ow-worker-presence-view-switch { display:flex; flex-wrap:wrap; gap:.35rem;
+  margin:.4rem 0 .8rem; padding:.28rem; border:1px solid var(--report-border,#d6e2e8);
+  background:#f5f9fa; border-radius:.7rem; width:fit-content; }
+.ow-worker-presence-view-switch>button { border:0; border-radius:.5rem; cursor:pointer;
+  padding:.43rem .8rem; font:inherit; font-size:.82rem; background:transparent; color:var(--report-navy,#153348); }
+.ow-worker-presence-view-switch>button.is-selected { background:#158b83; color:white; font-weight:700; }
+.ow-worker-presence-view-switch>button:focus-visible { outline:2px solid #135e89; outline-offset:2px; }
+.ow-worker-team-calendar { display:grid; gap:.65rem; min-width:0; }
+.ow-worker-team-calendar-notice { border:1px solid #d3eae6; background:#f3faf8;
+  padding:.65rem .8rem; border-radius:.7rem; }
+.ow-worker-team-calendar-notice>p { color:var(--report-muted,#56717d);
+  font-size:.78rem; line-height:1.75; margin:.2rem 0 0; }
+.ow-worker-team-calendar .ow-teamcal-dialog-actions { display:none; }
+.ow-worker-team-calendar>.report-alert { max-width:100%; }
