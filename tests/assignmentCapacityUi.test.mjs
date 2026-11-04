@@ -36,7 +36,8 @@ const plugin={
     if((importer?.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operationsV2')
       ||(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operationsV2')
       ||(importer?.endsWith('/src/components/TermBudgetPanel.jsx')&&source==='../lib/operationsV2')
-      ||(importer?.endsWith('/src/components/BudgetPoolEditor.jsx')&&source==='../lib/operationsV2'))
+      ||(importer?.endsWith('/src/components/BudgetPoolEditor.jsx')&&source==='../lib/operationsV2')
+      ||(importer?.endsWith('/src/components/TermStatusDialog.jsx')&&source==='../lib/operationsV2'))
       return '\0qa-v2-no-network'
     if(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operations')
       return '\0qa-operations-no-network'
