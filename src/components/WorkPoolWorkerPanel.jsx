@@ -52,10 +52,10 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
     throw Error('claim_not_confirmed')
    keys.current.requests.delete(item.id)
    setUncertainId('')
+   await load()
    setNotice(receipt.replayed===true
      ?'انتخاب قبلی تأیید شد؛ وظیفه تکراری ساخته نشده است.'
      :'انتخاب کار ثبت شد. ثبت ساعت و تأیید نهایی، مراحل جداگانه‌اند.')
-   await load()
    onClaimed?.(receipt.task_id)
   }catch{
    // Lost HTTP response is ambiguous: preserve same key for explicit retry.
