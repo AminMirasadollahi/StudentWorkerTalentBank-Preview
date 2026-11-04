@@ -1,4 +1,4 @@
-import {useLayoutEffect,useMemo,useRef,useState} from 'react'
+import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react'
 import {plusIsoDays,persianMonthCells,previousPersianMonth,nextPersianMonth} from '../lib/persianMonthCalendar.mjs'
 import {persianWeekBounds} from '../lib/weeklyScheduleGrid.mjs'
 import {projectTeamDay,projectTeamCalendarDays} from '../lib/teamCalendarProjection.mjs'
@@ -12,7 +12,7 @@ const weekdayLabels=['شنبه','یکشنبه','دوشنبه','سه‌شنبه',
 const unitNames={library:'کتابخانه',research:'پژوهش',public_relations:'روابط عمومی'}
 const taskStates={
  assigned:'واگذار شده',in_progress:'در حال انجام',submitted:'گزارش ارسال‌شده',
- needs_changes:'نیازمند اصلاح',completed:'تکمیل‌شده',unknown:'وضعیت نامشخص',
+ needs_changes:'نیازمند اصلاح',completed:'تکمیل‌شده',scheduled:'کار ثبت‌شده',unknown:'وضعیت نامشخص',
 }
 const dayName=iso=>pretty.format(new Date(iso+'T12:00:00Z'))
 const presenceName=kind=>kind==='weekly'?'برنامه ثابت'
@@ -21,7 +21,8 @@ const presenceName=kind=>kind==='weekly'?'برنامه ثابت'
 const isVisiblePerson=person=>person.hasPlan||person.hasTask||person.kind==='unavailable'
 const accessibleName=row=>`${dayName(row.date)}؛ ${fa.format(row.plannedWorkers)} نفر دارای برنامه، ${fa.format(row.taskCount)} کار واگذارشده؛ برای جزئیات انتخاب کنید`
 
-export default function TeamScheduleOverview({data,todayIso,onPlanAssignment}){
+export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
+ audience='manager',onVisibleRangeChange=null}){
  const [weekAnchor,setWeekAnchor]=useState(todayIso)
  const [monthAnchor,setMonthAnchor]=useState(todayIso)
  const [selectedDate,setSelectedDate]=useState('')
@@ -36,6 +37,11 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment}){
  const dailyByDate=useMemo(()=>new Map(monthRows.map(row=>[row.date,row])),[monthRows])
  const selected=useMemo(()=>selectedDate?projectTeamDay(data,selectedDate):null,[data,selectedDate])
  const people=selected?.people.filter(p=>showAll||isVisiblePerson(p))||[]
+ const teamLabel=audience==='worker'?'همکاران':'همه دانشجوکاران'
+ useEffect(()=>{
+  onVisibleRangeChange?.({weekStart:week.start,weekEnd:week.end,
+   monthStart:month.start,monthEnd:month.end})
+ },[week.start,week.end,month.start,month.end,onVisibleRangeChange])
  useLayoutEffect(()=>{
   const dialog=dateDialogRef.current
   if(!dialog)return
@@ -62,10 +68,10 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment}){
  const backToToday=()=>{
   setMonthAnchor(todayIso);setWeekAnchor(todayIso);closeDay()
  }
- return <div className="ow-presence-hub ow-teamcal" aria-label="برنامه مشترک هفتگی و ماهانه دانشجوکاران">
+ return <div className="ow-presence-hub ow-teamcal" aria-label={`برنامه مشترک هفتگی و ماهانه ${teamLabel}`}>
    <section className="ow-presence-week ow-teamcal-week" aria-label="نمای هفتگی همه دانشجوکاران">
      <div className="ow-presence-section-title">
-       <div><h3>برنامه هفتگی · همه دانشجوکاران</h3>
+       <div><h3>برنامه هفتگی · {teamLabel}</h3>
          <small className="ow-muted">بازه {dayName(week.start)} تا {dayName(week.end)}</small></div>
        <div className="ow-month-navigation">
          <button className="ow-mini-btn" type="button" onClick={()=>moveWeek(-1)}>هفته قبل</button>

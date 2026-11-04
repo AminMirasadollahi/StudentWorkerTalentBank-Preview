@@ -66,9 +66,9 @@ export const saveOperationsBudgetPool=({id=null,termId,label,units,minutes,reaso
   p_allocated_minutes:minutes,p_reason:reason,
  })
 
-// SWTB21-B: manager-only term eligibility status, changes and explicit
-// enforcement activation. These RPCs are NOT installed on live Supabase yet.
-// The optional UI is disabled by default until its audited backend rollout.
+// SWTB21-B: manager-only term eligibility and explicit assignment-gate mode.
+// Both RPC contracts are installed. The default gate is OBSERVE and remains
+// disabled until the manager explicitly reviews real term eligibility.
 export const getTermAccessOverview=termId=>
  rpc('ops_get_term_access_overview',{p_term_id:termId})
 export const setWorkerTermMembership=({workerId,termId,eligibility,reason=null})=>
@@ -80,3 +80,9 @@ export const setTermAccessMode=({termId,mode,reason})=>
  rpc('ops_set_term_access_mode',{
   p_term_id:termId,p_mode:mode,p_reason:reason,
  })
+
+// SWTB21-C2/C3: student-worker-only, privacy-minimal team calendar.
+// The server derives the caller from auth.uid(); never send worker_id or
+// fetch the privileged manager operations payload for a worker browser.
+export const getWorkerTeamCalendar=({from,to})=>
+ rpc('ops_get_team_calendar',{p_start_date:from,p_end_date:to})

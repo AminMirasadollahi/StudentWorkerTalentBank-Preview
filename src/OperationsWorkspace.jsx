@@ -23,6 +23,8 @@ import TeamScheduleOverview from './components/TeamScheduleOverview'
 import TermBudgetPanel from './components/TermBudgetPanel'
 // Load the optional manager surface ONLY after backend rollout explicitly enables it.
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
+// Worker view loads only on explicit team switch; never fetch admin operations.
+const WorkerTeamCalendar = lazy(()=>import('./components/WorkerTeamCalendar'))
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
  requestProfileChange,reviewProfileChange,getUnitHourTotals } from './lib/operationsV2'
 
@@ -1790,6 +1792,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const [localNavigation,setLocalNavigation]=useState({section:'tasks',taskRange:'today'})
   const [submissionReceipt,setSubmissionReceipt]=useState(null)
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
+  const [availabilityView,setAvailabilityView]=useState('mine')
   const [selectedTaskId,setSelectedTaskId]=useState(null)
   const [guideWelcomeOpen,setGuideWelcomeOpen]=useState(false)
   const [guideScope,setGuideScope]=useState(null)
@@ -1896,6 +1899,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     try{if(key)window.localStorage.setItem(key,'seen')}catch{}
   }
   const openWorkerGuide=scope=>{
+    if(scope==='availability'||scope==='all')setAvailabilityView('mine')
     rememberGuideOffer()
     setGuideWelcomeOpen(false)
     setSelectedTaskId(null)
@@ -2082,7 +2086,20 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         <button type="button" className="swtb-guide-launch" data-swtb-guide="help-availability"
           onClick={()=>openWorkerGuide('availability')}>؟ راهنمای این بخش</button>
       </div>
-      <ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
+      <div className="ow-worker-presence-view-switch" role="group" aria-label="نمای برنامه حضور">
+        <button type="button" aria-pressed={availabilityView==='mine'}
+          className={availabilityView==='mine'?'is-selected':''}
+          onClick={()=>setAvailabilityView('mine')}>برنامه من</button>
+        <button type="button" aria-pressed={availabilityView==='team'}
+          className={availabilityView==='team'?'is-selected':''}
+          onClick={()=>setAvailabilityView('team')}>برنامه همکاران</button>
+      </div>
+      {availabilityView==='mine'
+        ?<ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
+        :<Suspense fallback={<p className="ow-muted" role="status">در حال آماده‌سازی تقویم همکاران…</p>}>
+          <WorkerTeamCalendar key={profile.worker_id} todayIso={today()}
+            refreshRevision={refreshRevision}/>
+        </Suspense>}
     </section>}
     {!settingsOpen&&section==='history'&&<WorkerReportHistory tasks={tasks} records={records}
       onGuide={openWorkerGuide} refreshRevision={refreshRevision} approvedMinutesTotal={data.approved_minutes_total}
