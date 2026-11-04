@@ -116,7 +116,10 @@ test('mounted worker team view has weekly/month, generic work and no manager edi
   const anyDay=host.querySelector('.ow-teamcal-week-row')
   assert.ok(anyDay)
   await act(async()=>anyDay.click())
-  assert.ok(host.querySelector('dialog[open]'))
+  const dayDialog=host.querySelector('dialog[open]')
+  assert.ok(dayDialog)
+  assert.match(dayDialog.textContent,/کار ثبت‌شده/)
+  assert.doesNotMatch(dayDialog.textContent,/وضعیت نامشخص|PRIVATE_/)
  }finally{await cleanup()}
 })
 test('failed refreshed authorization hides all previously loaded coworker data',async()=>{
