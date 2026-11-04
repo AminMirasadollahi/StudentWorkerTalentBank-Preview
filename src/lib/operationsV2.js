@@ -80,3 +80,9 @@ export const setTermAccessMode=({termId,mode,reason})=>
  rpc('ops_set_term_access_mode',{
   p_term_id:termId,p_mode:mode,p_reason:reason,
  })
+
+// SWTB21-C2/C3: student-worker-only, privacy-minimal team calendar.
+// The server derives the caller from auth.uid(); never send worker_id or
+// fetch the privileged manager operations payload for a worker browser.
+export const getWorkerTeamCalendar=({from,to})=>
+ rpc('ops_get_team_calendar',{p_start_date:from,p_end_date:to})
