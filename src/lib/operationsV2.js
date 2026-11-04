@@ -42,3 +42,20 @@ export const assignLibraryDeskShift=({workerIds,date,startMinute,endMinute,title
  })
 export const cancelLibraryDeskShift=({shiftId,reason})=>
  rpc('ops_cancel_library_desk_shift',{p_shift_id:shiftId,p_reason:reason})
+
+// SWTB18: authority for historical term budgets is the server, never the
+// clipped manager list. All calls are manager-only, through database guards.
+export const getOperationsTermDashboard=({termId=null,unit=null,workerId=null}={})=>
+ rpc('ops_get_operations_term_dashboard',{
+  p_term_id:termId||null,p_unit_code:unit||null,p_worker_id:workerId||null,
+ })
+export const saveOperationsTerm=({termId=null,label,startDate,endDate,state,reason})=>
+ rpc('ops_save_operations_term',{
+  p_id:termId||null,p_label:label,p_start_date:startDate,
+  p_end_date:endDate,p_state:state,p_reason:reason,
+ })
+export const saveOperationsAllocation=({termId,unit,minutes,reason})=>
+ rpc('ops_save_operations_allocation',{
+  p_term_id:termId,p_unit_code:unit,p_allocated_minutes:minutes,
+  p_reason:reason,
+ })

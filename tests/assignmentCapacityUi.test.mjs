@@ -34,7 +34,8 @@ const plugin={
   enforce:'pre',
   resolveId(source,importer){
     if((importer?.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operationsV2')
-      ||(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operationsV2'))
+      ||(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operationsV2')
+      ||(importer?.endsWith('/src/components/TermBudgetPanel.jsx')&&source==='../lib/operationsV2'))
       return '\0qa-v2-no-network'
     if(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operations')
       return '\0qa-operations-no-network'
@@ -50,6 +51,9 @@ const plugin={
       'export const cancelLibraryDeskShift=async args=>{if(!globalThis.__qaPermitDeskCancel)throw Error("QA_NO_CANCELLATION");globalThis.__qaDeskCancels.push(args);globalThis.__qaDeskShifts=globalThis.__qaDeskShifts.map(s=>s.id===args.shiftId?{...s,state:"cancelled"}:s);return {ok:true,state:"cancelled"};};',
       'export const getUnitHourTotals=async()=>({scope:"admin",units:[{unit:"library",name:"کتابخانه",approved_minutes:55,pending_requested_minutes:0,pending_reports:0}]});',
       'export const getAdminWorkV2=async()=>globalThis.__qaCapacityData;',
+      'export const getOperationsTermDashboard=async()=>({ok:true,term:null,terms:[],units:[],workers:[],weeks:[]});',
+      'export const saveOperationsTerm=async()=>{throw Error("QA_NO_TERM_WRITES")};',
+      'export const saveOperationsAllocation=async()=>{throw Error("QA_NO_ALLOC_WRITES")};',
       'export const getMyWorkV2=async()=>globalThis.__qaCapacityData;',
       'export const getMyWorkerProfileV2=async()=>({worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"});',
       'export const getMyProfileChangeRequests=async()=>[];',

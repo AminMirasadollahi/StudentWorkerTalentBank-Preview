@@ -19,6 +19,7 @@ import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persian
 import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonthBounds } from './lib/persianMonthCalendar.mjs'
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 import TaskAssignmentEditor from './components/TaskAssignmentEditor'
+import TermBudgetPanel from './components/TermBudgetPanel'
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
  requestProfileChange,reviewProfileChange,getUnitHourTotals } from './lib/operationsV2'
 
@@ -69,7 +70,7 @@ function UnitHourSummary({scope,approvedTotal=null,refreshRevision=0}) {
        </small>}
      </article>)}
    </div>}
-   {scope==='admin'&&<p className="ow-muted">سقف ساعت واحدها در سامانه تعریف نشده است.</p>}
+   {scope==='admin'&&<p className="ow-muted">برای مشاهده مصرف هر نیمسال و تنظیم سهمیه‌ها، تب «نیمسال و سهمیه» را انتخاب کنید.</p>}
  </section>
 }
 
@@ -927,11 +928,12 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         <b>{exactDuration(approvedMinutes)}</b></article>
     </div>
     <SectionTabs value={view} onChange={setView} options={[
-      ['inbox','کارتابل'],['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],['profiles','پروفایل‌ها'],
+      ['inbox','کارتابل'],['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],['profiles','پروفایل‌ها'],['terms','نیمسال و سهمیه'],
     ]}/>
     {loading&&<p className="ow-muted">در حال دریافت اطلاعات…</p>}
     <Message error={error} notice={notice}/>
 
+    {view==='terms'&&<TermBudgetPanel workers={workers} refreshRevision={refreshRevision}/>}
     {view==='inbox'&&<section className="report-panel">
       <div className="ow-presence-section-title ow-manager-inbox-heading">
         <h2>کارتابل رسیدگی</h2>
