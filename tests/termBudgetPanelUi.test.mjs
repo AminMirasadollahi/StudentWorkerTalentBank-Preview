@@ -30,13 +30,13 @@ const fixture=()=>({
 const fakePlugin={
  name:'swtb18-no-network-term-mount',enforce:'pre',
  resolveId(source,importer){
-  if((importer?.endsWith('/src/components/TermBudgetPanel.jsx')||importer?.endsWith('/src/components/BudgetPoolEditor.jsx'))&&
+  if((importer?.endsWith('/src/components/TermBudgetPanel.jsx')||importer?.endsWith('/src/components/BudgetPoolEditor.jsx')||importer?.endsWith('/src/components/TermStatusDialog.jsx'))&&
      source==='../lib/operationsV2')return '\0fake-swtb18'
  },
  load(id){
   if(id==='\0fake-swtb18')return [
    'export const getOperationsTermDashboard=async a=>{globalThis.__termReads.push(a);if(globalThis.__termFail)throw Error("SYNTHETIC_NO_DATA");return globalThis.__termFixture};',
-   'export const saveOperationsTerm=async a=>{globalThis.__termWrites.push(a);return {ok:true,term_id:"TERM-NEW"};};',
+   'export const saveOperationsTerm=async a=>{globalThis.__termWrites.push(a);return {ok:true,term_id:a.termId||"TERM-NEW",state:a.state};};',
    'export const saveOperationsAllocation=async a=>{globalThis.__termWrites.push(a);return {ok:true};};',
    'export const saveOperationsBudgetPool=async a=>{globalThis.__termWrites.push(a);return {ok:true};};',
   ].join('\n')
