@@ -35,7 +35,8 @@ const plugin={
   resolveId(source,importer){
     if((importer?.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operationsV2')
       ||(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operationsV2')
-      ||(importer?.endsWith('/src/components/TermBudgetPanel.jsx')&&source==='../lib/operationsV2'))
+      ||(importer?.endsWith('/src/components/TermBudgetPanel.jsx')&&source==='../lib/operationsV2')
+      ||(importer?.endsWith('/src/components/BudgetPoolEditor.jsx')&&source==='../lib/operationsV2'))
       return '\0qa-v2-no-network'
     if(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operations')
       return '\0qa-task-review-ops'
@@ -47,9 +48,10 @@ const plugin={
   },
   load(id){
     if(id==='\0qa-v2-no-network')return [
-      'export const getOperationsTermDashboard=async()=>({ok:true,term:null,terms:[],units:[],workers:[],weeks:[]});',
+      'export const getOperationsTermDashboard=async()=>({ok:true,term:null,terms:[],units:[],workers:[],weeks:[],pools:[]});',
       'export const saveOperationsTerm=async()=>{throw Error("QA_TERM_WRITE_DENIED")};',
       'export const saveOperationsAllocation=async()=>{throw Error("QA_ALLOCATION_WRITE_DENIED")};',
+      'export const saveOperationsBudgetPool=async()=>{throw Error("QA_POOL_WRITES_FORBIDDEN")};',
       'export const getLibraryDeskShifts=async()=>({ok:true,shifts:globalThis.__qaDeskShifts||[]});',
       'export const assignLibraryDeskShift=async args=>{if(!globalThis.__qaPermitDesk)throw Error("QA_NO_BOOKING");(globalThis.__qaDeskCalls??=[]).push(args);return {ok:true};};',
       'export const cancelLibraryDeskShift=async()=>{throw Error("QA_NO_CANCELLATION")};',
