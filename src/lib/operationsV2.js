@@ -65,3 +65,18 @@ export const saveOperationsBudgetPool=({id=null,termId,label,units,minutes,reaso
   p_id:id||null,p_term_id:termId,p_label:label,p_unit_codes:units,
   p_allocated_minutes:minutes,p_reason:reason,
  })
+
+// SWTB21-B: manager-only term eligibility status, changes and explicit
+// enforcement activation. These RPCs are NOT installed on live Supabase yet.
+// The optional UI is disabled by default until its audited backend rollout.
+export const getTermAccessOverview=termId=>
+ rpc('ops_get_term_access_overview',{p_term_id:termId})
+export const setWorkerTermMembership=({workerId,termId,eligibility,reason=null})=>
+ rpc('ops_set_worker_term_membership',{
+  p_worker_id:workerId,p_term_id:termId,p_eligibility:eligibility,
+  p_reason:reason||null,
+ })
+export const setTermAccessMode=({termId,mode,reason})=>
+ rpc('ops_set_term_access_mode',{
+  p_term_id:termId,p_mode:mode,p_reason:reason,
+ })
