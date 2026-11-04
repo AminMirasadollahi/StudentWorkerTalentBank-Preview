@@ -43,8 +43,10 @@ const unitLabels = {library:'کتابخانه',public_relations:'روابط عم
 // in observation mode. Show the admin-only permissions view by default; a
 // build-time 'false' remains an emergency UI rollback without schema changes.
 const termMembershipUIEnabled=import.meta.env?.VITE_SWTB21_TERM_MEMBERSHIP_UI!=='false'
-// D1 safe source-first: keep hidden until reviewed backend migrations are live.
-const workPoolUIEnabled=import.meta.env?.VITE_SWTB21_WORK_POOL_UI==='true'
+// D1 backend is now installed in the sole Supabase project with zero templates,
+// zero offers and zero claims. Enable only the manager-authorized, worker-self
+// surfaces; keep emergency build-time UI kill switch without altering DB policy.
+const workPoolUIEnabled=import.meta.env?.VITE_SWTB21_WORK_POOL_UI!=='false'
 
 /** Complete, current-scope server aggregate, independent of bounded task/history rows.
  * Fail closed to an explicit unavailable message instead of displaying false zero totals. */
