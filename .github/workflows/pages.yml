@@ -33,9 +33,7 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Build (manager term-permission view available; assignment gate stays off)
-        env:
-          VITE_SWTB21_TERM_MEMBERSHIP_UI: 'true'
+      - name: Build
         run: npm run build
 
       - name: Upload Pages artifact
