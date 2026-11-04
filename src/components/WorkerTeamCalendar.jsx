@@ -119,7 +119,7 @@ export default function WorkerTeamCalendar({todayIso,refreshRevision=0}){
    <div className="ow-worker-team-calendar-notice">
      <strong>برنامه همکاران · فقط مشاهده</strong>
      <p>ساعت‌های نمایش‌داده‌شده برنامه‌ریزی‌شده‌اند، نه حضور قطعی یا ساعت تأییدشده.
-       عنوان کارهای دیگران تا تعیین مجوز انتشار، به‌صورت عمومی نمایش داده می‌شود.</p>
+       عنوان اختصاصی وظایف دیگران فعلاً نمایش داده نمی‌شود؛ تعداد و واحد مربوط به کارها قابل مشاهده است.</p>
    </div>
    {(snapshot.status==='loading'||snapshot.status==='idle')&&
       <p className="ow-muted" role="status">در حال دریافت امن برنامه همکاران…</p>}
