@@ -5,7 +5,7 @@
 import {projectDayPresence} from './presenceDayProjection.mjs'
 import {validIsoDay} from './assignmentCapacity.mjs'
 
-const statuses=new Set(['assigned','in_progress','submitted','needs_changes','completed'])
+const statuses=new Set(['assigned','in_progress','submitted','needs_changes','completed','scheduled'])
 const natural=(a,b)=>a.localeCompare(b,'fa')
 const isActive=w=>w&&w.state==='active'&&typeof w.id==='string'
 const taskForDay=(task,date)=>task?.planned_date===date
