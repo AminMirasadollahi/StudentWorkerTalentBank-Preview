@@ -47,10 +47,10 @@ function TermEditor({term,onSave,onClose}){
      value={label} onChange={e=>setLabel(e.target.value)} placeholder="مثلاً ۱۴۰۵–۱۴۰۶ / نیمسال اول"/>
    </label>
    <div className="report-field"><span>شروع نیمسال (شمسی)</span>
-    <JalaliDatePicker value={start} onChange={setStart} ariaLabel="تاریخ شروع نیمسال" disabled={locked||busy}/>
+    <JalaliDatePicker value={start} onChange={setStart} ariaLabel="تاریخ شروع نیمسال" disabled={locked||busy||term?.state==='active'}/>
    </div>
    <div className="report-field"><span>پایان نیمسال (شمسی)</span>
-    <JalaliDatePicker value={end} onChange={setEnd} ariaLabel="تاریخ پایان نیمسال" disabled={locked||busy}/>
+    <JalaliDatePicker value={end} onChange={setEnd} ariaLabel="تاریخ پایان نیمسال" disabled={locked||busy||term?.state==='active'}/>
    </div>
    {editing&&<label className="report-field"><span>وضعیت نیمسال</span>
     <select value={state} disabled={locked||busy} onChange={e=>setState(e.target.value)}>
@@ -253,7 +253,7 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0}){
       <small>{fa.format(u.unreported_tasks)} کار بدون گزارش · برآورد {faMinutes(u.unreported_estimate_minutes)}</small>
     </article>)}
    </div>
-   {canChange&&editAllocation&&<AllocationEditor
+   {canChange&&editAllocation&&unitRows.some(u=>u.unit===editAllocation)&&<AllocationEditor
     key={term.id+'-'+editAllocation}
     term={term} unit={unitRows.find(u=>u.unit===editAllocation)}
     onClose={()=>setEditAllocation(null)} onSave={()=>finish(null)}/>}
