@@ -34,7 +34,7 @@ const isolates={
    if(source==='./lib/operationsV2')return '\0swtb7-fake-v2'
    if(source==='./lib/operations')return '\0swtb7-fake-legacy'
   }
-  if((from.endsWith('/src/components/TermBudgetPanel.jsx')||from.endsWith('/src/components/BudgetPoolEditor.jsx'))&&source==='../lib/operationsV2')
+  if((from.endsWith('/src/components/TermBudgetPanel.jsx')||from.endsWith('/src/components/BudgetPoolEditor.jsx')||from.endsWith('/src/components/TermStatusDialog.jsx'))&&source==='../lib/operationsV2')
     return '\0swtb7-fake-v2'
   if(from.endsWith('/src/components/TaskAssignmentEditor.jsx')){
    if(source==='../lib/operationsV2')return '\0swtb7-fake-v2'
