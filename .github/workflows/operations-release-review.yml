@@ -34,7 +34,10 @@ jobs:
       - name: Install jsdom only for synthetic mounted React tests (not app dependency)
         run: npm install --no-save --no-package-lock --no-audit --no-fund jsdom@26.1.0
       - name: Verify protected public baselines and synthetic task/history/React tests
-        run: node --test tests/*.test.mjs
+        # Mounted React tests each spawn a Vite SSR server; serialize files to avoid
+        # Vite's shared websocket port 24678 collision and unstable dep scans.
+        # The timeout is per test suite, not a way to hide or skip failures.
+        run: timeout 420s node --test --test-concurrency=1 tests/*.test.mjs
       - name: Build EXACT public Vite entrypoint — without any deployment
         run: npm run build
       - name: Confirm normal HTML entry does not load synthetic QA
