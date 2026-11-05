@@ -115,3 +115,28 @@ export const claimWorkOpportunity=({opportunityId,requestId})=>
   rpc('ops_claim_work_opportunity',{
     p_opportunity_id:opportunityId,p_request_id:requestId,
   })
+
+// SWTB21-D2B (FEATURE FLAG OFF): timed library desk opportunities.
+// These calls require the separately approved D2A+D2B migration. The server
+// enforces the GLOBAL 2-seat desk advisory lock, even against manager bookings.
+export const getWorkerDeskWorkPool=()=>rpc('ops_get_worker_desk_work_pool')
+export const getManagerDeskWorkPool=({from,to})=>
+ rpc('ops_get_manager_desk_work_pool',{p_from:from,p_to:to})
+export const createDeskWorkTemplate=({title,description,privateInstructions,minutes,priority})=>
+ rpc('ops_create_desk_work_template',{
+  p_title:title,p_worker_description:description,
+  p_private_instructions:privateInstructions||'',
+  p_duration_minutes:Number(minutes),p_priority:Number(priority),
+ })
+export const createDeskWorkOffer=({templateId,termId,date,start,end,capacity,deadline})=>
+ rpc('ops_create_desk_work_offer',{
+  p_template_id:templateId,p_term_id:termId,p_shift_date:date,
+  p_start_minute:Number(start),p_end_minute:Number(end),
+  p_capacity:Number(capacity),p_claim_deadline:deadline||null,
+ })
+export const setDeskWorkOfferState=({offerId,state,reason})=>
+ rpc('ops_set_desk_work_offer_state',{
+  p_offer_id:offerId,p_state:state,p_reason:reason||null,
+ })
+export const claimDeskWorkOffer=({offerId,requestId})=>
+ rpc('ops_claim_desk_work_offer',{p_offer_id:offerId,p_request_id:requestId})
