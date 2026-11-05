@@ -1,6 +1,6 @@
 import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react'
 // Hidden until D2A/D2B are safely installed; D1 remains untouched by default.
-const deskPoolUIEnabled=import.meta.env?.VITE_SWTB21_DESK_POOL_UI==='true'
+const deskPoolUIEnabled=import.meta.env?.VITE_SWTB21_DESK_POOL_UI!=='false'
 const DeskWorkPoolWorkerSection=lazy(()=>import('./DeskWorkPoolWorkerSection'))
 import {getWorkerWorkPool,claimWorkOpportunity} from '../lib/operationsV2'
 
