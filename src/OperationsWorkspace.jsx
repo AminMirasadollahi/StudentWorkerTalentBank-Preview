@@ -25,6 +25,8 @@ import TermBudgetPanel from './components/TermBudgetPanel'
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
 // Worker view loads only on explicit team switch; never fetch admin operations.
 const WorkerTeamCalendar = lazy(()=>import('./components/WorkerTeamCalendar'))
+const WorkPoolManagerPanel = lazy(()=>import('./components/WorkPoolManagerPanel'))
+const WorkPoolWorkerPanel = lazy(()=>import('./components/WorkPoolWorkerPanel'))
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
  requestProfileChange,reviewProfileChange,getUnitHourTotals } from './lib/operationsV2'
 
@@ -41,6 +43,10 @@ const unitLabels = {library:'کتابخانه',public_relations:'روابط عم
 // in observation mode. Show the admin-only permissions view by default; a
 // build-time 'false' remains an emergency UI rollback without schema changes.
 const termMembershipUIEnabled=import.meta.env?.VITE_SWTB21_TERM_MEMBERSHIP_UI!=='false'
+// D1 backend is now installed in the sole Supabase project with zero templates,
+// zero offers and zero claims. Enable only the manager-authorized, worker-self
+// surfaces; keep emergency build-time UI kill switch without altering DB policy.
+const workPoolUIEnabled=import.meta.env?.VITE_SWTB21_WORK_POOL_UI!=='false'
 
 /** Complete, current-scope server aggregate, independent of bounded task/history rows.
  * Fail closed to an explicit unavailable message instead of displaying false zero totals. */
@@ -917,11 +923,15 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     <SectionTabs value={view} onChange={setView} options={[
       ['inbox','کارتابل'],['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],['profiles','پروفایل‌ها'],['terms','نیمسال و سهمیه'],
       ...(termMembershipUIEnabled?[['termMemberships','مجوز همکاری']]:[]),
+      ...(workPoolUIEnabled?[['workPool','مخزن وظایف']]:[]),
     ]}/>
     {loading&&<p className="ow-muted">در حال دریافت اطلاعات…</p>}
     <Message error={error} notice={notice}/>
 
     {view==='terms'&&<TermBudgetPanel workers={workers} refreshRevision={refreshRevision}/>}
+    {workPoolUIEnabled&&view==='workPool'&&<Suspense fallback={<p className="ow-muted">در حال آماده‌سازی مخزن وظایف…</p>}>
+      <WorkPoolManagerPanel refreshRevision={refreshRevision}/>
+    </Suspense>}
     {termMembershipUIEnabled&&view==='termMemberships'&&<Suspense fallback={<p className="ow-muted">در حال آماده‌سازی مجوزهای نیمسال…</p>}>
       <TermMembershipPanel workers={workers} refreshRevision={refreshRevision}/>
     </Suspense>}
@@ -1803,7 +1813,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     const fn=previous=>({...previous,...patch})
     ;(setNavigation||setLocalNavigation)(fn)
   }
-  const section=['tasks','availability','history','profile'].includes(selected.section)?selected.section:'tasks'
+  const section=['tasks','availability','history','profile',...(workPoolUIEnabled?['workPool']:[])].includes(selected.section)?selected.section:'tasks'
   const taskRange=['today','week','month','upcoming'].includes(selected.taskRange)?selected.taskRange:'today'
   const taskView=['action','pending','upcoming','completed','calendar'].includes(selected.taskView)
     ?selected.taskView:'action'
@@ -1882,7 +1892,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     document.addEventListener('keydown',onKeyDown)
     return()=>document.removeEventListener('keydown',onKeyDown)
   },[inspectedTask?.id])
-  const sectionNames={tasks:'کارهای من',availability:'زمان حضور',
+  const sectionNames={tasks:'کارهای من',availability:'زمان حضور',workPool:'فرصت‌های کاری',
     history:'سوابق گزارش‌ها',profile:'حساب من'}
   // Offer once per authenticated worker/version only after an authorized read.
   useEffect(()=>{
@@ -1942,7 +1952,8 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         if(settingsOpen)onToggleSettings?.()
         setSelectedTaskId(null);updateNavigation({section:next})
       }} options={[
-        ['tasks','کارهای من'],['availability','زمان حضور'],['history','سوابق گزارش‌ها'],['profile','حساب من'],
+        ['tasks','کارهای من'],...(workPoolUIEnabled?[['workPool','فرصت‌های کاری']]:[]),
+        ['availability','زمان حضور'],['history','سوابق گزارش‌ها'],['profile','حساب من'],
       ]}/>
       <div className="ow-b3-sidebar__footer">
         <button type="button" className="swtb-guide-launch" data-swtb-guide="help-global"
@@ -2080,6 +2091,11 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       </aside>}
       </div>
     </section>}
+    {!settingsOpen&&workPoolUIEnabled&&section==='workPool'&&<Suspense fallback={<p className="ow-muted" role="status">در حال آماده‌سازی فرصت‌های کاری…</p>}>
+      <WorkPoolWorkerPanel key={profile.worker_id} workerId={profile.worker_id}
+        refreshRevision={refreshRevision}
+        onClaimed={()=>{void refresh();updateNavigation({section:'tasks',taskView:'upcoming'})}}/>
+    </Suspense>}
     {!settingsOpen&&section==='availability'&&<section className="report-panel">
       <div className="ow-b3-guide-heading">
         <h2>برنامه حضور</h2>

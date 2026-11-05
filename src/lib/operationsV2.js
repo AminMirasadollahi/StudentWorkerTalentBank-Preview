@@ -86,3 +86,32 @@ export const setTermAccessMode=({termId,mode,reason})=>
 // fetch the privileged manager operations payload for a worker browser.
 export const getWorkerTeamCalendar=({from,to})=>
  rpc('ops_get_team_calendar',{p_start_date:from,p_end_date:to})
+
+// SWTB21-D1: general (NON-DESK) manager-published task opportunities.
+// The server derives worker identity exclusively from auth.uid(); the browser
+// cannot assign a task to another worker or report approved hours.
+export const getWorkerWorkPool=()=>rpc('ops_get_worker_work_pool')
+export const getManagerWorkPool=({from,to})=>rpc('ops_get_manager_work_pool',{
+  p_start_date:from,p_end_date:to,
+})
+export const createWorkTemplate=({unit,title,description,privateInstructions,minutes,priority})=>
+  rpc('ops_create_work_template',{
+    p_unit_code:unit,p_title:title,p_worker_description:description,
+    p_private_instructions:privateInstructions||'',p_estimated_minutes:Number(minutes),
+    p_priority:Number(priority),
+  })
+export const createWorkOpportunity=({templateId,termId,date,capacity,claimDeadline=null})=>
+  rpc('ops_create_work_opportunity',{
+    p_template_id:templateId,p_term_id:termId,p_planned_date:date,
+    p_capacity:Number(capacity),p_claim_deadline:claimDeadline||null,
+  })
+export const setWorkOpportunityState=({opportunityId,state,reason=null})=>
+  rpc('ops_set_work_opportunity_state',{
+    p_opportunity_id:opportunityId,p_state:state,p_reason:reason||null,
+  })
+// requestId MUST be retained for uncertain HTTP failures; NEVER issue a fresh
+// identifier for a blind retry. Server ensures one claim/task per worker+offer.
+export const claimWorkOpportunity=({opportunityId,requestId})=>
+  rpc('ops_claim_work_opportunity',{
+    p_opportunity_id:opportunityId,p_request_id:requestId,
+  })
