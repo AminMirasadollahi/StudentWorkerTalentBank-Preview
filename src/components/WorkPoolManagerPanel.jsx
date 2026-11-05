@@ -1,4 +1,7 @@
-import {useCallback,useEffect,useRef,useState} from 'react'
+import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react'
+// Hidden until audited D2A+D2B database rollout.
+const deskPoolUIEnabled=import.meta.env?.VITE_SWTB21_DESK_POOL_UI!=='false'
+const DeskWorkPoolManagerSection=lazy(()=>import('./DeskWorkPoolManagerSection'))
 import JalaliDatePicker from './JalaliDatePicker'
 import {plusIsoDays} from '../lib/persianMonthCalendar.mjs'
 import {getOperationsTermDashboard,getManagerWorkPool,
@@ -103,7 +106,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0}){
     onClick={()=>{setUncertain(false);setRevision(x=>x+1)}} disabled={busy!==''}>
     بازخوانی</button>
   </div>
-  <p className="ow-compact-hint">این بخش فقط برای کارهای عمومی است. نوبت‌های زمان‌دار کتابخانه، کار گروهی و درخواست‌های نیازمند تأیید مدیر همچنان از مسیرهای تخصصی خود انجام می‌شوند. انتخاب کار، ساعت تأییدشده ایجاد نمی‌کند.</p>
+  <p className="ow-compact-hint">{deskPoolUIEnabled?'فرصت‌های عمومی در این بخش و نوبت‌های زمان‌دار کتابخانه در بخش بعدی همین صفحه مدیریت می‌شوند.':'این بخش فقط برای کارهای عمومی است. نوبت‌های زمان‌دار کتابخانه، کار گروهی و درخواست‌های نیازمند تأیید مدیر همچنان از مسیرهای تخصصی خود انجام می‌شوند.'} انتخاب کار، ساعت تأییدشده ایجاد نمی‌کند.</p>
   {notice&&<p role={uncertain?'alert':'status'} className={uncertain?'report-alert report-alert--error':'ops-alert-success'}>{notice}</p>}
   {snapshot.status==='loading'&&<p role="status" className="ow-muted">در حال دریافت الگوها و فرصت‌ها…</p>}
   {snapshot.status==='error'&&<div role="alert" className="report-alert report-alert--error">اطلاعات مخزن در دسترس نیست. امکان ثبت تا بازخوانی موفق متوقف است.</div>}
@@ -182,7 +185,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0}){
     </details>
    </div>
    <div className="ow-work-pool-list">
-    <h3>فرصت‌ها <small>({fa.format(ordered.length)})</small></h3>
+    <h3>فرصت‌های عمومی <small>({fa.format(ordered.length)})</small></h3>
     {!ordered.length&&<p className="ow-muted">هنوز فرصتی برای این بازه تعریف نشده است.</p>}
     {ordered.map(opp=>{
      const item=templates.find(t=>t.id===opp.template_id)
@@ -219,5 +222,8 @@ export default function WorkPoolManagerPanel({refreshRevision=0}){
     })}
    </div>
   </div>}
+  {deskPoolUIEnabled&&<Suspense fallback={<p role="status">در حال آماده‌سازی نوبت‌های کتابخانه…</p>}>
+    <DeskWorkPoolManagerSection refreshRevision={refreshRevision}/>
+  </Suspense>}
  </section>
 }

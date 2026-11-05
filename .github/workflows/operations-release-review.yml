@@ -34,7 +34,26 @@ jobs:
       - name: Install jsdom only for synthetic mounted React tests (not app dependency)
         run: npm install --no-save --no-package-lock --no-audit --no-fund jsdom@26.1.0
       - name: Verify protected public baselines and synthetic task/history/React tests
-        run: node --test tests/*.test.mjs
+        # Each mounted test module runs in a separate Node process. This
+        # protects Vite SSR websocket port 24678 and makes leaked handles,
+        # stalled imports or dependency-scanning failures attributable to
+        # a specific file rather than hanging an opaque whole-suite run.
+        # No test file is skipped; each runner must exit successfully.
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test_file in tests/*.test.mjs; do
+            echo "::group::SWTB_NODE_FILE=$test_file"
+            if timeout --signal=TERM --kill-after=5s 65s node --test "$test_file"; then
+              echo "SWTB_NODE_FILE_PASS=$test_file"
+            else
+              status=$?
+              echo "::error::SWTB_NODE_FILE_FAILED=$test_file status=$status"
+              exit "$status"
+            fi
+            echo "::endgroup::"
+          done
+          echo 'SWTB_ALL_NODE_FILES_PASS'
       - name: Build EXACT public Vite entrypoint — without any deployment
         run: npm run build
       - name: Confirm normal HTML entry does not load synthetic QA

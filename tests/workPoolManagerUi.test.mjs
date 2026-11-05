@@ -9,8 +9,12 @@ const mock={
  resolveId(source,importer){
   if(importer?.endsWith('/src/components/WorkPoolManagerPanel.jsx')&&
     source==='../lib/operationsV2')return '\0d1-manager-rpc'
+  // D1 suite isolates its own RPC; D2 desk behavior has separate mounted tests.
+  if(importer?.endsWith('/src/components/WorkPoolManagerPanel.jsx')&&
+    source==='./DeskWorkPoolManagerSection')return '\0d1-desk-stub'
  },
  load(id){
+  if(id==='\0d1-desk-stub')return 'export default function DeskStub(){return null}'
   if(id!=='\0d1-manager-rpc')return null
   return [
    'export const getOperationsTermDashboard=async()=>({ok:true,',

@@ -1935,3 +1935,21 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-work-pool-twofields { grid-template-columns:1fr; }
  .ow-work-pool-item { padding:.55rem; }
 }
+
+
+/* SWTB21-D2B: timed desk-duty area stays INSIDE the single Work Pool surface.
+   Default-disabled until backend transaction and authenticated owner QA. */
+.ow-desk-pool-block { margin-top:.9rem; padding-top:.8rem;
+  border-top:1px solid #d7e5e7; min-width:0; display:grid; gap:.65rem; }
+.ow-desk-pool-heading { display:flex;align-items:flex-start;flex-wrap:wrap;
+  justify-content:space-between; gap:.55rem; }
+.ow-desk-pool-heading h3 { font-size:.96rem;margin:.05rem 0 .2rem; }
+.ow-desk-pool-heading .ow-muted { font-size:.78rem;line-height:1.75;margin:0; }
+.ow-desk-pool-block .ow-work-pool-item h4 {font-size:.86rem;margin:0; }
+.ow-desk-pool-block .ow-work-pool-list h4 {font-size:.83rem;margin:.3rem 0; }
+.ow-desk-pool-block .ow-work-pool-facts>span {white-space:normal;}
+.ow-desk-pool-block .report-panel,
+.ow-desk-pool-block .ow-work-pool-item {min-width:0;}
+.ow-desk-pool-block :is(button,input,textarea,select):focus-visible {
+ outline:2px solid #127d99;outline-offset:2px;
+}

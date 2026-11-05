@@ -1,4 +1,7 @@
-import {useCallback,useEffect,useRef,useState} from 'react'
+import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react'
+// Hidden until D2A/D2B are safely installed; D1 remains untouched by default.
+const deskPoolUIEnabled=import.meta.env?.VITE_SWTB21_DESK_POOL_UI!=='false'
+const DeskWorkPoolWorkerSection=lazy(()=>import('./DeskWorkPoolWorkerSection'))
 import {getWorkerWorkPool,claimWorkOpportunity} from '../lib/operationsV2'
 
 const fa=new Intl.NumberFormat('fa-IR')
@@ -77,7 +80,7 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
    <button type="button" className="report-btn report-btn--light"
     disabled={busyId!==''} onClick={()=>void refresh()}>بازخوانی</button>
   </div>
-  <p className="ow-compact-hint">ساعت تخمینی این فرصت‌ها هنوز ساعت تأییدشده محسوب نمی‌شود. نوبت‌های زمان‌دار کتابخانه از مسیر جداگانه برنامه‌ریزی می‌شوند.</p>
+  <p className="ow-compact-hint">ساعت تخمینی این فرصت‌ها هنوز ساعت تأییدشده محسوب نمی‌شود. {deskPoolUIEnabled?'نوبت‌های زمان‌دار کتابخانه در بخش پایین همین صفحه ارائه شده‌اند.':'نوبت‌های زمان‌دار کتابخانه از مسیر جداگانه برنامه‌ریزی می‌شوند.'}</p>
   {notice&&<div role="status" className={uncertainId?'report-alert report-alert--error':'ops-alert-success'}>{notice}</div>}
   {view.status==='loading'&&<p role="status" className="ow-muted">در حال دریافت فرصت‌های مجاز…</p>}
   {view.status==='error'&&<div role="alert" className="report-alert report-alert--error">
@@ -86,7 +89,7 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
    </div>}
   {view.status==='ready'&&<>
    {!items.length&&<div className="ow-worker-empty" role="status">
-     <strong>در حال حاضر فرصت منتشرشده‌ای در این بازه وجود ندارد.</strong>
+     <strong>{deskPoolUIEnabled?'در حال حاضر فرصت عمومی منتشرشده‌ای وجود ندارد.':'در حال حاضر فرصت منتشرشده‌ای در این بازه وجود ندارد.'}</strong>
      <p>تعریف الگوی کار توسط مدیر به‌تنهایی، به معنای انتشار فرصت قابل انتخاب نیست.</p>
     </div>}
    <div className="ow-work-pool-worker-list">
@@ -123,5 +126,9 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
     </article>)}
    </div>
   </>}
+  {deskPoolUIEnabled&&<Suspense fallback={<p role="status">در حال آماده‌سازی نوبت‌های میز کتابخانه…</p>}>
+    <DeskWorkPoolWorkerSection workerId={workerId} refreshRevision={refreshRevision}
+      onClaimed={onClaimed}/>
+  </Suspense>}
  </section>
 }
