@@ -2,7 +2,7 @@
 import {defineConfig} from 'vite'
 import react from '@vitejs/plugin-react'
 const api=[
- 'export const getOperationsTermDashboard=async()=>({ok:true,term:globalThis.__qaTerm,terms:[globalThis.__qaTerm],units:[],weeks:[],workers:[],pools:[]});',
+ 'export const getOperationsTermDashboard=async args=>globalThis.__qaBudgetForFilter?.(args)||({ok:true,term:globalThis.__qaTerm,terms:[globalThis.__qaTerm],units:[],weeks:[],workers:[],pools:[]});',
  'export const getTermAccessOverview=async()=>globalThis.__qaTermAccess;',
  'export const getManagerWorkPool=async()=>({ok:true,templates:[',
  '{id:"gen",title:"ثبت مشخصات منابع",unit:"library",kind:"general",state:"active",estimated_minutes:60},',
