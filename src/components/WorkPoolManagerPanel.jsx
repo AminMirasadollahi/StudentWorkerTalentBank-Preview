@@ -24,6 +24,20 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
  const today=todayISO()
  const [revision,setRevision]=useState(0)
  const [editorMode,setEditorMode]=useState('')
+ const editorRootRef=useRef(null)
+ const previousEditorMode=useRef('')
+ useEffect(()=>{
+  if(!focusUIEnabled)return
+  const old=previousEditorMode.current
+  previousEditorMode.current=editorMode
+  if(editorMode){
+   const summary=editorRootRef.current?.querySelector('details[open] summary')
+   summary?.focus({preventScroll:true})
+   summary?.scrollIntoView?.({block:'nearest'})
+  }else if(old){
+   document.getElementById('swtb22-general-'+old+'-open')?.focus({preventScroll:true})
+  }
+ },[editorMode])
  const [localKind,setLocalKind]=useState(activeKind)
  const kind=onKindChange?activeKind:localKind
  const [deskVisited,setDeskVisited]=useState(activeKind==='desk')
@@ -105,7 +119,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
  const ordered=opportunities.slice().sort((a,b)=>
   (a.date||'').localeCompare(b.date||'')||String(a.id).localeCompare(String(b.id)))
  const formDisabled=busy!==''||uncertain||snapshot.status!=='ready'
- const editorSurface=(<div className="ow-work-pool-compose">
+ const editorSurface=(<div key="editor" className="ow-work-pool-compose" ref={editorRootRef}>
     {ordered.length===0&&<p className="ow-work-pool-workflow" aria-label="مراحل آماده‌سازی فرصت عمومی">
      <span>۱. تعریف الگو</span><span>۲. ساخت پیش‌نویس</span><span>۳. انتشار توسط مدیر</span>
     </p>}
@@ -181,7 +195,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
      </form>
     </details>
    </div>)
- const listSurface=(<div className="ow-work-pool-list">
+ const listSurface=(<div key="list" className="ow-work-pool-list">
     <h3>فرصت‌های عمومی <small>({fa.format(ordered.length)})</small></h3>
     {!ordered.length&&<div className="ow-work-pool-empty" role="status">
      <strong>هنوز فرصتی برای این بازه تعریف نشده است.</strong>
@@ -241,11 +255,11 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
   {snapshot.status==='error'&&<div role="alert" className="report-alert report-alert--error">اطلاعات مخزن در دسترس نیست. امکان ثبت تا بازخوانی موفق متوقف است.</div>}
   {snapshot.status==='ready'&&<div className={`ow-work-pool-columns${ordered.length===0?' ow-work-pool-columns--empty':''}`}>
    {focusUIEnabled&&<div className="swtb22-work-pool-commands" role="group" aria-label="ساخت فرصت عمومی">
-    <button type="button" className="report-btn report-btn--primary" onClick={()=>setEditorMode('template')}>تعریف الگوی کار</button>
-    <button type="button" className="report-btn report-btn--light" disabled={!templates.some(t=>t.kind==='general'&&t.state==='active')} onClick={()=>setEditorMode('opportunity')}>ساخت فرصت تاریخ‌دار</button>
+    <button type="button" className="report-btn report-btn--primary" id="swtb22-general-template-open" onClick={()=>setEditorMode('template')}>تعریف الگوی کار</button>
+    <button type="button" className="report-btn report-btn--light" id="swtb22-general-opportunity-open" disabled={!templates.some(t=>t.kind==='general'&&t.state==='active')} onClick={()=>setEditorMode('opportunity')}>ساخت فرصت تاریخ‌دار</button>
     {!templates.some(t=>t.kind==='general'&&t.state==='active')&&<small>برای ساخت فرصت، ابتدا یک الگوی فعال تعریف کنید.</small>}
    </div>}
-   {focusUIEnabled?<>{listSurface}{editorSurface}</>:<>{editorSurface}{listSurface}</>}
+   {focusUIEnabled?(editorMode?<>{editorSurface}{listSurface}</>:<>{listSurface}{editorSurface}</>):<>{editorSurface}{listSurface}</>}
   </div>}
   </div>
   {deskPoolUIEnabled&&(!focusUIEnabled||deskVisited)&&<div className="swtb22-work-pool-kind-view" hidden={focusUIEnabled&&kind!=='desk'}>
