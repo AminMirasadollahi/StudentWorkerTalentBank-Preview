@@ -2568,3 +2568,121 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .swtb22-history-heading>.report-btn{width:100%}
  .swtb22-history-inspector{padding:.65rem}
 }
+
+
+/* SWTB22-D6B: manager-only, scope-audited term budgets. Unit/person
+   drilldowns are NOT authorization to mutate an incomplete pool roster. */
+.swtb22-term-focused{
+ min-width:0;display:grid;gap:.8rem;align-content:start;
+}
+.swtb22-term-focused>.ow-term-heading{margin-bottom:.1rem}
+.swtb22-term-focused .ow-term-heading>div{min-width:0;flex:1 1 20rem}
+.swtb22-term-focused .ow-term-heading-actions{gap:.5rem;justify-content:flex-end}
+.swtb22-term-focused .swtb22-term-filter-toolbar{
+ display:flex;flex-wrap:wrap;align-items:end;gap:.55rem;
+}
+.swtb22-term-filter-toolbar>.report-field{
+ flex:1 1 17rem;min-width:min(100%,15rem);max-width:30rem;
+}
+.swtb22-term-filter-toolbar>.swtb22-term-advanced-filter{
+ flex:1 1 20rem;min-width:min(100%,20rem);
+ border:1px solid #d9e7e9;border-radius:.68rem;
+ background:#f7fbfc;align-self:end;
+}
+.swtb22-term-advanced-filter>summary{
+ cursor:pointer;font-size:.82rem;font-weight:650;
+ padding:.62rem .75rem;line-height:1.7;color:#245969;
+ min-height:2.65rem;box-sizing:border-box;
+}
+.swtb22-term-advanced-filter[open]>summary{border-bottom:1px solid #dae6e9}
+.swtb22-term-advanced-controls{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:.65rem;padding:.75rem;
+}
+.swtb22-term-advanced-controls .report-field{min-width:0}
+.swtb22-term-advanced-controls .report-field :is(select,input){width:100%}
+.swtb22-term-advanced-controls>.report-btn{grid-column:1/-1;justify-self:start}
+.swtb22-term-scope{
+ display:block;line-height:1.75;font-size:.8rem;
+ border:1px solid #d1e6e5;background:#f1faf9;
+ border-radius:.65rem;padding:.65rem .85rem;color:#236464;margin:0;
+}
+.swtb22-term-scope>span{font-weight:650;color:#7f601a}
+.swtb22-term-audit{
+ display:grid;gap:.4rem;margin:0;
+}
+.swtb22-term-audit strong{font-size:.88rem}
+.swtb22-term-audit p{margin:0;line-height:1.75}
+.swtb22-term-audit ul{padding-inline-start:1.3rem;margin:.15rem 0;line-height:1.75}
+.swtb22-term-audit button{justify-self:start}
+.swtb22-term-metric-note{
+ font-size:.78rem;line-height:1.75;color:#55727c;
+ margin:0;padding:.55rem .75rem;
+ border:1px solid #e1ebed;border-radius:.58rem;background:#fbfdfd;
+}
+.swtb22-term-focused .ow-term-kpis{gap:.52rem;margin:.1rem 0}
+.swtb22-term-focused .ow-term-kpis article{
+ padding:.7rem .8rem;align-content:center;
+ border-color:#d8e8e8;background:#f7fcfc;
+}
+.swtb22-term-focused .ow-term-kpis strong{font-size:1.08rem;line-height:1.65}
+.swtb22-term-focused .ow-term-pools{
+ grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;
+}
+.swtb22-term-focused .ow-term-pool{
+ padding:.8rem .9rem;display:grid;gap:.6rem;align-content:start;
+}
+.swtb22-term-focused .ow-term-pool .ow-term-unit-figures{
+ border-top:1px solid #dce9e9;padding-top:.65rem;gap:.5rem;
+}
+.swtb22-term-focused .ow-term-pool .ow-term-unit-figures strong{
+ font-size:.9rem;overflow-wrap:anywhere;
+}
+.swtb22-term-focused .ow-term-section-title{
+ gap:.4rem .65rem;align-items:center;
+}
+.swtb22-term-unit-disclosure,.swtb22-term-week-disclosure{
+ border:1px solid #dbe8eb;border-radius:.7rem;
+ background:#fbfefe;min-width:0;
+}
+.swtb22-term-unit-disclosure>summary,
+.swtb22-term-week-disclosure>summary{
+ cursor:pointer;padding:.75rem .85rem;line-height:1.7;
+ font-size:.84rem;font-weight:650;color:#1d5968;
+}
+.swtb22-term-unit-disclosure[open]>summary,
+.swtb22-term-week-disclosure[open]>summary{
+ border-bottom:1px solid #e0eaec;
+}
+.swtb22-term-unit-disclosure>.ow-muted,
+.swtb22-term-week-disclosure>.ow-muted{
+ font-size:.77rem;line-height:1.8;
+ margin:.3rem .85rem .6rem;
+}
+.swtb22-term-unit-disclosure>.ow-term-units{
+ padding:0 .8rem .85rem;
+}
+.swtb22-term-week-disclosure>.ow-term-week-chart{
+ margin:.35rem .7rem .75rem;
+}
+.swtb22-term-focused .ow-term-worker-details{
+ padding:.7rem .8rem;border:1px solid #dbe8eb;border-radius:.7rem;
+ background:#fcfefe;
+}
+.swtb22-term-focused .ow-term-context-help{
+ padding:.7rem .8rem;border:1px solid #dbe8eb;border-radius:.7rem;
+}
+.swtb22-term-focused :is(select,input,summary,button):focus-visible{
+ outline:3px solid #118a82;outline-offset:2px;
+}
+@media(max-width:950px){
+ .swtb22-term-focused .ow-term-pools{grid-template-columns:minmax(0,1fr)}
+ .swtb22-term-focused .ow-term-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:680px){
+ .swtb22-term-advanced-controls{grid-template-columns:minmax(0,1fr)}
+ .swtb22-term-focused .ow-term-kpis{grid-template-columns:minmax(0,1fr)}
+ .swtb22-term-filter-toolbar>.report-field,
+ .swtb22-term-filter-toolbar>.swtb22-term-advanced-filter{max-width:none;flex-basis:100%}
+ .swtb22-term-unit-disclosure>.ow-term-units{grid-template-columns:minmax(0,1fr)}
+}
