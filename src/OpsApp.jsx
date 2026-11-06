@@ -15,6 +15,8 @@ import { disabledWorkerCopy } from './lib/workerAccess.mjs'
 import { watchOperationsResume } from './lib/operationsResume.mjs'
 import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
+import ManagerWorkspaceNav from './components/ManagerWorkspaceNav'
+import {currentManagerDestination,nextManagerNavigation} from './lib/managerWorkspaceNav.mjs'
 import {
   WORKER_PASSWORD_RECOVERY_REDIRECT,
   PASSWORD_RECOVERY_PENDING_KEY,
@@ -23,9 +25,16 @@ import {
 } from './lib/passwordRecovery.mjs'
 import './report.css'
 import './ops.css'
+import './manager-shell.css'
 
 // Enable only after the SMTP provider and Edge delivery switch are tested.
 const emailInvitesAvailable = import.meta.env.VITE_OPS_EMAIL_INVITES_AVAILABLE === 'true'
+// Rollback-safe preview: preserve the current manager UI until the new shell is accepted.
+const managerShellEnabled=import.meta.env.VITE_SWTB22_MANAGER_SHELL_UI==='true'
+const managerNavFlags={
+ workPoolEnabled:import.meta.env.VITE_SWTB21_WORK_POOL_UI!=='false',
+ termMembershipEnabled:import.meta.env.VITE_SWTB21_TERM_MEMBERSHIP_UI!=='false',
+}
 
 // Navigation-only state stays above the authorization-check placeholder, so
 // secure unmounting cannot reset the selected manager tab or worker filter.
@@ -620,35 +629,42 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   const activeCount = rows.filter(row => Boolean(row.worker_id)).length
   const readyCount = rows.filter(row => !row.worker_id
     && row.interview_status === 'approved' && row.clearance_status === 'cleared').length
+  const currentDestination=currentManagerDestination(navigation,managerNavFlags)
+  const navigateManager=item=>setNavigation(previous=>nextManagerNavigation(previous,item))
 
   return (
-    <main className="report-shell report-shell--dashboard ops-root" dir="rtl">
+    <main className={'report-shell report-shell--dashboard ops-root'+
+      (managerShellEnabled?' swtb22-manager-enabled':'')} dir="rtl">
+      {managerShellEnabled&&<ManagerWorkspaceNav navigation={navigation}
+       onNavigate={navigateManager} {...managerNavFlags}/>}
+      <div className={managerShellEnabled?'swtb22-manager-main':undefined}>
       <header className="report-header">
         <div>
           <span className="report-eyebrow">دانشکده علوم انسانی شهید رجایی بابل</span>
-          <h1>مدیریت دانشجوکارها</h1>
-          <p>بررسی داوطلبان، مصاحبه، استعلام و فعال‌سازی حساب</p>
+          <h1>{managerShellEnabled?currentDestination?.label:'مدیریت دانشجوکارها'}</h1>
+          <p>{managerShellEnabled?currentDestination?.description:
+           'بررسی داوطلبان، مصاحبه، استعلام و فعال‌سازی حساب'}</p>
         </div>
         <div className="report-header-actions">
           <button type="button" className="report-btn report-btn--ghost" onClick={refreshCurrentSection} disabled={adminSection === 'candidates' && loading}>به‌روزرسانی</button>
           <button type="button" className="report-btn report-btn--ghost" onClick={onLogout}>خروج</button>
         </div>
       </header>
-      <nav className="ow-tabs" aria-label="بخش‌های مدیریت دانشجوکار">
+      {!managerShellEnabled&&<nav className="ow-tabs" aria-label="بخش‌های مدیریت دانشجوکار">
         <button type="button"
           className={adminSection === 'candidates' ? 'ow-tab is-selected' : 'ow-tab'}
           onClick={() => setAdminSection('candidates')}>داشبورد و داوطلبان</button>
         <button type="button"
           className={adminSection === 'work' ? 'ow-tab is-selected' : 'ow-tab'}
           onClick={() => setAdminSection('work')}>برنامه و کارها</button>
-      </nav>
+      </nav>}
       {adminSection === 'candidates' && <>
-      <nav className="ow-tabs ops-subtabs" aria-label="بخش‌های داشبورد و داوطلبان">
+      {!managerShellEnabled&&<nav className="ow-tabs ops-subtabs" aria-label="بخش‌های داشبورد و داوطلبان">
         <button type="button" className={candidateView === 'applicants' ? 'ow-tab is-selected' : 'ow-tab'}
           onClick={() => setCandidateView('applicants')}>داوطلبان و پذیرش</button>
         <button type="button" className={candidateView === 'report' ? 'ow-tab is-selected' : 'ow-tab'}
           onClick={() => setCandidateView('report')}>آمار و خروجی‌ها</button>
-      </nav>
+      </nav>}
       {candidateView === 'applicants' && <>
       <section className="ops-kpis" aria-label="وضعیت دانشجوکارها">
         <article><span>کل داوطلبان</span><strong>{numbers.format(rows.length)}</strong></article>
@@ -692,7 +708,8 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
         refreshRevision={refreshRevision + manualReportRevision} />}
       </>}
       {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation}
-        refreshRevision={refreshRevision + manualWorkRevision} />}
+        refreshRevision={refreshRevision + manualWorkRevision}
+        hideSectionTabs={managerShellEnabled} />}
       {issuedCredentials && (
         <div className="ops-modal" role="dialog" aria-modal="true" aria-labelledby="ops-credentials-title">
           <div className="ops-modal__card">
@@ -732,6 +749,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
           </div>
         </div>
       )}
+      </div>
     </main>
   )
 }
