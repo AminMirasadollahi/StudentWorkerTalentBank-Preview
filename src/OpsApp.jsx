@@ -16,6 +16,7 @@ import { watchOperationsResume } from './lib/operationsResume.mjs'
 import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
 import ManagerWorkspaceNav from './components/ManagerWorkspaceNav'
+import ManagerCandidatesWorkspace from './components/ManagerCandidatesWorkspace'
 import {currentManagerDestination,nextManagerNavigation} from './lib/managerWorkspaceNav.mjs'
 import {
   WORKER_PASSWORD_RECOVERY_REDIRECT,
@@ -40,10 +41,12 @@ const managerNavFlags={
 // secure unmounting cannot reset the selected manager tab or worker filter.
 // No credentials, worker records or unsaved form inputs are cached here.
 const initialAdminNavigation = () => ({
-  section: 'candidates',
+  section: managerShellEnabled ? 'work' : 'candidates',
   candidateView: 'applicants',
   candidateFilter: 'all',
-  workView: 'tasks',
+  candidateSearch: '',
+  candidateId: '',
+  workView: managerShellEnabled ? 'inbox' : 'tasks',
   workPoolKind: 'general',
   workerId: '',
   taskWorkerId: '',
@@ -403,12 +406,29 @@ export function WorkerDisabledView({ profile, onLogout }) {
   )
 }
 
-function CandidateCard({ candidate, saving, onSave, onSaveEmail, onProvision, onReissue }) {
-  const [interview, setInterview] = useState(candidate.interview_status || 'pending')
-  const [clearance, setClearance] = useState(candidate.clearance_status || 'pending')
-  const [email, setEmail] = useState(candidate.email || '')
-  const [unit, setUnit] = useState(candidate.primary_unit)
-  const [onboardingMode, setOnboardingMode] = useState('secure_link')
+function CandidateCard({
+ candidate, saving, onSave, onSaveEmail, onProvision, onReissue,
+ draftValues, onDraftField,
+}) {
+  // The new inspector controls draft inputs above this component, retaining
+  // incomplete work when changing candidates. Legacy cards keep local state.
+  const [localInterview, localSetInterview] = useState(candidate.interview_status || 'pending')
+  const [localClearance, localSetClearance] = useState(candidate.clearance_status || 'pending')
+  const [localEmail, localSetEmail] = useState(candidate.email || '')
+  const [localUnit, localSetUnit] = useState(candidate.primary_unit)
+  const [localOnboardingMode, localSetOnboardingMode] = useState('secure_link')
+  const controlled=typeof onDraftField==='function'
+  const ControlsTag=controlled?'div':'details'
+  const interview=controlled?(draftValues?.interview??candidate.interview_status??'pending'):localInterview
+  const clearance=controlled?(draftValues?.clearance??candidate.clearance_status??'pending'):localClearance
+  const email=controlled?(draftValues?.email??candidate.email??''):localEmail
+  const unit=controlled?(draftValues?.unit??candidate.primary_unit):localUnit
+  const onboardingMode=controlled?(draftValues?.onboardingMode??'secure_link'):localOnboardingMode
+  const setInterview=v=>controlled?onDraftField('interview',v):localSetInterview(v)
+  const setClearance=v=>controlled?onDraftField('clearance',v):localSetClearance(v)
+  const setEmail=v=>controlled?onDraftField('email',v):localSetEmail(v)
+  const setUnit=v=>controlled?onDraftField('unit',v):localSetUnit(v)
+  const setOnboardingMode=v=>controlled?onDraftField('onboardingMode',v):localSetOnboardingMode(v)
   const hasWorker = Boolean(candidate.worker_id)
   const accepted = candidate.interview_status === 'approved'
     && candidate.clearance_status === 'cleared'
@@ -429,11 +449,11 @@ function CandidateCard({ candidate, saving, onSave, onSaveEmail, onProvision, on
           <small dir="ltr">{candidate.phone}</small>
         </div>
         <span className={`ops-status ${hasWorker ? 'ops-status--active' : ''}`}>
-          {hasWorker ? 'دانشجوکار فعال' : 'داوطلب'}
+          {hasWorker ? (candidate.worker_state==='active'?'دانشجوکار فعال':'حساب دانشجوکار ایجادشده') : 'داوطلب'}
         </span>
       </div>
-      <details className="ops-candidate-controls">
-        <summary>{hasWorker?'پرونده حساب و دسترسی':eligible?'بررسی و فعال‌سازی':'جزئیات و بررسی پرونده'}</summary>
+      <ControlsTag className="ops-candidate-controls">
+        {!controlled&&<summary>{hasWorker?'پرونده حساب و دسترسی':eligible?'بررسی و فعال‌سازی':'جزئیات و بررسی پرونده'}</summary>}
       {!hasWorker && (
         <>
           <div className="ops-field-row ops-email-row">
@@ -522,7 +542,7 @@ function CandidateCard({ candidate, saving, onSave, onSaveEmail, onProvision, on
         </button>
         <small>لینک جدید به معنای الزام تعیین مجدد رمز در ورود بعدی است. فقط با درخواست دانشجو یا برای آزمون از این گزینه استفاده کنید.</small>
       </>}
-      </details>
+      </ControlsTag>
     </article>
   )
 }
@@ -536,11 +556,27 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   const [issuedCredentials, setIssuedCredentials] = useState(null)
   const [manualWorkRevision,setManualWorkRevision] = useState(0)
   const [manualReportRevision,setManualReportRevision] = useState(0)
+  const [candidateDrafts,setCandidateDrafts] = useState({})
   const filter = navigation.candidateFilter
+  const search = navigation.candidateSearch||''
+  const selectedCandidateId = navigation.candidateId||''
   const adminSection = navigation.section
   const candidateView = navigation.candidateView || 'applicants'
   const setCandidateView = value => setNavigation(previous => ({ ...previous, candidateView: value }))
   const setFilter = value => setNavigation(previous => ({ ...previous, candidateFilter: value }))
+  const setCandidateSearch = value => setNavigation(previous=>({...previous,candidateSearch:value}))
+  const setSelectedCandidateId = value => setNavigation(previous=>({...previous,candidateId:value}))
+  const setCandidateDraftField = (id,field,value) => setCandidateDrafts(previous=>({
+   ...previous,[id]:{...previous[id],[field]:value},
+  }))
+  const clearCandidateDraftFields = (id,fields) => setCandidateDrafts(previous=>{
+   if(!previous[id])return previous
+   const next={...previous},draft={...previous[id]}
+   for(const field of fields)delete draft[field]
+   if(Object.keys(draft).length)next[id]=draft
+   else delete next[id]
+   return next
+  })
   const setAdminSection = value => setNavigation(previous => ({ ...previous, section: value }))
 
   const refresh = async () => {
@@ -552,6 +588,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
     } catch (e) {
       // Never leave the previous candidate list visible after a denied read.
       setRows([])
+      setCandidateDrafts({})
       setError(getMessage(e))
     } finally {
       setLoading(false)
@@ -575,6 +612,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
       await setCandidateScreening(id, interview, clearance)
       setFlash('وضعیت بررسی ثبت شد.')
       await refresh()
+      clearCandidateDraftFields(id,['interview','clearance'])
     } catch (e) { setError(getMessage(e)) }
     finally { setBusyId('') }
   }
@@ -585,6 +623,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
       await setCandidateEmail(id,email)
       setFlash('ایمیل داوطلب در پرونده ذخیره شد.')
       await refresh()
+      clearCandidateDraftFields(id,['email'])
     } catch (e) { setError(getMessage(e)) }
     finally { setBusyId('') }
   }
@@ -600,6 +639,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
           : 'حساب فعال شد ولی درخواست ارسال ایمیل ناموفق بود؛ لینک امن را جداگانه صادر کنید.'
         : 'حساب دانشجوکار فعال شد.')
       await refresh()
+      clearCandidateDraftFields(id,['interview','clearance','email','unit','onboardingMode'])
     } catch (e) { setError(getMessage(e)) }
     finally { setBusyId('') }
   }
@@ -666,7 +706,19 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
         <button type="button" className={candidateView === 'report' ? 'ow-tab is-selected' : 'ow-tab'}
           onClick={() => setCandidateView('report')}>آمار و خروجی‌ها</button>
       </nav>}
-      {candidateView === 'applicants' && <>
+      {candidateView === 'applicants' && (managerShellEnabled ?
+       <ManagerCandidatesWorkspace rows={rows} filter={filter} search={search}
+        selectedId={selectedCandidateId} onFilterChange={setFilter}
+        onSearchChange={setCandidateSearch} onSelect={setSelectedCandidateId}
+        loading={loading} error={error} flash={flash} busy={Boolean(busyId)}
+        renderDetails={row=><CandidateCard
+         key={row.id + ':' + row.interview_status + ':' + row.clearance_status + ':' + (row.worker_id||'')}
+         candidate={row} saving={busyId===row.id||busyId===row.worker_id}
+         draftValues={candidateDrafts[row.id]}
+         onDraftField={(field,value)=>setCandidateDraftField(row.id,field,value)}
+         onSave={saveScreening} onSaveEmail={saveEmail}
+         onProvision={activate} onReissue={reissueLink}/>}/>
+       :<>
       <section className="ops-kpis" aria-label="وضعیت دانشجوکارها">
         <article><span>کل داوطلبان</span><strong>{numbers.format(rows.length)}</strong></article>
         <article><span>آماده فعال‌سازی</span><strong>{numbers.format(readyCount)}</strong></article>
@@ -704,10 +756,20 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
             </div>
           ) : <p className="ops-muted">موردی برای نمایش وجود ندارد.</p>}
       </section>
-      </>}
+      </>)}
       {candidateView === 'report' && <ReportApp adminMode
         refreshRevision={refreshRevision + manualReportRevision} />}
       </>}
+      {managerShellEnabled&&adminSection==='work'&&navigation.workView==='inbox'&&
+       <section className="swtb22-manager-home-links" aria-label="مسیرهای سریع کار روزانه">
+        <div><h2>از کجا شروع کنم؟</h2>
+         <p>برای پیگیری روزانه، بخش موردنظر را انتخاب کنید. هر اقدام در فضای اختصاصی خودش انجام می‌شود.</p></div>
+        <div className="swtb22-manager-home-actions">
+         <button type="button" onClick={()=>navigateManager({section:'candidates',view:'applicants'})}>بررسی داوطلبان</button>
+         <button type="button" onClick={()=>navigateManager({section:'work',view:'tasks'})}>کارها و واگذاری</button>
+         <button type="button" onClick={()=>navigateManager({section:'work',view:'availability'})}>برنامه حضور</button>
+        </div>
+       </section>}
       {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation}
         refreshRevision={refreshRevision + manualWorkRevision}
         hideSectionTabs={managerShellEnabled} />}

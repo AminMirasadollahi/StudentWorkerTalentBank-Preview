@@ -102,7 +102,14 @@ test('type switch lazy-mounts desk once and retains general draft/editor on retu
   assert.equal(ui.host.querySelectorAll('details[open]').length,1)
   await act(async()=>button(ui.host,'نوبت‌های زمان‌دار کتابخانه').click())
   assert.equal(ui.host.querySelector('.swtb22-work-pool-kind-view').hidden,true)
-  assert.ok(ui.host.querySelector('[data-testid="swtb22-desk-stub"]'))
+  // React.lazy may resolve after the initial click's microtask; wait for the
+  // actual stub rather than racing the module loader on busy CI runners.
+  const deadline=Date.now()+800
+  while(!ui.host.querySelector('[data-testid="swtb22-desk-stub"]')&&Date.now()<deadline){
+   await act(async()=>{await new Promise(resolve=>setTimeout(resolve,25))})
+  }
+  assert.ok(ui.host.querySelector('[data-testid="swtb22-desk-stub"]'),
+   'desk remains lazily mounted after the first explicit selection')
   await act(async()=>button(ui.host,'فرصت‌های عمومی').click())
   assert.equal(ui.host.querySelector('.swtb22-work-pool-kind-view').hidden,false)
   assert.match(ui.host.querySelector('details[open] summary').textContent,/تعریف فرصت/)
