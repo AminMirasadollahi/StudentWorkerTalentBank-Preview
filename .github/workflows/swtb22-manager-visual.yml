@@ -9,6 +9,8 @@ on:
       - 'src/components/TeamScheduleOverview.jsx'
       - 'src/components/FocusedReviewQueue.jsx'
       - 'src/components/ManagerHistoryExplorer.jsx'
+      - 'src/components/TermBudgetPanel.jsx'
+      - 'src/lib/termBudgetIntegrity.mjs'
       - 'src/lib/managerHistoryExport.mjs'
       - 'src/lib/managerHistoryWorkbook.mjs'
       - 'src/components/TermMembershipPanel.jsx'
@@ -46,6 +48,7 @@ jobs:
           VITE_SWTB22_PRESENCE_FOCUS_UI: 'true'
           VITE_SWTB22_REVIEW_FOCUS_UI: 'true'
           VITE_SWTB22_HISTORY_FOCUS_UI: 'true'
+          VITE_SWTB22_TERM_FOCUS_UI: 'true'
         run: npm run build
       - name: Focused fake manager native Chrome appearance and interaction smoke
         run: node tests/browser/run-swtb22-manager-smoke.mjs
