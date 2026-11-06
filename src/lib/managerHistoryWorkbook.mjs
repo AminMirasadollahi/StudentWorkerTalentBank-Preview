@@ -5,7 +5,9 @@ import {
 // Create a workbook from the SAME already-scoped manager projection as the UI.
 // No HTTP/database access, workbook download, or spreadsheet calculations here.
 export function buildManagerHistoryWorkbook(ExcelJS,projection,metadata=[]){
- const wb=new ExcelJS.Workbook()
+ const Workbook=ExcelJS.Workbook||ExcelJS.default?.Workbook
+ if(typeof Workbook!=='function')throw Error('XLSX_WRITER_UNAVAILABLE')
+ const wb=new Workbook()
  wb.creator='Student Worker Talent Bank / Management'
  wb.subject='Scope-limited authorized manager work and hours history'
  wb.calcProperties.fullCalcOnLoad=false
