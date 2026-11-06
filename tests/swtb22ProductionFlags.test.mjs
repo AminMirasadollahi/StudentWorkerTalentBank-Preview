@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs'
 // Reversible, nonsecret production presentation release.
 // The protected GitHub Pages workflow remains pinned byte-for-byte by
 // releaseBoundary.test.mjs and is intentionally not edited.
-test('SWTB22 production Vite file enables exactly the three reviewed manager UI features',()=>{
+test('SWTB22 production Vite file enables exactly the four reviewed manager UI features',()=>{
  const raw=readFileSync(new URL('../.env.production',import.meta.url),'utf8')
  const rows=raw.split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'))
  const values=Object.fromEntries(rows.map(row=>{
@@ -17,8 +17,9 @@ test('SWTB22 production Vite file enables exactly the three reviewed manager UI 
   VITE_SWTB22_MANAGER_SHELL_UI:'true',
   VITE_SWTB22_WORK_POOL_FOCUS_UI:'true',
   VITE_SWTB22_TASKS_FOCUS_UI:'true',
+  VITE_SWTB22_PRESENCE_FOCUS_UI:'true',
  })
- assert.equal(rows.length,3,'no other variables or credentials may be included')
+ assert.equal(rows.length,4,'no other variables or credentials may be included')
 })
 test('all source feature switches remain explicitly overridable to false',()=>{
  const app=readFileSync(new URL('../src/OpsApp.jsx',import.meta.url),'utf8')
@@ -27,4 +28,5 @@ test('all source feature switches remain explicitly overridable to false',()=>{
  assert.match(app,/VITE_SWTB22_MANAGER_SHELL_UI\s*===\s*'true'/)
  assert.match(pool,/VITE_SWTB22_WORK_POOL_FOCUS_UI\s*===\s*'true'/)
  assert.match(tasks,/VITE_SWTB22_TASKS_FOCUS_UI\s*===\s*'true'/)
+ assert.match(tasks,/VITE_SWTB22_PRESENCE_FOCUS_UI\s*===\s*'true'/)
 })
