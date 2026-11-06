@@ -1096,7 +1096,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
        </div>
        <TaskAssignmentEditor key={taskEditorRevision}
         workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
-        onSaved={refresh} onClose={()=>closeTaskEditor(true)}/>
+        onSaved={refresh} onCancel={()=>closeTaskEditor()}
+        onClose={()=>closeTaskEditor(true)}/>
       </dialog>}
     </>}
 
