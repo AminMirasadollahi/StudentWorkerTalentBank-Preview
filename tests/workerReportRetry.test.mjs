@@ -54,13 +54,15 @@ test('retry contract: accepted canonical equivalents do not accidentally consume
   extraReasonCode:null,extraReasonText:null})
 })
 
-test('retry contract: SQLSTATE proves explicit database rejection, unknown transport does not',()=>{
- for(const code of ['22023','23514','42501','23505','P0002','XX000'])
+test('retry contract: ONLY explicit application SQLSTATE rejection can release the original key',()=>{
+ for(const code of ['22023','23514','42501','23505','P0002'])
   assert.equal(isDefinitiveWorkerReportRejection({code}),true,code)
  for(const error of [null,new Error('Failed to fetch'),{code:''},
-   {code:'PGRST116'},{code:'ETIMEDOUT'},{status:503},{code:null}]){
+   {code:'PGRST116'},{code:'ETIMEDOUT'},{status:503},{code:null},
+   {code:'08006'},{code:'08000'},{code:'40001'},{code:'57014'},
+   {code:'XX000'},{code:'53300'}]){
   assert.equal(isDefinitiveWorkerReportRejection(error),false,
-    'must retain payload on unknown outcome')
+    'must retain payload on network/transient/unknown outcome')
  }
 })
 
