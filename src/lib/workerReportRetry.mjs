@@ -22,11 +22,20 @@ export function sameWorkerReportPayload(previous,next) {
   return FIELDS.every(field=>Object.is(previous[field],next[field]))
 }
 
-// SQLSTATE returned by PostgREST proves the RPC raised an error and its
-// transaction was rolled back; transport/unknown failures do NOT prove that.
+// Only application-level SQLSTATE rejections with known, explicit server
+// semantics are safe to discard. Never treat every five-character SQLSTATE as
+// definitive: 08xxx connectivity failures and transient infrastructure states
+// can leave the outcome uncertain. A known validation/auth error rolls back.
+const DEFINITIVE_REPORT_REJECTIONS=new Set([
+  '22023', // invalid date, minutes, or request
+  '23514', // failed review-cycle or extra-time precondition
+  '23505', // duplicate submission key for a different task
+  '42501', // worker identity or task access denied
+  'P0002', // explicitly missing related record
+])
 export function isDefinitiveWorkerReportRejection(error) {
   return typeof error?.code==='string'
-    &&/^[0-9A-Z]{5}$/.test(error.code)
+    &&DEFINITIVE_REPORT_REJECTIONS.has(error.code)
 }
 
 export const WORKER_REPORT_CHANGED_RETRY_NOTICE=
