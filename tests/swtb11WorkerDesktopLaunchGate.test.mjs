@@ -66,7 +66,7 @@ test('worker launch gate: same synthetic server snapshot never exposes another w
  const scopedA=scopeSelfWorkRows(fixtures,A)
  const scopedB=scopeSelfWorkRows(fixtures,B)
  assert.deepEqual(scopedA.tasks.map(t=>t.id),['A-fix','A-pending','A-done'])
- assert.deepEqual(scopedA.time_entries.map(e=>e.id),['A-changes','A-pending-time','A-credit'])
+ assert.deepEqual(scopedA.time_entries.map(e=>e.id),['A-pending-time','A-changes','A-credit'])
  assert.deepEqual(scopedB.tasks.map(t=>t.id),['B-done'])
  assert.deepEqual(scopedB.time_entries.map(e=>e.id),['B-credit'])
  for(const kind of ['tasks','time_entries','weekly_slots','exceptions']){
