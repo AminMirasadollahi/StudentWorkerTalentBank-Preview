@@ -8,6 +8,7 @@ import {chromium} from 'playwright'
 process.env.VITE_SWTB22_WORK_POOL_FOCUS_UI='true'
 process.env.VITE_SWTB22_TASKS_FOCUS_UI='true'
 process.env.VITE_SWTB22_PRESENCE_FOCUS_UI='true'
+process.env.VITE_SWTB22_REVIEW_FOCUS_UI='true'
 const output=resolve('test-results/swtb22-manager-synthetic')
 await mkdir(output,{recursive:true})
 let server,browser,page
@@ -174,6 +175,58 @@ try{
  assert.ok(await page.locator('.swtb22-presence-day-inspector').evaluate(
   el=>el.getBoundingClientRect().width>340))
  await page.screenshot({path:resolve(output,'15-integrated-manager-presence-1920.png'),fullPage:true})
+ await page.setViewportSize({width:1440,height:900})
+ // D5: real manager approvals / inbox / selected worker review / term roster.
+ // Every entry is fake; getAdminWorkV2 and the term RPC are replaced by Vite
+ // before module resolution. Network outside localhost remains blocked.
+ await page.locator('[data-swtb22-route="approvals"]').click()
+ await page.locator('.swtb22-review-workspace .swtb22-review-row').first().waitFor()
+ assert.equal(await page.locator('.swtb22-review-workspace .swtb22-review-row').count(),2)
+ assert.equal(await page.locator('.swtb22-review-inspector .ow-item').count(),0)
+ const approvalWidths=await page.locator('.swtb22-review-workspace').evaluate(node=>{
+  const directory=node.querySelector('.swtb22-review-directory').getBoundingClientRect()
+  const inspector=node.querySelector('.swtb22-review-inspector').getBoundingClientRect()
+  return {directory:directory.width,inspector:inspector.width,
+   overflow:document.documentElement.scrollWidth>window.innerWidth+1}
+ })
+ assert.ok(approvalWidths.directory>190,'review directory must be scannable')
+ assert.ok(approvalWidths.inspector>420,'one active review form must be comfortable at 1440px')
+ assert.equal(approvalWidths.overflow,false)
+ await page.screenshot({path:resolve(output,'16-manager-approval-queue-empty-inspector.png'),fullPage:true})
+ await page.locator('.swtb22-review-row').first().click()
+ assert.equal(await page.locator('.swtb22-review-inspector .ow-item').count(),1)
+ assert.equal(await page.locator('.swtb22-review-row[aria-pressed="true"]').count(),1)
+ assert.ok(await page.locator('.swtb22-review-inspector-head h3').evaluate(
+  el=>document.activeElement===el),'focus must follow only chosen review')
+ assert.equal(await page.locator('.ow-approval-detail>summary').count(),0)
+ await page.screenshot({path:resolve(output,'17-manager-selected-time-approval.png'),fullPage:true})
+ await page.locator('[aria-label="فیلتر نوع درخواست زمان"]').selectOption('extra')
+ assert.equal(await page.locator('.swtb22-review-row').count(),1)
+ await page.locator('[data-swtb22-route="inbox"]').click()
+ await page.locator('.swtb22-review-workspace .swtb22-review-row').first().waitFor()
+ assert.equal(await page.locator('.swtb22-review-row').count(),3)
+ assert.equal(await page.locator('.ow-profile-request').count(),0,
+  'unselected candidate corrections must not mount sensitive decision forms')
+ await page.locator('.swtb22-review-row').first().click()
+ assert.equal(await page.locator('.swtb22-review-inspector .ow-profile-request').count(),1)
+ await page.screenshot({path:resolve(output,'18-manager-inbox-selected-profile-correction.png'),fullPage:true})
+ await page.locator('[data-swtb22-route="profiles"]').click()
+ await page.locator('.ow-people-directory button').first().click()
+ await page.locator('.swtb22-profile-review .swtb22-review-row').first().waitFor()
+ assert.equal(await page.locator('.swtb22-profile-review .swtb22-review-row').count(),2)
+ assert.equal(await page.locator('.swtb22-profile-review .ow-profile-request').count(),0)
+ await page.screenshot({path:resolve(output,'19-manager-worker-profile-review-directory.png'),fullPage:true})
+ await page.locator('[data-swtb22-route="termMemberships"]').click()
+ await page.locator('.swtb22-membership-roster-tools').waitFor()
+ assert.equal(await page.locator('.ow-membership-table tbody tr').count(),2)
+ await page.locator('[aria-label="فیلتر مجوز همکاری نیمسال"]').selectOption('unknown')
+ assert.equal(await page.locator('.ow-membership-table tbody tr').count(),1)
+ assert.equal(await page.locator('dialog[open]').count(),0)
+ assert.equal(await page.evaluate(()=>globalThis.__qaWriteAttempts),0)
+ await page.screenshot({path:resolve(output,'20-manager-term-access-unknown-filter.png'),fullPage:true})
+ await page.setViewportSize({width:1920,height:1080})
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1),false)
+ await page.screenshot({path:resolve(output,'21-manager-term-access-1920.png'),fullPage:true})
  await page.setViewportSize({width:1440,height:900})
  const result=await page.evaluate(()=>({writes:globalThis.__qaWriteAttempts,
   overflow:document.documentElement.scrollWidth>window.innerWidth+1}))
