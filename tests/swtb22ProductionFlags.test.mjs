@@ -16,6 +16,7 @@ test('SWTB22 production Vite file enables exactly the two reviewed manager UI fe
  assert.deepEqual(values,{
   VITE_SWTB22_MANAGER_SHELL_UI:'true',
   VITE_SWTB22_WORK_POOL_FOCUS_UI:'true',
+  VITE_SWTB22_TASKS_FOCUS_UI:'true',
  })
  assert.equal(rows.length,2,'no other variables or credentials may be included')
 })
