@@ -103,26 +103,7 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0}){
  const change=(id,state,why=null)=>
   void submit('state',()=>setDeskWorkOfferState({offerId:id,state,reason:why}),
   ()=>{setClosing('');setReason('')})
- return <section className="ow-desk-pool-block" aria-label="نوبت‌های زمان‌دار کتابخانه">
-  <div className="ow-desk-pool-heading">
-   <div><h3>نوبت‌های میز کتابخانه</h3>
-    <p className="ow-muted">هر نوبت، زمان شروع و پایان مشخص دارد. ظرفیت دو نفر در کل میز کتابخانه محاسبه می‌شود، نه فقط در یک فرصت کاری.</p>
-   </div>
-   <button type="button" className="ow-mini-btn" disabled={busy}
-    onClick={()=>{setUncertain(false);setRevision(x=>x+1)}}>
-    بازخوانی نوبت‌ها</button>
-  </div>
-  {notice&&<div className={uncertain?'report-alert report-alert--error':'ops-alert-success'}
-    role={uncertain?'alert':'status'}>{notice}</div>}
-  {view.status==='loading'&&<p role="status">در حال خواندن نوبت‌ها…</p>}
-  {view.status==='error'&&<p role="alert" className="report-alert report-alert--error">دریافت نوبت‌های کتابخانه موفق نبود؛ ثبت و انتشار غیرفعال است.</p>}
-  {view.status==='ready'&&<div className={`ow-work-pool-columns${view.offers.length===0?' ow-work-pool-columns--empty':''}`}>
-   {focusUIEnabled&&<div className="swtb22-work-pool-commands" role="group" aria-label="ساخت نوبت کتابخانه">
-    <button type="button" className="report-btn report-btn--primary" onClick={()=>setEditorMode('template')}>تعریف الگوی نوبت</button>
-    <button type="button" className="report-btn report-btn--light" disabled={!view.templates.length} onClick={()=>setEditorMode('offer')}>ساخت نوبت تاریخ‌دار</button>
-    {!view.templates.length&&<small>ابتدا الگوی نوبت فعال تعریف کنید؛ سپس تاریخ و ساعت را مشخص کنید.</small>}
-   </div>}
-   <div className="ow-work-pool-compose">
+ const editorSurface=(<div className="ow-work-pool-compose">
     {view.offers.length===0&&<p className="ow-work-pool-workflow" aria-label="مراحل آماده‌سازی نوبت کتابخانه">
      <span>۱. تعریف الگوی نوبت</span><span>۲. تعیین تاریخ و ساعت</span><span>۳. انتشار توسط مدیر</span>
     </p>}
@@ -206,8 +187,8 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0}){
        ساخت پیش‌نویس نوبت</button>
      </form>
     </details>
-   </div>
-   <div className="ow-work-pool-list">
+   </div>)
+ const listSurface=(<div className="ow-work-pool-list">
     <h4>فرصت‌های نوبت کتابخانه ({fa.format(view.offers.length)})</h4>
     {!view.offers.length&&<div className="ow-work-pool-empty" role="status">
      <strong>هنوز نوبتی منتشر یا تعریف نشده است.</strong>
@@ -242,7 +223,27 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0}){
       </div>
      </div>}
     </article>)}
+   </div>)
+ return <section className="ow-desk-pool-block" aria-label="نوبت‌های زمان‌دار کتابخانه">
+  <div className="ow-desk-pool-heading">
+   <div><h3>نوبت‌های میز کتابخانه</h3>
+    <p className="ow-muted">هر نوبت، زمان شروع و پایان مشخص دارد. ظرفیت دو نفر در کل میز کتابخانه محاسبه می‌شود، نه فقط در یک فرصت کاری.</p>
    </div>
+   <button type="button" className="ow-mini-btn" disabled={busy}
+    onClick={()=>{setUncertain(false);setRevision(x=>x+1)}}>
+    بازخوانی نوبت‌ها</button>
+  </div>
+  {notice&&<div className={uncertain?'report-alert report-alert--error':'ops-alert-success'}
+    role={uncertain?'alert':'status'}>{notice}</div>}
+  {view.status==='loading'&&<p role="status">در حال خواندن نوبت‌ها…</p>}
+  {view.status==='error'&&<p role="alert" className="report-alert report-alert--error">دریافت نوبت‌های کتابخانه موفق نبود؛ ثبت و انتشار غیرفعال است.</p>}
+  {view.status==='ready'&&<div className={`ow-work-pool-columns${view.offers.length===0?' ow-work-pool-columns--empty':''}`}>
+   {focusUIEnabled&&<div className="swtb22-work-pool-commands" role="group" aria-label="ساخت نوبت کتابخانه">
+    <button type="button" className="report-btn report-btn--primary" onClick={()=>setEditorMode('template')}>تعریف الگوی نوبت</button>
+    <button type="button" className="report-btn report-btn--light" disabled={!view.templates.length} onClick={()=>setEditorMode('offer')}>ساخت نوبت تاریخ‌دار</button>
+    {!view.templates.length&&<small>ابتدا الگوی نوبت فعال تعریف کنید؛ سپس تاریخ و ساعت را مشخص کنید.</small>}
+   </div>}
+   {focusUIEnabled?<>{listSurface}{editorSurface}</>:<>{editorSurface}{listSurface}</>}
   </div>}
  </section>
 }
