@@ -931,7 +931,9 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
 
     {view==='terms'&&<TermBudgetPanel workers={workers} refreshRevision={refreshRevision}/>}
     {workPoolUIEnabled&&view==='workPool'&&<Suspense fallback={<p className="ow-muted">در حال آماده‌سازی مخزن وظایف…</p>}>
-      <WorkPoolManagerPanel refreshRevision={refreshRevision}/>
+      <WorkPoolManagerPanel refreshRevision={refreshRevision}
+       activeKind={navigation.workPoolKind||'general'}
+       onKindChange={kind=>setNavigation(previous=>({...previous,workPoolKind:kind}))}/>
     </Suspense>}
     {termMembershipUIEnabled&&view==='termMemberships'&&<Suspense fallback={<p className="ow-muted">در حال آماده‌سازی مجوزهای نیمسال…</p>}>
       <TermMembershipPanel workers={workers} refreshRevision={refreshRevision}/>
