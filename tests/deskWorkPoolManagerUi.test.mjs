@@ -21,7 +21,7 @@ const fakeApi={
    'opportunities:[]});',
    'export const getManagerDeskWorkPool=async()=>{',
    'if(globalThis.__deskManagerDenied)throw Error("NO_ADMIN");',
-   'return {ok:true,scope:"manager_desk_offers",offers:[{',
+   'return {ok:true,scope:"manager_desk_offers",offers:globalThis.__deskNoOffers?[]:[{',
    'id:"offer",title:"نوبت میز کتابخانه",state:globalThis.__deskManagerState,',
    'date:"2026-11-25",start_minute:480,end_minute:540,claimed_count:0,',
    'capacity:2,deadline:"2026-11-23"}]};};',
@@ -51,11 +51,12 @@ before(async()=>{
 after(async()=>{
  await server?.close();dom?.window.close()
  for(const p of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT',
- '__deskManagerDenied','__deskManagerState','__deskManagerWrites'])delete globalThis[p]
+ '__deskManagerDenied','__deskManagerState','__deskManagerWrites','__deskNoOffers'])delete globalThis[p]
 })
 async function flush(){await act(async()=>{await Promise.resolve();await Promise.resolve()})}
 async function mount(){
  globalThis.__deskManagerDenied=false
+ globalThis.__deskNoOffers=false
  globalThis.__deskManagerState='draft'
  globalThis.__deskManagerWrites=[]
  const host=document.createElement('div');document.body.append(host)
@@ -102,5 +103,19 @@ test('manager auth failure fails closed and disables publish controls',async()=>
   assert.match(host.textContent,/ثبت و انتشار غیرفعال است/)
   assert.ok(!button(host,'انتشار نوبت'))
   assert.doesNotMatch(host.textContent,/08:00 تا 09:00/)
+ }finally{await cleanup()}
+})
+
+test('empty desk opportunity list adapts width without enabling an unauthorized booking',async()=>{
+ const {host,render,cleanup}=await mount()
+ try{
+  globalThis.__deskNoOffers=true
+  await render({refreshRevision:3})
+  assert.ok(host.querySelector('.ow-work-pool-columns--empty'))
+  assert.match(host.textContent,/۱\. تعریف الگوی نوبت/)
+  assert.match(host.textContent,/۳\. انتشار توسط مدیر/)
+  assert.ok(host.querySelector('.ow-work-pool-empty'))
+  assert.equal(globalThis.__deskManagerWrites.length,0)
+  assert.ok(!button(host,'انتشار نوبت'))
  }finally{await cleanup()}
 })
