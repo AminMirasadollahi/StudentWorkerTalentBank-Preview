@@ -51,6 +51,13 @@ globalThis.__qaAdminWork={
    review_state:'submitted',reported_minutes:120,work_date:'2026-11-06',
    submitted_at:'2026-11-06T06:00:00Z',extra_time_reason_code:'equipment_issue',
    extra_time_reason_text:'تأخیر نمونه برای آزمون'},
+  {id:'QA-REPORT-APPROVED',task_id:'QA-TASK-1',worker_id:'QA-A',
+   review_state:'approved',reported_minutes:60,approved_minutes:45,
+   review_note:'=HYPERLINK("https://invalid.example","test only")',
+   work_date:'2026-11-06',submitted_at:'2026-11-06T07:00:00Z'},
+  {id:'QA-REPORT-ORPHAN',task_id:'QA-UNKNOWN-TASK',worker_id:'QA-B',
+   review_state:'approved',reported_minutes:25,approved_minutes:25,
+   work_date:'2026-11-06',submitted_at:'2026-11-06T08:00:00Z'},
  ],
  profile_requests:[
   {id:'QA-PROFILE-R',worker_id:'QA-A',field_code:'major',
@@ -86,7 +93,7 @@ function Stage(){
    {navigation.section==='work'&&navigation.workView==='workPool'
     ?<WorkPoolManagerPanel activeKind={navigation.workPoolKind}
       onKindChange={kind=>setNavigation(v=>({...v,workPoolKind:kind}))}/>
-    :navigation.section==='work'&&['tasks','availability','inbox','approvals','profiles','termMemberships'].includes(navigation.workView)
+    :navigation.section==='work'&&['tasks','availability','inbox','approvals','profiles','termMemberships','history'].includes(navigation.workView)
      ?<AdminOperations navigation={navigation} setNavigation={setNavigation} hideSectionTabs/>
     :navigation.section==='candidates'&&navigation.candidateView==='applicants'
      ?<ManagerCandidatesWorkspace rows={demoCandidates} filter={navigation.candidateFilter}
