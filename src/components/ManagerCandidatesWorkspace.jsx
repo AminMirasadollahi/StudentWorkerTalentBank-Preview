@@ -1,4 +1,4 @@
-import {useMemo} from 'react'
+import {useEffect,useMemo,useRef} from 'react'
 import {candidateStage,selectManagerCandidates} from '../lib/managerCandidateView.mjs'
 
 // One navigable directory and one purpose-built candidate inspector.
@@ -10,6 +10,10 @@ export default function ManagerCandidatesWorkspace({
  const filtered=useMemo(
   ()=>selectManagerCandidates(rows,filter,search),[rows,filter,search])
  const selected=filtered.find(row=>String(row.id)===String(selectedId))
+ const inspectorHeading=useRef(null)
+ useEffect(()=>{
+  if(selected)inspectorHeading.current?.focus({preventScroll:true})
+ },[selected?.id])
  return <section className="report-panel swtb22-candidate-workspace"
    aria-label="مدیریت پرونده‌های داوطلبان">
   <div className="swtb22-candidate-head">
@@ -41,8 +45,10 @@ export default function ManagerCandidatesWorkspace({
   </div>
   {error&&<div role="alert" className="report-alert report-alert--error">{error}</div>}
   {flash&&<div role="status" className="ops-alert-success">{flash}</div>}
-  {loading&&<p role="status" className="ops-muted">در حال به‌روزرسانی پرونده‌ها…</p>}
-  {!loading&&error
+  {loading&&rows.length>0&&<p role="status" className="ops-muted">در حال به‌روزرسانی پرونده‌ها…</p>}
+  {loading&&rows.length===0
+   ?<p role="status" className="ops-muted">در حال دریافت پرونده‌ها…</p>
+   :error
    ?<p className="swtb22-candidate-empty" role="status">تا دریافت موفق اطلاعات و بررسی مجوز، پرونده‌های قبلی نمایش داده نمی‌شوند.</p>
    :<div className="swtb22-candidate-grid">
     <div className="swtb22-candidate-directory" role="region" aria-label="فهرست انتخاب داوطلب">
@@ -73,7 +79,7 @@ export default function ManagerCandidatesWorkspace({
      {selected
       ?<>
         <div className="swtb22-candidate-inspector-head">
-         <strong>بررسی پرونده: {selected.full_name}</strong>
+         <h3 tabIndex={-1} ref={inspectorHeading}>بررسی پرونده: {selected.full_name}</h3>
          <button type="button" className="report-btn report-btn--light" disabled={busy}
           onClick={()=>onSelect('')}>بستن جزئیات</button>
         </div>
