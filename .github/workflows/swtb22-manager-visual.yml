@@ -1,0 +1,49 @@
+name: SWTB22 native Chrome manager shell and Work Pool (synthetic only)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/ManagerWorkspaceNav.jsx'
+      - 'src/components/WorkPoolManagerPanel.jsx'
+      - 'src/components/DeskWorkPoolManagerSection.jsx'
+      - 'src/lib/managerWorkspaceNav.mjs'
+      - 'src/manager-shell.css'
+      - 'src/operations-workspace.css'
+      - 'tests/browser/*swtb22*'
+      - '.github/workflows/swtb22-manager-visual.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install existing dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install synthetic-only Chrome harness
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1 jsdom@26.1.0
+      - name: Confirm both new UI flags build without deployment
+        env:
+          VITE_SWTB22_MANAGER_SHELL_UI: 'true'
+          VITE_SWTB22_WORK_POOL_FOCUS_UI: 'true'
+        run: npm run build
+      - name: Focused fake manager native Chrome appearance and interaction smoke
+        run: node tests/browser/run-swtb22-manager-smoke.mjs
+      - name: Upload fake-only manager visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swtb22-manager-work-pool-synthetic
+          path: test-results/swtb22-manager-synthetic/*.png
+          if-no-files-found: ignore
+          retention-days: 5
+      - name: Confirm no production auth or database writes
+        run: echo "All SWTB22 browser smoke data are fake, external requests blocked, no deploy."
