@@ -78,9 +78,17 @@ export function managerHistoryProjection(scoped,{
  for(const entry of entries){
   if(!byTask.has(entry.task_id))toReport(entry,null)
  }
- const approved=reportRows.filter(r=>r.reviewState==='approved')
+ // Use one deterministic activity-date order for both the visible browser
+ // and the export. Unknown work dates sort last; never substitute plan dates.
+ const recentReports=[...reportRows].sort((a,b)=>
+  (b.date||'').localeCompare(a.date||'')||
+  String(b.reportId).localeCompare(String(a.reportId)))
+ const withoutReports=records.filter(r=>r.kind==='unreported').sort((a,b)=>
+  (b.date||'').localeCompare(a.date||'')||
+  String(b.taskId).localeCompare(String(a.taskId)))
+ const approved=recentReports.filter(r=>r.reviewState==='approved')
  return {
-  records,reportRows,
+  records:[...recentReports,...withoutReports],reportRows:recentReports,
   summary:{
    taskCount:tasks.length,
    reportCount:reportRows.length,
