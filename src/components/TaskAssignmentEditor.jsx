@@ -15,7 +15,7 @@ const localToday=()=>{
 }
 const dayAfter=(date,increment)=>{const d=new Date(date+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+increment);return d.toISOString().slice(0,10)}
 const unitNames={library:'کتابخانه',research:'پژوهش',public_relations:'روابط عمومی'}
-export default function TaskAssignmentEditor({workers=[],data={},defaultDate,defaultWorkerId='',onSaved,onClose}) {
+export default function TaskAssignmentEditor({workers=[],data={},defaultDate,defaultWorkerId='',onSaved,onClose,onCancel}) {
  const [workerIds,setWorkerIds]=useState(defaultWorkerId?[defaultWorkerId]:[])
  const [filter,setFilter]=useState('')
  const [date,setDate]=useState(defaultDate||localToday())
@@ -340,7 +340,8 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
   {error&&<p role="alert" className="report-alert report-alert--error">{error}</p>}
   {notice&&<p role="status" className="ops-alert-success">{notice}</p>}
   <div className="ow-actions">
-    {onClose&&<button type="button" className="report-btn report-btn--light" onClick={onClose}>انصراف</button>}
+    {(onClose||onCancel)&&<button type="button" className="report-btn report-btn--light"
+      onClick={onCancel||onClose}>انصراف</button>}
     <button type="submit" className="report-btn report-btn--primary"
       disabled={busy||cancelBusy||committed||!Object.hasOwn(unitNames,taskUnit)||!selected.length||selected.length!==workerIds.length||date<localToday()||!routineGroupOk||!estimateValid||!deskCanSubmit}>
       {busy?'در حال ثبت…':selected.length>1?'واگذاری گروهی':'واگذاری کار'}
