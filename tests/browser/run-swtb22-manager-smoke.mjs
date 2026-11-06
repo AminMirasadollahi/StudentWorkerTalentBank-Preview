@@ -10,6 +10,7 @@ process.env.VITE_SWTB22_TASKS_FOCUS_UI='true'
 process.env.VITE_SWTB22_PRESENCE_FOCUS_UI='true'
 process.env.VITE_SWTB22_REVIEW_FOCUS_UI='true'
 process.env.VITE_SWTB22_HISTORY_FOCUS_UI='true'
+process.env.VITE_SWTB22_TERM_FOCUS_UI='true'
 const output=resolve('test-results/swtb22-manager-synthetic')
 await mkdir(output,{recursive:true})
 let server,browser,page
@@ -294,6 +295,78 @@ try{
  assert.ok(wideReport.inspector>600,'read-only detail should grow at 1920px')
  assert.equal(wideReport.overflow,false)
  await page.screenshot({path:resolve(output,'25-d6a-history-1920.png'),fullPage:true})
+ await page.setViewportSize({width:1440,height:900})
+ // D6B: a real manager term-budget UI, with only synthetic server-authorized
+ // grouped data injected by the fake Vite modules; no live Supabase access.
+ await page.locator('[data-swtb22-route="terms"]').click()
+ await page.getByRole('heading',{name:'سهمیه و مصرف نیمسال'}).waitFor()
+ await page.locator('.swtb22-term-focused .ow-term-kpis').waitFor()
+ assert.equal(await page.locator('.swtb22-term-audit').count(),0,
+  'consistent pooled/units/weeks source must not trigger integrity errors')
+ assert.equal(await page.locator('.ow-term-pool').count(),2)
+ assert.equal(await page.locator('.swtb22-term-unit-disclosure[open]').count(),0)
+ assert.equal(await page.locator('.swtb22-term-week-disclosure[open]').count(),0)
+ const kpiTexts=await page.locator('.ow-term-kpis strong').allTextContents()
+ assert.equal(kpiTexts.length,4)
+ assert.match(kpiTexts[0],/۹ ساعت/)
+ assert.match(kpiTexts[3],/۵۰۲ ساعت/)
+ const pooledTotal=await page.locator('.ow-term-pool').allTextContents()
+ assert.ok(pooledTotal.some(s=>s.includes('۴۱۱ ساعت')))
+ assert.ok(pooledTotal.some(s=>s.includes('۱۰۰ ساعت')))
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false)
+ await page.screenshot({path:resolve(output,'26-d6b-manager-whole-term-1440.png'),fullPage:true})
+ await page.locator('.swtb22-term-unit-disclosure>summary').click()
+ assert.equal(await page.locator('.swtb22-term-unit-disclosure[open]').count(),1)
+ assert.equal(await page.locator('.swtb22-term-unit-disclosure .ow-term-units article').count(),3)
+ await page.locator('.swtb22-term-week-disclosure>summary').click()
+ assert.equal(await page.locator('.swtb22-term-week-disclosure[open]').count(),1)
+ await page.screenshot({path:resolve(output,'27-d6b-unit-and-week-drilldowns-1440.png'),fullPage:true})
+ await page.locator('.swtb22-term-advanced-filter>summary').click()
+ await page.locator('[aria-label="فیلتر واحد بودجه"]').selectOption('library')
+ await page.waitForFunction(()=>globalThis.__qaBudgetReads.at(-1)?.unit==='library')
+ assert.equal(await page.locator('.swtb22-term-audit').count(),0,
+  'shared group consumption must not be compared with one-unit consumption')
+ assert.equal(await page.locator('.ow-term-pool').count(),1)
+ assert.equal(await page.getByRole('button',{name:'ویرایش سهمیه'}).count(),0)
+ assert.equal(await page.getByRole('button',{name:'بستن نیمسال'}).count(),0)
+ assert.equal(await page.getByRole('button',{name:'+ تعریف سهمیه'}).count(),0)
+ assert.equal(await page.getByRole('button',{name:'+ تعریف نیمسال'}).isDisabled(),true)
+ assert.match(await page.locator('.swtb22-term-scope').textContent(),/همه واحدهای عضو/)
+ assert.equal(await page.evaluate(()=>globalThis.__qaWriteAttempts),0)
+ await page.screenshot({path:resolve(output,'28-d6b-shared-pool-single-unit-readonly-1440.png'),fullPage:true})
+ await page.locator('[aria-label="فیلتر دانشجوکار بودجه"]').selectOption('QA-A')
+ await page.waitForFunction(()=>globalThis.__qaBudgetReads.at(-1)?.workerId==='QA-A')
+ assert.equal(await page.locator('.swtb22-term-audit').count(),0)
+ assert.equal(await page.locator('.ow-term-kpis strong').nth(3).textContent(),'—',
+  'individual workers must not have a misleading collective remaining quota')
+ assert.match(await page.locator('.swtb22-term-scope').textContent(),/نمای فردی در یک واحد/)
+ await page.getByRole('button',{name:'بازگشت به نمای کل نیمسال'}).click()
+ await page.waitForFunction(()=>!globalThis.__qaBudgetReads.at(-1)?.unit&&!globalThis.__qaBudgetReads.at(-1)?.workerId)
+ assert.equal(await page.locator('.ow-term-pool').count(),2)
+ assert.equal(await page.locator('.ow-term-kpis strong').nth(3).textContent(),'۵۰۲ ساعت')
+ // Deliberately corrupt only an in-memory fake pool on fresh read. The new
+ // manager must SUPPRESS financial cards, not publish mismatched totals.
+ await page.evaluate(()=>{globalThis.__qaBudgetCorrupt=true})
+ await page.getByRole('button',{name:'بازخوانی',exact:true}).click()
+ await page.locator('.swtb22-term-audit').waitFor()
+ assert.equal(await page.locator('.ow-term-kpis').count(),0)
+ assert.equal(await page.locator('.ow-term-pool').count(),0)
+ assert.equal(await page.getByRole('button',{name:'ویرایش سهمیه'}).count(),0)
+ assert.equal(await page.evaluate(()=>globalThis.__qaWriteAttempts),0)
+ await page.screenshot({path:resolve(output,'29-d6b-inconsistent-source-fail-closed.png'),fullPage:true})
+ await page.evaluate(()=>{globalThis.__qaBudgetCorrupt=false})
+ await page.getByRole('button',{name:'بازخوانی آمار'}).click()
+ await page.locator('.ow-term-kpis').waitFor()
+ assert.equal(await page.locator('.swtb22-term-audit').count(),0)
+ await page.setViewportSize({width:1920,height:1080})
+ const termLayout=await page.locator('.swtb22-term-focused').evaluate(node=>({
+  width:node.getBoundingClientRect().width,
+  cards:[...node.querySelectorAll('.ow-term-pool')].map(el=>el.getBoundingClientRect().width),
+  overflow:document.documentElement.scrollWidth>innerWidth+1,
+ }))
+ assert.ok(termLayout.cards.every(w=>w>300),'grouped quotas must be readable on wide screen: '+JSON.stringify(termLayout))
+ assert.equal(termLayout.overflow,false)
+ await page.screenshot({path:resolve(output,'30-d6b-manager-full-term-1920.png'),fullPage:true})
  await page.setViewportSize({width:1440,height:900})
  const result=await page.evaluate(()=>({writes:globalThis.__qaWriteAttempts,
   overflow:document.documentElement.scrollWidth>window.innerWidth+1}))
