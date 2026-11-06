@@ -4,6 +4,7 @@ import {workerGuideStorageKey} from './lib/workerGuide.mjs'
 import { trapModalTab } from './lib/dialogFocusTrap.mjs'
 import { selectWorkerTaskFocus, summarizeWorkerTaskFocus } from './lib/workerTaskFocus.mjs'
 import {projectWorkerReportActivity,summarizeWorkerReportActivity} from './lib/workerReportActivity.mjs'
+import {canonicalWorkerReportPayload,sameWorkerReportPayload,isDefinitiveWorkerReportRejection,WORKER_REPORT_CHANGED_RETRY_NOTICE} from './lib/workerReportRetry.mjs'
 import {
   getAdminWork, getMyWork, setWeeklyDay, setDateException,
   assignWorkerTask, startMyTask, submitMyTime, reviewWorkerTime,
@@ -1508,16 +1509,19 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
 function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false,actionLedger,reviewCycle}) {
   const acknowledged=actionLedger.get(task.id)
   const sameReviewCycle=acknowledged?.reviewCycle===reviewCycle
+  // When tab navigation temporarily remounts an uncertain report, restore
+  // the exact original payload paired with its existing idempotency key.
+  const initialAttempt=sameReviewCycle?acknowledged?.submissionPayload:null
   const [reportOpen,setReportOpen]=useState(false)
   const reportDialogRef=useRef(null)
   const reportTriggerRef=useRef(null)
-  const [date,setDate]=useState(today())
-  const [requestExtra,setRequestExtra]=useState(false)
+  const [date,setDate]=useState(initialAttempt?.date||today())
+  const [requestExtra,setRequestExtra]=useState(Boolean(initialAttempt?.extraReasonCode))
   const [extraHelpOpen,setExtraHelpOpen]=useState(false)
-  const [requested,setRequested]=useState(String(task.estimate_minutes))
-  const [reasonCode,setReasonCode]=useState('')
-  const [reasonText,setReasonText]=useState('')
-  const [note,setNote]=useState('')
+  const [requested,setRequested]=useState(String(initialAttempt?.minutes??task.estimate_minutes))
+  const [reasonCode,setReasonCode]=useState(initialAttempt?.extraReasonCode||'')
+  const [reasonText,setReasonText]=useState(initialAttempt?.extraReasonText||'')
+  const [note,setNote]=useState(initialAttempt?.note||'')
   const [busy,setBusy]=useState(false)
   const [reportCommitted,setReportCommitted]=useState(Boolean(sameReviewCycle&&acknowledged.report))
   const [startCommitted,setStartCommitted]=useState(Boolean(sameReviewCycle&&acknowledged.start))
@@ -1590,7 +1594,18 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
         setNotice('عملیات ثبت شده است؛ فقط تازه‌سازی وضعیت ناموفق بود. از ارسال دوباره خودداری کنید.')
       }
     }catch(e){
-      // No acknowledgement: retain the SAME idempotency key for a cautious retry.
+      // A PostgreSQL SQLSTATE is an explicit transaction rejection; the user
+      // may correct inputs and create a NEW identity. Unknown HTTP/transport
+      // outcomes MUST retain both the old key and its exact original payload.
+      if(kind==='report'&&isDefinitiveWorkerReportRejection(e)){
+        const attempted=actionLedger.get(task.id)
+        if(attempted?.reviewCycle===reviewCycle&&!attempted?.report){
+          actionLedger.set(task.id,{
+            ...attempted,clientSubmissionId:null,submissionPayload:null,
+          })
+          keyRef.current=crypto.randomUUID()
+        }
+      }
       setError(readableError(e))
     }finally{actionLock.current=false;setBusy(false)}
   }
@@ -1639,19 +1654,30 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
           <summary>شرح کار محول‌شده</summary><p>{task.instructions}</p>
         </details>}
       <form onSubmit={e=>{e.preventDefault();if(!extraValid||reportCommitted||busy)return;
-      // Keep the same client submission identity if the tab temporarily unmounts
-      // after a request with uncertain network outcome.
-      const prior=actionLedger.get(task.id)
-      if(prior?.reviewCycle!==reviewCycle){
-        actionLedger.set(task.id,{reviewCycle,clientSubmissionId:keyRef.current})
-      }else if(!prior.clientSubmissionId){
-        actionLedger.set(task.id,{...prior,clientSubmissionId:keyRef.current})
-      }
-      void perform(
-      ()=>submitMyTime({taskId:task.id,date,minutes:requestedMinutes,note,
-        clientSubmissionId:keyRef.current,
+      // Treat one idempotency key as one immutable submission payload. The
+      // current server replays the original receipt for matching worker+task,
+      // even when a later request contains changed fields.
+      const nextPayload=canonicalWorkerReportPayload({
+        taskId:task.id,date,minutes:requestedMinutes,note,
         extraReasonCode:requestExtra?reasonCode:null,
-        extraReasonText:requestExtra?reasonText.trim():null}),'report')
+        extraReasonText:requestExtra?reasonText.trim():null,
+      })
+      const prior=actionLedger.get(task.id)
+      const previousPayload=prior?.reviewCycle===reviewCycle
+        ?prior.submissionPayload:null
+      if(previousPayload&&!sameWorkerReportPayload(previousPayload,nextPayload)){
+        setError(WORKER_REPORT_CHANGED_RETRY_NOTICE)
+        return
+      }
+      const savedPayload=previousPayload||nextPayload
+      actionLedger.set(task.id,{
+        ...(prior?.reviewCycle===reviewCycle?prior:{}),
+        reviewCycle,clientSubmissionId:keyRef.current,
+        submissionPayload:savedPayload,
+      })
+      void perform(
+        ()=>submitMyTime({...savedPayload,clientSubmissionId:keyRef.current}),
+        'report')
     }}>
       <div className="ow-fields ow-fields--two">
         <label className="report-field"><span>تاریخ انجام کار (شمسی)</span>
