@@ -161,3 +161,166 @@
   overscroll-behavior-y:contain;
  }
 }
+
+
+/* SWTB22-D2 — one actionable home and candidate master/detail workspace.
+   Manager-shell only; the legacy candidate form, intake wizard and worker B3
+   keep their established markup and visual rules. */
+.swtb22-manager-home-links{
+ display:flex;justify-content:space-between;align-items:center;
+ flex-wrap:wrap;gap:.85rem;padding:.85rem 1.15rem;
+ background:#fff;border:1px solid #d7e4e7;border-radius:.8rem;
+}
+.swtb22-manager-home-links h2{
+ color:#173b4c;font-size:.96rem;margin:0 0 .15rem;
+}
+.swtb22-manager-home-links p{
+ color:#58717c;font-size:.78rem;line-height:1.7;margin:0;
+}
+.swtb22-manager-home-actions{display:flex;gap:.4rem;flex-wrap:wrap}
+.swtb22-manager-home-actions button{
+ font:inherit;font-size:.79rem;font-weight:700;color:#166c6b;
+ min-height:2.65rem;padding:.4rem .73rem;cursor:pointer;
+ background:#eff9f8;border:1px solid #c6e2df;border-radius:.56rem;
+}
+.swtb22-manager-home-actions button:hover{background:#e1f5f1}
+.swtb22-manager-enabled .swtb22-candidate-workspace{
+ min-width:0;padding:clamp(.8rem,1.4vw,1.15rem);
+ display:grid;gap:.9rem;align-content:start;
+}
+.swtb22-candidate-head{
+ display:flex;align-items:flex-start;justify-content:space-between;
+ flex-wrap:wrap;gap:.6rem;
+}
+.swtb22-candidate-head h2{margin:0;font-size:1.05rem;color:#193c4b}
+.swtb22-candidate-head p{
+ max-width:58rem;margin:.23rem 0 0;
+ color:#54727c;line-height:1.65;font-size:.81rem;
+}
+.swtb22-candidate-count{
+ color:#245769;border:1px solid #d4e5e8;border-radius:.45rem;
+ padding:.3rem .58rem;white-space:nowrap;background:#f5f9fa;
+ font-size:.78rem;font-weight:700;
+}
+.swtb22-candidate-toolbar{
+ display:flex;align-items:end;gap:.48rem;flex-wrap:wrap;
+ background:#f5f9fa;border-radius:.72rem;padding:.7rem;
+ border:1px solid #e0eaec;
+}
+.swtb22-candidate-toolbar>.report-field{
+ flex:1 1 14rem;max-width:26rem;min-width:min(100%,13rem);
+}
+.swtb22-candidate-toolbar>.report-btn{
+ flex:0 0 auto;margin-bottom:.05rem;
+}
+.swtb22-candidate-grid{
+ display:grid;grid-template-columns:minmax(15rem,23rem) minmax(0,1fr);
+ gap:.85rem;align-items:start;min-width:0;
+}
+.swtb22-candidate-directory{
+ min-width:0;border:1px solid #d8e6e9;
+ border-radius:.78rem;overflow:hidden;background:#fbfefe;
+}
+.swtb22-candidate-directory-head{
+ display:flex;align-items:flex-start;justify-content:space-between;
+ gap:.4rem;flex-wrap:wrap;padding:.7rem .78rem;
+ border-bottom:1px solid #dce8ea;
+}
+.swtb22-candidate-directory-head strong{color:#1c4150;font-size:.85rem}
+.swtb22-candidate-directory-head small{color:#617c86;font-size:.72rem}
+.swtb22-candidate-list{
+ display:grid;align-content:start;gap:.3rem;padding:.48rem;
+ max-height:min(69dvh,49rem);overflow-y:auto;
+ overscroll-behavior:contain;scrollbar-gutter:stable;
+}
+.swtb22-candidate-row{
+ display:flex;align-items:center;justify-content:space-between;
+ gap:.55rem;width:100%;min-width:0;text-align:right;
+ border:1px solid #dce7e9;border-radius:.56rem;
+ background:#fff;padding:.67rem .7rem;min-height:3.7rem;
+ font:inherit;cursor:pointer;
+}
+.swtb22-candidate-row:hover{border-color:#8dbfc0;background:#f5fbfa}
+.swtb22-candidate-row[aria-pressed="true"]{
+ border-color:#178782;background:#eaf8f6;
+ box-shadow:inset 3px 0 #178782;
+}
+.swtb22-candidate-row:disabled{cursor:wait;opacity:.65}
+.swtb22-candidate-row-main{
+ display:grid;gap:.12rem;min-width:0;flex:1 1 auto;
+}
+.swtb22-candidate-row-main strong{
+ color:#173c4e;font-size:.84rem;line-height:1.5;
+ overflow-wrap:anywhere;
+}
+.swtb22-candidate-row-main small{
+ color:#597783;font-size:.74rem;line-height:1.5;
+ overflow-wrap:anywhere;
+}
+.swtb22-candidate-stage{
+ border-radius:1rem;padding:.19rem .46rem;
+ background:#edf2f5;color:#446371;
+ font-size:.68rem;line-height:1.5;white-space:nowrap;flex:0 0 auto;
+}
+.swtb22-candidate-stage.is-worker{
+ background:#e1f6f2;color:#146d65;
+}
+.swtb22-candidate-inspector{
+ min-width:0;min-height:16rem;padding:.75rem;
+ border:1px solid #d6e5e9;border-radius:.78rem;background:#fff;
+ display:grid;gap:.65rem;align-content:start;
+}
+.swtb22-candidate-inspector-head{
+ display:flex;justify-content:space-between;align-items:center;
+ gap:.6rem;flex-wrap:wrap;border-bottom:1px solid #dce8eb;
+ padding:0 .1rem .6rem;
+}
+.swtb22-candidate-inspector-head h3{
+ margin:0;color:#193e4f;font-size:.94rem;line-height:1.7;
+}
+.swtb22-candidate-inspector .ops-candidate{
+ width:100%;max-width:none;background:transparent;
+ border:0;border-radius:0;padding:.15rem 0;
+}
+.swtb22-candidate-inspector .ops-candidate__head{
+ padding-bottom:.45rem;border-bottom:1px dashed #dce8e9;
+}
+.swtb22-candidate-inspector .ops-candidate-controls{
+ display:grid;gap:.52rem;
+}
+.swtb22-candidate-inspector .ops-candidate-controls .ops-field-row,
+.swtb22-candidate-inspector .ops-candidate-controls .ops-email-row{
+ max-width:none;
+}
+.swtb22-candidate-inspector-placeholder{
+ display:grid;align-content:center;justify-items:center;
+ gap:.35rem;min-height:14.5rem;text-align:center;
+ background:#f7fbfc;border:1px dashed #c9dde1;border-radius:.62rem;
+ padding:1.2rem 1.8rem;
+}
+.swtb22-candidate-inspector-placeholder strong{
+ color:#21495a;font-size:.9rem;
+}
+.swtb22-candidate-inspector-placeholder p{
+ color:#587784;line-height:1.8;font-size:.8rem;
+ max-width:28rem;margin:0;
+}
+.swtb22-candidate-empty{
+ margin:.25rem;padding:1.05rem .65rem;color:#557583;
+ line-height:1.8;font-size:.8rem;text-align:center;
+}
+.swtb22-manager-enabled :is(.swtb22-manager-home-actions button,
+ .swtb22-candidate-row,.swtb22-candidate-toolbar input,
+ .swtb22-candidate-toolbar select,.swtb22-candidate-inspector button):focus-visible{
+ outline:3px solid #138e8b;outline-offset:2px;
+}
+@media(max-width:1030px){
+ .swtb22-candidate-grid{grid-template-columns:minmax(12rem,18rem) minmax(0,1fr)}
+ .swtb22-candidate-stage{white-space:normal}
+}
+@media(max-width:760px){
+ .swtb22-candidate-grid{grid-template-columns:minmax(0,1fr)}
+ .swtb22-candidate-list{max-height:min(42dvh,24rem)}
+ .swtb22-candidate-toolbar>.report-field{max-width:none}
+ .swtb22-candidate-inspector{padding:.65rem}
+}
