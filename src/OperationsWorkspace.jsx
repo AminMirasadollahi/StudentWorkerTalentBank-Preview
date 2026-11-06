@@ -1455,12 +1455,17 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         </p>}
       </div>
       </>}
-      {historyWithoutReport.length>0&&<div className="ow-history-unreported">
-        <div className="report-panel-heading">
+      {historyWithoutReport.length>0&&<HistoryUnreportedWrap
+        className={'ow-history-unreported'+(focusedHistory?' swtb22-history-unreported':'')}
+        {...(focusedHistory?{defaultOpen:historyReview==='without_report'}:{})}>
+        {focusedHistory?<summary>
+          کارهای بدون گزارش · {n(historyWithoutReport.length)} مورد
+        </summary>:<div className="report-panel-heading">
           <h3>کارهای بدون گزارش</h3><small>{n(historyWithoutReport.length)} کار</small>
-        </div>
+        </div>}
         <div className="ow-list">
-          {historyWithoutReport.map(task=><article className="ow-item" key={task.id}>
+          {(focusedHistory?historyWithoutReport.slice(0,historyUnreportedShown):historyWithoutReport)
+           .map(task=><article className="ow-item" key={task.id}>
             <div className="ow-item-header">
               <strong>{task.title}</strong>
               <span className="ow-status">{stateLabels[task.state]||task.state}</span>
@@ -1469,7 +1474,19 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
               {' · '}برنامه: {pretty(task.planned_date)} · برآورد: {minutes(task.estimate_minutes)}</small>
           </article>)}
         </div>
-      </div>}
+        {focusedHistory&&historyWithoutReport.length>historyUnreportedShown&&
+          <button type="button" className="report-btn report-btn--light"
+           onClick={()=>setHistoryUnreportedShown(count=>count+50)}>
+           نمایش ۵۰ کار بدون گزارش بیشتر
+          </button>}
+      </HistoryUnreportedWrap>}
+      {focusedHistory&&<details className="swtb22-history-lifetime"
+        onToggle={event=>setHistoryLifetimeOpen(event.currentTarget.open)}>
+       <summary>آمار تأییدشده تمام‌دوره از سرور · مستقل از فیلترهای این صفحه</summary>
+       <p className="ow-muted">این بخش از گزارش اختصاصی سرور می‌آید و
+        ممکن است با جمع سوابق بارگذاری‌شده یا سهمیه نیمسال تفاوت داشته باشد.</p>
+       {historyLifetimeOpen&&<UnitHourSummary scope="admin" refreshRevision={refreshRevision}/>}
+      </details>}
     </section>}
   </div>
 }
