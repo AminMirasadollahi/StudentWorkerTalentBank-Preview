@@ -50,6 +50,8 @@ const workPoolUIEnabled=import.meta.env?.VITE_SWTB21_WORK_POOL_UI!=='false'
 // SWTB22-D3 is a presentation-only, independently reversible manager release.
 // Legacy manager route and all TaskAssignmentEditor server guards remain unchanged.
 const focusTaskUIEnabled=import.meta.env?.VITE_SWTB22_TASKS_FOCUS_UI==='true'
+// D4 is a manager-only presentation refactor: legacy/worker calendars unchanged.
+const focusPresenceUIEnabled=import.meta.env?.VITE_SWTB22_PRESENCE_FOCUS_UI==='true'
 
 /** Complete, current-scope server aggregate, independent of bounded task/history rows.
  * Fail closed to an explicit unavailable message instead of displaying false zero totals. */
@@ -174,7 +176,7 @@ function SectionTabs({value,onChange,options}) {
       onClick={()=>onChange(id)}>{title}</button>)}
   </nav>
 }
-function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
+function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate=''}) {
   const [effective,setEffective]=useState(today())
   const [editingDay,setEditingDay]=useState(null)
   const [editingSlot,setEditingSlot]=useState(null)
@@ -265,6 +267,13 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment}) {
     setNote(exception?.note||'')
     setError('');setNotice('');setSaveState('')
   }
+  // The manager can arrive from a particular day/person in the group calendar.
+  // Reuse the EXISTING canonical exception editor rather than duplicating writes.
+  useEffect(()=>{
+    if(!initialDate)return
+    setMonthAnchor(initialDate)
+    chooseMonthDay(initialDate)
+  },[initialDate,workerId])
   const save=async(command,kind)=>{
     if(busy)return
     setBusy(true);setError('');setNotice('');setSaveState('')
@@ -803,6 +812,13 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const setHistoryFilter=(name,value)=>setNavigation(previous=>({...previous,[name]:value}))
   const setView=value=>setNavigation(previous=>({...previous,workView:value}))
   const setWorkerId=value=>setNavigation(previous=>({...previous,workerId:value}))
+  const focusedPresence=hideSectionTabs&&focusPresenceUIEnabled
+  const [presenceEditingDate,setPresenceEditingDate]=useState('')
+  const openPersonPresence=(id,date)=>{
+    setPresenceEditingDate(date||'')
+    setWorkerId(id)
+  }
+  const backToTeamPresence=()=>{setPresenceEditingDate('');setWorkerId('')}
   const setHistoryWorkerId=value=>setNavigation(previous=>({...previous,historyWorkerId:value}))
   const [title,setTitle]=useState('')
   const [instructions,setInstructions]=useState('')
@@ -1149,17 +1165,30 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       </div>}
     </section>}
 
-    {view==='availability'&&<section className="report-panel">
-      <h2>ظرفیت و برنامه دانشجوکارها</h2>
+    {view==='availability'&&<section className={'report-panel'+(focusedPresence?' swtb22-presence-workspace':'')}>
+      <div className="swtb22-presence-heading">
+       <div><h2>ظرفیت و برنامه دانشجوکارها</h2>
+        {focusedPresence&&<p>برنامه‌ریزی حضور، کار واگذارشده و ساعات تأییدشده مفاهیم متفاوتی هستند؛
+         این نما فقط وضعیت برنامه و کار ثبت‌شده را نشان می‌دهد.</p>}
+       </div>
+       {focusedPresence&&workerId&&<button type="button" className="report-btn report-btn--light"
+          onClick={backToTeamPresence}>بازگشت به برنامه همه دانشجوکارها</button>}
+      </div>
       <label className="report-field ow-worker-selector"><span>دانشجوکار</span>
-        <select value={workerId} onChange={e=>setWorkerId(e.target.value)}>
+        <select value={workerId} onChange={e=>{
+          setPresenceEditingDate('')
+          setWorkerId(e.target.value)
+        }} aria-label="انتخاب دانشجوکار برای برنامه حضور">
           <option value="">همه دانشجوکارها · هفتگی و ماهانه</option>
           {active.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
       </label>
-      {workerId?<ScheduleEditor key={workerId} workerId={workerId} data={data}
+      {workerId?<ScheduleEditor key={focusedPresence?workerId+':'+presenceEditingDate:workerId}
+        workerId={workerId} data={data} initialDate={focusedPresence?presenceEditingDate:''}
         onSaved={refresh} onPlanAssignment={setAssignmentDialogDate}/>:<TeamScheduleOverview
-           data={data} todayIso={today()} onPlanAssignment={setAssignmentDialogDate}/>}
+           data={data} todayIso={today()} onPlanAssignment={setAssignmentDialogDate}
+           inlineManager={focusedPresence}
+           onEditWorker={focusedPresence?openPersonPresence:null}/>}
 
     </section>}
 
