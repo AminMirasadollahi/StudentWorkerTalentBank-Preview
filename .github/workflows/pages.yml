@@ -33,13 +33,7 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      # SWTB22 cohesive manager IA + progressive Work Pool are enabled only
-      # for the GitHub Pages Preview build. Remove these two env values to
-      # restore the prior UI without editing RPCs or authorization behavior.
       - name: Build
-        env:
-          VITE_SWTB22_MANAGER_SHELL_UI: 'true'
-          VITE_SWTB22_WORK_POOL_FOCUS_UI: 'true'
         run: npm run build
 
       - name: Upload Pages artifact
