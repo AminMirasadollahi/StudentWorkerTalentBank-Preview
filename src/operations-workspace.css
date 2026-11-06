@@ -2686,3 +2686,32 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .swtb22-term-filter-toolbar>.swtb22-term-advanced-filter{max-width:none;flex-basis:100%}
  .swtb22-term-unit-disclosure>.ow-term-units{grid-template-columns:minmax(0,1fr)}
 }
+
+
+/* D6B visual QA: keep rare semester administration out of the primary
+   visual path and place active-term commands in a compact action group. */
+.swtb22-term-focused .ow-term-context-actions{
+ display:flex;align-items:center;justify-content:flex-start;
+ gap:.45rem;flex-wrap:wrap;
+}
+.swtb22-term-focused .ow-term-context-actions .report-btn{
+ min-height:2.4rem;padding:.4rem .65rem;
+}
+.swtb22-term-create-disclosure{
+ position:relative;min-width:0;align-self:center;
+}
+.swtb22-term-create-disclosure>summary{
+ cursor:pointer;color:#225c66;
+ border:1px solid #d4e4e7;background:#f5fafb;border-radius:.55rem;
+ min-height:2.6rem;display:flex;align-items:center;
+ padding:.4rem .72rem;font-size:.8rem;font-weight:650;
+}
+.swtb22-term-create-disclosure[open]>summary{
+ border-color:#88bdb8;background:#eaf7f4;
+}
+.swtb22-term-create-disclosure>.report-btn{
+ display:block;margin-top:.45rem;width:100%;
+}
+@media(max-width:690px){
+ .swtb22-term-focused .ow-term-context-actions{justify-content:flex-start}
+}
