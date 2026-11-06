@@ -121,6 +121,24 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0,focusedUI=
  const total=poolTermTotals(unitRows,pools,{workerSlice:Boolean(workerId),unitFilter:Boolean(unitFilter)})
  const weeks=useMemo(()=>weekRows(data?.weeks||[]),[data])
  const maxWeek=Math.max(1,...weeks.map(w=>w.minutes))
+ const unitCards=(   <div className="ow-term-units">
+    {unitRows.map(u=>{
+      const pool=pooledUnits.get(u.unit)
+      return <article key={u.unit}>
+       <div className="ow-term-unit-head"><strong>{u.name||unitName[u.unit]||u.unit}</strong></div>
+       <small>{pool?'عضو سهمیه مشترک «'+pool.label+'»':
+         u.allocated_minutes===null?'بدون سهمیه تعریف‌شده':'سهمیه مستقل: '+faMinutes(u.allocated_minutes)}</small>
+       <div className="ow-term-unit-figures">
+        <div><small>تأییدشده این واحد</small><strong>{faMinutes(u.approved_minutes)}</strong></div>
+        <div><small>در انتظار بررسی</small><strong>{faMinutes(u.pending_minutes)}</strong></div>
+        <div><small>کار بدون گزارش</small><strong>{faMinutes(u.unreported_estimate_minutes)}</strong></div>
+       </div>
+       {!pool&&u.allocated_minutes!==null&&u.allocated_minutes!==undefined&&
+         <small>مانده سهمیه مستقل: {u.remaining_minutes===null?'—':faMinutes(u.remaining_minutes)}</small>}
+      </article>
+    })}
+   </div>);
+
  const userNames=new Map(workers.map(w=>[w.id,w.name]))
  // CRITICAL: backend returns a subset of pools when unitFilter is set.
  // Editing against that partial set can omit other units' assignments.
@@ -305,33 +323,29 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0,focusedUI=
    {canChange&&editPool!==undefined&&<BudgetPoolEditor
      key={term.id+'-'+(editPool?.id||'new')} term={term} pool={editPool}
      allPools={pools} onSaved={()=>finish(null)} onClose={()=>setEditPool(undefined)}/>}
-   <div className="ow-term-section-title">
-    <h3>سهم هر واحد در مصرف ساعات</h3>
-    <small>تفکیک فعالیت واحدها؛ بدون تکرار سهمیه مشترک</small>
-   </div>
-   <div className="ow-term-units">
-    {unitRows.map(u=>{
-      const pool=pooledUnits.get(u.unit)
-      return <article key={u.unit}>
-       <div className="ow-term-unit-head"><strong>{u.name||unitName[u.unit]||u.unit}</strong></div>
-       <small>{pool?'عضو سهمیه مشترک «'+pool.label+'»':
-         u.allocated_minutes===null?'بدون سهمیه تعریف‌شده':'سهمیه مستقل: '+faMinutes(u.allocated_minutes)}</small>
-       <div className="ow-term-unit-figures">
-        <div><small>تأییدشده این واحد</small><strong>{faMinutes(u.approved_minutes)}</strong></div>
-        <div><small>در انتظار بررسی</small><strong>{faMinutes(u.pending_minutes)}</strong></div>
-        <div><small>کار بدون گزارش</small><strong>{faMinutes(u.unreported_estimate_minutes)}</strong></div>
-       </div>
-       {!pool&&u.allocated_minutes!==null&&u.allocated_minutes!==undefined&&
-         <small>مانده سهمیه مستقل: {u.remaining_minutes===null?'—':faMinutes(u.remaining_minutes)}</small>}
-      </article>
-    })}
-   </div>
+   {focusedUI?<details className="swtb22-term-unit-disclosure"
+     open={unitsOpen} onToggle={event=>setUnitsOpen(event.currentTarget.open)}>
+      <summary>ریز مصرف تفکیکی واحدها · {fa.format(unitRows.length)} واحد</summary>
+      <p className="ow-muted">
+       سهمیه گروه‌های مشترک در کارت‌های بالا فقط یک‌بار منظور شده است؛ این بخش صرفاً تفکیک مصرف واحدهاست.
+      </p>
+      {unitCards}
+    </details>:<>
+     <div className="ow-term-section-title">
+      <h3>سهم هر واحد در مصرف ساعات</h3>
+      <small>تفکیک فعالیت واحدها؛ بدون تکرار سهمیه مشترک</small>
+     </div>
+     {unitCards}
+    </>}
    <details className="ow-term-context-help"><summary>مبنای محاسبات و تفاوت وضعیت‌ها</summary>
     <p>«تأییدشده» مجموع دقایق مصوب مدیر بر اساس تاریخ واقعی انجام و واحد همان وظیفه است؛ «در انتظار» فقط زمان درخواست‌شده برای گزارش‌های ثبت‌شده و هنوز تأییدنشده است. «بدون گزارش» برآورد وظایفی است که هنوز گزارشی برای آن‌ها ثبت نشده. وضعیت‌های ردشده و نیازمند اصلاح، مصرف قطعی نیستند.</p>
     <p>مقدار صفر سهمیه تصمیم صریح است؛ نبود سهمیه یعنی اطلاعات ناموجود. سهمیه گروه مشترک برای هر واحد تکرار نمی‌شود. در فیلتر یک واحد، مانده گروه مشترک همچنان با احتساب مصرف تمام اعضای گروه محاسبه می‌شود. این نسخه سقف را خودکار روی واگذاری یا تأیید ساعت اعمال نمی‌کند.</p>
    </details>
-   <div className="ow-term-section-title"><h3>روند ساعات تأییدشده</h3><small>تجمیع هفتگی از روز شنبه</small></div>
-   {weeks.length===0?<p className="ow-muted">هنوز ساعتی در این محدوده تأیید نشده است.</p>:
+   {focusedUI?<details className="swtb22-term-week-disclosure"
+      open={weeksOpen} onToggle={event=>setWeeksOpen(event.currentTarget.open)}>
+      <summary>روند هفتگی ساعت‌های تأییدشده · {fa.format(weeks.length)} هفته</summary>
+      <p className="ow-muted">بازه هفتگی از شنبه آغاز می‌شود؛ فقط دقایق تأییدشده براساس تاریخ واقعی فعالیت نمایش داده شده‌اند.</p>
+      {weeks.length===0?<p className="ow-muted">هنوز ساعتی در این محدوده تأیید نشده است.</p>:
     <div className="ow-term-week-chart" aria-label="نمودار میله‌ای ساعات تأییدشده هفتگی">
      {weeks.map(w=><div key={w.date} className="ow-term-week">
       <span className="ow-term-week-bar" style={{height:(Math.max(5,Math.round(100*w.minutes/maxWeek)))+'%'}}
@@ -340,6 +354,18 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0,focusedUI=
       <b>{faMinutes(w.minutes)}</b>
      </div>)}
     </div>}
+     </details>:<>
+      <div className="ow-term-section-title"><h3>روند ساعات تأییدشده</h3><small>تجمیع هفتگی از روز شنبه</small></div>
+      {weeks.length===0?<p className="ow-muted">هنوز ساعتی در این محدوده تأیید نشده است.</p>:
+    <div className="ow-term-week-chart" aria-label="نمودار میله‌ای ساعات تأییدشده هفتگی">
+     {weeks.map(w=><div key={w.date} className="ow-term-week">
+      <span className="ow-term-week-bar" style={{height:(Math.max(5,Math.round(100*w.minutes/maxWeek)))+'%'}}
+       title={pretty(w.date)+' · '+faMinutes(w.minutes)} aria-hidden="true"/>
+      <small>{pretty(w.date)}</small>
+      <b>{faMinutes(w.minutes)}</b>
+     </div>)}
+    </div>}
+     </>}
    <details className="ow-term-worker-details"><summary>ریز جمع ساعات به تفکیک دانشجوکار و واحد · {fa.format(data.workers.length)} ردیف</summary>
     {data.workers.length>0?<div className="ow-term-worker-table-wrap"><table className="ow-term-worker-table">
      <thead><tr><th>دانشجوکار</th><th>واحد کار</th><th>تأییدشده</th><th>درخواست منتظر</th></tr></thead>
@@ -349,6 +375,7 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0,focusedUI=
      </tr>)}</tbody>
     </table></div>:<p className="ow-muted">در این نیمسال گزارشی مطابق فیلترها ثبت نشده است.</p>}
    </details>
+   </>}
   </>}
  </section>
 }
