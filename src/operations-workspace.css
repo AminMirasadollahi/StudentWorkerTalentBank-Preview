@@ -1953,3 +1953,44 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 .ow-desk-pool-block :is(button,input,textarea,select):focus-visible {
  outline:2px solid #127d99;outline-offset:2px;
 }
+
+/* SWTB21-E: adaptive D1/D2 manager Work Pool density, empty state and legibility.
+   Source/UI-only: no mutation of task, claim, auth or booking behavior. */
+.ow-work-pool-columns {
+ grid-template-columns:repeat(auto-fit,minmax(min(100%,28rem),1fr));
+}
+.ow-work-pool-columns--empty {
+ grid-template-columns:minmax(0,1fr);
+ gap:.7rem;
+}
+.ow-work-pool-columns--empty>.ow-work-pool-compose,
+.ow-work-pool-columns--empty>.ow-work-pool-list {
+ width:min(100%,38rem);
+}
+.ow-work-pool-workflow {
+ display:flex;align-items:center;flex-wrap:wrap;
+ gap:.35rem .45rem;margin:0 0 .15rem;
+ color:#3d6170;font-size:.79rem;line-height:1.75;
+}
+.ow-work-pool-workflow span {
+ display:inline-flex;align-items:center;min-height:2rem;
+ padding:.24rem .56rem;border:1px solid #d9e6e8;
+ border-radius:.48rem;background:#f3f9f9;
+}
+.ow-work-pool-empty {
+ display:grid;gap:.24rem;padding:.76rem .85rem;
+ border:1px dashed #bfd7dc;border-radius:.7rem;
+ background:#f8fbfc;align-content:start;
+}
+.ow-work-pool-empty strong {font-size:.87rem;color:#244b59}
+.ow-work-pool-empty p {margin:0;font-size:.81rem;line-height:1.75;color:#4b6a77}
+.ow-work-pool-editor>summary {font-size:.88rem;line-height:1.65}
+.ow-work-pool-editor .report-field>span {font-size:.81rem;line-height:1.6}
+.ow-work-pool .ow-work-pool-item p {font-size:.81rem}
+.ow-work-pool .ow-work-pool-item__top small {font-size:.75rem}
+.ow-work-pool .ow-work-pool-facts>span {font-size:.76rem}
+.ow-desk-pool-block .ow-work-pool-list h4 {font-size:.88rem;margin:0}
+@media (max-width:640px) {
+ .ow-work-pool-workflow {gap:.3rem}
+ .ow-work-pool-workflow span {min-height:1.8rem}
+}
