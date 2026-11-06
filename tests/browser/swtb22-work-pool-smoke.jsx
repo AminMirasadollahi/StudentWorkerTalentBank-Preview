@@ -19,6 +19,72 @@ globalThis.__qaDeskOffers=[]
 globalThis.__qaWriteAttempts=0
 // Additional D5 fake-only term access fixture; NEVER fetched from Supabase.
 globalThis.__qaTerm={id:'QA-TERM',label:'نیمسال نمونه نمایشی',state:'active'}
+// D6B: independently scoped fake, read-only term dashboard. None of these
+// rows or public-looking figures originate from any user account or DB query.
+globalThis.__qaTerm={...globalThis.__qaTerm,start_date:'2026-09-23',end_date:'2027-02-09'}
+globalThis.__qaBudgetCorrupt=false
+globalThis.__qaBudgetReads=[]
+globalThis.__qaBudgetPanel={
+ ok:true,term:globalThis.__qaTerm,terms:[globalThis.__qaTerm],
+ units:[
+  {unit:'library',name:'کتابخانه',allocated_minutes:null,remaining_minutes:null,
+   approved_minutes:390,pending_minutes:0,unreported_tasks:1,
+   unreported_estimate_minutes:60,pending_reports:0},
+  {unit:'research',name:'پژوهش',allocated_minutes:null,remaining_minutes:null,
+   approved_minutes:150,pending_minutes:0,unreported_tasks:0,
+   unreported_estimate_minutes:0,pending_reports:0},
+  {unit:'public_relations',name:'روابط عمومی',allocated_minutes:null,remaining_minutes:null,
+   approved_minutes:0,pending_minutes:0,unreported_tasks:0,
+   unreported_estimate_minutes:0,pending_reports:0},
+ ],
+ pools:[
+  {id:'QA-JOINT',label:'کتابخانه و پژوهش',
+   units:['library','research'],allocated_minutes:24660,approved_minutes:540,
+   pending_minutes:0,pending_reports:0,unreported_tasks:1,
+   unreported_estimate_minutes:60,remaining_minutes:24120},
+  {id:'QA-PR',label:'روابط عمومی',
+   units:['public_relations'],allocated_minutes:6000,approved_minutes:0,
+   pending_minutes:0,pending_reports:0,unreported_tasks:0,
+   unreported_estimate_minutes:0,remaining_minutes:6000},
+ ],
+ weeks:[
+  {week_start:'2026-10-31',unit:'library',approved_minutes:390},
+  {week_start:'2026-10-31',unit:'research',approved_minutes:150},
+ ],
+ workers:[
+  {worker_id:'QA-A',unit:'library',approved_minutes:390,pending_minutes:0},
+  {worker_id:'QA-B',unit:'research',approved_minutes:150,pending_minutes:0},
+ ],
+}
+globalThis.__qaBudgetForFilter=(filters={})=>{
+ globalThis.__qaBudgetReads.push(filters)
+ const data=globalThis.__qaBudgetPanel
+ const unit=filters?.unit||''
+ const worker=filters?.workerId||''
+ const units=data.units.filter(u=>!unit||u.unit===unit).map(u=>({...u}))
+ const pools=data.pools.filter(p=>!unit||p.units.includes(unit))
+  .map(p=>({...p,units:[...p.units]}))
+ const weeks=data.weeks.filter(w=>!unit||w.unit===unit).map(w=>({...w}))
+ const listedWorkers=data.workers.filter(w=>(!unit||w.unit===unit)&&(!worker||w.worker_id===worker))
+ if(worker){
+  // A one-worker budget view is a consumption slice, NOT an allocation slice.
+  const selected=data.workers.filter(w=>w.worker_id===worker)
+  for(const u of units)u.approved_minutes=selected
+   .filter(w=>w.unit===u.unit).reduce((sum,w)=>sum+w.approved_minutes,0)
+  for(const p of pools){
+   p.approved_minutes=selected.filter(w=>p.units.includes(w.unit))
+    .reduce((sum,w)=>sum+w.approved_minutes,0)
+   p.remaining_minutes=null
+  }
+  for(const w of weeks){
+   w.approved_minutes=selected.filter(a=>a.unit===w.unit)
+    .reduce((sum,a)=>sum+a.approved_minutes,0)
+  }
+ }
+ if(globalThis.__qaBudgetCorrupt&&pools.length)pools[0].approved_minutes+=17
+ return {...data,units,pools,weeks,workers:listedWorkers}
+}
+
 globalThis.__qaTermAccess={ok:true,term_id:'QA-TERM',enforcement_mode:'observe',
  active_workers:2,active_without_decision:1,active_not_eligible:0,
  legacy_noneligible_planned_tasks:0,
@@ -93,7 +159,7 @@ function Stage(){
    {navigation.section==='work'&&navigation.workView==='workPool'
     ?<WorkPoolManagerPanel activeKind={navigation.workPoolKind}
       onKindChange={kind=>setNavigation(v=>({...v,workPoolKind:kind}))}/>
-    :navigation.section==='work'&&['tasks','availability','inbox','approvals','profiles','termMemberships','history'].includes(navigation.workView)
+    :navigation.section==='work'&&['tasks','availability','inbox','approvals','profiles','termMemberships','history','terms'].includes(navigation.workView)
      ?<AdminOperations navigation={navigation} setNavigation={setNavigation} hideSectionTabs/>
     :navigation.section==='candidates'&&navigation.candidateView==='applicants'
      ?<ManagerCandidatesWorkspace rows={demoCandidates} filter={navigation.candidateFilter}

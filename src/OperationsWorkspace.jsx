@@ -61,6 +61,8 @@ const focusPresenceUIEnabled=import.meta.env?.VITE_SWTB22_PRESENCE_FOCUS_UI==='t
 const focusDecisionsUIEnabled=import.meta.env?.VITE_SWTB22_REVIEW_FOCUS_UI==='true'
 // D6A scoped manager history/export UX remains OFF until separate release gate.
 const focusHistoryUIEnabled=import.meta.env?.VITE_SWTB22_HISTORY_FOCUS_UI==='true'
+// D6B affects only manager term-budget presentation; source defaults OFF.
+const focusTermBudgetUIEnabled=import.meta.env?.VITE_SWTB22_TERM_FOCUS_UI==='true'
 
 /** Complete, current-scope server aggregate, independent of bounded task/history rows.
  * Fail closed to an explicit unavailable message instead of displaying false zero totals. */
@@ -1075,7 +1077,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     {loading&&<p className="ow-muted">در حال دریافت اطلاعات…</p>}
     <Message error={error} notice={notice}/>
 
-    {view==='terms'&&<TermBudgetPanel workers={workers} refreshRevision={refreshRevision}/>}
+    {view==='terms'&&<TermBudgetPanel workers={workers} refreshRevision={refreshRevision}
+      focusedUI={hideSectionTabs&&focusTermBudgetUIEnabled}/>}
     {workPoolUIEnabled&&view==='workPool'&&<Suspense fallback={<p className="ow-muted">در حال آماده‌سازی مخزن وظایف…</p>}>
       <WorkPoolManagerPanel refreshRevision={refreshRevision}
        activeKind={navigation.workPoolKind||'general'}
