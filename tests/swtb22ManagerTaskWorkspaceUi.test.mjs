@@ -159,6 +159,11 @@ test('manual dismissal retains unsent selection and controls remain accessible',
    'focus should restore to the creating action')
   await act(async()=>action(ui.host,'واگذاری کار جدید').click())
   assert.equal(editor(ui.host).querySelector('select[aria-label="واحد انجام کار"]').value,'research')
+  await act(async()=>action(editor(ui.host),'انصراف').click())
+  assert.equal(editor(ui.host).open,false,'in-form cancel must dismiss without resetting draft')
+  await act(async()=>action(ui.host,'واگذاری کار جدید').click())
+  assert.equal(editor(ui.host).querySelector('select[aria-label="واحد انجام کار"]').value,'research',
+   'in-form cancellation must keep unsent input, not call committed onClose')
   assert.equal(globalThis.__qaD3Writes,0)
  }finally{await ui.cleanup()}
 })
