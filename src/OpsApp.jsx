@@ -12,6 +12,7 @@ import {
 import { opsClient } from './lib/operations'
 import { normalizeCandidateEmail, isValidCandidateEmail } from './lib/candidateEmail'
 import { disabledWorkerCopy } from './lib/workerAccess.mjs'
+import { validWorkerPasswordPair, workerPasswordChangeErrorCopy } from './lib/workerOnboardingRecovery.mjs'
 import { watchOperationsResume } from './lib/operationsResume.mjs'
 import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
@@ -284,8 +285,8 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
     event.preventDefault()
     setMessage('')
     setPasswordError('')
-    if (password.length < 8 || password !== confirmation) {
-      setPasswordError('رمز جدید باید حداقل ۸ نویسه باشد و تکرار آن یکسان وارد شود.')
+    if (!validWorkerPasswordPair(password, confirmation)) {
+      setPasswordError('رمز جدید باید ۸ تا ۱۲۸ نویسه، غیرخالی و با تکرار یکسان باشد.')
       return
     }
     setSaving(true)
@@ -302,7 +303,10 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
       }
     } catch {
       setSaving(false)
-      setPasswordError('ثبت رمز انجام نشد. لطفاً رمز دیگری انتخاب کنید و دوباره تلاش کنید.')
+      // In a partial failure Auth may already have updated the password while
+      // the server's onboarding finalization failed. Never promise failure or
+      // instruct a different password without checking account/session state.
+      setPasswordError(workerPasswordChangeErrorCopy({initialSetup: !passwordEstablished}))
       return
     }
     setSaving(false)
@@ -325,13 +329,13 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
         <form onSubmit={changePassword}>
           <label className="report-field">
             <span>رمز جدید (حداقل ۸ نویسه)</span>
-            <input type="password" minLength={8} required
+            <input type="password" minLength={8} maxLength={128} required
               autoComplete="new-password" dir="ltr"
               value={password} onChange={event => setPassword(event.target.value)}/>
           </label>
           <label className="report-field">
             <span>تکرار رمز جدید</span>
-            <input type="password" minLength={8} required
+            <input type="password" minLength={8} maxLength={128} required
               autoComplete="new-password" dir="ltr"
               value={confirmation} onChange={event => setConfirmation(event.target.value)}/>
           </label>
