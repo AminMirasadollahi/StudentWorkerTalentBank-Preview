@@ -60,10 +60,25 @@ test('retry contract: ONLY explicit application SQLSTATE rejection can release t
  for(const error of [null,new Error('Failed to fetch'),{code:''},
    {code:'PGRST116'},{code:'ETIMEDOUT'},{status:503},{code:null},
    {code:'08006'},{code:'08000'},{code:'40001'},{code:'57014'},
-   {code:'XX000'},{code:'53300'}]){
+   {code:'XX000'},{code:'53300'},
+   // A future SQL-side content-conflict means an earlier report exists.
+   // It MUST NOT rotate the UUID and submit changed content as fresh work.
+   {code:'P0001',message:'idempotency_payload_conflict'}]){
   assert.equal(isDefinitiveWorkerReportRejection(error),false,
     'must retain payload on network/transient/unknown outcome')
  }
+})
+
+test('future server P0001 mismatch leaves the old report key and payload semantically pinned',()=>{
+ const before=canonicalWorkerReportPayload(fake)
+ const edited=canonicalWorkerReportPayload({...fake,minutes:80})
+ const server={code:'P0001',message:'idempotency_payload_conflict'}
+ assert.equal(isDefinitiveWorkerReportRejection(server),false,
+   'server confirms an earlier saved report; never invent a new submission identity')
+ assert.equal(sameWorkerReportPayload(before,edited),false,
+   'changed request cannot be presented as successful replay of original report')
+ assert.equal(sameWorkerReportPayload(before,canonicalWorkerReportPayload({...fake})),true,
+   'the original report remains eligible for same-key retry/readback')
 })
 
 test('retry contract: unknown outcomes must never be described as a failed submission',()=>{
