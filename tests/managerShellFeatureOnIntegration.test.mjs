@@ -121,6 +121,26 @@ test('role transition tears down all manager controls and sensitive route UI',as
   })
   assert.equal(ui.host.querySelector('.swtb22-manager-sidebar'),null)
   assert.equal(route(ui.host,'applicants'),null)
+  assert.doesNotMatch(ui.host.textContent,/WORKER_ONLY/)
+  assert.match(ui.host.textContent,/نشست مرورگر به حساب دیگری تغییر کرده است/)
+  assert.ok(!ui.host.querySelector('[data-testid="manager-stage"]'))
+ }finally{await ui.cleanup()}
+})
+
+test('same principal role downgrade unmounts manager nav and renders the worker-only view',async()=>{
+ const ui=await mount()
+ try{
+  assert.ok(ui.host.querySelector('.swtb22-manager-sidebar'))
+  identity={role:'worker',user:{id:'FAKE_ADMIN'},profile:{
+   worker_id:'FAKE-WORKER',name:'دانشجوکار آزمایشی',
+   unit:'library',state:'active',onboarding_state:'ready',
+  }}
+  await act(async()=>{
+   window.dispatchEvent(new window.Event('blur'))
+   window.dispatchEvent(new window.Event('focus'))
+   await Promise.resolve()
+  })
+  assert.equal(ui.host.querySelector('.swtb22-manager-sidebar'),null)
   assert.match(ui.host.textContent,/WORKER_ONLY/)
  }finally{await ui.cleanup()}
 })
