@@ -55,6 +55,37 @@ try{
   overflow:document.documentElement.scrollWidth>window.innerWidth+1}))
  assert.equal(result.writes,0,'rendering and switching must not call any mutation')
  assert.equal(result.overflow,false,'no horizontal viewport overflow at 1440px')
+ // Simulate the owner's long applicant list and actually scroll the Chrome window.
+ await page.evaluate(()=>{
+  const filler=document.createElement('div')
+  filler.id='swtb22-long-page-fixture'
+  filler.style.height='3500px'
+  filler.setAttribute('aria-hidden','true')
+  document.querySelector('.swtb22-manager-main').append(filler)
+ })
+ await page.evaluate(()=>window.scrollTo(0,1800))
+ await page.waitForFunction(()=>window.scrollY>1000)
+ const sticky=await page.locator('.swtb22-manager-sidebar').evaluate(el=>{
+  const rect=el.getBoundingClientRect()
+  return {
+   top:rect.top,bottom:rect.bottom,scrollY:window.scrollY,
+   viewport:window.innerHeight,
+   overflowHtml:getComputedStyle(document.documentElement).overflowX,
+   overflowBody:getComputedStyle(document.body).overflowX,
+   overflowRoot:getComputedStyle(document.getElementById('root')).overflowX,
+  }
+ })
+ assert.ok(Math.abs(sticky.top)<=2,'sidebar must remain at viewport top after scroll: '+JSON.stringify(sticky))
+ assert.ok(sticky.bottom>=sticky.viewport-4,'sidebar must fill viewport: '+JSON.stringify(sticky))
+ for(const key of ['overflowHtml','overflowBody','overflowRoot'])
+  assert.equal(sticky[key],'clip','sticky ancestor overflow: '+key)
+ await page.screenshot({path:resolve(output,'05-sticky-sidebar-after-scroll.png')})
+ await page.getByRole('button',{name:'جمع‌کردن فهرست مدیریت'}).click()
+ const collapsed=await page.locator('.swtb22-manager-sidebar').evaluate(el=>({
+  top:el.getBoundingClientRect().top,collapsed:el.classList.contains('is-collapsed'),
+ }))
+ assert.ok(collapsed.collapsed,'sidebar collapse must work after scrolling')
+ assert.ok(Math.abs(collapsed.top)<=2,'collapsed sidebar must remain pinned')
  assert.equal(blocked,0,'no external requests should occur')
  assert.deepEqual(errors,[],'no browser JavaScript errors')
  process.stdout.write('PASS SWTB22 synthetic Chrome: one grouped nav, full-width list, focused D1/D2 editors, no external calls/writes or viewport overflow\n')
