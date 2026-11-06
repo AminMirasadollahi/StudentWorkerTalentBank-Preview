@@ -6,11 +6,13 @@ export default function ManagerHistoryExplorer({rows=[],limit=100,emptyText='ه�
  const [selectedKey,setSelectedKey]=useState('')
  const selected=rows.find(r=>r.key===selectedKey)
  const heading=useRef(null)
+ const inspector=useRef(null)
  const directoryHeading=useRef(null)
  const opener=useRef(null)
  const previous=useRef('')
  useEffect(()=>{
   if(selected?.key&&selected.key!==previous.current){
+   if(inspector.current)inspector.current.scrollTop=0
    heading.current?.focus?.({preventScroll:true})
   }else if(!selected&&previous.current){
    directoryHeading.current?.focus?.({preventScroll:true})
@@ -39,7 +41,7 @@ export default function ManagerHistoryExplorer({rows=[],limit=100,emptyText='ه�
     {!rows.length&&<p className="ow-muted swtb22-history-empty">{emptyText}</p>}
    </div>
   </div>
-  <section id="swtb22-history-inspector" className="swtb22-history-inspector"
+  <section ref={inspector} id="swtb22-history-inspector" className="swtb22-history-inspector"
    role="region" aria-label="جزئیات گزارش انتخاب‌شده">
    {selected?<div className="swtb22-history-detail">
     <div className="swtb22-history-inspector-head">
