@@ -172,9 +172,14 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0,focusedUI=
    </div>
    <div className="ow-term-heading-actions">
     <button type="button" className="report-btn report-btn--light" onClick={()=>setRevision(v=>v+1)}>بازخوانی</button>
-    <button type="button" className="report-btn report-btn--primary"
-     disabled={load.state!=='ready'||filteredScope}
-     onClick={()=>{setEditPool(undefined);setTermEditor(null)}}>+ تعریف نیمسال</button>
+    {focusedUI?<details className="swtb22-term-create-disclosure">
+      <summary>مدیریت نیمسال</summary>
+      <button type="button" className="report-btn report-btn--light"
+       disabled={!canUpdateTerm}
+       onClick={()=>{setEditPool(undefined);setTermEditor(null)}}>+ تعریف نیمسال جدید</button>
+     </details>:<button type="button" className="report-btn report-btn--primary"
+     disabled={!canUpdateTerm}
+     onClick={()=>{setEditPool(undefined);setTermEditor(null)}}>+ تعریف نیمسال</button>}
    </div>
   </div>
   <div className={'ow-term-filters'+(focusedUI?' swtb22-term-filter-toolbar':'')}>
@@ -232,7 +237,7 @@ export default function TermBudgetPanel({workers=[],refreshRevision=0,focusedUI=
     آمار نیمسال در دسترس نیست. برای جلوگیری از نمایش اعداد اشتباه، هیچ مقدار قدیمی یا صفر جایگزین نشده است.
     <button type="button" className="report-btn report-btn--light" onClick={()=>setRevision(v=>v+1)}>تلاش مجدد</button>
   </div>}
-  {load.state==='ready'&&!filteredScope&&termEditor!==undefined&&<TermEditor key={termEditor?.id||'new'} term={termEditor}
+  {canUpdateTerm&&termEditor!==undefined&&<TermEditor key={termEditor?.id||'new'} term={termEditor}
     onClose={()=>setTermEditor(undefined)} onSave={finish}/>}
   {canUpdateTerm&&termStatus&&term&&<TermStatusDialog key={term.id+'-'+termStatus}
     term={term} pools={pools} onSaved={finish} onClose={()=>setTermStatus(null)}/>}
