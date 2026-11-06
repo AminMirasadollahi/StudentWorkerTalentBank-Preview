@@ -863,6 +863,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const setHistoryFilter=(name,value)=>setNavigation(previous=>({...previous,[name]:value}))
   const setView=value=>setNavigation(previous=>({...previous,workView:value}))
   const setWorkerId=value=>setNavigation(previous=>({...previous,workerId:value}))
+  const focusedHistory=hideSectionTabs&&focusHistoryUIEnabled
   const focusedPresence=hideSectionTabs&&focusPresenceUIEnabled
   const [presenceEditingDate,setPresenceEditingDate]=useState('')
   const [presenceSelectedDate,setPresenceSelectedDate]=useState(today())
@@ -921,6 +922,9 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const readSequence=useRef(0)
   const [notice,setNotice]=useState('')
   const [historyShown,setHistoryShown]=useState(100)
+  const [historyLifetimeOpen,setHistoryLifetimeOpen]=useState(false)
+  const [historyExporting,setHistoryExporting]=useState(false)
+  const [historyExportError,setHistoryExportError]=useState('')
   const [tasksShown,setTasksShown]=useState(100)
   const [approvalsShown,setApprovalsShown]=useState(25)
   useEffect(()=>setTasksShown(100),[taskWorkerId,taskUnit,taskState,taskSearch,taskOrder])
@@ -961,6 +965,25 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     unit:historyUnit,from:historyFrom,to:historyTo,review:historyReview,
   })
   const historySummary=summarizeWorkerHistory(historyData)
+  const scopedHistoryProjection=focusedHistory?managerHistoryProjection(historyData,{
+    unitLabels,reviewLabels,extraTimeReasons,dateLabel:pretty,
+  }):null
+  const scopedHistoryFilters={
+    workerId:historyWorkerId||'',unit:historyUnit||'',
+    review:historyReview||'',from:historyFrom||'',to:historyTo||'',
+  }
+  const runHistoryExport=async()=>{
+    if(historyExporting||loading||readFailed||invalidHistoryRange)return
+    const hasRecords=(historyData.tasks.length+historyData.time_entries.length)>0
+    if(!hasRecords)return
+    setHistoryExporting(true);setHistoryExportError('')
+    try{
+      if(focusedHistory)await exportOpsExcel(historyData,scopedHistoryFilters,scopedHistoryProjection)
+      else await exportOpsExcelLegacy(historyData,historyFiltersActive)
+    }catch{
+      setHistoryExportError('ساخت یا دریافت فایل Excel کامل نشد. هیچ داده یا تصمیمی تغییر نکرد؛ دوباره اقدام کنید.')
+    }finally{setHistoryExporting(false)}
+  }
   const reportTaskIds=new Set(historyData.time_entries.map(entry=>entry.task_id))
   const historyWithoutReport=historyData.tasks.filter(task=>!reportTaskIds.has(task.id))
   const allTasks=data.tasks||[]
