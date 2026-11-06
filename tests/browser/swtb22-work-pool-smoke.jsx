@@ -31,7 +31,7 @@ globalThis.__qaAdminWork={
   {id:'QA-TASK-3',title:'بازبینی فهرست منابع نمونه',worker_id:'QA-A',unit:'library',
    planned_date:'2026-11-08',estimate_minutes:45,state:'completed',created_at:'2026-11-05T12:00:00Z'},
  ],
- weekly_slots:[],exceptions:[],time_entries:[],profile_requests:[],approved_minutes_total:0,
+ weekly_slots:[{worker_id:'QA-A',weekday_iso:5,valid_from:'2026-10-01',valid_until:null,start_minute:480,end_minute:600}],exceptions:[],time_entries:[],profile_requests:[],approved_minutes_total:0,
 }
 const demoCandidates=[
  {id:'SYNTH_A',full_name:'داوطلب نمونه الف',major:'آموزش ابتدایی',entry_year:1404,
@@ -60,7 +60,7 @@ function Stage(){
    {navigation.section==='work'&&navigation.workView==='workPool'
     ?<WorkPoolManagerPanel activeKind={navigation.workPoolKind}
       onKindChange={kind=>setNavigation(v=>({...v,workPoolKind:kind}))}/>
-    :navigation.section==='work'&&navigation.workView==='tasks'
+    :navigation.section==='work'&&['tasks','availability'].includes(navigation.workView)
      ?<AdminOperations navigation={navigation} setNavigation={setNavigation} hideSectionTabs/>
     :navigation.section==='candidates'&&navigation.candidateView==='applicants'
      ?<ManagerCandidatesWorkspace rows={demoCandidates} filter={navigation.candidateFilter}
