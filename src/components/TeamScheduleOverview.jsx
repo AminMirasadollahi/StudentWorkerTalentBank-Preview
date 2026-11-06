@@ -22,13 +22,15 @@ const isVisiblePerson=person=>person.hasPlan||person.hasTask||person.kind==='una
 const accessibleName=row=>`${dayName(row.date)}؛ ${fa.format(row.plannedWorkers)} نفر دارای برنامه، ${fa.format(row.taskCount)} کار واگذارشده؛ برای جزئیات انتخاب کنید`
 
 export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
- audience='manager',onVisibleRangeChange=null,inlineManager=false,onEditWorker=null}){
- const [weekAnchor,setWeekAnchor]=useState(todayIso)
- const [monthAnchor,setMonthAnchor]=useState(todayIso)
- const [selectedDate,setSelectedDate]=useState(inlineManager?todayIso:'')
+ audience='manager',onVisibleRangeChange=null,inlineManager=false,onEditWorker=null,
+ selectedDay='',onSelectedDayChange=null}){
+ const initialDate=inlineManager?(selectedDay||todayIso):todayIso
+ const [weekAnchor,setWeekAnchor]=useState(initialDate)
+ const [monthAnchor,setMonthAnchor]=useState(initialDate)
+ const [selectedDate,setSelectedDate]=useState(inlineManager?initialDate:'')
  const inlineTitleRef=useRef(null)
  const inlineDidMount=useRef(false)
- const [showAll,setShowAll]=useState(false)
+ const [showAll,setShowAll]=useState(Boolean(inlineManager))
  const dateDialogRef=useRef(null)
  const lastDateButtonRef=useRef(null)
  const month=useMemo(()=>persianMonthCells(monthAnchor),[monthAnchor])
@@ -66,6 +68,7 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
   lastDateButtonRef.current=event?.currentTarget||null
   setShowAll(Boolean(inlineManager))
   setSelectedDate(date)
+  if(inlineManager)onSelectedDayChange?.(date)
   setWeekAnchor(date)
   if(date<month.start||date>month.end)setMonthAnchor(date)
  }
@@ -73,19 +76,19 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
  const moveWeek=delta=>{
   const next=plusIsoDays(week.start,delta*7)
   setWeekAnchor(next)
-  if(inlineManager){setMonthAnchor(next);setSelectedDate(next);setShowAll(true)}
+  if(inlineManager){setMonthAnchor(next);setSelectedDate(next);onSelectedDayChange?.(next);setShowAll(true)}
   else closeDay()
  }
  const moveMonth=delta=>{
   const next=delta<0?previousPersianMonth(monthAnchor):nextPersianMonth(monthAnchor)
   setMonthAnchor(next)
   if(inlineManager){const first=persianMonthCells(next).start
-   setWeekAnchor(first);setSelectedDate(first);setShowAll(true)}
+   setWeekAnchor(first);setSelectedDate(first);onSelectedDayChange?.(first);setShowAll(true)}
   else closeDay()
  }
  const backToToday=()=>{
   setMonthAnchor(todayIso);setWeekAnchor(todayIso)
-  if(inlineManager){setSelectedDate(todayIso);setShowAll(true)}
+  if(inlineManager){setSelectedDate(todayIso);onSelectedDayChange?.(todayIso);setShowAll(true)}
   else closeDay()
  }
  return <div className={'ow-presence-hub ow-teamcal'+(inlineManager?' swtb22-manager-teamcal':'')} aria-label={`برنامه مشترک هفتگی و ماهانه ${teamLabel}`}>
@@ -166,7 +169,7 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
        <div className="ow-presence-section-title ow-presence-date-dialog__head">
          <h3 id="ow-teamcal-day-title" tabIndex={-1} data-team-calendar-title ref={inlineManager?inlineTitleRef:undefined}>
            برنامه گروهی · {dayName(selected.date)}</h3>
-         <button className="ow-mini-btn" type="button" onClick={closeDay}>بستن</button>
+         <button className="ow-mini-btn" type="button" onClick={inlineManager?backToToday:closeDay}>{inlineManager?'بازگشت به امروز':'بستن'}</button>
        </div>
        <p className="ow-muted">
          {fa.format(selected.plannedWorkers)} نفر دارای برنامه ·
@@ -209,7 +212,7 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
              const date=selected.date
              if(!inlineManager)closeDay()
              onPlanAssignment(date)
-           }}>+ تعریف کار در این تاریخ</button>
+           }} disabled={inlineManager&&selected.date<todayIso}>+ تعریف کار در این تاریخ</button>
        </div>}
      </div>}
      </aside>
@@ -221,7 +224,7 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
        <div className="ow-presence-section-title ow-presence-date-dialog__head">
          <h3 id="ow-teamcal-day-title" tabIndex={-1} data-team-calendar-title ref={inlineManager?inlineTitleRef:undefined}>
            برنامه گروهی · {dayName(selected.date)}</h3>
-         <button className="ow-mini-btn" type="button" onClick={closeDay}>بستن</button>
+         <button className="ow-mini-btn" type="button" onClick={inlineManager?backToToday:closeDay}>{inlineManager?'بازگشت به امروز':'بستن'}</button>
        </div>
        <p className="ow-muted">
          {fa.format(selected.plannedWorkers)} نفر دارای برنامه ·
@@ -264,7 +267,7 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
              const date=selected.date
              if(!inlineManager)closeDay()
              onPlanAssignment(date)
-           }}>+ تعریف کار در این تاریخ</button>
+           }} disabled={inlineManager&&selected.date<todayIso}>+ تعریف کار در این تاریخ</button>
        </div>}
      </div>}
      </dialog>}
