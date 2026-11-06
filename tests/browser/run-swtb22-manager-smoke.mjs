@@ -7,6 +7,7 @@ import {chromium} from 'playwright'
 
 process.env.VITE_SWTB22_WORK_POOL_FOCUS_UI='true'
 process.env.VITE_SWTB22_TASKS_FOCUS_UI='true'
+process.env.VITE_SWTB22_PRESENCE_FOCUS_UI='true'
 const output=resolve('test-results/swtb22-manager-synthetic')
 await mkdir(output,{recursive:true})
 let server,browser,page
@@ -127,6 +128,52 @@ try{
   node=>node.getBoundingClientRect().width>800),'task rows should use 1920px canvas')
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1),false)
  await page.screenshot({path:resolve(output,'11-task-list-1920.png'),fullPage:true})
+ await page.setViewportSize({width:1440,height:900})
+ // D4: real manager presence component, week/month + day/person inspector.
+ await page.locator('[data-swtb22-route="availability"]').click()
+ await page.locator('.swtb22-manager-teamcal .ow-teamcal-week-row').first().waitFor()
+ assert.equal(await page.locator('.swtb22-manager-teamcal .ow-teamcal-week-row').count(),7)
+ assert.ok(await page.locator('.swtb22-manager-teamcal .ow-teamcal-day').count()>=29)
+ assert.equal(await page.locator('.swtb22-manager-teamcal dialog').count(),0,
+  'manager group day inspector must be inline, unlike legacy worker popup')
+ assert.equal(await page.locator('.swtb22-presence-day-inspector').count(),1)
+ assert.equal(await page.locator('.ow-teamcal-day[aria-pressed="true"]').count(),1)
+ assert.equal(await page.locator('.ow-teamcal-week-row[aria-pressed="true"]').count(),1)
+ const presenceLayout=await page.locator('.swtb22-manager-teamcal').evaluate(root=>{
+  const week=root.querySelector('.ow-teamcal-week').getBoundingClientRect()
+  const aside=root.querySelector('.swtb22-presence-day-inspector').getBoundingClientRect()
+  return {weekWidth:week.width,inspectorWidth:aside.width,
+   sideBySide:week.right<=aside.left+4,
+   overflow:document.documentElement.scrollWidth>window.innerWidth+1}
+ })
+ assert.ok(presenceLayout.weekWidth>430,'calendar needs a usable week/month column: '+JSON.stringify(presenceLayout))
+ assert.ok(presenceLayout.inspectorWidth>260,'inspector must not be a collapsed sliver: '+JSON.stringify(presenceLayout))
+ assert.equal(presenceLayout.sideBySide,true,'desktop day inspector sits beside the calendar')
+ assert.equal(presenceLayout.overflow,false)
+ await page.screenshot({path:resolve(output,'12-integrated-manager-week-month-day-1440.png'),fullPage:true})
+ await page.getByRole('button',{name:'هفته بعد'}).click()
+ assert.equal(await page.locator('.ow-teamcal-day[aria-pressed="true"]').count(),1)
+ assert.equal(await page.locator('.ow-teamcal-week-row[aria-pressed="true"]').count(),1)
+ await page.screenshot({path:resolve(output,'13-selected-future-day-inspector-1440.png'),fullPage:true})
+ const currentInspectorLabel=await page.locator('.swtb22-presence-day-inspector h3').textContent()
+ await page.locator('.swtb22-presence-person-actions button:not([disabled])').first().click()
+ await page.locator('dialog.ow-presence-date-dialog[open]').waitFor()
+ assert.equal(await page.locator('.swtb22-manager-teamcal').count(),0,
+  'person/date editor is shown only after an explicit user selection')
+ assert.equal(await page.locator('dialog.ow-presence-date-dialog[open]').count(),1)
+ assert.match(await page.locator('#ow-presence-day-dialog-title').textContent(),/برنامه و تغییرات روز/)
+ await page.screenshot({path:resolve(output,'14-existing-date-edit-dialog-opened-from-person.png')})
+ await page.locator('dialog.ow-presence-date-dialog[open]').getByRole('button',{name:'بستن'}).click()
+ await page.getByRole('button',{name:'بازگشت به برنامه همه دانشجوکارها'}).click()
+ assert.equal(await page.locator('.swtb22-manager-teamcal').count(),1)
+ assert.equal(await page.locator('.ow-teamcal-day[aria-pressed="true"]').count(),1)
+ assert.equal(await page.locator('.swtb22-presence-day-inspector h3').textContent(),currentInspectorLabel,
+  'return to group restores exact selected day and context')
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1),false)
+ await page.setViewportSize({width:1920,height:1080})
+ assert.ok(await page.locator('.swtb22-presence-day-inspector').evaluate(
+  el=>el.getBoundingClientRect().width>340))
+ await page.screenshot({path:resolve(output,'15-integrated-manager-presence-1920.png'),fullPage:true})
  await page.setViewportSize({width:1440,height:900})
  const result=await page.evaluate(()=>({writes:globalThis.__qaWriteAttempts,
   overflow:document.documentElement.scrollWidth>window.innerWidth+1}))
