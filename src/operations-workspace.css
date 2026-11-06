@@ -2294,3 +2294,118 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .swtb22-presence-heading>.report-btn{width:100%}
  .swtb22-presence-workspace>.ow-worker-selector{max-width:none}
 }
+
+
+/* SWTB22-D5: focused manager approvals, per-worker review and term decisions.
+   This is view-only IA; review and membership RPCs remain server canonical. */
+.swtb22-review-workspace{
+ display:grid;grid-template-columns:minmax(15rem,21rem) minmax(0,1fr);
+ gap:.75rem;align-items:start;min-width:0;margin-top:.65rem;
+}
+.swtb22-review-directory,
+.swtb22-review-inspector{
+ min-width:0;background:#fff;border:1px solid #d7e6e8;
+ border-radius:.75rem;overflow:hidden;
+}
+.swtb22-review-directory-heading{
+ display:flex;justify-content:space-between;align-items:center;
+ flex-wrap:wrap;gap:.4rem;
+ padding:.75rem .85rem;background:#f4faf9;
+ border-bottom:1px solid #dce9e9;
+ font-size:.83rem;color:#173e4e;
+}
+.swtb22-review-directory-heading span{font-size:.74rem;color:#567581}
+.swtb22-review-list{
+ display:grid;gap:.34rem;padding:.46rem;
+ max-height:min(73dvh,54rem);overflow-y:auto;
+ overscroll-behavior-y:contain;scrollbar-gutter:stable;
+}
+.swtb22-review-row{
+ display:flex;align-items:flex-start;justify-content:space-between;
+ gap:.45rem;min-width:0;width:100%;padding:.66rem;
+ border:1px solid #dfebec;border-radius:.57rem;
+ font:inherit;text-align:right;cursor:pointer;color:#194152;background:#fff;
+}
+.swtb22-review-row:hover,.swtb22-review-row[aria-pressed="true"]{
+ border-color:#42aaa0;background:#edf9f6;
+}
+.swtb22-review-row[aria-pressed="true"]{box-shadow:inset 3px 0 #138c83}
+.swtb22-review-row:disabled{cursor:wait;opacity:.55}
+.swtb22-review-row-main{display:grid;gap:.2rem;min-width:0;flex:1 1 auto}
+.swtb22-review-row strong{font-size:.82rem;line-height:1.65;overflow-wrap:anywhere}
+.swtb22-review-row small{
+ font-size:.72rem;line-height:1.65;color:#5d7882;overflow-wrap:anywhere;
+}
+.swtb22-review-badge{
+ font-size:.69rem;line-height:1.4;white-space:normal;
+ padding:.25rem .45rem;background:#e8f4f2;border-radius:.45rem;color:#216e69;
+}
+.swtb22-review-badge.is-alert{color:#865a18;background:#fff2d9}
+.swtb22-review-inspector{
+ display:grid;gap:.66rem;align-content:start;padding:.85rem;min-height:17rem;
+}
+.swtb22-review-inspector-head{
+ display:flex;gap:.5rem;align-items:flex-start;justify-content:space-between;
+ flex-wrap:wrap;padding:0 0 .65rem;
+ border-bottom:1px solid #e1ecee;
+}
+.swtb22-review-inspector-head h3{
+ margin:0!important;min-width:0;flex:1 1 15rem;
+ color:#173f51;font-size:.97rem;line-height:1.75;
+}
+.swtb22-review-inspector>.ow-item{
+ width:100%;margin:0;max-width:none;padding:.78rem .85rem;
+}
+.swtb22-review-inspector .ow-approval-detail{margin-top:.5rem}
+.swtb22-review-inspector .ow-profile-request .ow-fields{
+ grid-template-columns:repeat(2,minmax(0,1fr));
+}
+.swtb22-review-placeholder{
+ display:grid;align-content:center;justify-items:center;
+ gap:.35rem;min-height:13.2rem;
+ padding:1rem;text-align:center;
+ background:#f6fbfc;border:1px dashed #d3e3e5;border-radius:.62rem;
+}
+.swtb22-review-placeholder strong{color:#234959;font-size:.92rem}
+.swtb22-review-placeholder p{font-size:.8rem;line-height:1.8;color:#5e7882;max-width:25rem;margin:0}
+.swtb22-review-empty{padding:1rem .6rem;text-align:center}
+.swtb22-profile-review{margin:.6rem 0 0;min-width:0;container-type:inline-size}
+.swtb22-profile-review>h4{font-size:.86rem;color:#224756;margin:0}
+.swtb22-profile-review .swtb22-review-workspace{
+ grid-template-columns:minmax(12rem,15rem) minmax(0,1fr);
+ gap:.55rem;
+}
+@container (max-width:740px){
+ .swtb22-profile-review .swtb22-review-workspace{grid-template-columns:minmax(0,1fr)}
+ .swtb22-profile-review .swtb22-review-list{max-height:17rem}
+}
+.swtb22-membership-focus .ow-membership-table-wrap{max-width:100%;overflow-x:auto}
+.swtb22-membership-roster-tools{
+ display:flex;gap:.5rem .8rem;align-items:end;flex-wrap:wrap;
+ border:1px solid #dbe8eb;border-radius:.66rem;
+ background:#f6fbfb;padding:.7rem;margin:.8rem 0;
+}
+.swtb22-membership-roster-tools .report-field{
+ min-width:min(100%,13rem);flex:1 1 14rem;max-width:22rem;
+}
+.swtb22-membership-roster-tools .report-field :is(input,select){width:100%}
+.swtb22-membership-roster-tools .report-btn{min-height:2.6rem}
+.swtb22-membership-count{
+ color:#315b67;background:#e8f5f4;border-radius:.45rem;
+ padding:.48rem .55rem;font-size:.76rem;
+}
+.swtb22-membership-empty{margin:.3rem .6rem .7rem}
+:is(.swtb22-review-row,.swtb22-review-inspector button,
+ .swtb22-review-inspector-head h3,.swtb22-membership-roster-tools input,
+ .swtb22-membership-roster-tools select,.swtb22-membership-roster-tools button):focus-visible{
+ outline:3px solid #198f85;outline-offset:2px;
+}
+@media(max-width:1120px){
+ .swtb22-review-workspace{grid-template-columns:minmax(0,1fr)}
+ .swtb22-review-list{max-height:min(37dvh,23rem)}
+}
+@media(max-width:640px){
+ .swtb22-review-inspector{padding:.6rem}
+ .swtb22-review-inspector .ow-fields--two{grid-template-columns:1fr}
+ .swtb22-membership-roster-tools .report-field{max-width:none}
+}
