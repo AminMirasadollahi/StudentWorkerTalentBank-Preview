@@ -194,7 +194,7 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
              onClick={()=>onEditWorker(p.workerId,selected.date)}>
              ویرایش برنامه همین تاریخ
             </button>
-            {selected.date<todayIso&&<small>ویرایش استثنای روزهای گذشته از این مسیر مجاز نیست.</small>}
+
            </div>}
            {p.tasks.length>0&&<div className="ow-teamcal-person-tasks">
              {p.tasks.map((task,i)=><div key={task.id||i}>
@@ -205,6 +205,9 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
            </div>}
          </article>)}
          {!people.length&&<p className="ow-muted">برای این تاریخ برنامه یا وظیفه‌ای ثبت نشده است. نبود اطلاعات به معنای غیبت نیست.</p>}
+         {inlineManager&&selected.date<todayIso&&<p className="ow-muted">
+           نمایش برنامه روزهای گذشته امکان‌پذیر است؛ ویرایش استثنا و واگذاری جدید در این تاریخ از این مسیر مجاز نیست.
+         </p>}
        </div>
        {onPlanAssignment&&<div className="ow-teamcal-dialog-actions">
          <button type="button" className="report-btn report-btn--primary"
@@ -249,7 +252,7 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
              onClick={()=>onEditWorker(p.workerId,selected.date)}>
              ویرایش برنامه همین تاریخ
             </button>
-            {selected.date<todayIso&&<small>ویرایش استثنای روزهای گذشته از این مسیر مجاز نیست.</small>}
+
            </div>}
            {p.tasks.length>0&&<div className="ow-teamcal-person-tasks">
              {p.tasks.map((task,i)=><div key={task.id||i}>
@@ -260,6 +263,9 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
            </div>}
          </article>)}
          {!people.length&&<p className="ow-muted">برای این تاریخ برنامه یا وظیفه‌ای ثبت نشده است. نبود اطلاعات به معنای غیبت نیست.</p>}
+         {inlineManager&&selected.date<todayIso&&<p className="ow-muted">
+           نمایش برنامه روزهای گذشته امکان‌پذیر است؛ ویرایش استثنا و واگذاری جدید در این تاریخ از این مسیر مجاز نیست.
+         </p>}
        </div>
        {onPlanAssignment&&<div className="ow-teamcal-dialog-actions">
          <button type="button" className="report-btn report-btn--primary"
