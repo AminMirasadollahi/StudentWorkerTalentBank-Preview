@@ -7,6 +7,9 @@ on:
       - 'src/components/ManagerWorkspaceNav.jsx'
       - 'src/components/WorkPoolManagerPanel.jsx'
       - 'src/components/TeamScheduleOverview.jsx'
+      - 'src/components/FocusedReviewQueue.jsx'
+      - 'src/components/TermMembershipPanel.jsx'
+      - 'src/lib/managerReviewRows.mjs'
       - 'src/OperationsWorkspace.jsx'
       - 'src/components/DeskWorkPoolManagerSection.jsx'
       - 'src/lib/managerWorkspaceNav.mjs'
@@ -32,12 +35,13 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Install synthetic-only Chrome harness
         run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1 jsdom@26.1.0
-      - name: Confirm both new UI flags build without deployment
+      - name: Confirm all reviewed manager features build without deployment
         env:
           VITE_SWTB22_MANAGER_SHELL_UI: 'true'
           VITE_SWTB22_WORK_POOL_FOCUS_UI: 'true'
           VITE_SWTB22_TASKS_FOCUS_UI: 'true'
           VITE_SWTB22_PRESENCE_FOCUS_UI: 'true'
+          VITE_SWTB22_REVIEW_FOCUS_UI: 'true'
         run: npm run build
       - name: Focused fake manager native Chrome appearance and interaction smoke
         run: node tests/browser/run-swtb22-manager-smoke.mjs
