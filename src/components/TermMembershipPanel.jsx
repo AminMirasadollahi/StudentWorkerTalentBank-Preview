@@ -13,7 +13,7 @@ const globalState={active:'فعال',paused:'تعلیق',inactive:'غیرفعا�
 const termState={draft:'پیش‌نویس',active:'فعال',closed:'بسته‌شده'}
 const reasonValid=value=>value.trim().length>=5&&value.trim().length<=500
 
-export default function TermMembershipPanel({workers=[],refreshRevision=0}){
+export default function TermMembershipPanel({workers=[],refreshRevision=0,focusedReview=false}){
  const [terms,setTerms]=useState([])
  const [termId,setTermId]=useState('')
  const [termLoading,setTermLoading]=useState(true)
@@ -29,6 +29,8 @@ export default function TermMembershipPanel({workers=[],refreshRevision=0}){
  const [saving,setSaving]=useState(false)
  const [writeError,setWriteError]=useState('')
  const [notice,setNotice]=useState('')
+ const [query,setQuery]=useState('')
+ const [eligibilityFilter,setEligibilityFilter]=useState('all')
  useEffect(()=>{
   let alive=true
   setTermLoading(true);setTermError('')
@@ -51,7 +53,9 @@ export default function TermMembershipPanel({workers=[],refreshRevision=0}){
    if(r?.ok!==true||!Array.isArray(r.workers)
       ||!['observe','enforced'].includes(r.enforcement_mode))throw Error('invalid_access_overview')
    setSnapshot({status:'ready',data:r})
-  }).catch(()=>{if(alive)setSnapshot({status:'error',data:null})})
+  }).catch(()=>{if(alive){
+    setSnapshot({status:'error',data:null});setDecision(null);setModeEditor(null)
+  }})
   return()=>{alive=false}
  },[termId,revision,refreshRevision])
  const selected=terms.find(t=>t.id===termId)||null
@@ -62,13 +66,27 @@ export default function TermMembershipPanel({workers=[],refreshRevision=0}){
    x.global_state==='active'?1:2
   return priority(a)-priority(b)||((labels.get(a.worker_id)||'').localeCompare(labels.get(b.worker_id)||'','fa'))
  }),[access,labels])
+ const scopedRows=useMemo(()=>{
+  if(!focusedReview)return rows
+  const q=query.trim().toLocaleLowerCase('fa')
+   .replace(/[يى]/g,'ی').replace(/ك/g,'ک')
+  return rows.filter(row=>{
+   if(eligibilityFilter!=='all'&&row.eligibility!==eligibilityFilter)return false
+   const name=(labels.get(row.worker_id)||'').toLocaleLowerCase('fa')
+    .replace(/[يى]/g,'ی').replace(/ك/g,'ک')
+   return !q||name.includes(q)
+  })
+ },[rows,labels,query,eligibilityFilter,focusedReview])
  const startDecision=row=>{
   setDecision(row);setNextState(row.eligibility==='unknown'?'eligible':row.eligibility)
   setReason('');setWriteError('');setNotice('')
  }
  const submitDecision=async event=>{
   event.preventDefault()
-  if(saving||!decision||!termId||nextState===decision.eligibility||
+  if(saving||snapshot.status!=='ready'||!access||!decision||
+     !access.workers.some(row=>row.worker_id===decision.worker_id&&
+       row.eligibility===decision.eligibility)||selected?.state==='closed'||
+     !termId||nextState===decision.eligibility||
      (decision.eligibility!=='unknown'&&!reasonValid(reason)))return
   setSaving(true);setWriteError('')
   try{
@@ -83,7 +101,9 @@ export default function TermMembershipPanel({workers=[],refreshRevision=0}){
  }
  const submitMode=async event=>{
   event.preventDefault()
-  if(saving||!modeEditor||!termId||modeReason.trim().length<10||
+  if(saving||snapshot.status!=='ready'||!access||selected?.state!=='active'||
+    !modeEditor||modeEditor===currentMode||
+    (modeEditor==='enforced'&&!canEnable)||!termId||modeReason.trim().length<10||
     modeReason.trim().length>500||!ack)return
   setSaving(true);setWriteError('')
   try{
@@ -99,7 +119,7 @@ export default function TermMembershipPanel({workers=[],refreshRevision=0}){
  }
  const canEnable=selected?.state==='active'&&access?.active_without_decision===0
  const currentMode=access?.enforcement_mode||'observe'
- return <section className="report-panel ow-membership" aria-label="مجوز همکاری دانشجوکاران در نیمسال">
+ return <section className={"report-panel ow-membership"+(focusedReview?" swtb22-membership-focus":"")} aria-label="مجوز همکاری دانشجوکاران در نیمسال">
    <div className="ow-term-heading">
      <div><h2>مجوز همکاری در نیمسال</h2>
        <p className="ow-muted">وضعیت حساب و مجوز همکاری هر نیمسال مستقل هستند؛ سوابق و گزارش‌های قبلی حذف نمی‌شوند.</p>
@@ -149,20 +169,46 @@ export default function TermMembershipPanel({workers=[],refreshRevision=0}){
          <small className="ow-muted">{selected.state!=='active'?'فقط برای نیمسال فعال امکان اعمال کنترل وجود دارد.':
            'ابتدا وضعیت تمام حساب‌های فعال را مشخص کنید.'}</small>}
      </div>
+     {focusedReview&&<div className="swtb22-membership-roster-tools" role="group"
+       aria-label="مرور و فیلتر مجوزهای نیمسال">
+       <label className="report-field"><span>جست‌وجوی دانشجوکار</span>
+        <input type="search" value={query} onChange={e=>setQuery(e.target.value)}
+         placeholder="نام دانشجوکار" aria-label="جست‌وجوی نام دانشجوکار در مجوزهای نیمسال"/>
+       </label>
+       <label className="report-field"><span>وضعیت مجوز این نیمسال</span>
+        <select value={eligibilityFilter} onChange={e=>setEligibilityFilter(e.target.value)}
+         aria-label="فیلتر مجوز همکاری نیمسال">
+         <option value="all">همه وضعیت‌ها</option>
+         <option value="unknown">تعیین‌تکلیف‌نشده</option>
+         <option value="eligible">مجاز به همکاری</option>
+         <option value="not_eligible">فاقد مجوز</option>
+        </select>
+       </label>
+       <span className="swtb22-membership-count" role="status">
+        {number.format(scopedRows.length)} از {number.format(rows.length)} دانشجوکار
+       </span>
+       {(query||eligibilityFilter!=='all')&&
+        <button type="button" className="report-btn report-btn--light"
+          onClick={()=>{setQuery('');setEligibilityFilter('all')}}>پاک‌کردن فیلتر</button>}
+      </div>}
      <div className="ow-membership-table-wrap">
        <table className="ow-membership-table">
          <thead><tr><th>دانشجوکار</th><th>وضعیت حساب</th><th>مجوز این نیمسال</th><th>اقدام</th></tr></thead>
-         <tbody>{rows.map(row=><tr key={row.worker_id}>
+         <tbody>{scopedRows.map(row=><tr key={row.worker_id}>
            <td>{labels.get(row.worker_id)||'دانشجوکار ثبت‌شده'}</td>
            <td>{globalState[row.global_state]||row.global_state}</td>
            <td>{eligibilityText[row.eligibility]||'نامشخص'}</td>
            <td><button type="button" className="ow-mini-btn"
              disabled={selected.state==='closed'||saving}
-             onClick={()=>startDecision(row)} aria-label="تغییر مجوز همکاری دانشجوکار">
+             onClick={()=>startDecision(row)}
+             aria-label={`تغییر مجوز همکاری ${labels.get(row.worker_id)||"دانشجوکار"}`}>
              {row.eligibility==='unknown'?'تعیین وضعیت':'تغییر'}
            </button></td>
          </tr>)}</tbody>
        </table>
+       {focusedReview&&scopedRows.length===0&&<p className="ow-muted swtb22-membership-empty">
+        {rows.length?'هیچ دانشجوکاری با این فیلتر یافت نشد.':'هنوز دانشجوکاری برای این نیمسال ثبت نشده است.'}
+       </p>}
      </div>
    </>}
    {decision&&<ManagerSettingsDialog title="تعیین مجوز همکاری" busy={saving}
