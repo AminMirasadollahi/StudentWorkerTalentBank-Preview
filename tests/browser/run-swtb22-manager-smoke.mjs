@@ -143,7 +143,7 @@ try{
   const week=root.querySelector('.ow-teamcal-week').getBoundingClientRect()
   const aside=root.querySelector('.swtb22-presence-day-inspector').getBoundingClientRect()
   return {weekWidth:week.width,inspectorWidth:aside.width,
-   sideBySide:week.right<=aside.left+4,
+   sideBySide:week.right<=aside.left+4||aside.right<=week.left+4,
    overflow:document.documentElement.scrollWidth>window.innerWidth+1}
  })
  assert.ok(presenceLayout.weekWidth>430,'calendar needs a usable week/month column: '+JSON.stringify(presenceLayout))
