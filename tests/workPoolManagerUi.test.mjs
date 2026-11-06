@@ -23,7 +23,7 @@ const mock={
    'if(globalThis.__managerReadDenied)throw Error("NO_MANAGER_ACCESS");',
    'return {ok:true,templates:[{id:"tpl",title:"مستندسازی منابع",unit:"research",',
    'kind:"general",state:"active",priority:2,description:"شرح عمومی کار"}],',
-   'opportunities:[{id:"opp",template_id:"tpl",term_id:"term",',
+   'opportunities:globalThis.__managerNoOffers?[]:[{id:"opp",template_id:"tpl",term_id:"term",',
    'date:"2026-11-15",claim_deadline:"2026-11-13",capacity:2,claimed_count:0,',
    'state:globalThis.__managerOpportunityState}]};',
    '};',
@@ -54,7 +54,7 @@ before(async()=>{
 after(async()=>{
  await server?.close();dom?.window.close()
  for(const k of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT',
-  '__managerReadDenied','__managerOpportunityState','__managerWrites'])
+  '__managerReadDenied','__managerOpportunityState','__managerWrites','__managerNoOffers'])
   delete globalThis[k]
 })
 async function flush(){
@@ -62,6 +62,7 @@ async function flush(){
 }
 async function mount(props={}){
  globalThis.__managerReadDenied=false
+ globalThis.__managerNoOffers=false
  globalThis.__managerOpportunityState='draft'
  globalThis.__managerWrites=[]
  const host=document.createElement('div');document.body.append(host)
@@ -110,6 +111,20 @@ test('manager authorization read failure clears previous draft and blocks write 
   await flush()
   assert.match(host.textContent,/امکان ثبت تا بازخوانی موفق متوقف است/)
   assert.doesNotMatch(host.textContent,/مستندسازی منابع/)
+  assert.ok(!button(host,'انتشار فرصت'))
+ }finally{await cleanup()}
+})
+
+test('empty general opportunity list uses compact single-column onboarding without publishing',async()=>{
+ const {host,render,cleanup}=await mount()
+ try{
+  globalThis.__managerNoOffers=true
+  await render({refreshRevision:3})
+  assert.ok(host.querySelector('.ow-work-pool-columns--empty'))
+  assert.match(host.textContent,/۱\. تعریف الگو/)
+  assert.match(host.textContent,/۳\. انتشار توسط مدیر/)
+  assert.ok(host.querySelector('.ow-work-pool-empty'))
+  assert.equal(globalThis.__managerWrites.length,0)
   assert.ok(!button(host,'انتشار فرصت'))
  }finally{await cleanup()}
 })

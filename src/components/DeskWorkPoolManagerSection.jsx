@@ -114,8 +114,11 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0}){
     role={uncertain?'alert':'status'}>{notice}</div>}
   {view.status==='loading'&&<p role="status">در حال خواندن نوبت‌ها…</p>}
   {view.status==='error'&&<p role="alert" className="report-alert report-alert--error">دریافت نوبت‌های کتابخانه موفق نبود؛ ثبت و انتشار غیرفعال است.</p>}
-  {view.status==='ready'&&<div className="ow-work-pool-columns">
+  {view.status==='ready'&&<div className={`ow-work-pool-columns${view.offers.length===0?' ow-work-pool-columns--empty':''}`}>
    <div className="ow-work-pool-compose">
+    {view.offers.length===0&&<p className="ow-work-pool-workflow" aria-label="مراحل آماده‌سازی نوبت کتابخانه">
+     <span>۱. تعریف الگوی نوبت</span><span>۲. تعیین تاریخ و ساعت</span><span>۳. انتشار توسط مدیر</span>
+    </p>}
     <details className="ow-work-pool-editor">
      <summary>+ تعریف الگوی نوبت کتابخانه</summary>
      <form className="ow-compact-form" onSubmit={createTemplate}>
@@ -199,7 +202,10 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0}){
    </div>
    <div className="ow-work-pool-list">
     <h4>فرصت‌های نوبت کتابخانه ({fa.format(view.offers.length)})</h4>
-    {!view.offers.length&&<p className="ow-muted">هنوز نوبتی منتشر یا تعریف نشده است.</p>}
+    {!view.offers.length&&<div className="ow-work-pool-empty" role="status">
+     <strong>هنوز نوبتی منتشر یا تعریف نشده است.</strong>
+     <p>از الگوی نوبت شروع کنید؛ سپس تاریخ، ساعت و ظرفیت را مشخص کرده و نوبت را منتشر کنید.</p>
+    </div>}
     {view.offers.map(o=><article className="ow-work-pool-item" key={o.id}>
      <div className="ow-work-pool-item__top">
       <strong>{o.title}</strong><small>{labels[o.state]||o.state}</small>

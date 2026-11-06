@@ -110,8 +110,11 @@ export default function WorkPoolManagerPanel({refreshRevision=0}){
   {notice&&<p role={uncertain?'alert':'status'} className={uncertain?'report-alert report-alert--error':'ops-alert-success'}>{notice}</p>}
   {snapshot.status==='loading'&&<p role="status" className="ow-muted">در حال دریافت الگوها و فرصت‌ها…</p>}
   {snapshot.status==='error'&&<div role="alert" className="report-alert report-alert--error">اطلاعات مخزن در دسترس نیست. امکان ثبت تا بازخوانی موفق متوقف است.</div>}
-  {snapshot.status==='ready'&&<div className="ow-work-pool-columns">
+  {snapshot.status==='ready'&&<div className={`ow-work-pool-columns${ordered.length===0?' ow-work-pool-columns--empty':''}`}>
    <div className="ow-work-pool-compose">
+    {ordered.length===0&&<p className="ow-work-pool-workflow" aria-label="مراحل آماده‌سازی فرصت عمومی">
+     <span>۱. تعریف الگو</span><span>۲. ساخت پیش‌نویس</span><span>۳. انتشار توسط مدیر</span>
+    </p>}
     <details className="ow-work-pool-editor">
      <summary>+ تعریف الگوی کار</summary>
      <form className="ow-compact-form" onSubmit={createTemplate}>
@@ -186,7 +189,10 @@ export default function WorkPoolManagerPanel({refreshRevision=0}){
    </div>
    <div className="ow-work-pool-list">
     <h3>فرصت‌های عمومی <small>({fa.format(ordered.length)})</small></h3>
-    {!ordered.length&&<p className="ow-muted">هنوز فرصتی برای این بازه تعریف نشده است.</p>}
+    {!ordered.length&&<div className="ow-work-pool-empty" role="status">
+     <strong>هنوز فرصتی برای این بازه تعریف نشده است.</strong>
+     <p>ابتدا الگوی کار را ثبت کنید، سپس فرصت تاریخ‌دار را بسازید و در پایان، آن را منتشر کنید.</p>
+    </div>}
     {ordered.map(opp=>{
      const item=templates.find(t=>t.id===opp.template_id)
      const term=terms.find(t=>t.id===opp.term_id)||snapshot.terms.find(t=>t.id===opp.term_id)
