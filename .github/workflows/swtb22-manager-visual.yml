@@ -34,6 +34,7 @@ jobs:
         env:
           VITE_SWTB22_MANAGER_SHELL_UI: 'true'
           VITE_SWTB22_WORK_POOL_FOCUS_UI: 'true'
+          VITE_SWTB22_TASKS_FOCUS_UI: 'true'
         run: npm run build
       - name: Focused fake manager native Chrome appearance and interaction smoke
         run: node tests/browser/run-swtb22-manager-smoke.mjs
