@@ -10,17 +10,23 @@ export default function FocusedReviewQueue({
  const [selectedKey,setSelectedKey]=useState('')
  const selected=items.find(item=>item.key===selectedKey)
  const selectedHeading=useRef(null)
+ const directoryHeading=useRef(null)
+ const activeTrigger=useRef(null)
  const lastKey=useRef('')
  useEffect(()=>{
   if(selected?.key && lastKey.current!==selected.key){
    selectedHeading.current?.focus?.({preventScroll:true})
+  }else if(!selected && lastKey.current){
+   // Server refresh or filter removed the reviewed row; do not focus
+   // an unmounted form or auto-select the next potentially sensitive case.
+   directoryHeading.current?.focus?.({preventScroll:true})
   }
   lastKey.current=selected?.key||''
  },[selected?.key])
  return <div className="swtb22-review-workspace" aria-label={label}>
   <div className="swtb22-review-directory" role="region" aria-label={label+' ـ فهرست'}>
    <div className="swtb22-review-directory-heading">
-    <strong>درخواست‌های قابل رسیدگی</strong>
+    <strong tabIndex={-1} ref={directoryHeading}>درخواست‌های قابل رسیدگی</strong>
     <span>{new Intl.NumberFormat('fa-IR').format(items.length)} مورد</span>
    </div>
    <div className="swtb22-review-list">
@@ -28,7 +34,7 @@ export default function FocusedReviewQueue({
      key={item.key} disabled={item.disabled}
      aria-pressed={selected?.key===item.key}
      aria-controls="swtb22-review-inspector"
-     onClick={()=>setSelectedKey(item.key)}>
+     onClick={event=>{activeTrigger.current=event.currentTarget;setSelectedKey(item.key)}}>
       <span className="swtb22-review-row-main">
        <strong>{item.title}</strong>
        <small>{item.subtitle}</small>
@@ -45,7 +51,7 @@ export default function FocusedReviewQueue({
       <div className="swtb22-review-inspector-head">
        <h3 tabIndex={-1} ref={selectedHeading}>{selected.title}</h3>
        <button type="button" className="report-btn report-btn--light"
-        onClick={()=>setSelectedKey('')}>بستن جزئیات</button>
+        onClick={()=>{activeTrigger.current?.focus?.({preventScroll:true});setSelectedKey('')}}>بستن جزئیات</button>
       </div>
       {renderReview(selected)}
      </>
