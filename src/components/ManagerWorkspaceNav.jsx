@@ -17,13 +17,12 @@ export default function ManagerWorkspaceNav({
     <small>دانشکده علوم انسانی شهید رجایی بابل</small></div>
    <button type="button" className="swtb22-manager-collapse"
     aria-label={collapsed?'گسترش فهرست مدیریت':'جمع‌کردن فهرست مدیریت'}
-    aria-expanded={!collapsed} onClick={()=>setCollapsed(v=>!v)}>
+    aria-expanded={!collapsed} aria-controls="swtb22-manager-route-list" onClick={()=>setCollapsed(v=>!v)}>
     {collapsed?'◀':'☰'}
    </button>
   </div>
-  <nav aria-label="بخش‌های فضای مدیریت" className="swtb22-manager-nav">
-   {groups.map(group=><section className="swtb22-manager-nav-group" key={group.id}
-     aria-labelledby={'swtb22-group-'+group.id}>
+  <nav id="swtb22-manager-route-list" aria-label="بخش‌های فضای مدیریت" className="swtb22-manager-nav">
+   {groups.map(group=><div className="swtb22-manager-nav-group" key={group.id}>
     <h2 id={'swtb22-group-'+group.id}>{group.title}</h2>
     {group.items.map(item=><button type="button" key={item.id}
       className="swtb22-manager-nav-item"
@@ -33,7 +32,7 @@ export default function ManagerWorkspaceNav({
       <span className="swtb22-manager-nav-mark" aria-hidden="true"/>
       <span className="swtb22-manager-nav-label">{item.label}</span>
     </button>)}
-   </section>)}
+   </div>)}
   </nav>
   <div className="swtb22-manager-sidebar-foot">
    <span>فضای مدیریت</span>
