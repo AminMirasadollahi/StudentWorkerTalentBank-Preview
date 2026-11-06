@@ -105,31 +105,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
  const ordered=opportunities.slice().sort((a,b)=>
   (a.date||'').localeCompare(b.date||'')||String(a.id).localeCompare(String(b.id)))
  const formDisabled=busy!==''||uncertain||snapshot.status!=='ready'
- return <section className={'report-panel ow-work-pool'+(focusUIEnabled?' swtb22-work-pool':'')} aria-label="مدیریت مخزن وظایف">
-  <div className="report-panel-heading">
-   <div><h2>مخزن وظایف و فرصت‌های کاری</h2>
-    <p className="ow-muted">الگوهای کار مستقل از نوبت‌های تاریخ‌دارند. فقط فرصت منتشرشده می‌تواند توسط دانشجوکار واجد شرایط انتخاب شود.</p>
-   </div>
-   <button type="button" className="report-btn report-btn--light"
-    onClick={()=>{setUncertain(false);setRevision(x=>x+1)}} disabled={busy!==''}>
-    بازخوانی</button>
-  </div>
-  {focusUIEnabled&&deskPoolUIEnabled&&<div className="swtb22-kind-switch" role="group" aria-label="نوع فرصت کاری">
-   <button type="button" aria-pressed={kind==='general'} onClick={()=>selectKind('general')}>فرصت‌های عمومی</button>
-   <button type="button" aria-pressed={kind==='desk'} onClick={()=>selectKind('desk')}>نوبت‌های زمان‌دار کتابخانه</button>
-  </div>}
-  <div className="swtb22-work-pool-kind-view" hidden={focusUIEnabled&&kind==='desk'}>
-  <p className="ow-compact-hint">{deskPoolUIEnabled?'فرصت‌های عمومی در این بخش و نوبت‌های زمان‌دار کتابخانه در بخش بعدی همین صفحه مدیریت می‌شوند.':'این بخش فقط برای کارهای عمومی است. نوبت‌های زمان‌دار کتابخانه، کار گروهی و درخواست‌های نیازمند تأیید مدیر همچنان از مسیرهای تخصصی خود انجام می‌شوند.'} انتخاب کار، ساعت تأییدشده ایجاد نمی‌کند.</p>
-  {notice&&<p role={uncertain?'alert':'status'} className={uncertain?'report-alert report-alert--error':'ops-alert-success'}>{notice}</p>}
-  {snapshot.status==='loading'&&<p role="status" className="ow-muted">در حال دریافت الگوها و فرصت‌ها…</p>}
-  {snapshot.status==='error'&&<div role="alert" className="report-alert report-alert--error">اطلاعات مخزن در دسترس نیست. امکان ثبت تا بازخوانی موفق متوقف است.</div>}
-  {snapshot.status==='ready'&&<div className={`ow-work-pool-columns${ordered.length===0?' ow-work-pool-columns--empty':''}`}>
-   {focusUIEnabled&&<div className="swtb22-work-pool-commands" role="group" aria-label="ساخت فرصت عمومی">
-    <button type="button" className="report-btn report-btn--primary" onClick={()=>setEditorMode('template')}>تعریف الگوی کار</button>
-    <button type="button" className="report-btn report-btn--light" disabled={!templates.some(t=>t.kind==='general'&&t.state==='active')} onClick={()=>setEditorMode('opportunity')}>ساخت فرصت تاریخ‌دار</button>
-    {!templates.some(t=>t.kind==='general'&&t.state==='active')&&<small>برای ساخت فرصت، ابتدا یک الگوی فعال تعریف کنید.</small>}
-   </div>}
-   <div className="ow-work-pool-compose">
+ const editorSurface=(<div className="ow-work-pool-compose">
     {ordered.length===0&&<p className="ow-work-pool-workflow" aria-label="مراحل آماده‌سازی فرصت عمومی">
      <span>۱. تعریف الگو</span><span>۲. ساخت پیش‌نویس</span><span>۳. انتشار توسط مدیر</span>
     </p>}
@@ -204,8 +180,8 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
        type="submit">{busy==='opportunity'?'در حال ثبت…':'ساخت پیش‌نویس فرصت'}</button>
      </form>
     </details>
-   </div>
-   <div className="ow-work-pool-list">
+   </div>)
+ const listSurface=(<div className="ow-work-pool-list">
     <h3>فرصت‌های عمومی <small>({fa.format(ordered.length)})</small></h3>
     {!ordered.length&&<div className="ow-work-pool-empty" role="status">
      <strong>هنوز فرصتی برای این بازه تعریف نشده است.</strong>
@@ -244,7 +220,32 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
       </div>}
      </article>
     })}
+   </div>)
+ return <section className={'report-panel ow-work-pool'+(focusUIEnabled?' swtb22-work-pool':'')} aria-label="مدیریت مخزن وظایف">
+  <div className="report-panel-heading">
+   <div><h2>مخزن وظایف و فرصت‌های کاری</h2>
+    <p className="ow-muted">الگوهای کار مستقل از نوبت‌های تاریخ‌دارند. فقط فرصت منتشرشده می‌تواند توسط دانشجوکار واجد شرایط انتخاب شود.</p>
    </div>
+   <button type="button" className="report-btn report-btn--light"
+    onClick={()=>{setUncertain(false);setRevision(x=>x+1)}} disabled={busy!==''}>
+    بازخوانی</button>
+  </div>
+  {focusUIEnabled&&deskPoolUIEnabled&&<div className="swtb22-kind-switch" role="group" aria-label="نوع فرصت کاری">
+   <button type="button" aria-pressed={kind==='general'} onClick={()=>selectKind('general')}>فرصت‌های عمومی</button>
+   <button type="button" aria-pressed={kind==='desk'} onClick={()=>selectKind('desk')}>نوبت‌های زمان‌دار کتابخانه</button>
+  </div>}
+  <div className="swtb22-work-pool-kind-view" hidden={focusUIEnabled&&kind==='desk'}>
+  <p className="ow-compact-hint">{deskPoolUIEnabled?'فرصت‌های عمومی در این بخش و نوبت‌های زمان‌دار کتابخانه در بخش بعدی همین صفحه مدیریت می‌شوند.':'این بخش فقط برای کارهای عمومی است. نوبت‌های زمان‌دار کتابخانه، کار گروهی و درخواست‌های نیازمند تأیید مدیر همچنان از مسیرهای تخصصی خود انجام می‌شوند.'} انتخاب کار، ساعت تأییدشده ایجاد نمی‌کند.</p>
+  {notice&&<p role={uncertain?'alert':'status'} className={uncertain?'report-alert report-alert--error':'ops-alert-success'}>{notice}</p>}
+  {snapshot.status==='loading'&&<p role="status" className="ow-muted">در حال دریافت الگوها و فرصت‌ها…</p>}
+  {snapshot.status==='error'&&<div role="alert" className="report-alert report-alert--error">اطلاعات مخزن در دسترس نیست. امکان ثبت تا بازخوانی موفق متوقف است.</div>}
+  {snapshot.status==='ready'&&<div className={`ow-work-pool-columns${ordered.length===0?' ow-work-pool-columns--empty':''}`}>
+   {focusUIEnabled&&<div className="swtb22-work-pool-commands" role="group" aria-label="ساخت فرصت عمومی">
+    <button type="button" className="report-btn report-btn--primary" onClick={()=>setEditorMode('template')}>تعریف الگوی کار</button>
+    <button type="button" className="report-btn report-btn--light" disabled={!templates.some(t=>t.kind==='general'&&t.state==='active')} onClick={()=>setEditorMode('opportunity')}>ساخت فرصت تاریخ‌دار</button>
+    {!templates.some(t=>t.kind==='general'&&t.state==='active')&&<small>برای ساخت فرصت، ابتدا یک الگوی فعال تعریف کنید.</small>}
+   </div>}
+   {focusUIEnabled?<>{listSurface}{editorSurface}</>:<>{editorSurface}{listSurface}</>}
   </div>}
   </div>
   {deskPoolUIEnabled&&(!focusUIEnabled||deskVisited)&&<div className="swtb22-work-pool-kind-view" hidden={focusUIEnabled&&kind!=='desk'}>
