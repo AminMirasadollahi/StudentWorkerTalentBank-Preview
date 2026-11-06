@@ -55,7 +55,7 @@ before(async()=>{
 })
 after(async()=>{await vite?.close();dom?.window.close();for(const k of
  ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT','__termReads','__termFixture','__termFail','__termWrites'])delete globalThis[k]})
-async function mount(result=fixture()){
+async function mount(result=fixture(),{focusedUI=false}={}){
  globalThis.__termReads=[]
  globalThis.__termWrites=[]
  globalThis.__termFixture=result
@@ -63,7 +63,7 @@ async function mount(result=fixture()){
  const host=document.createElement('div')
  document.body.append(host)
  const root=createRoot(host)
- await act(async()=>root.render(createElement(Panel,{workers:[{id:'FAKE-A',name:'نمونه ساختگی'}]})))
+ await act(async()=>root.render(createElement(Panel,{workers:[{id:'FAKE-A',name:'نمونه ساختگی'}],focusedUI})))
  return {host,teardown:async()=>{await act(async()=>root.unmount());host.remove()}}
 }
 async function choose(select,value){
@@ -207,5 +207,77 @@ test('activation is a deliberate separate confirmation and never an implicit edi
   assert.equal(saved.startDate,'2030-01-01')
   assert.equal(saved.endDate,'2030-06-30')
   assert.match(saved.reason,/تأیید/)
+ }finally{await teardown()}
+})
+
+const reconciledFixture=()=>{
+ const d=fixture()
+ // The legacy synthetic fixture intentionally models an old standalone unit
+ // quota and an incomplete week. D6B synthetic audit uses a self-consistent
+ // backend snapshot instead, without changing older regression fixtures.
+ d.units[0]={...d.units[0],allocated_minutes:null,remaining_minutes:null}
+ d.weeks[0]={...d.weeks[0],approved_minutes:165}
+ return d
+}
+test('D6B compact manager term view emphasizes one-copy pooled quota, with deferred unit/week detail',async()=>{
+ const {host,teardown}=await mount(reconciledFixture(),{focusedUI:true})
+ try{
+  assert.match(host.textContent,/سهمیه و مصرف نیمسال/)
+  assert.match(host.textContent,/کتابخانه و پژوهش/)
+  assert.match(host.textContent,/۴۱۱ ساعت/)
+  assert.match(host.textContent,/۱۰۰ ساعت/)
+  assert.equal(host.querySelector('.swtb22-term-audit'),null)
+  assert.equal(host.querySelector('.swtb22-term-unit-disclosure')?.open,false)
+  assert.equal(host.querySelector('.swtb22-term-week-disclosure')?.open,false)
+  assert.equal(host.querySelector('.swtb22-term-advanced-filter')?.open,false)
+  assert.equal(host.querySelectorAll('.ow-term-pool').length,2)
+  assert.equal(globalThis.__termWrites.length,0)
+ }finally{await teardown()}
+})
+test('filtered unit view cannot mutate incomplete shared pool, term state, or create a new semester',async()=>{
+ const {host,teardown}=await mount(reconciledFixture(),{focusedUI:true})
+ try{
+  await act(async()=>host.querySelector('.swtb22-term-advanced-filter summary').click())
+  const select=host.querySelector('[aria-label="فیلتر واحد بودجه"]')
+  assert.ok(select)
+  await choose(select,'library')
+  assert.match(host.textContent,/برای تغییر سهمیه یا وضعیت نیمسال/)
+  assert.equal([...host.querySelectorAll('button')].some(b=>b.textContent.includes('ویرایش سهمیه')),false)
+  assert.equal([...host.querySelectorAll('button')].some(b=>b.textContent.includes('بستن نیمسال')),false)
+  assert.equal([...host.querySelectorAll('button')].some(b=>b.textContent.includes('+ تعریف سهمیه')),false)
+  const create=[...host.querySelectorAll('button')].find(b=>b.textContent.includes('+ تعریف نیمسال'))
+  assert.ok(create?.disabled)
+  assert.equal(globalThis.__termReads.at(-1).unit,'library')
+  assert.equal(globalThis.__termWrites.length,0)
+  await clickNamed(host,'بازگشت به نمای کل نیمسال')
+  assert.equal(globalThis.__termReads.at(-1).unit,null)
+  assert.ok([...host.querySelectorAll('button')].some(b=>b.textContent.includes('ویرایش سهمیه')))
+  assert.equal(globalThis.__termWrites.length,0)
+ }finally{await teardown()}
+})
+test('inconsistent server snapshots hide decision figures and all mutation forms',async()=>{
+ const bad=reconciledFixture()
+ bad.pools[0].approved_minutes=250
+ const {host,teardown}=await mount(bad,{focusedUI:true})
+ try{
+  assert.ok(host.querySelector('.swtb22-term-audit'))
+  assert.match(host.textContent,/جمع approved_minutes/)
+  assert.equal(host.querySelector('.ow-term-kpis'),null)
+  assert.equal(host.querySelector('.ow-term-pools'),null)
+  assert.equal([...host.querySelectorAll('button')].some(b=>b.textContent.includes('ویرایش سهمیه')),false)
+  assert.equal(globalThis.__termWrites.length,0)
+ }finally{await teardown()}
+})
+test('D6B rejected refresh fails closed and invalidates a previously opened quota edit dialog',async()=>{
+ const {host,teardown}=await mount(reconciledFixture(),{focusedUI:true})
+ try{
+  await clickNamed(host,'ویرایش سهمیه')
+  assert.ok(document.querySelector('dialog.ow-manager-dialog[open]'))
+  globalThis.__termFail=true
+  await clickNamed(host,'بازخوانی')
+  assert.match(host.textContent,/آمار نیمسال در دسترس نیست/)
+  assert.equal(document.querySelector('dialog.ow-manager-dialog[open]'),null)
+  assert.equal(host.querySelector('.ow-term-pools'),null)
+  assert.equal(globalThis.__termWrites.length,0)
  }finally{await teardown()}
 })
