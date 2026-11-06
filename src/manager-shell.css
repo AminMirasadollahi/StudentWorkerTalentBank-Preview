@@ -137,3 +137,27 @@
 @media(prefers-reduced-motion:reduce){
  .swtb22-manager-sidebar *{scroll-behavior:auto}
 }
+
+
+/* SWTB22-D1: the public intake's global overflow-x:hidden on html/body/#root
+   creates a synthetic scroll container and prevents descendant sticky
+   positioning from tracking the *window* while long admin lists scroll.
+   Scope the non-scroll-container 'clip' reset strictly to the authenticated
+   manager shell; never change the protected public intake or worker UI. */
+@media(min-width:901px){
+ html:has(.swtb22-manager-enabled),
+ body:has(.swtb22-manager-enabled),
+ #root:has(.swtb22-manager-enabled){
+  overflow-x:clip;
+ }
+ .swtb22-manager-enabled .swtb22-manager-sidebar{
+  position:sticky;
+  top:0;
+  height:100vh;
+  height:100dvh;
+  min-height:0;
+  max-height:100dvh;
+  overflow-y:auto;
+  overscroll-behavior-y:contain;
+ }
+}
