@@ -264,7 +264,9 @@ try{
  const downloaded=await downloadEvent
  assert.match(downloaded.suggestedFilename(),/^swtb-manager-history-loaded\.xlsx$/)
  const ExcelJS=(await import('exceljs'))
- const book=new ExcelJS.Workbook()
+ const Workbook=ExcelJS.Workbook||ExcelJS.default?.Workbook
+ assert.equal(typeof Workbook,'function')
+ const book=new Workbook()
  await book.xlsx.readFile(await downloaded.path())
  assert.deepEqual(book.worksheets.map(sh=>sh.name),['دامنه و جمع‌بندی','ریز سوابق'])
  const exported=book.getWorksheet('ریز سوابق')
