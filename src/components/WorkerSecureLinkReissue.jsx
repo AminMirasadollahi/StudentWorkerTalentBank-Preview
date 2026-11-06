@@ -1,4 +1,4 @@
-import {useState} from 'react'
+import {useEffect,useState} from 'react'
 
 // Deliberate, in-context confirmation: issuing a fresh one-time link stages
 // password_required for an EXISTING worker account. Never do this accidentally.
@@ -6,6 +6,8 @@ export default function WorkerSecureLinkReissue({
   workerId,workerState,saving,onReissue,
 }) {
   const [pendingWorkerId,setPendingWorkerId]=useState(null)
+  // Identity or role changes invalidate an unconsumed confirmation.
+  useEffect(()=>setPendingWorkerId(null),[workerId,workerState])
   const isActive=workerState==='active'
   const confirming=isActive&&pendingWorkerId===workerId
   const disabled=saving||!isActive||!workerId
