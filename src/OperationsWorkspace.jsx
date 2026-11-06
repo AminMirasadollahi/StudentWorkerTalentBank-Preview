@@ -1389,6 +1389,41 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       {invalidHistoryRange&&<div className="report-alert report-alert--error" role="alert">
         تاریخ شروع نباید بعد از تاریخ پایان باشد؛ بازه را اصلاح کنید.
       </div>}
+      {focusedHistory?<div className="swtb22-history-results">
+       <div className="swtb22-history-scope-metrics" aria-label="خلاصه نتایج فیلترشده و بارگذاری‌شده">
+        <div><span>گزارش موجود</span><strong>{n(scopedHistoryProjection.summary.reportCount)}</strong></div>
+        <div><span>گزارش تأییدشده</span><strong>{n(scopedHistoryProjection.summary.approvedReportCount)}</strong></div>
+        <div><span>کار بدون گزارش</span><strong>{n(scopedHistoryProjection.summary.unreportedTaskCount)}</strong></div>
+        <div><span>زمان تأییدشده در همین نتایج</span><strong>{
+          scopedHistoryProjection.summary.invalidMinutesCount
+           ?'نیازمند بررسی'
+           :exactDuration(scopedHistoryProjection.summary.approvedMinutes)
+        }</strong></div>
+       </div>
+       <p className="ow-muted swtb22-history-scope-note">
+        این جمع صرفاً مربوط به نتایج فیلترشده و بارگذاری‌شده است؛
+        برای مجموع قطعی همه دوره‌ها از بخش مستقل «آمار تمام‌دوره سرور» استفاده کنید.
+       </p>
+       {scopedHistoryProjection.summary.orphanReportCount>0&&<p className="ow-warning" role="status">
+        {n(scopedHistoryProjection.summary.orphanReportCount)} گزارش با وظیفه مرتبط نامشخص در این نتایج وجود دارد.
+       </p>}
+       {scopedHistoryProjection.summary.invalidMinutesCount>0&&<p className="ow-warning" role="alert">
+        {n(scopedHistoryProjection.summary.invalidMinutesCount)} گزارش، داده زمانی نیازمند بررسی دارد؛
+        جمع زمان تأییدشده تا رفع مغایرت قابل اتکا نیست.
+       </p>}
+       <ManagerHistoryExplorer rows={scopedHistoryProjection.reportRows}
+        limit={historyShown}
+        emptyText={historyWithoutReport.length
+         ?'در این بازه گزارشی نیست؛ کارهای بدون گزارش را در بخش پایین ببینید.'
+         :historyFiltersActive?'هیچ گزارشی با فیلترهای فعلی موجود نیست.':'هنوز گزارشی در فهرست بارگذاری‌شده وجود ندارد.'}/>
+       {scopedHistoryProjection.reportRows.length>historyShown&&<div className="ow-history-load-more">
+        <span className="ow-muted">نمایش {n(Math.min(historyShown,scopedHistoryProjection.reportRows.length))}
+         {' '}از {n(scopedHistoryProjection.reportRows.length)} گزارش بارگذاری‌شده و فیلترشده؛
+         خروجی Excel همه این نتایج را در بر می‌گیرد.</span>
+        <button type="button" className="report-btn report-btn--light"
+         onClick={()=>setHistoryShown(count=>count+100)}>نمایش ۱۰۰ گزارش بیشتر</button>
+       </div>}
+      </div>:<>
       <div className="report-panel-heading">
         <h3>{historyFiltersActive?'سوابق منطبق با فیلتر':'سوابق فعالیت همه دانشجوکارها'}</h3>
         <small>{n(historySummary.reportCount)} گزارش · {exactDuration(historySummary.approvedMinutes)} تأییدشده</small>
@@ -1419,6 +1454,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
             historyFiltersActive?'نتیجه‌ای برای فیلترهای انتخاب‌شده پیدا نشد.':'هنوز سابقه‌ای وجود ندارد.'}
         </p>}
       </div>
+      </>}
       {historyWithoutReport.length>0&&<div className="ow-history-unreported">
         <div className="report-panel-heading">
           <h3>کارهای بدون گزارش</h3><small>{n(historyWithoutReport.length)} کار</small>
