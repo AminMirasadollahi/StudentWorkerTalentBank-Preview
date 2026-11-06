@@ -18,6 +18,7 @@ import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
 import ManagerWorkspaceNav from './components/ManagerWorkspaceNav'
 import ManagerCandidatesWorkspace from './components/ManagerCandidatesWorkspace'
+import WorkerSecureLinkReissue from './components/WorkerSecureLinkReissue'
 import {currentManagerDestination,nextManagerNavigation} from './lib/managerWorkspaceNav.mjs'
 import {
   WORKER_PASSWORD_RECOVERY_REDIRECT,
@@ -539,12 +540,13 @@ function CandidateCard({
       {hasWorker && <>
         <p className="ops-worker-state">ایمیل حساب: <span dir="ltr">{candidate.email || '—'}</span></p>
         <p className="ops-worker-state">واحد فعال: {unitLabels[candidate.worker_unit]} · وضعیت: {candidate.worker_state}</p>
-        <button className="report-btn report-btn--light ops-small-action"
-          type="button" disabled={saving}
-          onClick={() => onReissue(candidate.worker_id)}>
-          صدور لینک امن تعیین رمز
-        </button>
-        <small>لینک جدید به معنای الزام تعیین مجدد رمز در ورود بعدی است. فقط با درخواست دانشجو یا برای آزمون از این گزینه استفاده کنید.</small>
+        <WorkerSecureLinkReissue
+          key={candidate.worker_id}
+          workerId={candidate.worker_id}
+          workerState={candidate.worker_state}
+          saving={saving}
+          onReissue={onReissue}
+        />
       </>}
       </ControlsTag>
     </article>
