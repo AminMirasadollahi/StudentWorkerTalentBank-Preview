@@ -33,6 +33,8 @@ const plugin={
     if(id==='\0p3-legacy-report')return [
       'export async function getStudentWorkerReport(code,filters){',
       'globalThis.__p3LegacyCalls.push({code,filters});',
+      'if(globalThis.__p3LegacyDeferred) return globalThis.__p3LegacyDeferred;',
+      'if(globalThis.__p3LegacyReject) throw new Error("SYNTHETIC_LEGACY_REPORT_DENIED");',
       'return globalThis.__p3Fixture;',
       '}',
     ].join('\n')
@@ -49,6 +51,8 @@ before(async()=>{
   globalThis.__p3LegacyCalls=[]
   globalThis.__p3Fixture=fixture()
   globalThis.__p3Reject=false
+  globalThis.__p3LegacyReject=false
+  globalThis.__p3LegacyDeferred=null
   ;({createRoot}=await import('react-dom/client'))
   vite=await createServer({plugins:[plugin],server:{middlewareMode:true},appType:'custom',logLevel:'error'})
   ReportApp=(await vite.ssrLoadModule('/src/ReportApp.jsx')).default
@@ -56,7 +60,8 @@ before(async()=>{
 after(async()=>{
   await vite?.close()
   dom?.window.close()
-  for(const k of ['__p3AdminCalls','__p3LegacyCalls','__p3Fixture','__p3Reject','IS_REACT_ACT_ENVIRONMENT',
+  for(const k of ['__p3AdminCalls','__p3LegacyCalls','__p3Fixture','__p3Reject',
+    '__p3LegacyReject','__p3LegacyDeferred','IS_REACT_ACT_ENVIRONMENT',
     'window','document','sessionStorage','HTMLElement'])delete globalThis[k]
 })
 async function renderReport(props){
@@ -111,4 +116,78 @@ test('P3: standalone report continues using independent access-code login, not m
   assert.ok(ui.host.querySelector('input[type=password]'))
   assert.equal(globalThis.__p3AdminCalls.length,0)
  }finally{await ui.dispose()}
+})
+
+test('SWTB11: legacy previously authorized candidate rows vanish after a denied refresh',async()=>{
+ sessionStorage.clear()
+ globalThis.__p3LegacyDeferred=null
+ globalThis.__p3LegacyReject=false
+ sessionStorage.setItem('student-worker-report:access:v1','SYNTHETIC_BEARER_TEST_ONLY')
+ const ui=await renderReport({adminMode:false,refreshRevision:0})
+ try{
+  assert.match(ui.host.textContent,/SYNTHETIC_P3_TEST_ONLY/)
+  assert.ok(ui.host.querySelector('.report-table'))
+  globalThis.__p3LegacyReject=true
+  await ui.update({adminMode:false,refreshRevision:1})
+  assert.doesNotMatch(ui.host.textContent,/SYNTHETIC_P3_TEST_ONLY/)
+  assert.equal(ui.host.querySelector('.report-table'),null)
+  assert.match(ui.host.textContent,/ورود به صفحه گزارش‌گیری/)
+  assert.match(ui.host.textContent,/SYNTHETIC_LEGACY_REPORT_DENIED/)
+  assert.equal(sessionStorage.getItem('student-worker-report:access:v1'),null,
+    'revoked or denied credential must not silently auto-read on next mount')
+ }finally{
+  globalThis.__p3LegacyReject=false
+  await ui.dispose();sessionStorage.clear()
+ }
+})
+
+test('SWTB11: pending legacy refresh hides previously loaded applicant PII immediately',async()=>{
+ sessionStorage.clear()
+ globalThis.__p3LegacyReject=false
+ globalThis.__p3LegacyDeferred=null
+ sessionStorage.setItem('student-worker-report:access:v1','SYNTHETIC_BEARER_TEST_ONLY')
+ const ui=await renderReport({adminMode:false,refreshRevision:0})
+ let release
+ try{
+  assert.match(ui.host.textContent,/SYNTHETIC_P3_TEST_ONLY/)
+  globalThis.__p3LegacyDeferred=new Promise(resolve=>{release=resolve})
+  await ui.update({adminMode:false,refreshRevision:1})
+  assert.doesNotMatch(ui.host.textContent,/SYNTHETIC_P3_TEST_ONLY|خروجی Excel/)
+  assert.equal(ui.host.querySelector('.report-table'),null)
+  assert.match(ui.host.textContent,/اطلاعات قبلی تا پایان بررسی پنهان هستند/)
+  assert.ok([...ui.host.querySelectorAll('button')].some(b=>b.textContent.includes('خروج از گزارش‌ها')))
+ }finally{
+  if(release)await act(async()=>{release(fixture());await Promise.resolve()})
+  globalThis.__p3LegacyDeferred=null
+  await ui.dispose();sessionStorage.clear()
+ }
+})
+
+test('SWTB11: a delayed successful legacy response cannot restore report after logout',async()=>{
+ sessionStorage.clear()
+ globalThis.__p3LegacyReject=false
+ globalThis.__p3LegacyDeferred=null
+ sessionStorage.setItem('student-worker-report:access:v1','SYNTHETIC_BEARER_TEST_ONLY')
+ const ui=await renderReport({adminMode:false,refreshRevision:0})
+ let release
+ try{
+  assert.match(ui.host.textContent,/SYNTHETIC_P3_TEST_ONLY/)
+  globalThis.__p3LegacyDeferred=new Promise(resolve=>{release=resolve})
+  await ui.update({adminMode:false,refreshRevision:1})
+  const exit=[...ui.host.querySelectorAll('button')].find(b=>b.textContent.includes('خروج از گزارش‌ها'))
+  assert.ok(exit)
+  await act(async()=>{exit.click();await Promise.resolve()})
+  assert.match(ui.host.textContent,/ورود به صفحه گزارش‌گیری/)
+  assert.doesNotMatch(ui.host.textContent,/SYNTHETIC_P3_TEST_ONLY/)
+  assert.equal(sessionStorage.getItem('student-worker-report:access:v1'),null)
+  await act(async()=>{release(fixture());await Promise.resolve();await Promise.resolve()})
+  assert.match(ui.host.textContent,/ورود به صفحه گزارش‌گیری/)
+  assert.doesNotMatch(ui.host.textContent,/SYNTHETIC_P3_TEST_ONLY/)
+  assert.equal(ui.host.querySelector('.report-table'),null)
+  assert.equal(sessionStorage.getItem('student-worker-report:access:v1'),null)
+ }finally{
+  if(release)await act(async()=>{release(fixture());await Promise.resolve()})
+  globalThis.__p3LegacyDeferred=null
+  await ui.dispose();sessionStorage.clear()
+ }
 })
