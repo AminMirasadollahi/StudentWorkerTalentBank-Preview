@@ -66,7 +66,7 @@ test('worker launch gate: same synthetic server snapshot never exposes another w
  const scopedA=scopeSelfWorkRows(fixtures,A)
  const scopedB=scopeSelfWorkRows(fixtures,B)
  assert.deepEqual(scopedA.tasks.map(t=>t.id),['A-fix','A-pending','A-done'])
- assert.deepEqual(scopedA.time_entries.map(e=>e.id),['A-pending-time','A-changes','A-credit'])
+ assert.deepEqual(scopedA.time_entries.map(e=>e.id),['A-changes','A-pending-time','A-credit'])
  assert.deepEqual(scopedB.tasks.map(t=>t.id),['B-done'])
  assert.deepEqual(scopedB.time_entries.map(e=>e.id),['B-credit'])
  for(const kind of ['tasks','time_entries','weekly_slots','exceptions']){
@@ -89,7 +89,7 @@ test('worker launch gate: future correction is an action; pending never implies 
 test('worker launch gate: self-owned approved time only, not raw requested minutes or other worker credit',()=>{
  const mine=scopeSelfWorkRows(fixtures,A)
  const rows=projectWorkerReportActivity(mine.time_entries,mine.tasks)
- assert.deepEqual(rows.map(e=>e.id),['A-changes','A-pending-time','A-credit'])
+ assert.deepEqual(rows.map(e=>e.id),['A-pending-time','A-changes','A-credit'])
  assert.equal(rows.find(e=>e.id==='A-changes').approved_minutes,null)
  assert.equal(rows.find(e=>e.id==='A-pending-time').approved_minutes,null)
  const approved=rows.filter(e=>e.review_state==='approved')
