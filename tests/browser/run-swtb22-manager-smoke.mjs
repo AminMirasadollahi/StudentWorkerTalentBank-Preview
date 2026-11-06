@@ -51,6 +51,41 @@ try{
  await page.getByRole('button',{name:'تعریف الگوی نوبت'}).first().click()
  assert.equal(await page.locator('.ow-desk-pool-block details[open]').count(),1)
  await page.screenshot({path:resolve(output,'04-focused-library-editor.png'),fullPage:true})
+ // Candidate case-management visual QA uses only the fake in-memory records
+ // from swtb22-work-pool-smoke.jsx; never the real candidate API.
+ await page.locator('[data-swtb22-route="applicants"]').click()
+ await page.locator('.swtb22-candidate-grid').waitFor()
+ assert.equal(await page.locator('.swtb22-candidate-row').count(),3)
+ assert.equal(await page.locator('[data-testid="swtb22-fake-candidate-detail"]').count(),0)
+ const widths=await page.locator('.swtb22-candidate-grid').evaluate(grid=>{
+  const list=grid.querySelector('.swtb22-candidate-directory').getBoundingClientRect()
+  const detail=grid.querySelector('.swtb22-candidate-inspector').getBoundingClientRect()
+  return {listWidth:list.width,detailWidth:detail.width,
+   viewport:window.innerWidth,overflow:document.documentElement.scrollWidth>window.innerWidth+1}
+ })
+ assert.ok(widths.listWidth>=220,'candidate browser should remain scannable: '+JSON.stringify(widths))
+ assert.ok(widths.detailWidth>=450,'candidate inspector must have room for review forms: '+JSON.stringify(widths))
+ assert.equal(widths.overflow,false,'case-management browse must not overflow viewport')
+ await page.screenshot({path:resolve(output,'06-candidate-directory-empty-inspector-1440.png'),fullPage:true})
+ await page.locator('.swtb22-candidate-row').first().click()
+ assert.equal(await page.locator('[data-testid="swtb22-fake-candidate-detail"]').count(),1)
+ assert.equal(await page.locator('.swtb22-candidate-row[aria-pressed="true"]').count(),1)
+ assert.ok(await page.locator('.swtb22-candidate-inspector-head h3').evaluate(
+  el=>document.activeElement===el),'focused record title is reachable immediately')
+ await page.screenshot({path:resolve(output,'07-candidate-inspector-selected-1440.png'),fullPage:true})
+ await page.locator('.swtb22-candidate-toolbar input[type="search"]').fill('۱۴۰۳')
+ assert.equal(await page.locator('.swtb22-candidate-row').count(),1)
+ await page.getByRole('button',{name:'پاک‌کردن فیلترها'}).click()
+ assert.equal(await page.locator('.swtb22-candidate-row').count(),3)
+ await page.setViewportSize({width:1920,height:1080})
+ const wide=await page.locator('.swtb22-candidate-grid').evaluate(grid=>{
+  const i=grid.querySelector('.swtb22-candidate-inspector').getBoundingClientRect()
+  return {detailWidth:i.width,horizontalOverflow:document.documentElement.scrollWidth>window.innerWidth+1}
+ })
+ assert.ok(wide.detailWidth>=640,'inspector should benefit from 1920px desktop space')
+ assert.equal(wide.horizontalOverflow,false)
+ await page.screenshot({path:resolve(output,'08-candidate-directory-1920.png'),fullPage:true})
+ await page.setViewportSize({width:1440,height:900})
  const result=await page.evaluate(()=>({writes:globalThis.__qaWriteAttempts,
   overflow:document.documentElement.scrollWidth>window.innerWidth+1}))
  assert.equal(result.writes,0,'rendering and switching must not call any mutation')
