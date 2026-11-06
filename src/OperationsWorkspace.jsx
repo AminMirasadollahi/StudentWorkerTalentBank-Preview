@@ -922,6 +922,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const readSequence=useRef(0)
   const [notice,setNotice]=useState('')
   const [historyShown,setHistoryShown]=useState(100)
+  const [historyUnreportedShown,setHistoryUnreportedShown]=useState(50)
   const [historyLifetimeOpen,setHistoryLifetimeOpen]=useState(false)
   const [historyExporting,setHistoryExporting]=useState(false)
   const [historyExportError,setHistoryExportError]=useState('')
@@ -929,7 +930,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const [approvalsShown,setApprovalsShown]=useState(25)
   useEffect(()=>setTasksShown(100),[taskWorkerId,taskUnit,taskState,taskSearch,taskOrder])
   useEffect(()=>setApprovalsShown(25),[approvalWorkerId,approvalUnit,approvalKind])
-  useEffect(()=>{setHistoryShown(100)},[historyWorkerId,historyUnit,historyFrom,historyTo,historyReview])
+  useEffect(()=>{setHistoryShown(100);setHistoryUnreportedShown(50)},[historyWorkerId,historyUnit,historyFrom,historyTo,historyReview])
 
   const refresh=async ()=>{
     // Ignore older in-flight responses after a newer role check has completed.
@@ -986,6 +987,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   }
   const reportTaskIds=new Set(historyData.time_entries.map(entry=>entry.task_id))
   const historyWithoutReport=historyData.tasks.filter(task=>!reportTaskIds.has(task.id))
+  const HistoryFilterWrap=focusedHistory?'details':'div'
+  const HistoryUnreportedWrap=focusedHistory?'details':'div'
   const allTasks=data.tasks||[]
   const taskCounts=summarizeTaskWorkflow(allTasks)
   const matchingTasks=selectManagerTasks(data,{
@@ -1306,16 +1309,25 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         defaultDate={assignmentDialogDate} defaultWorkerId={workerId}
         onSaved={refresh} onClose={()=>setAssignmentDialogDate('')}/>
     </dialog>}
-    {view==='history'&&<section className="report-panel">
-      <UnitHourSummary scope="admin" refreshRevision={refreshRevision}/>
-      <div className="report-panel-heading">
-        <h2>سابقه ساعات و خروجی</h2>
+    {view==='history'&&<section className={'report-panel'+(focusedHistory?' swtb22-history-focused':'')}>
+      {!focusedHistory&&<UnitHourSummary scope="admin" refreshRevision={refreshRevision}/>}
+      <div className="report-panel-heading swtb22-history-heading">
+        <div>
+         <h2>{focusedHistory?'سوابق و گزارش‌های مدیریتی':'سابقه ساعات و خروجی'}</h2>
+         {focusedHistory&&<p className="ow-muted">
+          مرور و خروجی فقط براساس سوابق مجازِ بارگذاری‌شده در همین صفحه انجام می‌شود.
+          آمار قطعی همه دوره‌ها و سهمیه نیمسال، منابع مستقل سرور هستند و با این فیلترها یکی نیستند.
+         </p>}
+        </div>
         <button className="report-btn report-btn--primary" type="button"
-          disabled={loading||invalidHistoryRange||(!historyData.tasks.length&&!historyData.time_entries.length)}
-          onClick={()=>exportOpsExcel(historyData,historyFiltersActive)}>
-          {historyFiltersActive?'خروجی Excel نتایج فیلتر':'خروجی Excel همه'}
+          disabled={loading||historyExporting||invalidHistoryRange||(!historyData.tasks.length&&!historyData.time_entries.length)}
+          aria-busy={historyExporting}
+          onClick={()=>{void runHistoryExport()}}>
+          {historyExporting?'در حال تهیه فایل Excel…':
+           historyFiltersActive?'خروجی Excel همین نتایج':'خروجی Excel سوابق بارگذاری‌شده'}
         </button>
       </div>
+      {historyExportError&&<p className="report-alert report-alert--error" role="alert">{historyExportError}</p>}
       <div className="ow-history-filter">
         <label className="report-field ow-worker-selector"><span>فیلتر بر اساس دانشجوکار</span>
           <select value={historyWorkerId} onChange={e=>setHistoryWorkerId(e.target.value)}>
@@ -1329,6 +1341,14 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
           <p className="ow-muted">فیلترها فقط سوابق و Excel را محدود می‌کنند و وضعیت حساب یا آمار کلی پرونده را تغییر نمی‌دهند.</p>
         </details>
       </div>
+      <HistoryFilterWrap {...(focusedHistory?{
+        className:'swtb22-history-filter-disclosure',
+        defaultOpen:Boolean(historyUnit||historyReview||historyFrom||historyTo),
+      }:{})}>
+       {focusedHistory&&<summary>
+        فیلترهای تکمیلی
+        {(historyUnit||historyReview||historyFrom||historyTo)&&' · فعال'}
+       </summary>}
       <div className="ow-history-extra" aria-label="فیلترهای گزارش مدیریتی">
         <label className="report-field"><span>واحد همکاری</span>
           <select value={historyUnit} onChange={e=>setHistoryFilter('historyUnit',e.target.value)}>
@@ -1356,6 +1376,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
             onClick={()=>setHistoryFilter('historyTo','')}>حذف تاریخ پایان</button>}
         </div>
       </div>
+      </HistoryFilterWrap>
       <div className="ow-history-filter-footer">
         <p className="ow-muted">
           {historyFiltersActive&&<>{n(historySummary.taskCount)} کار · {n(historySummary.reportCount)} گزارش</>}
