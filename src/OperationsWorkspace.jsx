@@ -814,7 +814,9 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const setWorkerId=value=>setNavigation(previous=>({...previous,workerId:value}))
   const focusedPresence=hideSectionTabs&&focusPresenceUIEnabled
   const [presenceEditingDate,setPresenceEditingDate]=useState('')
+  const [presenceSelectedDate,setPresenceSelectedDate]=useState(today())
   const openPersonPresence=(id,date)=>{
+    if(date)setPresenceSelectedDate(date)
     setPresenceEditingDate(date||'')
     setWorkerId(id)
   }
@@ -1188,6 +1190,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         onSaved={refresh} onPlanAssignment={setAssignmentDialogDate}/>:<TeamScheduleOverview
            data={data} todayIso={today()} onPlanAssignment={setAssignmentDialogDate}
            inlineManager={focusedPresence}
+           selectedDay={focusedPresence?presenceSelectedDate:''}
+           onSelectedDayChange={focusedPresence?setPresenceSelectedDate:null}
            onEditWorker={focusedPresence?openPersonPresence:null}/>}
 
     </section>}
