@@ -418,6 +418,7 @@ function CandidateCard({
   const [localUnit, localSetUnit] = useState(candidate.primary_unit)
   const [localOnboardingMode, localSetOnboardingMode] = useState('secure_link')
   const controlled=typeof onDraftField==='function'
+  const ControlsTag=controlled?'div':'details'
   const interview=controlled?(draftValues?.interview??candidate.interview_status??'pending'):localInterview
   const clearance=controlled?(draftValues?.clearance??candidate.clearance_status??'pending'):localClearance
   const email=controlled?(draftValues?.email??candidate.email??''):localEmail
@@ -451,8 +452,8 @@ function CandidateCard({
           {hasWorker ? (candidate.worker_state==='active'?'دانشجوکار فعال':'حساب دانشجوکار ایجادشده') : 'داوطلب'}
         </span>
       </div>
-      <details className="ops-candidate-controls">
-        <summary>{hasWorker?'پرونده حساب و دسترسی':eligible?'بررسی و فعال‌سازی':'جزئیات و بررسی پرونده'}</summary>
+      <ControlsTag className="ops-candidate-controls">
+        {!controlled&&<summary>{hasWorker?'پرونده حساب و دسترسی':eligible?'بررسی و فعال‌سازی':'جزئیات و بررسی پرونده'}</summary>}
       {!hasWorker && (
         <>
           <div className="ops-field-row ops-email-row">
@@ -541,7 +542,7 @@ function CandidateCard({
         </button>
         <small>لینک جدید به معنای الزام تعیین مجدد رمز در ورود بعدی است. فقط با درخواست دانشجو یا برای آزمون از این گزینه استفاده کنید.</small>
       </>}
-      </details>
+      </ControlsTag>
     </article>
   )
 }
@@ -759,6 +760,16 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
       {candidateView === 'report' && <ReportApp adminMode
         refreshRevision={refreshRevision + manualReportRevision} />}
       </>}
+      {managerShellEnabled&&adminSection==='work'&&navigation.workView==='inbox'&&
+       <section className="swtb22-manager-home-links" aria-label="مسیرهای سریع کار روزانه">
+        <div><h2>از کجا شروع کنم؟</h2>
+         <p>برای پیگیری روزانه، بخش موردنظر را انتخاب کنید. هر اقدام در فضای اختصاصی خودش انجام می‌شود.</p></div>
+        <div className="swtb22-manager-home-actions">
+         <button type="button" onClick={()=>navigateManager({section:'candidates',view:'applicants'})}>بررسی داوطلبان</button>
+         <button type="button" onClick={()=>navigateManager({section:'work',view:'tasks'})}>کارها و واگذاری</button>
+         <button type="button" onClick={()=>navigateManager({section:'work',view:'availability'})}>برنامه حضور</button>
+        </div>
+       </section>}
       {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation}
         refreshRevision={refreshRevision + manualWorkRevision}
         hideSectionTabs={managerShellEnabled} />}
