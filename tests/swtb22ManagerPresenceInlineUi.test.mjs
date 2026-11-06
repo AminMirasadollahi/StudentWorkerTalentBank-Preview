@@ -108,7 +108,10 @@ test('clicking worker/date edits only the selected person, not an arbitrary day 
  try{
   const actions=[...ui.host.querySelectorAll('.swtb22-presence-person-actions button')]
   assert.equal(actions.length,2)
-  await act(async()=>actions[0].click())
+  const firstA=actions.find(button=>button.closest('.ow-teamcal-person')?.textContent
+   .includes('دانشجوکار نمونه کتابخانه'))
+  assert.ok(firstA,'select a named worker, not an unstable task-priority list index')
+  await act(async()=>firstA.click())
   assert.deepEqual(ui.calls.edit,[{id:'FAKE-A',date:todayIso}])
   assert.deepEqual(ui.calls.assign,[])
   await act(async()=>btn(ui.host,'+ تعریف کار در این تاریخ').click())
