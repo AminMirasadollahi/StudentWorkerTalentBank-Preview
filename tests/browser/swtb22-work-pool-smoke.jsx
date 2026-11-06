@@ -17,6 +17,16 @@ import '../../src/manager-shell.css'
 globalThis.__qaGeneralOffers=[]
 globalThis.__qaDeskOffers=[]
 globalThis.__qaWriteAttempts=0
+// Additional D5 fake-only term access fixture; NEVER fetched from Supabase.
+globalThis.__qaTerm={id:'QA-TERM',label:'نیمسال نمونه نمایشی',state:'active'}
+globalThis.__qaTermAccess={ok:true,term_id:'QA-TERM',enforcement_mode:'observe',
+ active_workers:2,active_without_decision:1,active_not_eligible:0,
+ legacy_noneligible_planned_tasks:0,
+ workers:[
+  {worker_id:'QA-A',global_state:'active',eligibility:'unknown'},
+  {worker_id:'QA-B',global_state:'active',eligibility:'eligible'},
+ ],
+}
 // All data are synthetic, and the Vite plugin prevents access to live APIs.
 globalThis.__qaAdminWork={
  workers:[
@@ -31,7 +41,23 @@ globalThis.__qaAdminWork={
   {id:'QA-TASK-3',title:'بازبینی فهرست منابع نمونه',worker_id:'QA-A',unit:'library',
    planned_date:'2026-11-08',estimate_minutes:45,state:'completed',created_at:'2026-11-05T12:00:00Z'},
  ],
- weekly_slots:[{worker_id:'QA-A',weekday_iso:5,valid_from:'2026-10-01',valid_until:null,start_minute:480,end_minute:600}],exceptions:[],time_entries:[],profile_requests:[],approved_minutes_total:0,
+ weekly_slots:[{worker_id:'QA-A',weekday_iso:5,valid_from:'2026-10-01',valid_until:null,start_minute:480,end_minute:600}],
+ exceptions:[],
+ time_entries:[
+  {id:'QA-REPORT-A',task_id:'QA-TASK-1',worker_id:'QA-A',
+   review_state:'submitted',reported_minutes:60,work_date:'2026-11-06',
+   submitted_at:'2026-11-06T05:00:00Z'},
+  {id:'QA-REPORT-B',task_id:'QA-TASK-2',worker_id:'QA-B',
+   review_state:'submitted',reported_minutes:120,work_date:'2026-11-06',
+   submitted_at:'2026-11-06T06:00:00Z',extra_time_reason_code:'equipment_issue',
+   extra_time_reason_text:'تأخیر نمونه برای آزمون'},
+ ],
+ profile_requests:[
+  {id:'QA-PROFILE-R',worker_id:'QA-A',field_code:'major',
+   proposed_value:'رشته آزمایشی',reason:'درخواست ساختگی برای آزمون UX',
+   review_state:'pending'},
+ ],
+ approved_minutes_total:0,
 }
 const demoCandidates=[
  {id:'SYNTH_A',full_name:'داوطلب نمونه الف',major:'آموزش ابتدایی',entry_year:1404,
@@ -60,7 +86,7 @@ function Stage(){
    {navigation.section==='work'&&navigation.workView==='workPool'
     ?<WorkPoolManagerPanel activeKind={navigation.workPoolKind}
       onKindChange={kind=>setNavigation(v=>({...v,workPoolKind:kind}))}/>
-    :navigation.section==='work'&&['tasks','availability'].includes(navigation.workView)
+    :navigation.section==='work'&&['tasks','availability','inbox','approvals','profiles','termMemberships'].includes(navigation.workView)
      ?<AdminOperations navigation={navigation} setNavigation={setNavigation} hideSectionTabs/>
     :navigation.section==='candidates'&&navigation.candidateView==='applicants'
      ?<ManagerCandidatesWorkspace rows={demoCandidates} filter={navigation.candidateFilter}

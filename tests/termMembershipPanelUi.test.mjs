@@ -51,7 +51,7 @@ after(async()=>{
  for(const key of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT',
   '__t21term','__t21state','__t21writes','__t21readDenied','__t21writeDenied'])delete globalThis[key]
 })
-async function mount(){
+async function mount({focusedReview=false}={}){
  globalThis.__t21term=term
  globalThis.__t21state=fixture()
  globalThis.__t21writes=[]
@@ -62,6 +62,7 @@ async function mount(){
  const root=createRoot(host)
  await act(async()=>root.render(createElement(Panel,{
   workers:[{id:'FAKE-A',name:'آزمایش الف'},{id:'FAKE-B',name:'آزمایش ب'}],
+  focusedReview,
  })))
  return {host,teardown:async()=>{
   await act(async()=>root.unmount());host.remove()
@@ -125,6 +126,39 @@ test('failed authorized read hides roster rather than presenting stale state',as
   await click(findButton(/بازخوانی/,host))
   assert.match(host.textContent,/دریافت وضعیت مجوزها تأیید نشد/)
   assert.equal(host.querySelector('.ow-membership-table'),null)
+  assert.deepEqual(globalThis.__t21writes,[])
+ }finally{await teardown()}
+})
+
+test('D5 term roster filters authorized rows without any eligibility or enforcement write',async()=>{
+ const {host,teardown}=await mount({focusedReview:true})
+ try{
+  const field=host.querySelector('[aria-label="فیلتر مجوز همکاری نیمسال"]')
+  assert.ok(field)
+  await setValue(field,'unknown')
+  assert.equal(host.querySelectorAll('.ow-membership-table tbody tr').length,1)
+  assert.match(host.querySelector('.ow-membership-table tbody').textContent,/آزمایش الف/)
+  assert.deepEqual(globalThis.__t21writes,[])
+  const search=host.querySelector('[aria-label="جست‌وجوی نام دانشجوکار در مجوزهای نیمسال"]')
+  assert.ok(search)
+  await setValue(search,'نظیر ندارد')
+  assert.equal(host.querySelectorAll('.ow-membership-table tbody tr').length,0)
+  assert.match(host.textContent,/هیچ دانشجوکاری با این فیلتر/)
+  await click(findButton(/پاک‌کردن فیلتر/,host))
+  assert.equal(host.querySelectorAll('.ow-membership-table tbody tr').length,2)
+  assert.deepEqual(globalThis.__t21writes,[])
+ }finally{await teardown()}
+})
+test('D5 failed term read closes any stale open decision and leaves no actionable modal',async()=>{
+ const {host,teardown}=await mount({focusedReview:true})
+ try{
+  await click(findButton(/تعیین وضعیت/,host))
+  assert.ok(document.querySelector('dialog[open]'))
+  globalThis.__t21readDenied=true
+  await click(findButton(/بازخوانی/,host))
+  assert.match(host.textContent,/دریافت وضعیت مجوزها تأیید نشد/)
+  assert.equal(host.querySelector('.ow-membership-table'),null)
+  assert.equal(document.querySelector('dialog[open]'),null)
   assert.deepEqual(globalThis.__t21writes,[])
  }finally{await teardown()}
 })

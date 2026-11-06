@@ -21,6 +21,8 @@ import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 import TaskAssignmentEditor from './components/TaskAssignmentEditor'
 import TeamScheduleOverview from './components/TeamScheduleOverview'
 import TermBudgetPanel from './components/TermBudgetPanel'
+import FocusedReviewQueue from './components/FocusedReviewQueue'
+import {managerReviewItems} from './lib/managerReviewRows.mjs'
 // Load the optional manager surface ONLY after backend rollout explicitly enables it.
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
 // Worker view loads only on explicit team switch; never fetch admin operations.
@@ -52,6 +54,8 @@ const workPoolUIEnabled=import.meta.env?.VITE_SWTB21_WORK_POOL_UI!=='false'
 const focusTaskUIEnabled=import.meta.env?.VITE_SWTB22_TASKS_FOCUS_UI==='true'
 // D4 is a manager-only presentation refactor: legacy/worker calendars unchanged.
 const focusPresenceUIEnabled=import.meta.env?.VITE_SWTB22_PRESENCE_FOCUS_UI==='true'
+// D5 manager-only review UX; true on a separately reviewed Preview release.
+const focusDecisionsUIEnabled=import.meta.env?.VITE_SWTB22_REVIEW_FOCUS_UI==='true'
 
 /** Complete, current-scope server aggregate, independent of bounded task/history rows.
  * Fail closed to an explicit unavailable message instead of displaying false zero totals. */
@@ -518,7 +522,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate=''})
     </div>
   </div>
 }
-function ApprovalCard({entry,task,worker,onDone}) {
+function ApprovalCard({entry,task,worker,onDone,focused=false}) {
   const standard=Number(task?.estimate_minutes ?? entry.reported_minutes)
   const missingTask=!task
   const requested=Number(entry.reported_minutes)
@@ -552,6 +556,7 @@ function ApprovalCard({entry,task,worker,onDone}) {
       setError(readableError(e))
     }finally{setBusy(false)}
   }
+  const Detail=focused?'div':'details'
   return <article className="ow-item">
     <div className="ow-item-header">
       <strong>{task?.title||'کار مرتبط نامشخص'}</strong>
@@ -561,8 +566,8 @@ function ApprovalCard({entry,task,worker,onDone}) {
       {asksExtra&&<> · اضافه: {minutes(requested-standard)}</>}
     </small>
     {missingTask&&<p className="ow-warning" role="alert">کار مرتبط در اطلاعات فعلی موجود نیست؛ تصمیم‌گیری تا بررسی پرونده غیرفعال است.</p>}
-    <details className="ow-approval-detail">
-      <summary>بررسی جزئیات و ثبت تصمیم</summary>
+    <Detail className="ow-approval-detail">
+      {!focused&&<summary>بررسی جزئیات و ثبت تصمیم</summary>}
       <p>زمان استاندارد: <b>{missingTask?'نامشخص':minutes(standard)}</b> · زمان درخواستی: <b>{minutes(requested)}</b></p>
     {asksExtra&&<p className="ow-overtime-review">
       <b>علت درخواست اضافه:</b> {extraTimeReasons[entry.extra_time_reason_code]||'در گزارش قدیمی ثبت نشده'}
@@ -588,7 +593,7 @@ function ApprovalCard({entry,task,worker,onDone}) {
     </div>
     {notice&&<p role="status" className="ow-muted">{notice}</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
-    </details>
+    </Detail>
   </article>
 }
 async function exportOpsExcel(data, filteredToOneWorker=false) {
@@ -699,7 +704,7 @@ function ProfileChangeReview({request,worker,onDone}) {
    {error&&<p role="alert" className="report-alert report-alert--error">{error}</p>}
  </article>
 }
-function ManagerWorkerProfile({data,selectedId,onChange,onDone}) {
+function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=false}) {
   const workers=data.workers||[]
   const [query,setQuery]=useState('')
   const shownWorkers=workers.filter(w=>w.name?.toLocaleLowerCase('fa-IR')
@@ -715,7 +720,12 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone}) {
     &&r.review_state==='pending')
   const timeQueue=entries.filter(e=>e.review_state==='submitted')
   const taskById=new Map(tasks.map(t=>[t.id,t]))
-  return <section className="report-panel ow-profile-section">
+  const reviewItems=focusedReview?managerReviewItems({
+   timeEntries:timeQueue,profileChanges:changeQueue,
+   workers, tasks,formatDate:pretty,
+   formatUnit:unit=>unitLabels[unit]||'واحد نامشخص',
+  }):[]
+  return <section className={'report-panel ow-profile-section'+(focusedReview?' swtb22-profile-focus':'')}>
     <h2>پروفایل دانشجوکارها</h2>
     <div className="ow-profile-layout">
       <aside className="ow-people-directory" aria-label="فهرست دانشجوکارها">
@@ -769,7 +779,16 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone}) {
           {!entries.length&&<p className="ow-muted">گزارشی وجود ندارد.</p>}
         </div>
       </details>
-      {(changeQueue.length>0||timeQueue.length>0)&&<details open className="ow-profile-fold">
+      {(changeQueue.length>0||timeQueue.length>0)&&
+       (focusedReview?<div className="swtb22-profile-review">
+        <h4>درخواست‌های منتظر رسیدگی · {n(reviewItems.length)}</h4>
+        <FocusedReviewQueue items={reviewItems} label="رسیدگی به درخواست‌های این دانشجوکار"
+         renderReview={item=>item.kind==='profile'
+          ?<ProfileChangeReview key={item.key} request={item.request} worker={selected}
+            onDone={onDone}/>
+          :<ApprovalCard key={item.key} entry={item.entry} worker={selected}
+            task={item.task} onDone={onDone} focused/>}/>
+       </div>:<details open className="ow-profile-fold">
         <summary>نیازمند رسیدگی · {n(changeQueue.length+timeQueue.length)}</summary>
         <div className="ow-profile-action-list">
           {changeQueue.map(r=><ProfileChangeReview key={r.id} request={r}
@@ -777,7 +796,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone}) {
           {timeQueue.map(e=><ApprovalCard key={e.id} entry={e}
             worker={selected} task={taskById.get(e.task_id)} onDone={onDone}/>)}
         </div>
-      </details>}
+      </details>)}
       <details className="ow-profile-fold"><summary>وضعیت حساب · فقط مشاهده</summary>
         <WorkerLifecycleReadOnlyPreview worker={selected}/>
       </details>
@@ -929,6 +948,16 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const todayTasks=(data.tasks||[]).filter(t=>t.planned_date===today()&&t.state!=='cancelled')
   const pending=(data.time_entries||[]).filter(e=>e.review_state==='submitted')
   const pendingProfileChanges=(data.profile_requests||[]).filter(r=>r.review_state==='pending')
+  const focusedReview=hideSectionTabs&&focusDecisionsUIEnabled
+  const inboxReviewItems=focusedReview?managerReviewItems({
+    timeEntries:pending,profileChanges:pendingProfileChanges,
+    workers,tasks:allTasks,formatDate:pretty,
+    formatUnit:unit=>unitLabels[unit]||'واحد نامشخص',
+  }):[]
+  const approvalReviewItems=focusedReview?managerReviewItems({
+    timeEntries:visibleApprovals,workers,tasks:allTasks,formatDate:pretty,
+    formatUnit:unit=>unitLabels[unit]||'واحد نامشخص',mode:'time',
+  }):[]
   // All-time approved minutes use the authorized, uncapped backend aggregate.
   const approvedMinutes=data.approved_minutes_total??(data.time_entries||[])
     .filter(e=>e.review_state==='approved')
@@ -987,7 +1016,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
        onKindChange={kind=>setNavigation(previous=>({...previous,workPoolKind:kind}))}/>
     </Suspense>}
     {termMembershipUIEnabled&&view==='termMemberships'&&<Suspense fallback={<p className="ow-muted">در حال آماده‌سازی مجوزهای نیمسال…</p>}>
-      <TermMembershipPanel workers={workers} refreshRevision={refreshRevision}/>
+      <TermMembershipPanel workers={workers} refreshRevision={refreshRevision}
+       focusedReview={focusedReview}/>
     </Suspense>}
     {view==='inbox'&&<section className="report-panel">
       <div className="ow-presence-section-title ow-manager-inbox-heading">
@@ -998,13 +1028,20 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       </div>
       {pending.length===0&&pendingProfileChanges.length===0&&
         <p className="ow-muted">درخواستی برای رسیدگی وجود ندارد.</p>}
-      <div className="ow-inbox-items">
+      {focusedReview?<FocusedReviewQueue items={inboxReviewItems}
+       label="کارتابل تصمیم‌ها و گزارش‌های منتظر"
+       renderReview={item=>item.kind==='profile'
+        ?<ProfileChangeReview key={item.key} request={item.request}
+          worker={item.worker} onDone={refresh}/>
+        :<ApprovalCard key={item.key} entry={item.entry} task={item.task}
+          worker={item.worker} focused onDone={refresh}/>}/>
+       :<div className="ow-inbox-items">
         {pendingProfileChanges.map(r=><ProfileChangeReview key={r.id} request={r}
           worker={workers.find(w=>w.id===r.worker_id)} onDone={refresh}/>)}
         {pending.map(e=><ApprovalCard key={e.id} entry={e}
           task={taskById.get(e.task_id)} worker={workers.find(w=>w.id===e.worker_id)}
           onDone={refresh}/>)}
-      </div>
+      </div>}
     </section>}
     {view==='tasks'&&<>
       {!focusedTasks&&<section className="report-panel">
@@ -1152,14 +1189,19 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
           </select>
         </label>
       </div>
-      <div className="ow-list ow-approval-results">
+      {focusedReview?<FocusedReviewQueue items={approvalReviewItems.slice(0,approvalsShown)}
+        label="صف بررسی گزارش‌های ساعت"
+        emptyText={pending.length?'گزارشی مطابق فیلتر انتخاب‌شده وجود ندارد.':'گزارشی منتظر بررسی نیست.'}
+        renderReview={item=><ApprovalCard key={item.key} entry={item.entry}
+         task={item.task} worker={item.worker} onDone={refresh} focused/>}/>
+       :<div className="ow-list ow-approval-results">
         {visibleApprovals.slice(0,approvalsShown).map(e=><ApprovalCard key={e.id} entry={e}
           task={taskById.get(e.task_id)}
           worker={workers.find(w=>w.id===e.worker_id)} onDone={refresh}/>)}
         {!visibleApprovals.length&&<p className="ow-muted">
           {pending.length?'گزارشی با فیلتر انتخاب‌شده در صف وجود ندارد.':'گزارشی در صف بررسی وجود ندارد.'}
         </p>}
-      </div>
+      </div>}
       {visibleApprovals.length>approvalsShown&&<div className="ow-paged-more">
         <span className="ow-muted">نمایش {n(approvalsShown)} گزارش از {n(visibleApprovals.length)}</span>
         <button type="button" className="report-btn report-btn--light"
@@ -1197,7 +1239,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     </section>}
 
     {view==='profiles'&&<ManagerWorkerProfile data={data} selectedId={profileWorkerId}
-      onChange={setProfileWorkerId} onDone={refresh}/>}
+      onChange={setProfileWorkerId} onDone={refresh} focusedReview={focusedReview}/>} 
     {assignmentDialogDate&&<dialog ref={assignmentDialogRef} className="ow-assignment-dialog"
       onCancel={e=>{e.preventDefault();setAssignmentDialogDate('')}} aria-label="تعریف کار جدید در تقویم">
       <div className="ow-presence-section-title">
