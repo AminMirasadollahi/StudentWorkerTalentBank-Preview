@@ -2081,3 +2081,97 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .swtb22-work-pool .ow-work-pool-columns>.ow-work-pool-compose{padding:.46rem}
  .swtb22-work-pool-commands button{flex:1 1 9rem}
 }
+
+
+/* SWTB22-D3 — reversible, manager-only task review first. Dialog is only
+   exposed by an explicit action; legacy task assignment remains unchanged. */
+.ow-workspace .swtb22-task-directory{
+ min-width:0;display:grid;gap:.7rem;
+}
+.swtb22-task-heading{
+ align-items:center;flex-wrap:wrap;
+ gap:.5rem 1rem;margin:0;
+}
+.swtb22-task-heading>div:first-child{
+ flex:1 1 20rem;min-width:0;
+}
+.swtb22-task-heading p{
+ font-size:.8rem;color:#55727e;line-height:1.75;
+ margin:.15rem 0 0;
+}
+.swtb22-task-heading-actions{
+ display:flex;align-items:center;justify-content:flex-end;
+ gap:.65rem;flex-wrap:wrap;min-width:0;
+}
+.swtb22-task-heading-actions small{
+ color:#526e77;font-size:.76rem;white-space:nowrap;
+}
+.swtb22-task-heading-actions .report-btn{
+ min-height:2.65rem;
+}
+.swtb22-task-directory .ow-task-metrics{
+ margin:.1rem 0 .25rem;
+}
+.swtb22-task-directory .ow-list-filters{
+ border:1px solid #dae8eb;background:#f7fbfc;
+ border-radius:.7rem;padding:.65rem;gap:.55rem;
+}
+.swtb22-task-directory .ow-task-results{
+ display:grid;grid-template-columns:minmax(0,1fr);
+ gap:.46rem;margin-top:.15rem;
+}
+.swtb22-task-directory .ow-task-results>.ow-item{
+ width:100%;max-width:none;min-width:0;
+ border:1px solid #d9e6e9;background:#fcfefe;
+ border-radius:.65rem;padding:.74rem .85rem;
+}
+.swtb22-task-directory .ow-task-results>.ow-item:hover{
+ border-color:#acd2d3;background:#f7fbfb;
+}
+.swtb22-task-directory .ow-task-results .ow-item-header{
+ gap:.5rem;align-items:center;
+}
+.swtb22-task-directory .ow-task-results .ow-item-header strong{
+ font-size:.87rem;line-height:1.65;overflow-wrap:anywhere;
+}
+.swtb22-task-directory .ow-task-results .ow-item small{
+ line-height:1.7;overflow-wrap:anywhere;
+}
+.swtb22-task-directory .ow-task-detail>summary{
+ min-height:2rem;align-content:center;
+}
+.swtb22-task-editor-dialog{
+ width:min(96vw,64rem);max-height:90dvh;
+ padding:0;border:1px solid #cfdee2;
+ box-shadow:0 14px 55px #092b4250;
+}
+.swtb22-task-editor-dialog[open]{
+ display:grid;align-content:start;
+}
+.swtb22-task-editor-dialog-head{
+ display:flex;justify-content:space-between;
+ align-items:start;gap:.7rem;flex-wrap:wrap;
+ padding:1rem 1.2rem;background:#f5fafb;
+ border-bottom:1px solid #d8e6e9;
+}
+.swtb22-task-editor-dialog-head>div{flex:1 1 22rem;min-width:0}
+.swtb22-task-editor-dialog-head h2{
+ font-size:1.09rem;color:#153e50;margin:0;
+}
+.swtb22-task-editor-dialog-head p{
+ font-size:.78rem;line-height:1.75;
+ color:#5a7680;margin:.28rem 0 0;
+}
+.swtb22-task-editor-dialog>.ow-assignment-form{
+ padding:1rem 1.2rem;min-width:0;
+}
+.swtb22-task-editor-dialog :is(button,input,select,summary):focus-visible,
+.swtb22-task-directory :is(button,input,select,summary):focus-visible{
+ outline:3px solid #138982;outline-offset:2px;
+}
+@media(max-width:640px){
+ .swtb22-task-heading-actions{justify-content:stretch;width:100%}
+ .swtb22-task-heading-actions .report-btn{flex:1}
+ .swtb22-task-editor-dialog-head,
+ .swtb22-task-editor-dialog>.ow-assignment-form{padding:.75rem}
+}

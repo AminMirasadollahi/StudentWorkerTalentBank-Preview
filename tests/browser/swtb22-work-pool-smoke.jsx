@@ -4,6 +4,7 @@ import {createRoot} from 'react-dom/client'
 import ManagerWorkspaceNav from '../../src/components/ManagerWorkspaceNav.jsx'
 import WorkPoolManagerPanel from '../../src/components/WorkPoolManagerPanel.jsx'
 import ManagerCandidatesWorkspace from '../../src/components/ManagerCandidatesWorkspace.jsx'
+import {AdminOperations} from '../../src/OperationsWorkspace.jsx'
 import {currentManagerDestination,nextManagerNavigation} from '../../src/lib/managerWorkspaceNav.mjs'
 // Match global public entrypoint styles, including the historical html/body/#root overflow rule.
 import '../../src/typography.css'
@@ -16,6 +17,22 @@ import '../../src/manager-shell.css'
 globalThis.__qaGeneralOffers=[]
 globalThis.__qaDeskOffers=[]
 globalThis.__qaWriteAttempts=0
+// All data are synthetic, and the Vite plugin prevents access to live APIs.
+globalThis.__qaAdminWork={
+ workers:[
+  {id:'QA-A',name:'دانشجوکار نمونه کتابخانه',state:'active',unit:'library'},
+  {id:'QA-B',name:'دانشجوکار نمونه پژوهش',state:'active',unit:'research'},
+ ],
+ tasks:[
+  {id:'QA-TASK-1',title:'ثبت و دسته‌بندی کتاب‌های نمونه',worker_id:'QA-A',unit:'library',
+   planned_date:'2026-11-06',estimate_minutes:60,state:'assigned',created_at:'2026-11-05T10:00:00Z'},
+  {id:'QA-TASK-2',title:'گردآوری آمار کارگاه‌های نمونه',worker_id:'QA-B',unit:'research',
+   planned_date:'2026-11-07',estimate_minutes:90,state:'submitted',created_at:'2026-11-05T11:00:00Z'},
+  {id:'QA-TASK-3',title:'بازبینی فهرست منابع نمونه',worker_id:'QA-A',unit:'library',
+   planned_date:'2026-11-08',estimate_minutes:45,state:'completed',created_at:'2026-11-05T12:00:00Z'},
+ ],
+ weekly_slots:[],exceptions:[],time_entries:[],profile_requests:[],approved_minutes_total:0,
+}
 const demoCandidates=[
  {id:'SYNTH_A',full_name:'داوطلب نمونه الف',major:'آموزش ابتدایی',entry_year:1404,
   phone:'09123456780',primary_unit:'library',interview_status:'pending',clearance_status:'pending'},
@@ -43,6 +60,8 @@ function Stage(){
    {navigation.section==='work'&&navigation.workView==='workPool'
     ?<WorkPoolManagerPanel activeKind={navigation.workPoolKind}
       onKindChange={kind=>setNavigation(v=>({...v,workPoolKind:kind}))}/>
+    :navigation.section==='work'&&navigation.workView==='tasks'
+     ?<AdminOperations navigation={navigation} setNavigation={setNavigation} hideSectionTabs/>
     :navigation.section==='candidates'&&navigation.candidateView==='applicants'
      ?<ManagerCandidatesWorkspace rows={demoCandidates} filter={navigation.candidateFilter}
        search={navigation.candidateSearch} selectedId={navigation.candidateId}

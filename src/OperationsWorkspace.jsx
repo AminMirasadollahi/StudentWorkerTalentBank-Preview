@@ -47,6 +47,9 @@ const termMembershipUIEnabled=import.meta.env?.VITE_SWTB21_TERM_MEMBERSHIP_UI!==
 // zero offers and zero claims. Enable only the manager-authorized, worker-self
 // surfaces; keep emergency build-time UI kill switch without altering DB policy.
 const workPoolUIEnabled=import.meta.env?.VITE_SWTB21_WORK_POOL_UI!=='false'
+// SWTB22-D3 is a presentation-only, independently reversible manager release.
+// Legacy manager route and all TaskAssignmentEditor server guards remain unchanged.
+const focusTaskUIEnabled=import.meta.env?.VITE_SWTB22_TASKS_FOCUS_UI==='true'
 
 /** Complete, current-scope server aggregate, independent of bounded task/history rows.
  * Fail closed to an explicit unavailable message instead of displaying false zero totals. */
@@ -808,6 +811,33 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const [reason,setReason]=useState('')
   const [busy,setBusy]=useState(false)
   const [assignmentDialogDate,setAssignmentDialogDate]=useState('')
+  const focusedTasks=hideSectionTabs&&focusTaskUIEnabled
+  const [taskEditorOpen,setTaskEditorOpen]=useState(false)
+  const [taskEditorRevision,setTaskEditorRevision]=useState(0)
+  const taskEditorDialogRef=useRef(null)
+  const taskEditorOpenerRef=useRef(null)
+  const closeTaskEditor=(reset=false)=>{
+    const dialog=taskEditorDialogRef.current
+    if(dialog?.open){
+      if(typeof dialog.close==='function')dialog.close()
+      else dialog.removeAttribute('open')
+    }
+    setTaskEditorOpen(false)
+    if(reset)setTaskEditorRevision(v=>v+1)
+    taskEditorOpenerRef.current?.focus?.({preventScroll:true})
+  }
+  useEffect(()=>{
+    if(view!=='tasks'&&taskEditorOpen)setTaskEditorOpen(false)
+  },[view,taskEditorOpen])
+  useEffect(()=>{
+    const dialog=taskEditorDialogRef.current
+    if(!focusedTasks||view!=='tasks'||!dialog||!taskEditorOpen)return
+    if(!dialog.open){
+      if(typeof dialog.showModal==='function')dialog.showModal()
+      else dialog.setAttribute('open','')
+    }
+    dialog.querySelector('[data-swtb22-task-editor-heading]')?.focus?.({preventScroll:true})
+  },[view,focusedTasks,taskEditorOpen])
   const assignmentDialogRef=useRef(null)
   useEffect(()=>{
     const dialog=assignmentDialogRef.current
@@ -845,6 +875,9 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       setData({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       setReadFailed(true)
       setAssignmentDialogDate('')
+      // Drop any stale privileged draft after authorization/read rejection.
+      setTaskEditorOpen(false)
+      setTaskEditorRevision(v=>v+1)
       setError(readableError(e))
       return false
     }finally{if(sequence===readSequence.current)setLoading(false)}
@@ -943,7 +976,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         <h2>کارتابل رسیدگی</h2>
         <small>{n(pending.length)} گزارش · {n(pendingProfileChanges.length)} درخواست اصلاح</small>
         <button type="button" className="report-btn report-btn--light"
-          onClick={()=>setView('tasks')}>+ واگذاری کار جدید</button>
+          onClick={()=>{setView('tasks');if(focusedTasks&&!loading&&active.length>0)setTaskEditorOpen(true)}}>+ واگذاری کار جدید</button>
       </div>
       {pending.length===0&&pendingProfileChanges.length===0&&
         <p className="ow-muted">درخواستی برای رسیدگی وجود ندارد.</p>}
@@ -956,16 +989,26 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       </div>
     </section>}
     {view==='tasks'&&<>
-      <section className="report-panel">
+      {!focusedTasks&&<section className="report-panel">
         <h2>واگذاری کار</h2>
         <TaskAssignmentEditor workers={active} data={data}
           defaultWorkerId={workerId} defaultDate={date} onSaved={refresh}/>
-      </section>
-      <section className="report-panel">
-        <div className="report-panel-heading">
-          <h2>کارهای ثبت‌شده</h2>
-          <small>{n(matchingTasks.length)} از {n(taskCounts.total)} کار</small>
+      </section>}
+      <section className={'report-panel'+(focusedTasks?' swtb22-task-directory':'')}>
+        <div className="report-panel-heading swtb22-task-heading">
+          <div><h2>کارهای ثبت‌شده</h2>
+           {focusedTasks&&<p>مرور و پیگیری کارها در این صفحه؛ واگذاری مستقیم فقط هنگام درخواست شما باز می‌شود.</p>}
+          </div>
+          <div className="swtb22-task-heading-actions">
+           <small>{n(matchingTasks.length)} از {n(taskCounts.total)} کار</small>
+           {focusedTasks&&<button type="button" ref={taskEditorOpenerRef}
+             className="report-btn report-btn--primary"
+             disabled={loading||active.length===0} aria-haspopup="dialog"
+             aria-controls="swtb22-task-assign-dialog"
+             onClick={()=>setTaskEditorOpen(true)}>+ واگذاری کار جدید</button>}
+          </div>
         </div>
+        {focusedTasks&&active.length===0&&<p className="ow-muted" role="status">برای واگذاری مستقیم، ابتدا باید دست‌کم یک دانشجوکار فعال وجود داشته باشد.</p>}
         <div className="ow-task-metrics" aria-label="خلاصه وضعیت کارهای ثبت‌شده">
           <span>باز: <b>{n(taskCounts.open)}</b></span>
           <span>منتظر بررسی: <b>{n(taskCounts.waiting)}</b></span>
@@ -1038,6 +1081,24 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
             onClick={()=>setTasksShown(count=>count+100)}>نمایش ۱۰۰ کار بیشتر</button>
         </div>}
       </section>
+      {focusedTasks&&<dialog id="swtb22-task-assign-dialog"
+       ref={taskEditorDialogRef} className="ow-assignment-dialog swtb22-task-editor-dialog"
+       aria-labelledby="swtb22-task-editor-heading"
+       onCancel={event=>{event.preventDefault();closeTaskEditor()}}
+       onClose={()=>{setTaskEditorOpen(false);taskEditorOpenerRef.current?.focus?.({preventScroll:true})}}>
+       <div className="swtb22-task-editor-dialog-head">
+        <div><h2 id="swtb22-task-editor-heading" tabIndex={-1}
+         data-swtb22-task-editor-heading>واگذاری مستقیم کار جدید</h2>
+         <p>این فرم برای واگذاری به دانشجوکاران مشخص است؛ فرصت‌های انتخاب آزاد در «مخزن فرصت‌های کاری» منتشر می‌شوند.</p>
+        </div>
+        <button type="button" className="report-btn report-btn--light"
+         onClick={()=>closeTaskEditor()}>بستن و حفظ پیش‌نویس</button>
+       </div>
+       <TaskAssignmentEditor key={taskEditorRevision}
+        workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
+        onSaved={refresh} onCancel={()=>closeTaskEditor()}
+        onClose={()=>closeTaskEditor(true)}/>
+      </dialog>}
     </>}
 
     {view==='approvals'&&<section className="report-panel">
