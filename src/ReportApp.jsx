@@ -173,9 +173,10 @@ export default function ReportApp({ adminMode = false, refreshRevision = 0 }) {
     const sequence = ++requestSeq.current
     setLoading(true)
     setError('')
-    // A previously authorized report must never remain visible after an
-    // unsuccessful role-sensitive refresh.
-    if (adminMode) { setData(null); setDetail(null) }
+    // Revalidate every report read. Legacy bearer-code access is revocable too:
+    // never expose previously fetched student PII while a new read is pending.
+    setData(null)
+    setDetail(null)
     try {
       const result = adminMode
         ? await getAdminStudentWorkerReport(nextFilters)
@@ -192,10 +193,12 @@ export default function ReportApp({ adminMode = false, refreshRevision = 0 }) {
     } catch (caught) {
       if (sequence !== requestSeq.current) return
       setError(caught instanceof Error ? caught.message : 'دریافت گزارش با خطا مواجه شد.')
-      if (adminMode) {
-        setData(null)
-        setDetail(null)
-      } else if (!authorized) {
+      // Both authenticated-manager and legacy code-only readers fail closed.
+      // A denied/failed refresh must hide previously loaded personal data.
+      setData(null)
+      setDetail(null)
+      if (!adminMode) {
+        setAuthorized(false)
         try { sessionStorage.removeItem(REPORT_SESSION_KEY) } catch { /* ignore */ }
       }
     } finally {
@@ -232,6 +235,9 @@ export default function ReportApp({ adminMode = false, refreshRevision = 0 }) {
   }
 
   const logout = () => {
+    // A reply already in flight must never reauthorize the legacy report.
+    requestSeq.current += 1
+    setLoading(false)
     try { sessionStorage.removeItem(REPORT_SESSION_KEY) } catch { /* ignore */ }
     setAccessCode('')
     setAuthorized(false)
@@ -264,6 +270,23 @@ export default function ReportApp({ adminMode = false, refreshRevision = 0 }) {
         {!loading && <button type="button" className="report-btn report-btn--light"
           onClick={() => void loadReport('', filters)}>تلاش مجدد</button>}
       </section>
+    )
+  }
+
+  if (!adminMode && authorized && !data) {
+    // Do not render stale rows, filters or zero-valued KPIs during refresh.
+    // Keep an explicit logout affordance even if the request hangs.
+    return (
+      <main className="report-shell report-shell--login" dir="rtl">
+        <section className="report-login-card">
+          <h1>بررسی دوباره دسترسی گزارش‌ها</h1>
+          <p role="status">
+            در حال دریافت امن گزارش‌ها… اطلاعات قبلی تا پایان بررسی پنهان هستند.
+          </p>
+          <button type="button" className="report-btn report-btn--ghost"
+            onClick={logout}>خروج از گزارش‌ها</button>
+        </section>
+      </main>
     )
   }
 
