@@ -1,6 +1,7 @@
 import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react'
 // Hidden until audited D2A+D2B database rollout.
 const deskPoolUIEnabled=import.meta.env?.VITE_SWTB21_DESK_POOL_UI!=='false'
+const focusUIEnabled=import.meta.env?.VITE_SWTB22_WORK_POOL_FOCUS_UI==='true'
 const DeskWorkPoolManagerSection=lazy(()=>import('./DeskWorkPoolManagerSection'))
 import JalaliDatePicker from './JalaliDatePicker'
 import {plusIsoDays} from '../lib/persianMonthCalendar.mjs'
@@ -19,9 +20,30 @@ const todayISO=()=>{
  const part=k=>pieces.find(p=>p.type===k)?.value||''
  return part('year')+'-'+part('month')+'-'+part('day')
 }
-export default function WorkPoolManagerPanel({refreshRevision=0}){
+export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='general',onKindChange}){
  const today=todayISO()
  const [revision,setRevision]=useState(0)
+ const [editorMode,setEditorMode]=useState('')
+ const editorRootRef=useRef(null)
+ const previousEditorMode=useRef('')
+ useEffect(()=>{
+  if(!focusUIEnabled)return
+  const old=previousEditorMode.current
+  previousEditorMode.current=editorMode
+  if(editorMode){
+   const summary=editorRootRef.current?.querySelector('details[open] summary')
+   summary?.focus({preventScroll:true})
+   summary?.scrollIntoView?.({block:'nearest'})
+  }else if(old){
+   document.getElementById('swtb22-general-'+old+'-open')?.focus({preventScroll:true})
+  }
+ },[editorMode])
+ const [localKind,setLocalKind]=useState(activeKind)
+ const kind=onKindChange?activeKind:localKind
+ const [deskVisited,setDeskVisited]=useState(activeKind==='desk')
+ const selectKind=next=>{setLocalKind(next);onKindChange?.(next);
+  if(next==='desk')setDeskVisited(true)}
+ useEffect(()=>{if(kind==='desk')setDeskVisited(true)},[kind])
  const [snapshot,setSnapshot]=useState({status:'loading',terms:[],items:null})
  const [template,setTemplate]=useState({unit:'library',title:'',
   description:'',instructions:'',minutes:'60',priority:'3'})
@@ -76,7 +98,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0}){
    unit:template.unit,title:template.title.trim(),description:template.description.trim(),
    privateInstructions:template.instructions.trim(),minutes:template.minutes,
    priority:template.priority,
-  }),()=>setTemplate({unit:'library',title:'',description:'',instructions:'',minutes:'60',priority:'3'}))
+  }),()=>{setTemplate({unit:'library',title:'',description:'',instructions:'',minutes:'60',priority:'3'});if(focusUIEnabled)setEditorMode('')})
  }
  const createOffer=event=>{
   event.preventDefault()
@@ -84,7 +106,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0}){
   void run('opportunity',()=>createWorkOpportunity({
    templateId:offer.templateId,termId:offer.termId,date:offer.date,
    capacity:offer.capacity,claimDeadline:offer.deadline||null,
-  }),()=>setOffer(old=>({...old,templateId:'',capacity:'1',deadline:''})))
+  }),()=>{setOffer(old=>({...old,templateId:'',capacity:'1',deadline:''}));if(focusUIEnabled)setEditorMode('')})
  }
  const transition=(id,state,why=null)=>{
   void run('state:'+id,()=>setWorkOpportunityState({
@@ -97,26 +119,12 @@ export default function WorkPoolManagerPanel({refreshRevision=0}){
  const ordered=opportunities.slice().sort((a,b)=>
   (a.date||'').localeCompare(b.date||'')||String(a.id).localeCompare(String(b.id)))
  const formDisabled=busy!==''||uncertain||snapshot.status!=='ready'
- return <section className="report-panel ow-work-pool" aria-label="مدیریت مخزن وظایف">
-  <div className="report-panel-heading">
-   <div><h2>مخزن وظایف و فرصت‌های کاری</h2>
-    <p className="ow-muted">الگوهای کار مستقل از نوبت‌های تاریخ‌دارند. فقط فرصت منتشرشده می‌تواند توسط دانشجوکار واجد شرایط انتخاب شود.</p>
-   </div>
-   <button type="button" className="report-btn report-btn--light"
-    onClick={()=>{setUncertain(false);setRevision(x=>x+1)}} disabled={busy!==''}>
-    بازخوانی</button>
-  </div>
-  <p className="ow-compact-hint">{deskPoolUIEnabled?'فرصت‌های عمومی در این بخش و نوبت‌های زمان‌دار کتابخانه در بخش بعدی همین صفحه مدیریت می‌شوند.':'این بخش فقط برای کارهای عمومی است. نوبت‌های زمان‌دار کتابخانه، کار گروهی و درخواست‌های نیازمند تأیید مدیر همچنان از مسیرهای تخصصی خود انجام می‌شوند.'} انتخاب کار، ساعت تأییدشده ایجاد نمی‌کند.</p>
-  {notice&&<p role={uncertain?'alert':'status'} className={uncertain?'report-alert report-alert--error':'ops-alert-success'}>{notice}</p>}
-  {snapshot.status==='loading'&&<p role="status" className="ow-muted">در حال دریافت الگوها و فرصت‌ها…</p>}
-  {snapshot.status==='error'&&<div role="alert" className="report-alert report-alert--error">اطلاعات مخزن در دسترس نیست. امکان ثبت تا بازخوانی موفق متوقف است.</div>}
-  {snapshot.status==='ready'&&<div className={`ow-work-pool-columns${ordered.length===0?' ow-work-pool-columns--empty':''}`}>
-   <div className="ow-work-pool-compose">
+ const editorSurface=(<div key="editor" className="ow-work-pool-compose" ref={editorRootRef}>
     {ordered.length===0&&<p className="ow-work-pool-workflow" aria-label="مراحل آماده‌سازی فرصت عمومی">
      <span>۱. تعریف الگو</span><span>۲. ساخت پیش‌نویس</span><span>۳. انتشار توسط مدیر</span>
     </p>}
-    <details className="ow-work-pool-editor">
-     <summary>+ تعریف الگوی کار</summary>
+    <details className="ow-work-pool-editor" open={focusUIEnabled?editorMode==='template':undefined}>
+     <summary onClick={e=>{if(focusUIEnabled){e.preventDefault();setEditorMode(v=>v==='template'?'':'template')}}}>+ تعریف الگوی کار</summary>
      <form className="ow-compact-form" onSubmit={createTemplate}>
       <label className="report-field"><span>واحد انجام کار</span>
        <select value={template.unit} disabled={formDisabled} onChange={e=>setTemplate(v=>({...v,unit:e.target.value}))}>
@@ -151,8 +159,8 @@ export default function WorkPoolManagerPanel({refreshRevision=0}){
        {busy==='template'?'در حال ثبت…':'ثبت الگوی کار'}</button>
      </form>
     </details>
-    <details className="ow-work-pool-editor">
-     <summary>+ تعریف فرصت کاری در تاریخ مشخص</summary>
+    <details className="ow-work-pool-editor" open={focusUIEnabled?editorMode==='opportunity':undefined}>
+     <summary onClick={e=>{if(focusUIEnabled){e.preventDefault();setEditorMode(v=>v==='opportunity'?'':'opportunity')}}}>+ تعریف فرصت کاری در تاریخ مشخص</summary>
      <form className="ow-compact-form" onSubmit={createOffer}>
       <label className="report-field"><span>الگوی کار</span>
        <select required value={offer.templateId} disabled={formDisabled} onChange={e=>setOffer(v=>({...v,templateId:e.target.value}))}>
@@ -186,8 +194,8 @@ export default function WorkPoolManagerPanel({refreshRevision=0}){
        type="submit">{busy==='opportunity'?'در حال ثبت…':'ساخت پیش‌نویس فرصت'}</button>
      </form>
     </details>
-   </div>
-   <div className="ow-work-pool-list">
+   </div>)
+ const listSurface=(<div key="list" className="ow-work-pool-list">
     <h3>فرصت‌های عمومی <small>({fa.format(ordered.length)})</small></h3>
     {!ordered.length&&<div className="ow-work-pool-empty" role="status">
      <strong>هنوز فرصتی برای این بازه تعریف نشده است.</strong>
@@ -226,10 +234,38 @@ export default function WorkPoolManagerPanel({refreshRevision=0}){
       </div>}
      </article>
     })}
+   </div>)
+ return <section className={'report-panel ow-work-pool'+(focusUIEnabled?' swtb22-work-pool':'')} aria-label="مدیریت مخزن وظایف">
+  <div className="report-panel-heading">
+   <div><h2>مخزن وظایف و فرصت‌های کاری</h2>
+    <p className="ow-muted">الگوهای کار مستقل از نوبت‌های تاریخ‌دارند. فقط فرصت منتشرشده می‌تواند توسط دانشجوکار واجد شرایط انتخاب شود.</p>
    </div>
+   <button type="button" className="report-btn report-btn--light"
+    onClick={()=>{setUncertain(false);setRevision(x=>x+1)}} disabled={busy!==''}>
+    بازخوانی</button>
+  </div>
+  {focusUIEnabled&&deskPoolUIEnabled&&<div className="swtb22-kind-switch" role="group" aria-label="نوع فرصت کاری">
+   <button type="button" aria-pressed={kind==='general'} onClick={()=>selectKind('general')}>فرصت‌های عمومی</button>
+   <button type="button" aria-pressed={kind==='desk'} onClick={()=>selectKind('desk')}>نوبت‌های زمان‌دار کتابخانه</button>
   </div>}
-  {deskPoolUIEnabled&&<Suspense fallback={<p role="status">در حال آماده‌سازی نوبت‌های کتابخانه…</p>}>
+  <div className="swtb22-work-pool-kind-view" hidden={focusUIEnabled&&kind==='desk'}>
+  <p className="ow-compact-hint">{deskPoolUIEnabled?'فرصت‌های عمومی در این بخش و نوبت‌های زمان‌دار کتابخانه در بخش بعدی همین صفحه مدیریت می‌شوند.':'این بخش فقط برای کارهای عمومی است. نوبت‌های زمان‌دار کتابخانه، کار گروهی و درخواست‌های نیازمند تأیید مدیر همچنان از مسیرهای تخصصی خود انجام می‌شوند.'} انتخاب کار، ساعت تأییدشده ایجاد نمی‌کند.</p>
+  {notice&&<p role={uncertain?'alert':'status'} className={uncertain?'report-alert report-alert--error':'ops-alert-success'}>{notice}</p>}
+  {snapshot.status==='loading'&&<p role="status" className="ow-muted">در حال دریافت الگوها و فرصت‌ها…</p>}
+  {snapshot.status==='error'&&<div role="alert" className="report-alert report-alert--error">اطلاعات مخزن در دسترس نیست. امکان ثبت تا بازخوانی موفق متوقف است.</div>}
+  {snapshot.status==='ready'&&<div className={`ow-work-pool-columns${ordered.length===0?' ow-work-pool-columns--empty':''}`}>
+   {focusUIEnabled&&<div className="swtb22-work-pool-commands" role="group" aria-label="ساخت فرصت عمومی">
+    <button type="button" className="report-btn report-btn--primary" id="swtb22-general-template-open" onClick={()=>setEditorMode('template')}>تعریف الگوی کار</button>
+    <button type="button" className="report-btn report-btn--light" id="swtb22-general-opportunity-open" disabled={!templates.some(t=>t.kind==='general'&&t.state==='active')} onClick={()=>setEditorMode('opportunity')}>ساخت فرصت تاریخ‌دار</button>
+    {!templates.some(t=>t.kind==='general'&&t.state==='active')&&<small>برای ساخت فرصت، ابتدا یک الگوی فعال تعریف کنید.</small>}
+   </div>}
+   {focusUIEnabled?(editorMode?<>{editorSurface}{listSurface}</>:<>{listSurface}{editorSurface}</>):<>{editorSurface}{listSurface}</>}
+  </div>}
+  </div>
+  {deskPoolUIEnabled&&(!focusUIEnabled||deskVisited)&&<div className="swtb22-work-pool-kind-view" hidden={focusUIEnabled&&kind!=='desk'}>
+   <Suspense fallback={<p role="status">در حال آماده‌سازی نوبت‌های کتابخانه…</p>}>
     <DeskWorkPoolManagerSection refreshRevision={refreshRevision}/>
-  </Suspense>}
+  </Suspense>
+  </div>}
  </section>
 }

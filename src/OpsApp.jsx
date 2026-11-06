@@ -44,6 +44,7 @@ const initialAdminNavigation = () => ({
   candidateView: 'applicants',
   candidateFilter: 'all',
   workView: 'tasks',
+  workPoolKind: 'general',
   workerId: '',
   taskWorkerId: '',
   taskUnit: '',

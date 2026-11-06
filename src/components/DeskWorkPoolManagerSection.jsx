@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react'
 import JalaliDatePicker from './JalaliDatePicker'
+const focusUIEnabled=import.meta.env?.VITE_SWTB22_WORK_POOL_FOCUS_UI==='true'
 import {plusIsoDays} from '../lib/persianMonthCalendar.mjs'
 import {getOperationsTermDashboard,getManagerWorkPool,getManagerDeskWorkPool,
  createDeskWorkTemplate,createDeskWorkOffer,setDeskWorkOfferState} from '../lib/operationsV2'
@@ -28,6 +29,21 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0}){
  const [offer,setOffer]=useState({templateId:'',termId:'',date:plusIsoDays(todayTehran(),7),
   start:'08:00',end:'09:00',capacity:'1',deadline:''})
  const [reason,setReason]=useState('')
+ const [editorMode,setEditorMode]=useState('')
+ const editorRootRef=useRef(null)
+ const previousEditorMode=useRef('')
+ useEffect(()=>{
+  if(!focusUIEnabled)return
+  const old=previousEditorMode.current
+  previousEditorMode.current=editorMode
+  if(editorMode){
+   const summary=editorRootRef.current?.querySelector('details[open] summary')
+   summary?.focus({preventScroll:true})
+   summary?.scrollIntoView?.({block:'nearest'})
+  }else if(old){
+   document.getElementById('swtb22-desk-'+old+'-open')?.focus({preventScroll:true})
+  }
+ },[editorMode])
  const [closing,setClosing]=useState('')
  const [busy,setBusy]=useState(false)
  const [uncertain,setUncertain]=useState(false)
@@ -82,7 +98,7 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0}){
   void submit('template',()=>createDeskWorkTemplate({
    title:draft.title.trim(),description:draft.description.trim(),
    privateInstructions:draft.instructions,minutes:draft.minutes,priority:draft.priority,
-  }),()=>setDraft({title:'',description:'',instructions:'',minutes:'60',priority:'3'}))
+  }),()=>{setDraft({title:'',description:'',instructions:'',minutes:'60',priority:'3'});if(focusUIEnabled)setEditorMode('')})
  }
  const createOffer=e=>{
   e.preventDefault()
@@ -96,31 +112,17 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0}){
   void submit('offer',()=>createDeskWorkOffer({
    templateId:offer.templateId,termId:offer.termId,date:offer.date,
    start,end,capacity:offer.capacity,deadline:offer.deadline||null,
-  }),()=>setOffer(p=>({...p,templateId:'',capacity:'1',deadline:''})))
+  }),()=>{setOffer(p=>({...p,templateId:'',capacity:'1',deadline:''}));if(focusUIEnabled)setEditorMode('')})
  }
  const change=(id,state,why=null)=>
   void submit('state',()=>setDeskWorkOfferState({offerId:id,state,reason:why}),
   ()=>{setClosing('');setReason('')})
- return <section className="ow-desk-pool-block" aria-label="نوبت‌های زمان‌دار کتابخانه">
-  <div className="ow-desk-pool-heading">
-   <div><h3>نوبت‌های میز کتابخانه</h3>
-    <p className="ow-muted">هر نوبت، زمان شروع و پایان مشخص دارد. ظرفیت دو نفر در کل میز کتابخانه محاسبه می‌شود، نه فقط در یک فرصت کاری.</p>
-   </div>
-   <button type="button" className="ow-mini-btn" disabled={busy}
-    onClick={()=>{setUncertain(false);setRevision(x=>x+1)}}>
-    بازخوانی نوبت‌ها</button>
-  </div>
-  {notice&&<div className={uncertain?'report-alert report-alert--error':'ops-alert-success'}
-    role={uncertain?'alert':'status'}>{notice}</div>}
-  {view.status==='loading'&&<p role="status">در حال خواندن نوبت‌ها…</p>}
-  {view.status==='error'&&<p role="alert" className="report-alert report-alert--error">دریافت نوبت‌های کتابخانه موفق نبود؛ ثبت و انتشار غیرفعال است.</p>}
-  {view.status==='ready'&&<div className={`ow-work-pool-columns${view.offers.length===0?' ow-work-pool-columns--empty':''}`}>
-   <div className="ow-work-pool-compose">
+ const editorSurface=(<div key="editor" className="ow-work-pool-compose" ref={editorRootRef}>
     {view.offers.length===0&&<p className="ow-work-pool-workflow" aria-label="مراحل آماده‌سازی نوبت کتابخانه">
      <span>۱. تعریف الگوی نوبت</span><span>۲. تعیین تاریخ و ساعت</span><span>۳. انتشار توسط مدیر</span>
     </p>}
-    <details className="ow-work-pool-editor">
-     <summary>+ تعریف الگوی نوبت کتابخانه</summary>
+    <details className="ow-work-pool-editor" open={focusUIEnabled?editorMode==='template':undefined}>
+     <summary onClick={e=>{if(focusUIEnabled){e.preventDefault();setEditorMode(v=>v==='template'?'':'template')}}}>+ تعریف الگوی نوبت کتابخانه</summary>
      <form className="ow-compact-form" onSubmit={createTemplate}>
       <label className="report-field"><span>عنوان قابل مشاهده</span>
        <input required minLength={3} maxLength={160} value={draft.title}
@@ -151,8 +153,8 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0}){
        ثبت الگوی نوبت</button>
      </form>
     </details>
-    <details className="ow-work-pool-editor">
-     <summary>+ تعریف فرصت نوبت تاریخ‌دار</summary>
+    <details className="ow-work-pool-editor" open={focusUIEnabled?editorMode==='offer':undefined}>
+     <summary onClick={e=>{if(focusUIEnabled){e.preventDefault();setEditorMode(v=>v==='offer'?'':'offer')}}}>+ تعریف فرصت نوبت تاریخ‌دار</summary>
      <form className="ow-compact-form" onSubmit={createOffer}>
       <label className="report-field"><span>الگوی نوبت</span>
        <select value={offer.templateId} required disabled={inactive}
@@ -199,8 +201,8 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0}){
        ساخت پیش‌نویس نوبت</button>
      </form>
     </details>
-   </div>
-   <div className="ow-work-pool-list">
+   </div>)
+ const listSurface=(<div key="list" className="ow-work-pool-list">
     <h4>فرصت‌های نوبت کتابخانه ({fa.format(view.offers.length)})</h4>
     {!view.offers.length&&<div className="ow-work-pool-empty" role="status">
      <strong>هنوز نوبتی منتشر یا تعریف نشده است.</strong>
@@ -235,7 +237,27 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0}){
       </div>
      </div>}
     </article>)}
+   </div>)
+ return <section className="ow-desk-pool-block" aria-label="نوبت‌های زمان‌دار کتابخانه">
+  <div className="ow-desk-pool-heading">
+   <div><h3>نوبت‌های میز کتابخانه</h3>
+    <p className="ow-muted">هر نوبت، زمان شروع و پایان مشخص دارد. ظرفیت دو نفر در کل میز کتابخانه محاسبه می‌شود، نه فقط در یک فرصت کاری.</p>
    </div>
+   <button type="button" className="ow-mini-btn" disabled={busy}
+    onClick={()=>{setUncertain(false);setRevision(x=>x+1)}}>
+    بازخوانی نوبت‌ها</button>
+  </div>
+  {notice&&<div className={uncertain?'report-alert report-alert--error':'ops-alert-success'}
+    role={uncertain?'alert':'status'}>{notice}</div>}
+  {view.status==='loading'&&<p role="status">در حال خواندن نوبت‌ها…</p>}
+  {view.status==='error'&&<p role="alert" className="report-alert report-alert--error">دریافت نوبت‌های کتابخانه موفق نبود؛ ثبت و انتشار غیرفعال است.</p>}
+  {view.status==='ready'&&<div className={`ow-work-pool-columns${view.offers.length===0?' ow-work-pool-columns--empty':''}`}>
+   {focusUIEnabled&&<div className="swtb22-work-pool-commands" role="group" aria-label="ساخت نوبت کتابخانه">
+    <button type="button" className="report-btn report-btn--primary" id="swtb22-desk-template-open" onClick={()=>setEditorMode('template')}>تعریف الگوی نوبت</button>
+    <button type="button" className="report-btn report-btn--light" id="swtb22-desk-offer-open" disabled={!view.templates.length} onClick={()=>setEditorMode('offer')}>ساخت نوبت تاریخ‌دار</button>
+    {!view.templates.length&&<small>ابتدا الگوی نوبت فعال تعریف کنید؛ سپس تاریخ و ساعت را مشخص کنید.</small>}
+   </div>}
+   {focusUIEnabled?(editorMode?<>{editorSurface}{listSurface}</>:<>{listSurface}{editorSurface}</>):<>{editorSurface}{listSurface}</>}
   </div>}
  </section>
 }
