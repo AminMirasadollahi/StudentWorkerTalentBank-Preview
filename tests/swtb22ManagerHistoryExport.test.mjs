@@ -109,7 +109,9 @@ test('text cells remain data, never formulas or silently formatted as numeric mi
  assert.equal(workbook.getWorksheet(2).rowCount,projection.records.length+1)
  assert.equal(workbook.getWorksheet(2).columnCount,MANAGER_HISTORY_COLUMNS.length)
  const buffer=await workbook.xlsx.writeBuffer()
- const verify=new ExcelJS.Workbook()
+ const Workbook=ExcelJS.Workbook||ExcelJS.default?.Workbook
+ assert.equal(typeof Workbook,'function')
+ const verify=new Workbook()
  await verify.xlsx.load(buffer)
  const sheet=verify.getWorksheet('ریز سوابق')
  const actual=[]
