@@ -1994,3 +1994,89 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-work-pool-workflow {gap:.3rem}
  .ow-work-pool-workflow span {min-height:1.8rem}
 }
+
+
+/* SWTB22-C: opt-in, single-surface manager Work Pool.
+   List-first *DOM* order, one visible editor, no CSS visual reordering
+   of interactive controls; the original D1/D2 UX remains the default. */
+.swtb22-work-pool{display:grid;gap:.82rem}
+.swtb22-work-pool-kind-view[hidden]{display:none!important}
+.swtb22-kind-switch{
+ display:inline-flex;flex-wrap:wrap;gap:.26rem;
+ width:fit-content;max-width:100%;
+ border:1px solid #d6e7e8;border-radius:.72rem;
+ background:#f2f8f8;padding:.26rem;
+}
+.swtb22-kind-switch button{
+ border:0;border-radius:.5rem;padding:.58rem .86rem;
+ min-height:2.75rem;font:inherit;font-weight:650;font-size:.83rem;
+ background:transparent;color:#385e6b;cursor:pointer;
+}
+.swtb22-kind-switch button[aria-pressed="true"]{
+ background:#fff;box-shadow:0 1px 4px #9dbfc038;
+ color:#0b6862;font-weight:750;
+}
+.swtb22-work-pool .ow-work-pool-columns{
+ display:grid;grid-template-columns:minmax(0,1fr);
+ gap:.85rem;min-width:0;
+}
+.swtb22-work-pool .ow-work-pool-columns>.swtb22-work-pool-commands{
+ display:flex;align-items:center;flex-wrap:wrap;
+ gap:.4rem .65rem;min-width:0;
+}
+.swtb22-work-pool-commands small{
+ flex:1 1 16rem;color:#57727f;
+ font-size:.78rem;line-height:1.7;
+}
+.swtb22-work-pool .ow-work-pool-columns>.ow-work-pool-list{
+ min-width:0;max-width:none;
+}
+.swtb22-work-pool .ow-work-pool-list>h3,
+.swtb22-work-pool .ow-work-pool-list>h4{
+ font-size:.96rem!important;margin:.1rem 0 .3rem;
+}
+.swtb22-work-pool .ow-work-pool-empty{
+ width:100%;padding:clamp(1.25rem,3vw,2.2rem);
+ background:#f7fbfb;display:grid;gap:.35rem;
+}
+.swtb22-work-pool .ow-work-pool-empty strong{font-size:.94rem}
+.swtb22-work-pool .ow-work-pool-empty p{font-size:.83rem}
+.swtb22-work-pool .ow-work-pool-columns>.ow-work-pool-compose{
+ max-width:min(100%,44rem);width:100%;padding:.76rem;
+ border:1px solid #c9dee2;border-radius:.85rem;
+ background:#fafdfe;align-self:start;
+}
+.swtb22-work-pool .ow-work-pool-compose:not(:has(details[open])){
+ display:none;
+}
+.swtb22-work-pool .ow-work-pool-editor{
+ background:#fff;padding:.65rem .8rem;
+}
+.swtb22-work-pool .ow-work-pool-editor[open]{
+ border-color:#a9d1d3;box-shadow:0 3px 13px #1e6d7410;
+}
+.swtb22-work-pool .ow-work-pool-editor summary{
+ min-height:2.5rem;display:list-item;align-content:center;
+ font-size:.86rem;line-height:1.7;
+}
+.swtb22-work-pool .ow-work-pool-item{
+ padding:.85rem .9rem;gap:.5rem;
+}
+.swtb22-work-pool .ow-desk-pool-block{
+ margin-top:0;padding-top:0;border-top:0;
+}
+.swtb22-work-pool .ow-work-pool-workflow{
+ font-size:.78rem;flex-wrap:wrap;
+}
+.swtb22-work-pool .ow-compact-hint{
+ margin:.15rem 0;font-size:.8rem;
+}
+.swtb22-work-pool :is(.swtb22-kind-switch button,.swtb22-work-pool-commands button,.ow-work-pool-editor summary):focus-visible{
+ outline:3px solid #258c86;outline-offset:3px;
+}
+@media(max-width:640px){
+ .swtb22-kind-switch{width:100%}
+ .swtb22-kind-switch button{flex:1 1 9rem}
+ .swtb22-work-pool .ow-work-pool-columns>.ow-work-pool-compose{padding:.46rem}
+ .swtb22-work-pool-commands button{flex:1 1 9rem}
+}
