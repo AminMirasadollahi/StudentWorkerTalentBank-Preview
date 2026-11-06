@@ -6,6 +6,7 @@ import {createServer} from 'vite'
 import {chromium} from 'playwright'
 
 process.env.VITE_SWTB22_WORK_POOL_FOCUS_UI='true'
+process.env.VITE_SWTB22_TASKS_FOCUS_UI='true'
 const output=resolve('test-results/swtb22-manager-synthetic')
 await mkdir(output,{recursive:true})
 let server,browser,page
@@ -85,6 +86,47 @@ try{
  assert.ok(wide.detailWidth>=640,'inspector should benefit from 1920px desktop space')
  assert.equal(wide.horizontalOverflow,false)
  await page.screenshot({path:resolve(output,'08-candidate-directory-1920.png'),fullPage:true})
+ await page.setViewportSize({width:1440,height:900})
+ // D3: load the actual manager task workspace (not a visual mock), all data
+ // and RPCs replaced with the local, no-network Vite fake provider.
+ await page.locator('[data-swtb22-route="tasks"]').click()
+ await page.locator('.swtb22-task-directory .ow-task-results .ow-item').first().waitFor()
+ assert.equal(await page.locator('.swtb22-task-directory .ow-task-results .ow-item').count(),3)
+ assert.equal(await page.locator('#swtb22-task-assign-dialog[open]').count(),0)
+ assert.equal(await page.locator('.swtb22-task-directory .ow-list-filters').count(),1)
+ const taskWidth=await page.locator('.swtb22-task-directory .ow-task-results .ow-item').first().evaluate(node=>({
+  card:node.getBoundingClientRect().width,
+  parent:node.parentElement.getBoundingClientRect().width,
+  horizontalOverflow:document.documentElement.scrollWidth>window.innerWidth+1,
+ }))
+ assert.ok(taskWidth.card>600,'task list should use main canvas: '+JSON.stringify(taskWidth))
+ assert.ok(taskWidth.card>=taskWidth.parent*.9,'task card must not retain narrow width cap')
+ assert.equal(taskWidth.horizontalOverflow,false)
+ await page.screenshot({path:resolve(output,'09-task-list-1440.png'),fullPage:true})
+ await page.getByRole('button',{name:'واگذاری کار جدید'}).click()
+ await page.locator('#swtb22-task-assign-dialog[open]').waitFor()
+ const dialogState=await page.locator('#swtb22-task-assign-dialog').evaluate(d=>({
+  top:d.getBoundingClientRect().top,height:d.getBoundingClientRect().height,
+  width:d.getBoundingClientRect().width,screen:window.innerHeight,
+  focused:document.activeElement?.id==='swtb22-task-editor-heading',
+ }))
+ assert.ok(dialogState.width>650&&dialogState.height<dialogState.screen,
+  'focused task editor must fit viewport and scroll internally: '+JSON.stringify(dialogState))
+ assert.equal(dialogState.focused,true,'keyboard focus follows the active editor')
+ await page.screenshot({path:resolve(output,'10-focused-task-assignment-1440.png')})
+ await page.locator('#swtb22-task-assign-dialog input[maxlength="160"]').fill('پیش‌نویس ساختگی بدون ثبت')
+ await page.getByRole('button',{name:'بستن و حفظ پیش‌نویس'}).click()
+ assert.equal(await page.locator('#swtb22-task-assign-dialog[open]').count(),0)
+ await page.getByRole('button',{name:'واگذاری کار جدید'}).click()
+ assert.equal(await page.locator('#swtb22-task-assign-dialog input[maxlength="160"]').inputValue(),
+  'پیش‌نویس ساختگی بدون ثبت')
+ await page.getByRole('button',{name:'بستن و حفظ پیش‌نویس'}).click()
+ await page.setViewportSize({width:1920,height:1080})
+ assert.equal(await page.locator('.swtb22-task-directory .ow-task-results .ow-item').count(),3)
+ assert.ok(await page.locator('.swtb22-task-directory .ow-task-results .ow-item').first().evaluate(
+  node=>node.getBoundingClientRect().width>800),'task rows should use 1920px canvas')
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1),false)
+ await page.screenshot({path:resolve(output,'11-task-list-1920.png'),fullPage:true})
  await page.setViewportSize({width:1440,height:900})
  const result=await page.evaluate(()=>({writes:globalThis.__qaWriteAttempts,
   overflow:document.documentElement.scrollWidth>window.innerWidth+1}))
