@@ -22,6 +22,9 @@ import TaskAssignmentEditor from './components/TaskAssignmentEditor'
 import TeamScheduleOverview from './components/TeamScheduleOverview'
 import TermBudgetPanel from './components/TermBudgetPanel'
 import FocusedReviewQueue from './components/FocusedReviewQueue'
+import ManagerHistoryExplorer from './components/ManagerHistoryExplorer'
+import {managerHistoryProjection,managerHistoryExportMetadata} from './lib/managerHistoryExport.mjs'
+import {buildManagerHistoryWorkbook} from './lib/managerHistoryWorkbook.mjs'
 import {managerReviewItems} from './lib/managerReviewRows.mjs'
 // Load the optional manager surface ONLY after backend rollout explicitly enables it.
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
@@ -56,6 +59,8 @@ const focusTaskUIEnabled=import.meta.env?.VITE_SWTB22_TASKS_FOCUS_UI==='true'
 const focusPresenceUIEnabled=import.meta.env?.VITE_SWTB22_PRESENCE_FOCUS_UI==='true'
 // D5 manager-only review UX; true on a separately reviewed Preview release.
 const focusDecisionsUIEnabled=import.meta.env?.VITE_SWTB22_REVIEW_FOCUS_UI==='true'
+// D6A scoped manager history/export UX remains OFF until separate release gate.
+const focusHistoryUIEnabled=import.meta.env?.VITE_SWTB22_HISTORY_FOCUS_UI==='true'
 
 /** Complete, current-scope server aggregate, independent of bounded task/history rows.
  * Fail closed to an explicit unavailable message instead of displaying false zero totals. */
@@ -596,7 +601,7 @@ function ApprovalCard({entry,task,worker,onDone,focused=false}) {
     </Detail>
   </article>
 }
-async function exportOpsExcel(data, filteredToOneWorker=false) {
+async function exportOpsExcelLegacy(data, filteredToOneWorker=false) {
   const ExcelJS=await import('exceljs')
   const wb=new ExcelJS.Workbook()
   const sh=wb.addWorksheet('کارها و ساعات',{views:[{rightToLeft:true}]})
@@ -654,6 +659,33 @@ async function exportOpsExcel(data, filteredToOneWorker=false) {
   const a=document.createElement('a')
   a.href=url;a.download=filteredToOneWorker?'student-worker-selected-history.xlsx':'student-worker-operations.xlsx';a.click()
   setTimeout(()=>URL.revokeObjectURL(url),1000)
+}
+
+async function exportOpsExcel(scoped,filters,projection){
+ // The workbook is built from the same authorized, filtered rows that the
+ // on-screen manager history uses. The separate full-lifetime RPC is never
+ // silently mixed into the bounded operational-history workbook.
+ const ExcelJS=await import('exceljs')
+ const metadata=managerHistoryExportMetadata(filters,{
+  workers:scoped.workers,unitLabels,reviewLabels,dateLabel:pretty,
+ })
+ const wb=buildManagerHistoryWorkbook(ExcelJS,projection,metadata)
+ const buffer=await wb.xlsx.writeBuffer()
+ const blob=new Blob([buffer],{
+  type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+ })
+ const url=URL.createObjectURL(blob)
+ try{
+  const link=document.createElement('a')
+  link.href=url
+  link.download=Object.values(filters).some(Boolean)
+   ?'swtb-manager-history-filtered.xlsx':'swtb-manager-history-loaded.xlsx'
+  document.body.append(link)
+  link.click()
+  link.remove()
+ }finally{
+  setTimeout(()=>URL.revokeObjectURL(url),1500)
+ }
 }
 function ProfileChangeReview({request,worker,onDone}) {
  const [note,setNote]=useState('')
@@ -831,6 +863,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const setHistoryFilter=(name,value)=>setNavigation(previous=>({...previous,[name]:value}))
   const setView=value=>setNavigation(previous=>({...previous,workView:value}))
   const setWorkerId=value=>setNavigation(previous=>({...previous,workerId:value}))
+  const focusedHistory=hideSectionTabs&&focusHistoryUIEnabled
   const focusedPresence=hideSectionTabs&&focusPresenceUIEnabled
   const [presenceEditingDate,setPresenceEditingDate]=useState('')
   const [presenceSelectedDate,setPresenceSelectedDate]=useState(today())
@@ -889,11 +922,23 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const readSequence=useRef(0)
   const [notice,setNotice]=useState('')
   const [historyShown,setHistoryShown]=useState(100)
+  const [historyUnreportedShown,setHistoryUnreportedShown]=useState(50)
+  const [historyLifetimeOpen,setHistoryLifetimeOpen]=useState(false)
+  const [historyAdvancedOpen,setHistoryAdvancedOpen]=useState(
+    Boolean(historyUnit||historyReview||historyFrom||historyTo))
+  const [historyUnreportedOpen,setHistoryUnreportedOpen]=useState(
+    historyReview==='without_report')
+  const [historyExporting,setHistoryExporting]=useState(false)
+  const [historyExportError,setHistoryExportError]=useState('')
   const [tasksShown,setTasksShown]=useState(100)
   const [approvalsShown,setApprovalsShown]=useState(25)
   useEffect(()=>setTasksShown(100),[taskWorkerId,taskUnit,taskState,taskSearch,taskOrder])
   useEffect(()=>setApprovalsShown(25),[approvalWorkerId,approvalUnit,approvalKind])
-  useEffect(()=>{setHistoryShown(100)},[historyWorkerId,historyUnit,historyFrom,historyTo,historyReview])
+  useEffect(()=>{setHistoryShown(100);setHistoryUnreportedShown(50)},[historyWorkerId,historyUnit,historyFrom,historyTo,historyReview])
+  useEffect(()=>{
+    if(historyUnit||historyReview||historyFrom||historyTo)setHistoryAdvancedOpen(true)
+    if(historyReview==='without_report')setHistoryUnreportedOpen(true)
+  },[historyUnit,historyReview,historyFrom,historyTo])
 
   const refresh=async ()=>{
     // Ignore older in-flight responses after a newer role check has completed.
@@ -929,8 +974,29 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     unit:historyUnit,from:historyFrom,to:historyTo,review:historyReview,
   })
   const historySummary=summarizeWorkerHistory(historyData)
+  const scopedHistoryProjection=focusedHistory?managerHistoryProjection(historyData,{
+    unitLabels,reviewLabels,extraTimeReasons,dateLabel:pretty,
+  }):null
+  const scopedHistoryFilters={
+    workerId:historyWorkerId||'',unit:historyUnit||'',
+    review:historyReview||'',from:historyFrom||'',to:historyTo||'',
+  }
+  const runHistoryExport=async()=>{
+    if(historyExporting||loading||readFailed||invalidHistoryRange)return
+    const hasRecords=(historyData.tasks.length+historyData.time_entries.length)>0
+    if(!hasRecords)return
+    setHistoryExporting(true);setHistoryExportError('')
+    try{
+      if(focusedHistory)await exportOpsExcel(historyData,scopedHistoryFilters,scopedHistoryProjection)
+      else await exportOpsExcelLegacy(historyData,historyFiltersActive)
+    }catch{
+      setHistoryExportError('ساخت یا دریافت فایل Excel کامل نشد. هیچ داده یا تصمیمی تغییر نکرد؛ دوباره اقدام کنید.')
+    }finally{setHistoryExporting(false)}
+  }
   const reportTaskIds=new Set(historyData.time_entries.map(entry=>entry.task_id))
   const historyWithoutReport=historyData.tasks.filter(task=>!reportTaskIds.has(task.id))
+  const HistoryFilterWrap=focusedHistory?'details':'div'
+  const HistoryUnreportedWrap=focusedHistory?'details':'div'
   const allTasks=data.tasks||[]
   const taskCounts=summarizeTaskWorkflow(allTasks)
   const matchingTasks=selectManagerTasks(data,{
@@ -1251,16 +1317,25 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         defaultDate={assignmentDialogDate} defaultWorkerId={workerId}
         onSaved={refresh} onClose={()=>setAssignmentDialogDate('')}/>
     </dialog>}
-    {view==='history'&&<section className="report-panel">
-      <UnitHourSummary scope="admin" refreshRevision={refreshRevision}/>
-      <div className="report-panel-heading">
-        <h2>سابقه ساعات و خروجی</h2>
+    {view==='history'&&<section className={'report-panel'+(focusedHistory?' swtb22-history-focused':'')}>
+      {!focusedHistory&&<UnitHourSummary scope="admin" refreshRevision={refreshRevision}/>}
+      <div className="report-panel-heading swtb22-history-heading">
+        <div>
+         <h2>{focusedHistory?'سوابق و گزارش‌های مدیریتی':'سابقه ساعات و خروجی'}</h2>
+         {focusedHistory&&<p className="ow-muted">
+          مرور و خروجی فقط براساس سوابق مجازِ بارگذاری‌شده در همین صفحه انجام می‌شود.
+          آمار قطعی همه دوره‌ها و سهمیه نیمسال، منابع مستقل سرور هستند و با این فیلترها یکی نیستند.
+         </p>}
+        </div>
         <button className="report-btn report-btn--primary" type="button"
-          disabled={loading||invalidHistoryRange||(!historyData.tasks.length&&!historyData.time_entries.length)}
-          onClick={()=>exportOpsExcel(historyData,historyFiltersActive)}>
-          {historyFiltersActive?'خروجی Excel نتایج فیلتر':'خروجی Excel همه'}
+          disabled={loading||historyExporting||invalidHistoryRange||(!historyData.tasks.length&&!historyData.time_entries.length)}
+          aria-busy={historyExporting}
+          onClick={()=>{void runHistoryExport()}}>
+          {historyExporting?'در حال تهیه فایل Excel…':
+           historyFiltersActive?'خروجی Excel همین نتایج':'خروجی Excel سوابق بارگذاری‌شده'}
         </button>
       </div>
+      {historyExportError&&<p className="report-alert report-alert--error" role="alert">{historyExportError}</p>}
       <div className="ow-history-filter">
         <label className="report-field ow-worker-selector"><span>فیلتر بر اساس دانشجوکار</span>
           <select value={historyWorkerId} onChange={e=>setHistoryWorkerId(e.target.value)}>
@@ -1274,6 +1349,15 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
           <p className="ow-muted">فیلترها فقط سوابق و Excel را محدود می‌کنند و وضعیت حساب یا آمار کلی پرونده را تغییر نمی‌دهند.</p>
         </details>
       </div>
+      <HistoryFilterWrap {...(focusedHistory?{
+        className:'swtb22-history-filter-disclosure',
+        open:historyAdvancedOpen,
+        onToggle:event=>setHistoryAdvancedOpen(event.currentTarget.open),
+      }:{})}>
+       {focusedHistory&&<summary>
+        فیلترهای تکمیلی
+        {(historyUnit||historyReview||historyFrom||historyTo)&&' · فعال'}
+       </summary>}
       <div className="ow-history-extra" aria-label="فیلترهای گزارش مدیریتی">
         <label className="report-field"><span>واحد همکاری</span>
           <select value={historyUnit} onChange={e=>setHistoryFilter('historyUnit',e.target.value)}>
@@ -1301,6 +1385,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
             onClick={()=>setHistoryFilter('historyTo','')}>حذف تاریخ پایان</button>}
         </div>
       </div>
+      </HistoryFilterWrap>
       <div className="ow-history-filter-footer">
         <p className="ow-muted">
           {historyFiltersActive&&<>{n(historySummary.taskCount)} کار · {n(historySummary.reportCount)} گزارش</>}
@@ -1313,6 +1398,41 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       {invalidHistoryRange&&<div className="report-alert report-alert--error" role="alert">
         تاریخ شروع نباید بعد از تاریخ پایان باشد؛ بازه را اصلاح کنید.
       </div>}
+      {focusedHistory?<div className="swtb22-history-results">
+       <div className="swtb22-history-scope-metrics" aria-label="خلاصه نتایج فیلترشده و بارگذاری‌شده">
+        <div><span>گزارش موجود</span><strong>{n(scopedHistoryProjection.summary.reportCount)}</strong></div>
+        <div><span>گزارش تأییدشده</span><strong>{n(scopedHistoryProjection.summary.approvedReportCount)}</strong></div>
+        <div><span>کار بدون گزارش</span><strong>{n(scopedHistoryProjection.summary.unreportedTaskCount)}</strong></div>
+        <div><span>زمان تأییدشده در همین نتایج</span><strong>{
+          scopedHistoryProjection.summary.invalidMinutesCount
+           ?'نیازمند بررسی'
+           :exactDuration(scopedHistoryProjection.summary.approvedMinutes)
+        }</strong></div>
+       </div>
+       <p className="ow-muted swtb22-history-scope-note">
+        این جمع صرفاً مربوط به نتایج فیلترشده و بارگذاری‌شده است؛
+        برای مجموع قطعی همه دوره‌ها از بخش مستقل «آمار تمام‌دوره سرور» استفاده کنید.
+       </p>
+       {scopedHistoryProjection.summary.orphanReportCount>0&&<p className="ow-warning" role="status">
+        {n(scopedHistoryProjection.summary.orphanReportCount)} گزارش با وظیفه مرتبط نامشخص در این نتایج وجود دارد.
+       </p>}
+       {scopedHistoryProjection.summary.invalidMinutesCount>0&&<p className="ow-warning" role="alert">
+        {n(scopedHistoryProjection.summary.invalidMinutesCount)} گزارش، داده زمانی نیازمند بررسی دارد؛
+        جمع زمان تأییدشده تا رفع مغایرت قابل اتکا نیست.
+       </p>}
+       <ManagerHistoryExplorer rows={scopedHistoryProjection.reportRows}
+        limit={historyShown}
+        emptyText={historyWithoutReport.length
+         ?'در این بازه گزارشی نیست؛ کارهای بدون گزارش را در بخش پایین ببینید.'
+         :historyFiltersActive?'هیچ گزارشی با فیلترهای فعلی موجود نیست.':'هنوز گزارشی در فهرست بارگذاری‌شده وجود ندارد.'}/>
+       {scopedHistoryProjection.reportRows.length>historyShown&&<div className="ow-history-load-more">
+        <span className="ow-muted">نمایش {n(Math.min(historyShown,scopedHistoryProjection.reportRows.length))}
+         {' '}از {n(scopedHistoryProjection.reportRows.length)} گزارش بارگذاری‌شده و فیلترشده؛
+         خروجی Excel همه این نتایج را در بر می‌گیرد.</span>
+        <button type="button" className="report-btn report-btn--light"
+         onClick={()=>setHistoryShown(count=>count+100)}>نمایش ۱۰۰ گزارش بیشتر</button>
+       </div>}
+      </div>:<>
       <div className="report-panel-heading">
         <h3>{historyFiltersActive?'سوابق منطبق با فیلتر':'سوابق فعالیت همه دانشجوکارها'}</h3>
         <small>{n(historySummary.reportCount)} گزارش · {exactDuration(historySummary.approvedMinutes)} تأییدشده</small>
@@ -1343,12 +1463,21 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
             historyFiltersActive?'نتیجه‌ای برای فیلترهای انتخاب‌شده پیدا نشد.':'هنوز سابقه‌ای وجود ندارد.'}
         </p>}
       </div>
-      {historyWithoutReport.length>0&&<div className="ow-history-unreported">
-        <div className="report-panel-heading">
+      </>}
+      {historyWithoutReport.length>0&&<HistoryUnreportedWrap
+        className={'ow-history-unreported'+(focusedHistory?' swtb22-history-unreported':'')}
+        {...(focusedHistory?{
+          open:historyUnreportedOpen,
+          onToggle:event=>setHistoryUnreportedOpen(event.currentTarget.open),
+        }:{})}>
+        {focusedHistory?<summary>
+          کارهای بدون گزارش · {n(historyWithoutReport.length)} مورد
+        </summary>:<div className="report-panel-heading">
           <h3>کارهای بدون گزارش</h3><small>{n(historyWithoutReport.length)} کار</small>
-        </div>
+        </div>}
         <div className="ow-list">
-          {historyWithoutReport.map(task=><article className="ow-item" key={task.id}>
+          {(focusedHistory?historyWithoutReport.slice(0,historyUnreportedShown):historyWithoutReport)
+           .map(task=><article className="ow-item" key={task.id}>
             <div className="ow-item-header">
               <strong>{task.title}</strong>
               <span className="ow-status">{stateLabels[task.state]||task.state}</span>
@@ -1357,7 +1486,19 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
               {' · '}برنامه: {pretty(task.planned_date)} · برآورد: {minutes(task.estimate_minutes)}</small>
           </article>)}
         </div>
-      </div>}
+        {focusedHistory&&historyWithoutReport.length>historyUnreportedShown&&
+          <button type="button" className="report-btn report-btn--light"
+           onClick={()=>setHistoryUnreportedShown(count=>count+50)}>
+           نمایش ۵۰ کار بدون گزارش بیشتر
+          </button>}
+      </HistoryUnreportedWrap>}
+      {focusedHistory&&<details className="swtb22-history-lifetime"
+        onToggle={event=>setHistoryLifetimeOpen(event.currentTarget.open)}>
+       <summary>آمار تأییدشده تمام‌دوره از سرور · مستقل از فیلترهای این صفحه</summary>
+       <p className="ow-muted">این بخش از گزارش اختصاصی سرور می‌آید و
+        ممکن است با جمع سوابق بارگذاری‌شده یا سهمیه نیمسال تفاوت داشته باشد.</p>
+       {historyLifetimeOpen&&<UnitHourSummary scope="admin" refreshRevision={refreshRevision}/>}
+      </details>}
     </section>}
   </div>
 }
