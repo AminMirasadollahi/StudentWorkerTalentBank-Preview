@@ -924,6 +924,10 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const [historyShown,setHistoryShown]=useState(100)
   const [historyUnreportedShown,setHistoryUnreportedShown]=useState(50)
   const [historyLifetimeOpen,setHistoryLifetimeOpen]=useState(false)
+  const [historyAdvancedOpen,setHistoryAdvancedOpen]=useState(
+    Boolean(historyUnit||historyReview||historyFrom||historyTo))
+  const [historyUnreportedOpen,setHistoryUnreportedOpen]=useState(
+    historyReview==='without_report')
   const [historyExporting,setHistoryExporting]=useState(false)
   const [historyExportError,setHistoryExportError]=useState('')
   const [tasksShown,setTasksShown]=useState(100)
@@ -931,6 +935,10 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   useEffect(()=>setTasksShown(100),[taskWorkerId,taskUnit,taskState,taskSearch,taskOrder])
   useEffect(()=>setApprovalsShown(25),[approvalWorkerId,approvalUnit,approvalKind])
   useEffect(()=>{setHistoryShown(100);setHistoryUnreportedShown(50)},[historyWorkerId,historyUnit,historyFrom,historyTo,historyReview])
+  useEffect(()=>{
+    if(historyUnit||historyReview||historyFrom||historyTo)setHistoryAdvancedOpen(true)
+    if(historyReview==='without_report')setHistoryUnreportedOpen(true)
+  },[historyUnit,historyReview,historyFrom,historyTo])
 
   const refresh=async ()=>{
     // Ignore older in-flight responses after a newer role check has completed.
@@ -1343,7 +1351,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       </div>
       <HistoryFilterWrap {...(focusedHistory?{
         className:'swtb22-history-filter-disclosure',
-        defaultOpen:Boolean(historyUnit||historyReview||historyFrom||historyTo),
+        open:historyAdvancedOpen,
+        onToggle:event=>setHistoryAdvancedOpen(event.currentTarget.open),
       }:{})}>
        {focusedHistory&&<summary>
         فیلترهای تکمیلی
@@ -1457,7 +1466,10 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       </>}
       {historyWithoutReport.length>0&&<HistoryUnreportedWrap
         className={'ow-history-unreported'+(focusedHistory?' swtb22-history-unreported':'')}
-        {...(focusedHistory?{defaultOpen:historyReview==='without_report'}:{})}>
+        {...(focusedHistory?{
+          open:historyUnreportedOpen,
+          onToggle:event=>setHistoryUnreportedOpen(event.currentTarget.open),
+        }:{})}>
         {focusedHistory?<summary>
           کارهای بدون گزارش · {n(historyWithoutReport.length)} مورد
         </summary>:<div className="report-panel-heading">
