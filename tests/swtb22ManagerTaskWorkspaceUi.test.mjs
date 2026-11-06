@@ -101,7 +101,7 @@ async function mount(options={}){
  let updateRevision=()=>{}
  function Harness({revision}){
   const [nav,setNav]=useState({
-   section:'work',workView:'tasks',workerId:'',historyWorkerId:'',
+   section:'work',workView:options.view||'tasks',workerId:'',historyWorkerId:'',
    taskWorkerId:'',taskUnit:'',taskState:'',taskSearch:'',taskOrder:'latest',
   })
   return createElement(AdminOperations,{navigation:nav,setNavigation:setNav,
@@ -200,6 +200,21 @@ test('no active worker disables the direct assignment action without inventing e
   const open=action(ui.host,'واگذاری کار جدید')
   assert.ok(open.disabled)
   assert.match(ui.host.textContent,/ابتدا باید دست‌کم یک دانشجوکار فعال/)
+  assert.equal(globalThis.__qaD3Writes,0)
+ }finally{await ui.cleanup()}
+})
+
+test('inbox direct assignment shortcut opens the focused editor, not only the task route',async()=>{
+ const ui=await mount({view:'inbox'})
+ try{
+  assert.equal(editor(ui.host),null)
+  const shortcut=[...ui.host.querySelectorAll('button')].find(
+   b=>b.textContent.includes('+ واگذاری کار جدید'))
+  assert.ok(shortcut)
+  await act(async()=>shortcut.click())
+  assert.ok(editor(ui.host),'the tasks view must mount after using the inbox shortcut')
+  assert.equal(editor(ui.host).open,true,'the user intent is to create, not merely browse tasks')
+  assert.equal(document.activeElement?.id,'swtb22-task-editor-heading')
   assert.equal(globalThis.__qaD3Writes,0)
  }finally{await ui.cleanup()}
 })
