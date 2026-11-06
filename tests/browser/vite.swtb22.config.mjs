@@ -2,7 +2,8 @@
 import {defineConfig} from 'vite'
 import react from '@vitejs/plugin-react'
 const api=[
- 'export const getOperationsTermDashboard=async()=>({ok:true,terms:[{id:"fake-term",label:"نیمسال نمونه",state:"active"}]});',
+ 'export const getOperationsTermDashboard=async()=>({ok:true,term:globalThis.__qaTerm,terms:[globalThis.__qaTerm],units:[],weeks:[],workers:[],pools:[]});',
+ 'export const getTermAccessOverview=async()=>globalThis.__qaTermAccess;',
  'export const getManagerWorkPool=async()=>({ok:true,templates:[',
  '{id:"gen",title:"ثبت مشخصات منابع",unit:"library",kind:"general",state:"active",estimated_minutes:60},',
  '{id:"desk",title:"پاسخ‌گویی میز امانت",unit:"library",kind:"library_desk",state:"active",estimated_minutes:60}],',
@@ -15,7 +16,8 @@ const api=[
  'export const getMyProfileChangeRequests=async()=>[];',
  'export const getUnitHourTotals=async()=>({scope:"admin",units:[]});',
  'export const getLibraryDeskShifts=async()=>({ok:true,shifts:[]});',
- ...['assignGroupTask','assignLibraryDeskShift','cancelLibraryDeskShift',
+ ...['setWorkerTermMembership','setTermAccessMode',
+ 'assignGroupTask','assignLibraryDeskShift','cancelLibraryDeskShift',
  'saveOperationsTerm','saveOperationsAllocation','saveOperationsBudgetPool',
  'requestProfileChange','reviewProfileChange'].map(name=>
   `export const ${name}=async()=>{globalThis.__qaWriteAttempts++;throw Error("NO_WRITES")};`),
@@ -40,7 +42,8 @@ const fake={
      from.endsWith('/src/components/TaskAssignmentEditor.jsx')||
      from.endsWith('/src/components/TermBudgetPanel.jsx')||
      from.endsWith('/src/components/BudgetPoolEditor.jsx')||
-     from.endsWith('/src/components/TermStatusDialog.jsx'))&&
+     from.endsWith('/src/components/TermStatusDialog.jsx')||
+     from.endsWith('/src/components/TermMembershipPanel.jsx'))&&
      source==='../lib/operationsV2')return '\0swtb22-fake-api'
   if(from.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operationsV2')return '\0swtb22-fake-api'
   if(from.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operations')return '\0swtb22-fake-ops'
