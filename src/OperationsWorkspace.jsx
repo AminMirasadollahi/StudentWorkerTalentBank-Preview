@@ -601,6 +601,66 @@ function ApprovalCard({entry,task,worker,onDone,focused=false}) {
     </Detail>
   </article>
 }
+async function exportOpsExcelLegacy(data, filteredToOneWorker=false) {
+  const ExcelJS=await import('exceljs')
+  const wb=new ExcelJS.Workbook()
+  const sh=wb.addWorksheet('کارها و ساعات',{views:[{rightToLeft:true}]})
+  sh.columns=[
+    {header:'دانشجوکار',key:'name',width:25},{header:'واحد',key:'unit',width:20},
+    {header:'عنوان کار',key:'task',width:34},{header:'تاریخ فعالیت',key:'date',width:21},
+    {header:'زمان برآوردی (دقیقه)',key:'estimate',width:24},
+    {header:'زمان درخواستی (دقیقه)',key:'reported',width:25},
+    {header:'زمان تأییدشده (دقیقه)',key:'approved',width:25},
+    {header:'وضعیت گزارش',key:'review',width:22},
+    {header:'علت زمان اضافه',key:'extraReason',width:30},
+    {header:'توضیح درخواست اضافه',key:'extraText',width:42},
+    {header:'توضیح تأیید مدیر',key:'approvalNote',width:42},
+  ]
+  for(const task of data.tasks||[]){
+    const worker=data.workers?.find(w=>w.id===task.worker_id)
+    const entries=(data.time_entries||[]).filter(e=>e.task_id===task.id)
+    if(!entries.length) sh.addRow({name:worker?.name||'',unit:unitLabels[task.unit],
+      task:task.title,date:pretty(task.planned_date),estimate:task.estimate_minutes,review:'بدون گزارش'})
+    for(const entry of entries) sh.addRow({
+      name:worker?.name||'',unit:unitLabels[task.unit],task:task.title,
+      date:pretty(entry.work_date||task.planned_date),estimate:task.estimate_minutes,
+      reported:entry.reported_minutes,
+      approved:entry.review_state==='approved'?entry.approved_minutes:'',
+      review:reviewLabels[entry.review_state] || entry.review_state,
+      extraReason:extraTimeReasons[entry.extra_time_reason_code]||'',
+      extraText:entry.extra_time_reason_text||'',
+      approvalNote:entry.review_note||'',
+    })
+  }
+  // Preserve already-authorized time reports even if a legacy record's
+  // linked task is missing from the authorized read projection.
+  const includedTaskIds=new Set((data.tasks||[]).map(task=>task.id))
+  for(const entry of data.time_entries||[]){
+    if(includedTaskIds.has(entry.task_id)) continue
+    const worker=data.workers?.find(w=>w.id===entry.worker_id)
+    sh.addRow({
+      name:worker?.name||'',unit:'واحد کار نامشخص',
+      task:'کار مرتبط در خروجی موجود نیست',date:pretty(entry.work_date),
+      reported:entry.reported_minutes,
+      approved:entry.review_state==='approved'?entry.approved_minutes:'',
+      review:reviewLabels[entry.review_state]||entry.review_state,
+      extraReason:extraTimeReasons[entry.extra_time_reason_code]||'',
+      extraText:entry.extra_time_reason_text||'',
+      approvalNote:entry.review_note||'',
+    })
+  }
+  sh.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}}
+  sh.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF153E5C'}}
+  sh.autoFilter={from:{row:1,column:1},to:{row:sh.rowCount,column:11}}
+  sh.views=[{state:'frozen',ySplit:1,rightToLeft:true}]
+  const blob=new Blob([await wb.xlsx.writeBuffer()],
+    {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
+  const url=URL.createObjectURL(blob)
+  const a=document.createElement('a')
+  a.href=url;a.download=filteredToOneWorker?'student-worker-selected-history.xlsx':'student-worker-operations.xlsx';a.click()
+  setTimeout(()=>URL.revokeObjectURL(url),1000)
+}
+
 async function exportOpsExcel(scoped,filters,projection){
  // The workbook is built from the same authorized, filtered rows that the
  // on-screen manager history uses. The separate full-lifetime RPC is never
