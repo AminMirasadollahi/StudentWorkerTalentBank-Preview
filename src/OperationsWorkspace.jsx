@@ -976,7 +976,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         <h2>کارتابل رسیدگی</h2>
         <small>{n(pending.length)} گزارش · {n(pendingProfileChanges.length)} درخواست اصلاح</small>
         <button type="button" className="report-btn report-btn--light"
-          onClick={()=>setView('tasks')}>+ واگذاری کار جدید</button>
+          onClick={()=>{setView('tasks');if(focusedTasks&&!loading&&active.length>0)setTaskEditorOpen(true)}}>+ واگذاری کار جدید</button>
       </div>
       {pending.length===0&&pendingProfileChanges.length===0&&
         <p className="ow-muted">درخواستی برای رسیدگی وجود ندارد.</p>}
