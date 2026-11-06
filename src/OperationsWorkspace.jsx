@@ -774,7 +774,8 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone}) {
     </div>
   </section>
 }
-export function AdminOperations({ navigation, setNavigation, refreshRevision = 0 }) {
+export function AdminOperations({ navigation, setNavigation, refreshRevision = 0,
+  hideSectionTabs = false }) {
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const view=navigation.workView
   const profileWorkerId=navigation.profileWorkerId||''
@@ -901,7 +902,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   </div>
 
   return <div className="ow-workspace">
-    <div className="ow-summary ow-summary--actionable">
+    {(!hideSectionTabs||view==='inbox')&&<div className="ow-summary ow-summary--actionable">
       <article><button type="button" className="ow-manager-kpi-action"
         onClick={()=>setView('profiles')} aria-label="نمایش پرونده‌های دانشجوکارها">
         <span>دانشجوکار فعال</span><b>{n(active.length)}</b>
@@ -919,12 +920,12 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       </button></article>
       <article><span>مجموع ساعات تأییدشده · همه دوره‌ها</span>
         <b>{exactDuration(approvedMinutes)}</b></article>
-    </div>
-    <SectionTabs value={view} onChange={setView} options={[
+    </div>}
+    {!hideSectionTabs&&<SectionTabs value={view} onChange={setView} options={[
       ['inbox','کارتابل'],['tasks','واگذاری کار'],['approvals','تأیید ساعات'],['availability','برنامه حضور'],['history','سابقه و خروجی'],['profiles','پروفایل‌ها'],['terms','نیمسال و سهمیه'],
       ...(termMembershipUIEnabled?[['termMemberships','مجوز همکاری']]:[]),
       ...(workPoolUIEnabled?[['workPool','مخزن وظایف']]:[]),
-    ]}/>
+    ]}/>}
     {loading&&<p className="ow-muted">در حال دریافت اطلاعات…</p>}
     <Message error={error} notice={notice}/>
 
