@@ -3,6 +3,7 @@ import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react'
 const deskPoolUIEnabled=import.meta.env?.VITE_SWTB21_DESK_POOL_UI!=='false'
 const DeskWorkPoolWorkerSection=lazy(()=>import('./DeskWorkPoolWorkerSection'))
 import {getWorkerWorkPool,claimWorkOpportunity} from '../lib/operationsV2'
+import WorkerInfoHint from './WorkerInfoHint.jsx'
 
 const fa=new Intl.NumberFormat('fa-IR')
 const pretty=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{dateStyle:'medium',timeZone:'UTC'})
@@ -74,13 +75,14 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
  return <section className="report-panel ow-work-pool ow-worker-work-pool"
   aria-label="فرصت‌های کاری قابل انتخاب">
   <div className="report-panel-heading">
-   <div><h2>فرصت‌های کاری</h2>
-    <p className="ow-muted">فرصت‌های منتشرشده مدیر را مشاهده و در صورت داشتن مجوز نیمسال و ظرفیت آزاد، کار مناسب را انتخاب کنید.</p>
+   <div className="ow-worker-title-inline"><h2>فرصت‌های کاری</h2>
+    <WorkerInfoHint label="درباره انتخاب فرصت کاری"
+      text="فقط فرصت‌های منتشرشده مدیر و متناسب با مجوز نیمسال، مهلت و ظرفیت قابل انتخاب‌اند. زمان تخمینی فرصت، ساعت تأییدشده نیست. "/>
    </div>
    <button type="button" className="report-btn report-btn--light"
     disabled={busyId!==''} onClick={()=>void refresh()}>بازخوانی</button>
   </div>
-  <p className="ow-compact-hint">ساعت تخمینی این فرصت‌ها هنوز ساعت تأییدشده محسوب نمی‌شود. {deskPoolUIEnabled?'نوبت‌های زمان‌دار کتابخانه در بخش پایین همین صفحه ارائه شده‌اند.':'نوبت‌های زمان‌دار کتابخانه از مسیر جداگانه برنامه‌ریزی می‌شوند.'}</p>
+  
   {notice&&<div role="status" className={uncertainId?'report-alert report-alert--error':'ops-alert-success'}>{notice}</div>}
   {view.status==='loading'&&<p role="status" className="ow-muted">در حال دریافت فرصت‌های مجاز…</p>}
   {view.status==='error'&&<div role="alert" className="report-alert report-alert--error">
@@ -90,7 +92,7 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
   {view.status==='ready'&&<>
    {!items.length&&<div className="ow-worker-empty" role="status">
      <strong>{deskPoolUIEnabled?'در حال حاضر فرصت عمومی منتشرشده‌ای وجود ندارد.':'در حال حاضر فرصت منتشرشده‌ای در این بازه وجود ندارد.'}</strong>
-     <p>تعریف الگوی کار توسط مدیر به‌تنهایی، به معنای انتشار فرصت قابل انتخاب نیست.</p>
+  
     </div>}
    <div className="ow-work-pool-worker-list">
     {items.map(item=><article className="ow-work-pool-item" key={item.id}>
