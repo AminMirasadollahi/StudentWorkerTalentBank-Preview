@@ -39,7 +39,8 @@ const WorkPoolManagerPanel = lazy(()=>import('./components/WorkPoolManagerPanel'
 const WorkPoolWorkerPanel = lazy(()=>import('./components/WorkPoolWorkerPanel'))
 import * as unifiedPeerApi from './lib/operationsV2'
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
- requestProfileChange,reviewProfileChange,getUnitHourTotals } from './lib/operationsV2'
+ requestProfileChange,reviewProfileChange,getUnitHourTotals,
+ setWorkerState,getWorkerStateHistory } from './lib/operationsV2'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
@@ -970,7 +971,8 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
         </div>
       </details>)}
       <details className="ow-profile-fold"><summary>وضعیت حساب و مدیریت دسترسی</summary>
-        <WorkerLifecycleManager key={selected.id} worker={selected} onDone={onDone}/>
+        <WorkerLifecycleManager key={selected.id} worker={selected} onDone={onDone}
+         onChangeState={setWorkerState} onReadHistory={getWorkerStateHistory}/>
       </details>
     </>}
       </div>
