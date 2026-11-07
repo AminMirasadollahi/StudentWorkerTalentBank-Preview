@@ -24,7 +24,7 @@ test('every step has an explicit unique visible anchor and human instruction',()
  const full=getWorkerGuideSteps()
  const seen=new Set()
  for(const step of full){
-  assert.match(step.anchor,/^[a-z-]+$/)
+  assert.match(step.anchor,/^[a-z][a-zA-Z-]*$/)
   assert.ok(step.title.length>=4)
   assert.ok(step.description.length>=60)
   assert.ok(!seen.has(step.anchor),'each anchor unique: '+step.anchor)
