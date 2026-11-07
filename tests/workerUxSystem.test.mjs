@@ -42,12 +42,15 @@ test('Persian history filters share one compact toolbar and keep semantics',()=>
  assert.match(history,/className="ow-b3-ledger-list"/)
 })
 
-test('empty analytics omit two large blank chart placeholders',()=>{
- assert.match(panel,/monthlyReady\|\|unitsReady\?<details/)
- assert.match(panel,/className="ow-worker-performance-chart-empty"/)
- assert.match(panel,/monthlyReady&&<section/)
- assert.match(panel,/unitsReady&&<section/)
+test('analytics show truthful zero categories and never infer a missing month',()=>{
+ assert.match(panel,/className="ow-worker-performance-chart-disclosure" open/)
+ assert.match(panel,/className="ow-worker-performance-zero-month"/)
+ assert.match(panel,/className="ow-worker-performance-chart-grid"/)
+ assert.match(panel,/metrics\.byMonth\.length>0/)
+ assert.match(panel,/metrics\.missingWorkDateCount===0/)
+ assert.match(panel,/metrics\.missingUnitCount===0/)
  assert.match(panel,/metrics\.approvedMinutes!==null/)
+ assert.match(panel,/Object\.keys\(units\)\.map\(unit=>\(\{unit,minutes:byUnitMap\.get\(unit\)\|\|0\}\)\)/)
  assert.ok(!panel.includes('monthlyReady?<PerformanceBars'))
  assert.ok(!panel.includes('unitsReady?<PerformanceBars'))
 })

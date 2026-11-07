@@ -6,6 +6,7 @@ import { selectWorkerTaskFocus, summarizeWorkerTaskFocus } from './lib/workerTas
 import {projectWorkerReportActivity,summarizeWorkerReportActivity} from './lib/workerReportActivity.mjs'
 import {filterPerformanceByWorkDate} from './lib/workerPerformance.mjs'
 import WorkerPerformancePanel from './components/WorkerPerformancePanel.jsx'
+import WorkerInfoHint from './components/WorkerInfoHint.jsx'
 import {canonicalWorkerReportPayload,sameWorkerReportPayload,isDefinitiveWorkerReportRejection,WORKER_REPORT_CHANGED_RETRY_NOTICE} from './lib/workerReportRetry.mjs'
 import {
   getAdminWork, getMyWork, setWeeklyDay, setDateException,
@@ -87,10 +88,15 @@ function UnitHourSummary({scope,approvedTotal=null,refreshRevision=0}) {
    data-swtb-guide={scope==='worker'?'history-summary':undefined}
    aria-label="مجموع ساعات تأییدشده به تفکیک واحد فعالیت">
    <div className="ow-unit-hours__heading">
-     <div><h3>{scope==='worker'?'جمع قطعی ساعات تأییدشده':'ساعات به تفکیک واحد فعالیت'}</h3>
-       <small>{scope==='worker'?'تمام دوره‌های مجاز · مستقل از فیلترهای پایین صفحه':'مجموع کل زمان تأییدشده در سرور؛ مستقل از واحد ثبت‌نام دانشجو'}</small></div>
+     <div className="ow-summary-title">
+       <h3>{scope==='worker'?'ساعات تأییدشده':'ساعات به تفکیک واحد فعالیت'}</h3>
+       {scope==='worker'
+         ?<WorkerInfoHint label="توضیح مجموع ساعات"
+           text="مجموع قطعی سرور در دوره‌های مجاز است و با فیلتر گزارش‌های پایین صفحه تغییر نمی‌کند؛ زمان حضور برنامه‌ریزی‌شده یا گزارش در انتظار بررسی در آن منظور نمی‌شود."/>
+         :<small>مجموع کل زمان تأییدشده در سرور؛ مستقل از واحد ثبت‌نام دانشجو</small>}
+     </div>
      {scope==='worker'&&<div className="ow-unit-hours__total">
-       <span>مجموع تأییدشده</span><strong>{approvedTotal===null?'—':exactDuration(approvedTotal)}</strong>
+       <strong aria-label="مجموع ساعات تأییدشده">{approvedTotal===null?'—':exactDuration(approvedTotal)}</strong>
      </div>}
    </div>
    {result.loading&&<p className="ow-muted" role="status">در حال دریافت جمع ساعات واحدها…</p>}
@@ -416,7 +422,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
           <button type="button" className="ow-mini-btn"
             onClick={peerSnapshot.retry}>تلاش مجدد</button>
         </span>}
-        {peerReady&&<span>این بازه‌ها برنامه‌ریزی‌شده‌اند، نه حضور قطعی یا ساعات تأییدشده؛ خط‌های عمودی نوارها با ساعت‌های محور بالا منطبق‌اند.</span>}
+        {peerReady&&<WorkerInfoHint label="معنای زمان‌های همکاران" text="نوارها بازه‌های برنامه‌ریزی‌شده هستند، نه حضور قطعی یا ساعات تأییدشده؛ خطوط عمودی با محور ساعت مشترک بالا منطبق‌اند."/>}
       </div>}
       {peerReady&&<div className="ow-unified-peer-ruler" aria-label="محور مشترک ساعت برای تمام روزهای این هفته">
         <span>محور ساعت</span>
@@ -1933,18 +1939,22 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
  return <section className="report-panel ow-worker-history-panel ow-b3-ledger"
    aria-label="سابقه گزارش‌ها و ساعات">
    <div className="ow-history-heading ow-b3-guide-heading ow-b3-guide-heading--history">
-     <div><h2>سوابق گزارش‌ها و ساعات</h2>
-       <p>دفتر پیگیری گزارش‌های ثبت‌شده؛ تاریخ هر ردیف، تاریخ انجام کار است، نه تاریخ رسیدگی مدیر.</p>
+     <div className="ow-worker-title-inline"><h2>سوابق گزارش‌ها و ساعات</h2>
+       <WorkerInfoHint label="درباره دفتر گزارش‌ها"
+         text="هر ردیف گزارش زمان کار و نتیجه رسیدگی مدیر را نشان می‌دهد. تاریخ هر ردیف، روز انجام کار است؛ نه روز تأیید مدیر."/>
      </div>
      <button type="button" className="swtb-guide-launch" data-swtb-guide="help-history"
        onClick={()=>onGuide?.('history')}>؟ راهنمای این بخش</button>
    </div>
    <UnitHourSummary scope="worker" approvedTotal={total} refreshRevision={refreshRevision}/>
+   <div className="ow-history-report-flow">
    <section className="ow-history-query" aria-label="فیلترهای گزارش‌ها"
      data-swtb-guide="history-controls">
      <div className="ow-history-query-header">
-       <div><h3>پالایش گزارش‌ها</h3>
-         <p>واحد، بازه تاریخ انجام کار و وضعیت بررسی را در یک محل انتخاب کنید.</p></div>
+       <div className="ow-worker-title-inline"><h3>فیلتر گزارش‌ها</h3>
+         <WorkerInfoHint label="درباره فیلتر گزارش‌ها"
+           text="واحد، تاریخ انجام کار و وضعیت رسیدگی را انتخاب کنید. این فیلترها هم دفتر گزارش‌ها و هم تحلیل عملکرد پایین آن را تغییر می‌دهند، اما جمع قطعی ساعات بالای صفحه مستقل است."/>
+       </div>
        {(unitFilter||view!=='all'||dateFrom||dateTo)&&<button type="button"
          className="report-btn report-btn--light ow-worker-performance-reset"
          onClick={()=>{setUnitFilter('');setView('all');setDateFrom('');setDateTo('');setSelectedReportId(null)}}>
@@ -1980,12 +1990,11 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
          </button>)}
        </div>
      </div>
-     <p className="ow-history-query-note">فیلتر تاریخ براساس روز انجام کار است، نه روز تأیید مدیر.
-       تغییر فیلترها روی ساعات قطعی ثبت‌شده تأثیری ندارد.</p>
+
    </section>
-   {dateResult.invalidRange?<p className="report-alert report-alert--error" role="alert">
+   {dateResult.invalidRange&&<p className="report-alert report-alert--error" role="alert">
      بازه تاریخ نامعتبر است؛ تاریخ شروع نباید پس از تاریخ پایان باشد.
-   </p>:<WorkerPerformancePanel rows={entries} tasks={tasks} units={unitLabels}/>}
+   </p>}
    <div className="ow-history-results-heading">
      <h3>دفتر گزارش‌ها</h3><span role="status">{n(entries.length)} گزارش در فیلتر فعلی</span>
    </div>
@@ -2047,6 +2056,8 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
        </section>}
     </aside>}
    </div>
+   </div>
+   {!dateResult.invalidRange&&<WorkerPerformancePanel rows={entries} tasks={tasks} units={unitLabels}/>}
  </section>
 }
 
@@ -2189,7 +2200,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
         className="report-btn report-btn--light ow-profile-change-trigger"
         aria-haspopup="dialog" aria-controls="ow-profile-change-dialog"
         onClick={()=>{setProfileTab('new');setEditing(true)}}>درخواست اصلاح و پیگیری</button>
-      <small className="ow-muted">مشخصات فعلی تا بررسی و تأیید مدیر تغییر نمی‌کنند.</small>
+      <WorkerInfoHint label="درباره اصلاح مشخصات" text="درخواست اصلاح پس از ثبت برای مدیر ارسال می‌شود؛ مشخصات فعلی تا بررسی و تأیید او تغییر نخواهند کرد."/>
     </div>
     <dialog ref={profileDialogRef} id="ow-profile-change-dialog"
       className="ow-profile-action-dialog" dir="rtl"
@@ -2498,8 +2509,8 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           </div>
         </div>}
       <div className="ow-worker-task-intro">
-        <div><h1>کارهای من</h1>
-          <p>ابتدا کارهایی که نیاز به اقدام شما دارند؛ سایر وضعیت‌ها و برنامهٔ زمانی در دسترس‌اند.</p>
+        <div className="ow-worker-title-inline"><h1>کارهای من</h1>
+          <WorkerInfoHint label="راهنمای اولویت‌بندی کارها" text="دسته نیازمند اقدام، کارهای موعدرسیده و درخواست‌های نیازمند اصلاح را نشان می‌دهد. برای کارهای بعدی، دسته‌های دیگر یا فیلتر تاریخ را انتخاب کنید."/>
         </div>
         <div className="ow-b3-guide-heading">
           <span className="ow-b3-current-count">{n(tasks.length)} کار در فهرست</span>
@@ -2608,7 +2619,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
             })}/>
           <span>نمایش برنامه همکاران</span>
         </label>
-        <small>برنامه شما همیشه قابل ویرایش است؛ اطلاعات همکاران صرفاً برای هماهنگی نمایش داده می‌شوند.</small>
+        <WorkerInfoHint label="درباره نمایش همکاران" text="برنامه خودتان قابل ویرایش است. بازه‌های همکاران فقط برای هماهنگی و بدون جزئیات خصوصی نمایش داده می‌شوند."/>
       </div>
       <div className="ow-worker-unified-presence">
         <ScheduleEditor key={profile.worker_id}
