@@ -20,7 +20,7 @@ import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persian
 import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonthBounds } from './lib/persianMonthCalendar.mjs'
 import {projectUnifiedPeerDay,sharedPeerClockScale,packPeerDayIntervals,labelPeerInterval} from './lib/workerUnifiedPresence.mjs'
 import {minutesToClock} from './lib/weeklyScheduleGrid.mjs'
-import {useWorkerTeamCalendarSnapshot} from './components/WorkerTeamCalendar'
+import {useUnifiedPeerCalendar} from './lib/useUnifiedPeerCalendar.js'
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 import TaskAssignmentEditor from './components/TaskAssignmentEditor'
 import TeamScheduleOverview from './components/TeamScheduleOverview'
@@ -34,6 +34,7 @@ import {managerReviewItems} from './lib/managerReviewRows.mjs'
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
 const WorkPoolManagerPanel = lazy(()=>import('./components/WorkPoolManagerPanel'))
 const WorkPoolWorkerPanel = lazy(()=>import('./components/WorkPoolWorkerPanel'))
+import * as unifiedPeerApi from './lib/operationsV2'
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
  requestProfileChange,reviewProfileChange,getUnitHourTotals } from './lib/operationsV2'
 
@@ -231,9 +232,10 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
     weekStart:peerWeek.start,weekEnd:peerWeek.end,
     monthStart:month.start,monthEnd:month.end,
   }),[peerWeek.start,peerWeek.end,month.start,month.end])
-  const peerSnapshot=useWorkerTeamCalendarSnapshot({
-    range:peerRange,enabled:showPeers,ownerKey:workerId,
+  const peerSnapshot=useUnifiedPeerCalendar({
+    range:peerRange,enabled:showPeers,workerId,
     refreshRevision:peerRefreshRevision,
+    fetcher:unifiedPeerApi.getWorkerTeamCalendar,
   })
   const peerReady=showPeers&&peerSnapshot.status==='ready'
   const peerDays=useMemo(()=>peerReady
