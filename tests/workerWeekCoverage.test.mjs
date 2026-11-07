@@ -43,10 +43,10 @@ const fixture={
 test('weekly worker coverage shows actual local interval times sorted and respects date overrides',()=>{
  const result=projectWorkerWeekCoverage(projectTeamDay(fixture,date))
  assert.equal(result.planned,3)
- assert.equal(result.taskWithoutPlan,1,'task-only worker not mistaken for scheduled attendance')
+ assert.equal(result.taskWithoutPlan,2,'task-only and explicitly unavailable workers do not become planned attendance')
  assert.equal(result.explicitlyUnavailable,1)
  assert.equal(result.unknown,1)
- assert.deepEqual(result.entries.map(x=>x.workerId),['b','a','e','c'])
+ assert.deepEqual(result.entries.map(x=>x.workerId),['b','a','e','c','d'])
  assert.deepEqual(result.entries.find(x=>x.workerId==='a').windows,
   [{start:'11:00',end:'12:30'}], 'override beats fixed 08:00–09:00')
  assert.equal(result.entries.find(x=>x.workerId==='a').corrected,true)
@@ -54,7 +54,8 @@ test('weekly worker coverage shows actual local interval times sorted and respec
   [{start:'09:00',end:'12:00'}])
  assert.equal(result.entries.find(x=>x.workerId==='c').scheduleUnknown,true)
  assert.deepEqual(result.entries.find(x=>x.workerId==='c').windows,[])
- assert.equal(result.entries.find(x=>x.workerId==='d'),undefined)
+ assert.equal(result.entries.find(x=>x.workerId==='d').explicitlyUnavailable,true)
+ assert.equal(result.entries.find(x=>x.workerId==='d').scheduleUnknown,false)
  assert.equal(result.entries.find(x=>x.workerId==='paused'),undefined)
  assert.equal(result.remaining,0)
 })
