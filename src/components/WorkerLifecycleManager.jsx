@@ -3,12 +3,11 @@ import {
  allowedWorkerTransitions,isWorkerStateReasonValid,normalizeWorkerStateReason,
  workerStateLabels,workerTransitionAction,
 } from '../lib/workerLifecycle.mjs'
-import {getWorkerStateHistory,setWorkerState} from '../lib/operationsV2'
 import './worker-lifecycle.css'
 
 // Actual administrator-only workflow. Server is the source of authorization,
 // allowed transitions, optimistic state precondition, append-only audit log.
-export default function WorkerLifecycleManager({worker,onDone}) {
+export default function WorkerLifecycleManager({worker,onDone,onChangeState,onReadHistory}) {
  const [target,setTarget]=useState('')
  const [reason,setReason]=useState('')
  const [busy,setBusy]=useState(false)
@@ -31,7 +30,7 @@ export default function WorkerLifecycleManager({worker,onDone}) {
  if(!worker)return null
  const validTargets=allowedWorkerTransitions(worker.state)
  const selected=validTargets.includes(target)
- const canSubmit=selected&&isWorkerStateReasonValid(reason)&&!busy&&!refreshRequired
+ const canSubmit=selected&&isWorkerStateReasonValid(reason)&&!busy&&!refreshRequired&&typeof onChangeState==='function'
 
  const loadHistory=async()=>{
   if(historyLoading)return
@@ -39,7 +38,8 @@ export default function WorkerLifecycleManager({worker,onDone}) {
   const id=worker.id
   setHistoryLoading(true);setHistoryError('')
   try{
-   const response=await getWorkerStateHistory(id)
+   if(typeof onReadHistory!=='function')throw Error('history_not_available')
+   const response=await onReadHistory(id)
    if(request!==historyRequest.current)return
    if(!Array.isArray(response))throw Error('invalid_history_response')
    setHistory(response)
@@ -58,7 +58,7 @@ export default function WorkerLifecycleManager({worker,onDone}) {
   lock.current=true
   setBusy(true);setError('');setNotice('')
   try{
-   const result=await setWorkerState({
+   const result=await onChangeState({
     workerId:id,expectedState:original,newState:next,reason:auditReason,
    })
    if(result?.worker_id!==id||result?.previous_state!==original||result?.state!==next) {
