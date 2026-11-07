@@ -1,6 +1,18 @@
 import {projectTeamDay} from './teamCalendarProjection.mjs'
 import {clockToMinutes,minutesToClock} from './weeklyScheduleGrid.mjs'
 
+// Stable decorative tone assigned only from a whitelisted worker id.
+// Never encode privilege, performance, attendance or review state as color.
+// Same peer uses the same visual tone across days/weeks (collisions possible).
+export function peerToneIndex(workerId){
+ const chars=String(workerId||'')
+ let hash=2166136261
+ for(const char of chars){
+  hash=Math.imul(hash^char.codePointAt(0),16777619)
+ }
+ return (hash>>>0)%6
+}
+
 // Every source must first pass the coworker_summary_only RPC whitelist.
 // Exclude the signed-in worker: their own editable calendar is the authority.
 export function projectUnifiedPeerDay(data,date,selfWorkerId){
