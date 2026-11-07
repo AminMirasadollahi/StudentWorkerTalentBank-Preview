@@ -2602,7 +2602,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     </section>}
     {!settingsOpen&&workPoolUIEnabled&&section==='workPool'&&<Suspense fallback={<p className="ow-muted" role="status">در حال آماده‌سازی فرصت‌های کاری…</p>}>
       <WorkPoolWorkerPanel key={profile.worker_id} workerId={profile.worker_id}
-        refreshRevision={refreshRevision}
+        onGuide={openWorkerGuide} refreshRevision={refreshRevision}
         onClaimed={()=>{void refresh();updateNavigation({section:'tasks',taskView:'upcoming'})}}/>
     </Suspense>}
     {!settingsOpen&&section==='availability'&&<section className="report-panel ow-worker-availability-panel">
