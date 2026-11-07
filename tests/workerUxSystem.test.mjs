@@ -43,7 +43,9 @@ test('Persian history filters share one compact toolbar and keep semantics',()=>
 })
 
 test('analytics show truthful zero categories and never infer a missing month',()=>{
- assert.match(panel,/className="ow-worker-performance-chart-disclosure" open/)
+ assert.match(panel,/className="ow-worker-performance-chart-disclosure" aria-label=/)
+ assert.match(panel,/className="ow-worker-unit-donut-ring"/)
+ assert.doesNotMatch(panel,/<summary>نمای نموداری کارکرد تأییدشده<\/summary>/)
  assert.match(panel,/className="ow-worker-performance-zero-month"/)
  assert.match(panel,/className="ow-worker-performance-chart-grid"/)
  assert.match(panel,/metrics\.byMonth\.length>0/)
