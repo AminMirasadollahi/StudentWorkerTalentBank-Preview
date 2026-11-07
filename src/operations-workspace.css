@@ -1883,6 +1883,88 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
   font-size:.78rem; line-height:1.75; margin:.2rem 0 0; }
 .ow-worker-team-calendar .ow-teamcal-dialog-actions { display:none; }
 .ow-worker-team-calendar>.report-alert { max-width:100%; }
+/* SWTB11 worker-first calendar: actual per-person time coverage is visible
+   in the week itself. Scoped to the worker team projection; manager layout,
+   7×4 self-editor and privileged controls are deliberately unaffected. */
+.ow-worker-team-calendar .ow-teamcal-week-row {
+ align-items:start;
+}
+.ow-worker-team-calendar .ow-peer-week-coverage {
+ display:grid;
+ grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:.28rem;
+ min-width:0;
+ margin-top:.18rem;
+}
+.ow-worker-team-calendar .ow-peer-week-person {
+ display:flex;
+ align-items:baseline;
+ flex-wrap:wrap;
+ gap:.12rem .38rem;
+ min-width:0;
+ padding:.34rem .42rem;
+ border:1px solid #d2e5e4;
+ border-radius:.38rem;
+ background:#f4faf8;
+ text-align:right;
+}
+.ow-worker-team-calendar .ow-peer-week-person strong {
+ display:block;
+ flex:1 1 7rem;
+ min-width:0;
+ font-size:.75rem;
+ line-height:1.45;
+ overflow-wrap:anywhere;
+ color:#173c43;
+}
+.ow-worker-team-calendar .ow-peer-week-time {
+ flex:0 1 auto;
+ max-width:100%;
+ font-size:.73rem;
+ color:#11655f;
+ line-height:1.5;
+ unicode-bidi:isolate;
+ white-space:normal;
+ overflow-wrap:anywhere;
+ text-align:left;
+}
+.ow-worker-team-calendar .ow-peer-week-person small {
+ font-size:.65rem;
+ color:#54717a;
+ line-height:1.4;
+}
+.ow-worker-team-calendar .ow-peer-week-person.is-unscheduled {
+ background:#f7f8fa;
+ border-color:#dfe6ea;
+}
+.ow-worker-team-calendar .ow-peer-week-person.is-unscheduled .ow-peer-week-time {
+ color:#526978;
+}
+.ow-worker-team-calendar .ow-peer-week-person.is-unavailable {
+ background:#fff8ec;
+ border-color:#e8d9b8;
+}
+.ow-worker-team-calendar .ow-peer-week-person.is-unavailable .ow-peer-week-time {
+ color:#805e24;
+}
+.ow-worker-team-calendar .ow-peer-week-extra,
+.ow-worker-team-calendar .ow-peer-week-status,
+.ow-worker-team-calendar .ow-peer-week-empty {
+ grid-column:1 / -1;
+ font-size:.69rem;
+ line-height:1.55;
+ color:#546e78;
+}
+.ow-worker-team-calendar .ow-peer-week-extra {
+ font-weight:600;
+ color:#156c66;
+}
+@media (max-width:660px) {
+ .ow-worker-team-calendar .ow-peer-week-coverage {
+  grid-template-columns:minmax(0,1fr);
+ }
+}
+
 
 
 /* SWTB21-D1 / gated Work Pool: compact, workflow-first layout. */

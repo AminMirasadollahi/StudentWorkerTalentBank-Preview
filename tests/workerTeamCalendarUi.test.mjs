@@ -110,9 +110,22 @@ test('mounted worker team view has weekly/month, generic work and no manager edi
   assert.ok(host.querySelector('.ow-teamcal-month'))
   assert.ok(globalThis.__teamCalls.length>=1)
   assert.match(host.textContent,/همکار آزمایشی/)
+  // P0 acceptance: coworker's exact effective slot is now visible in the
+  // weekly view itself, without clicking into a day or gaining edit rights.
+  const week=host.querySelector('.ow-teamcal-week')
+  assert.ok(week)
+  assert.match(week.textContent,/08:00–09:00/)
+  assert.match(week.textContent,/همکار آزمایشی/)
+  assert.equal(week.querySelectorAll('.ow-peer-week-person').length,1)
+  assert.match(week.textContent,/بازه‌ها برنامه‌ریزی‌شده‌اند/)
+  assert.doesNotMatch(week.textContent,/CONFIDENTIAL_RAW_TITLE/)
   assert.doesNotMatch(host.textContent,/PRIVATE_EMAIL_NOT_FOR_PEERS|PRIVATE_ABSENCE_REASON/)
+  // The entire weekly DAY is itself a read-only button containing plain
+  // descriptive words (e.g. "برنامه اصلاح‌شده"). Do not mistake that
+  // description for an actual privileged edit control.
   assert.ok(![...host.querySelectorAll('button')].some(b=>
-   /ثبت.*برنامه|ویرایش نوبت|تعریف کار در این تاریخ/.test(b.textContent)))
+   /^(?:ثبت.*برنامه|ویرایش نوبت|\+? تعریف کار در این تاریخ)$/.test(
+    (b.getAttribute('aria-label')||b.textContent).trim())))
   const anyDay=host.querySelector('.ow-teamcal-week-row')
   assert.ok(anyDay)
   await act(async()=>anyDay.click())
