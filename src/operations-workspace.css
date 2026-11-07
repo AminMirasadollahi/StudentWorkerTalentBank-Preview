@@ -3001,3 +3001,91 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-self-profile-quicklinks-actions{width:100%}
  .ow-self-profile-quicklinks-actions button{flex:1}
 }
+
+
+/* SWTB12: compact self-only worker report analytics. Never impersonates
+   the independent lifetime server total or changes worker ledger writes. */
+.ow-b3-ledger .ow-worker-performance-dates{
+ margin:.3rem 0 .6rem;max-width:54rem;border:1px solid #dae8eb;
+ border-radius:.65rem;background:#f9fcfc;padding:.45rem .75rem;
+}
+.ow-worker-performance-dates>summary{
+ cursor:pointer;color:#25596b;font-size:.82rem;font-weight:700;padding:.25rem 0;
+}
+.ow-worker-performance-date-fields{
+ display:flex;align-items:end;gap:.65rem;flex-wrap:wrap;padding:.5rem 0;
+}
+.ow-worker-performance-date-fields .report-field{max-width:14rem;min-width:11rem}
+.ow-worker-performance-dates>small{font-size:.74rem;line-height:1.8;color:#587480}
+.ow-b3-ledger .ow-worker-performance-reset{margin:0 0 .55rem}
+.ow-worker-performance{
+ border:1px solid #dae8e7;background:#f9fcfb;border-radius:.7rem;
+ padding:.75rem .85rem;margin:.5rem 0 .8rem;
+}
+.ow-worker-performance-heading{display:grid;gap:.15rem;margin-bottom:.65rem}
+.ow-worker-performance-heading h3{
+ font-size:.98rem;line-height:1.7;color:#12394b;margin:0;
+}
+.ow-worker-performance-heading p{
+ margin:0;font-size:.77rem;line-height:1.8;color:#56727c;
+}
+.ow-worker-performance-kpis{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem;
+}
+.ow-worker-performance-kpis article{
+ display:grid;gap:.35rem;background:#fff;border:1px solid #dce8e9;
+ border-radius:.55rem;padding:.65rem .75rem;min-width:0;
+}
+.ow-worker-performance-kpis article span{font-size:.75rem;line-height:1.6;color:#52727d}
+.ow-worker-performance-kpis article strong{
+ color:#133b4f;font-size:1.04rem;line-height:1.5;overflow-wrap:anywhere;
+}
+.ow-worker-performance-warning{
+ margin:.6rem 0 .1rem;padding:.5rem .65rem;
+ border:1px solid #f0dcaa;border-radius:.5rem;background:#fff8e9;
+ color:#765723;font-size:.76rem;line-height:1.8;
+}
+.ow-worker-performance-chart-disclosure{
+ margin-top:.65rem;border-top:1px solid #dfeae9;padding-top:.45rem;
+}
+.ow-worker-performance-chart-disclosure>summary{
+ cursor:pointer;display:list-item;font-size:.8rem;font-weight:700;
+ color:#1b5965;line-height:1.8;padding:.2rem 0;
+}
+.ow-worker-performance-chart-grid{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;
+ margin-top:.55rem;
+}
+.ow-worker-performance-chart-grid>section{
+ background:white;border:1px solid #e0e9eb;border-radius:.55rem;
+ padding:.65rem .7rem;min-width:0;
+}
+.ow-worker-performance-chart-grid h4{
+ margin:0 0 .5rem;font-size:.85rem;color:#193f50;
+}
+.ow-worker-performance-chart-grid p{
+ margin:.25rem 0;font-size:.76rem;line-height:1.8;color:#587480;
+}
+.ow-worker-performance-bars{display:grid;gap:.45rem}
+.ow-worker-performance-bar-row{
+ display:grid;grid-template-columns:minmax(4.4rem,34%) minmax(0,1fr) minmax(4.2rem,23%);
+ gap:.45rem;align-items:center;font-size:.71rem;min-width:0;
+}
+.ow-worker-performance-bar-row>span{line-height:1.6;overflow-wrap:anywhere}
+.ow-worker-performance-bar-row>strong{text-align:start;font-size:.71rem;line-height:1.5}
+.ow-worker-performance-bar-track{
+ background:#edf5f5;border-radius:.25rem;height:.65rem;min-width:0;overflow:hidden;
+}
+.ow-worker-performance-bar-track>div{
+ height:100%;background:#208f88;border-radius:.25rem;
+}
+.ow-worker-performance-note{
+ margin:.6rem 0 0;font-size:.72rem;line-height:1.8;color:#577782;
+}
+@media(max-width:800px){
+ .ow-worker-performance-chart-grid{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+ .ow-worker-performance-kpis{grid-template-columns:1fr}
+ .ow-worker-performance-date-fields .report-field{max-width:none;min-width:0;width:100%}
+}
