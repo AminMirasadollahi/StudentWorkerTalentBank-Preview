@@ -124,7 +124,7 @@ test('mounted worker team view has weekly/month, generic work and no manager edi
   // descriptive words (e.g. "برنامه اصلاح‌شده"). Do not mistake that
   // description for an actual privileged edit control.
   assert.ok(![...host.querySelectorAll('button')].some(b=>
-   /^(?:ثبت.*برنامه|ویرایش نوبت|\\+? تعریف کار در این تاریخ)$/.test(
+   /^(?:ثبت.*برنامه|ویرایش نوبت|\+? تعریف کار در این تاریخ)$/.test(
     (b.getAttribute('aria-label')||b.textContent).trim())))
   const anyDay=host.querySelector('.ow-teamcal-week-row')
   assert.ok(anyDay)
