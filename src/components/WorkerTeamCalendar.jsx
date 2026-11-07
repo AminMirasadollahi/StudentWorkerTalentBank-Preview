@@ -84,58 +84,37 @@ export function mergeWorkerTeamCalendar(results){
  return {workers:roster,weekly_slots:[...weekly.values()],exceptions,tasks}
 }
 
-// Single source of truth for the server's role-scoped coworker calendar.
-// The new unified self editor and the historical read-only calendar both use
-// this validated, fail-closed hook. No request is sent while disabled.
-export function useWorkerTeamCalendarSnapshot({
- range,enabled=true,refreshRevision=0,ownerKey='legacy-team-page',
-}){
+export default function WorkerTeamCalendar({todayIso,refreshRevision=0}){
+ const [range,setRange]=useState(null)
  const [revision,setRevision]=useState(0)
- const [snapshot,setSnapshot]=useState({key:null,status:'idle',data:EMPTY})
+ const [snapshot,setSnapshot]=useState({status:'idle',data:EMPTY})
  const sequence=useRef(0)
- const rangeKey=[range?.weekStart,range?.weekEnd,range?.monthStart,range?.monthEnd].join('|')
- const key=[ownerKey,rangeKey,refreshRevision,revision].join('|')
+ const onVisibleRangeChange=useCallback(next=>{
+  setRange(prev=>equals(prev,next)?prev:next)
+ },[])
  useEffect(()=>{
-  if(!enabled||!range){
-   ++sequence.current
-   setSnapshot({key:null,status:'idle',data:EMPTY})
-   return
-  }
+  if(!range)return
   let alive=true
   const index=++sequence.current
-  setSnapshot({key,status:'loading',data:EMPTY})
+  setSnapshot({status:'loading',data:EMPTY})
   let windows
   try{windows=teamCalendarRequestWindows(range)}
   catch{
-   setSnapshot({key,status:'error',data:EMPTY})
+   setSnapshot({status:'error',data:EMPTY})
    return ()=>{alive=false}
   }
   Promise.all(windows.map(window=>
    getWorkerTeamCalendar(window).then(data=>limitedResponse(data,window))
   )).then(all=>{
    if(!alive||sequence.current!==index)return
-   setSnapshot({key,status:'ready',data:mergeWorkerTeamCalendar(all)})
+   setSnapshot({status:'ready',data:mergeWorkerTeamCalendar(all)})
   }).catch(()=>{
    if(!alive||sequence.current!==index)return
-   // Clear previously fetched coworkers on auth/network failure; do not
-   // display obsolete data from another worker, month or credentials.
-   setSnapshot({key,status:'error',data:EMPTY})
+   // Never show previously fetched coworkers after a failed reauth/network read.
+   setSnapshot({status:'error',data:EMPTY})
   })
   return ()=>{alive=false}
- },[enabled,rangeKey,key])
- const retry=useCallback(()=>setRevision(r=>r+1),[])
- if(!enabled||!range)return {status:'idle',data:EMPTY,retry}
- return snapshot.key===key
-  ?{status:snapshot.status,data:snapshot.data,retry}
-  :{status:'loading',data:EMPTY,retry}
-}
-
-export default function WorkerTeamCalendar({todayIso,refreshRevision=0}){
- const [range,setRange]=useState(null)
- const onVisibleRangeChange=useCallback(next=>{
-  setRange(prev=>equals(prev,next)?prev:next)
- },[])
- const snapshot=useWorkerTeamCalendarSnapshot({range,refreshRevision})
+ },[range,refreshRevision,revision])
  return <div className="ow-worker-team-calendar" aria-label="برنامه همکاران ـ فقط مشاهده">
    <div className="ow-worker-team-calendar-notice">
      <strong>برنامه همکاران · فقط مشاهده</strong>
@@ -147,7 +126,7 @@ export default function WorkerTeamCalendar({todayIso,refreshRevision=0}){
    {snapshot.status==='error'&&<div className="report-alert report-alert--error" role="alert">
      <p>برنامه همکاران در دسترس نیست. اطلاعات قدیمی برای حفاظت از حریم خصوصی پنهان شدند.</p>
      <button type="button" className="report-btn report-btn--light"
-       onClick={snapshot.retry}>تلاش مجدد</button>
+       onClick={()=>setRevision(v=>v+1)}>تلاش مجدد</button>
    </div>}
    {(snapshot.status==='ready'||snapshot.status==='loading'||snapshot.status==='idle')&&
       <TeamScheduleOverview data={snapshot.data} todayIso={todayIso}
