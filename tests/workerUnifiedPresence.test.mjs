@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {projectUnifiedPeerDay,sharedPeerClockScale,packPeerDayIntervals,
  labelPeerInterval} from '../src/lib/workerUnifiedPresence.mjs'
+import {unifiedPeerRequestWindows,sanitizeUnifiedPeerResponse,mergeUnifiedPeerWindows}
+ from '../src/lib/useUnifiedPeerCalendar.js'
 
 const date='2026-11-07'
 function fixture(){
@@ -103,4 +105,28 @@ test('explicit unavailable worker with assigned task is not incorrectly describe
  assert.equal(person.kind,'unavailable')
  assert.deepEqual(person.windows,[])
  assert.equal(person.assignedCount,1)
+})
+
+test('month/week requests do not overlap, and actor changes require a new scoped request',()=>{
+ assert.deepEqual(unifiedPeerRequestWindows({
+  monthStart:'2026-11-01',monthEnd:'2026-11-30',
+  weekStart:'2026-10-31',weekEnd:'2026-11-06',
+ }),[{from:'2026-11-01',to:'2026-11-30'},
+  {from:'2026-10-31',to:'2026-10-31'}])
+ assert.throws(()=>unifiedPeerRequestWindows({}),/invalid_unified_peer_calendar_window/)
+})
+test('public client keeps only whitelisted fields, rejects raw task titles and inconsistent roster',()=>{
+ const w={from:'2026-11-01',to:'2026-11-30'}
+ const good={ok:true,scope:'coworker_summary_only',start_date:w.from,end_date:w.to,
+  workers:[{id:'SYNTHETIC-A',name:'همکار ساختگی',state:'active',
+   private_phone:'SHOULD_NEVER_RENDER'}],
+  weekly_slots:[],exceptions:[],tasks:[]}
+ const clean=sanitizeUnifiedPeerResponse(good,w)
+ assert.doesNotMatch(JSON.stringify(clean),/SHOULD_NEVER_RENDER/)
+ assert.throws(()=>sanitizeUnifiedPeerResponse({...good,
+  tasks:[{title:'PRIVATE_TASK',state:'scheduled'}]},w),/untrusted_unified_peer_task/)
+ assert.throws(()=>sanitizeUnifiedPeerResponse({...good,
+  scope:'manager_full_calendar'},w),/untrusted_unified_peer_response/)
+ assert.throws(()=>mergeUnifiedPeerWindows([clean,
+  {...clean,workers:[{id:'DIFFERENT'}]}]),/unified_peer_roster_changed/)
 })
