@@ -43,8 +43,8 @@ export function WorkerGuideWelcome({onBegin,onSkip}){
    </div>
  </dialog>
 }
-export function WorkerGuideSpotlight({scope,currentSection,onNavigate,onClose}){
- const steps=getWorkerGuideSteps(scope)
+export function WorkerGuideSpotlight({scope,currentSection,onNavigate,onClose,includeWorkPool=true}){
+ const steps=getWorkerGuideSteps(scope,{includeWorkPool})
  const [index,setIndex]=useState(0)
  const [layout,setLayout]=useState(null)
  const dialog=useRef(null)
