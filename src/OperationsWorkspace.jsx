@@ -18,6 +18,9 @@ import WorkerLifecycleReadOnlyPreview from './components/WorkerLifecycleReadOnly
 import { workerStateLabels } from './lib/workerLifecycle.mjs'
 import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persianWeekBounds, suggestNextWindow, scopeSelfWorkRows } from './lib/weeklyScheduleGrid.mjs'
 import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonthBounds } from './lib/persianMonthCalendar.mjs'
+import {projectUnifiedPeerDay,sharedPeerClockScale,packPeerDayIntervals,labelPeerInterval} from './lib/workerUnifiedPresence.mjs'
+import {minutesToClock} from './lib/weeklyScheduleGrid.mjs'
+import {useWorkerTeamCalendarSnapshot} from './components/WorkerTeamCalendar'
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 import TaskAssignmentEditor from './components/TaskAssignmentEditor'
 import TeamScheduleOverview from './components/TeamScheduleOverview'
@@ -29,8 +32,6 @@ import {buildManagerHistoryWorkbook} from './lib/managerHistoryWorkbook.mjs'
 import {managerReviewItems} from './lib/managerReviewRows.mjs'
 // Load the optional manager surface ONLY after backend rollout explicitly enables it.
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
-// Worker view loads only on explicit team switch; never fetch admin operations.
-const WorkerTeamCalendar = lazy(()=>import('./components/WorkerTeamCalendar'))
 const WorkPoolManagerPanel = lazy(()=>import('./components/WorkPoolManagerPanel'))
 const WorkPoolWorkerPanel = lazy(()=>import('./components/WorkPoolWorkerPanel'))
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
@@ -188,13 +189,14 @@ function SectionTabs({value,onChange,options}) {
       onClick={()=>onChange(id)}>{title}</button>)}
   </nav>
 }
-function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate=''}) {
+function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',showPeers=false,peerRefreshRevision=0}) {
   const [effective,setEffective]=useState(today())
   const [editingDay,setEditingDay]=useState(null)
   const [editingSlot,setEditingSlot]=useState(null)
   const [draftWindows,setDraftWindows]=useState([])
   const [monthAnchor,setMonthAnchor]=useState(today())
   const [selectedDate,setSelectedDate]=useState('')
+  const [peerSelectedDate,setPeerSelectedDate]=useState('')
   const dateDialogRef=useRef(null)
   const lastDateButtonRef=useRef(null)
   const [exceptionKind,setExceptionKind]=useState('replacement_intervals')
@@ -222,6 +224,38 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate=''})
   },[selectedDate])
   const month=persianMonthCells(monthAnchor)
   const calendarData=data||{}
+  // The worker's OWN 7×4 editor stays authoritative. This additional feed
+  // is only a whitelisted, role-scoped visual projection, disabled by default.
+  const peerWeek=useMemo(()=>persianWeekBounds(effective),[effective])
+  const peerRange=useMemo(()=>({
+    weekStart:peerWeek.start,weekEnd:peerWeek.end,
+    monthStart:month.start,monthEnd:month.end,
+  }),[peerWeek.start,peerWeek.end,month.start,month.end])
+  const peerSnapshot=useWorkerTeamCalendarSnapshot({
+    range:peerRange,enabled:showPeers,ownerKey:workerId,
+    refreshRevision:peerRefreshRevision,
+  })
+  const peerReady=showPeers&&peerSnapshot.status==='ready'
+  const peerDays=useMemo(()=>peerReady
+    ?Array.from({length:7},(_,i)=>projectUnifiedPeerDay(peerSnapshot.data,
+       firstMatchingWeekday(effective,dayLabels[i][0]),workerId))
+    :[],[peerReady,peerSnapshot.data,effective,workerId])
+  const peerDaysByDate=useMemo(()=>new Map(peerDays.map(day=>[day.date,day])),[peerDays])
+  const clockScale=useMemo(()=>sharedPeerClockScale(peerDays),[peerDays])
+  const peerMonthCounts=useMemo(()=>peerReady
+    ?new Map(month.days.filter(Boolean).map(day=>{
+      const record=projectUnifiedPeerDay(peerSnapshot.data,day.date,workerId)
+      return [day.date,record.plannedCount]
+    })) :new Map(),[peerReady,peerSnapshot.data,month.days,workerId])
+  const peerDetail=useMemo(()=>peerReady&&peerSelectedDate
+    ?projectUnifiedPeerDay(peerSnapshot.data,peerSelectedDate,workerId):null,
+    [peerReady,peerSelectedDate,peerSnapshot.data,workerId])
+  const percentForMinute=minute=>((minute-clockScale.start)/
+    (clockScale.end-clockScale.start))*100
+  const showPeerDay=date=>{
+    setPeerSelectedDate(date)
+    if(date<month.start||date>month.end)setMonthAnchor(date)
+  }
   const weeklyValidation=validateDailyWindows(draftWindows)
   const exceptionValidation=exceptionKind==='unavailable'
     ? {ok:true,intervals:[],minutes:0}
@@ -273,6 +307,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate=''})
         }))
       : selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,isoWeekday(date),date)
     setSelectedDate(date)
+    if(showPeers)setPeerSelectedDate(date)
     setExceptionSlot(null)
     setExceptionKind(kind)
     setExceptionWindows(windows.length?windows:[suggestNextWindow([])])
@@ -317,7 +352,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate=''})
   const setMonth=direction=>{
     setMonthAnchor(previous=>direction==='previous'
       ?previousPersianMonth(previous):nextPersianMonth(previous))
-    setSelectedDate('');setError('');setSaveState('')
+    setSelectedDate('');setPeerSelectedDate('');setError('');setSaveState('')
   }
   const editWindow=(setter,index,field,value)=>
     setter(current=>current.map((w,i)=>i===index?{...w,[field]:value}:w))
@@ -354,7 +389,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate=''})
     </div>
   )
   if(!workerId)return <p className="ow-muted">یک دانشجوکار انتخاب کنید.</p>
-  return <div className="ow-presence-hub">
+  return <div className={'ow-presence-hub'+(showPeers?' is-peer-overlay-visible':'')}>
     <section className="ow-presence-week" data-swtb-guide="availability-week" aria-label="برنامه ثابت هفتگی">
       <div className="ow-presence-section-title">
         <h3>برنامه ثابت هفتگی</h3>
@@ -369,13 +404,39 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate=''})
       <div className="ow-week-grid-header" aria-hidden="true">
         <span>روز</span>{[1,2,3,4].map(i=><span key={i}>نوبت {n(i)}</span>)}
       </div>
+      {showPeers&&<div className="ow-unified-peer-status" aria-live="polite">
+        {peerSnapshot.status==='loading'||peerSnapshot.status==='idle'
+          ?<span>در حال دریافت امن برنامه همکاران…</span>:null}
+        {peerSnapshot.status==='error'&&<span role="alert">
+          برنامه همکاران در دسترس نیست؛ اطلاعات قبلی پنهان شدند.
+          <button type="button" className="ow-mini-btn"
+            onClick={peerSnapshot.retry}>تلاش مجدد</button>
+        </span>}
+        {peerReady&&<span>زمان‌ها برنامه‌ریزی‌شده‌اند، نه حضور قطعی یا ساعات تأییدشده.</span>}
+      </div>}
+      {peerReady&&<div className="ow-unified-peer-ruler" aria-label="محور مشترک ساعت برای تمام روزهای این هفته">
+        <span>ساعت</span>
+        <div className="ow-unified-peer-ruler-track">
+          {clockScale.ticks.map(minute=><span key={minute}
+            className="ow-unified-peer-tick"
+            style={{right:percentForMinute(minute)+'%'}}>
+            {minutesToClock(minute)}</span>)}
+        </div>
+      </div>}
       <div className="ow-week-grid">
         {dayLabels.map(([id,name])=>{
           const date=firstMatchingWeekday(effective,id)
           const slots=selectedWeeklyWindows(calendarData.weekly_slots||[],workerId,id,date)
+          const peerDay=peerDaysByDate.get(date)
+          const packed=peerDay?packPeerDayIntervals(peerDay):null
           return <div className="ow-week-row-shell" key={id}>
             <div className="ow-week-row">
-              <span className="ow-week-day"><strong>{name}</strong></span>
+              <span className="ow-week-day">
+                {showPeers?<button type="button" className="ow-unified-peer-day-link"
+                  onClick={()=>showPeerDay(date)}
+                  aria-label={'نمایش جزئیات برنامه همکاران در '+name}>
+                  {name}</button>:<strong>{name}</strong>}
+              </span>
               {[0,1,2,3].map(index=>{
                 const slot=slots[index]
                 const isEditing=editingDay===id&&editingSlot===index
@@ -412,6 +473,41 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate=''})
                 </div>
               })}
             </div>
+            {peerReady&&peerDay&&<div className="ow-unified-peer-day" aria-label={'برنامه همکاران در '+name}>
+              <span className="ow-unified-peer-label">همکاران</span>
+              <div className="ow-unified-peer-tracks">
+                {packed.lanes.map((lane,laneIndex)=><div
+                  className="ow-unified-peer-lane" key={laneIndex}>
+                  {lane.map((item,index)=>{
+                    const width=percentForMinute(item.end)-percentForMinute(item.start)
+                    return <button type="button"
+                      className={'ow-unified-peer-bar'+(laneIndex?' is-second':'')}
+                      key={item.workerId+'-'+item.start+'-'+index}
+                      style={{right:percentForMinute(item.start)+'%',width:width+'%'}}
+                      title={labelPeerInterval(item)}
+                      aria-label={labelPeerInterval(item)+'؛ فقط مشاهده'}
+                      onClick={()=>showPeerDay(date)}>
+                      {width>=15?item.name:item.name.slice(0,1)}
+                    </button>
+                  })}
+                </div>)}
+                {packed.hiddenIntervalCount>0&&<button type="button"
+                  className="ow-unified-peer-overflow"
+                  onClick={()=>showPeerDay(date)}>
+                  +{n(packed.hiddenIntervalCount)} بازه دیگر · مشاهده جزئیات روز
+                </button>}
+                {peerDay.unavailableCount>0&&<small className="ow-unified-peer-hint">
+                  {n(peerDay.unavailableCount)} نفر عدم حضور ثبت‌شده
+                </small>}
+                {peerDay.taskWithoutPlanCount>0&&<small className="ow-unified-peer-hint">
+                  {n(peerDay.taskWithoutPlanCount)} نفر دارای کار بدون بازه حضور
+                </small>}
+                {packed.totalLanes===0&&peerDay.unavailableCount===0
+                 &&peerDay.taskWithoutPlanCount===0&&<small className="ow-unified-peer-hint">
+                  برنامه‌ای ثبت نشده؛ وضعیت همکاران نامشخص است.
+                 </small>}
+              </div>
+            </div>}
           </div>
         })}
       </div>
@@ -459,11 +555,37 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate=''})
                 {daily.windows.length===1?timings:`${daily.windows.length} بازه · ${daily.windows[0].start}`}
               </small>:null}
             {hasException&&daily.kind!=='unavailable'&&<i className="ow-exception-mark">تغییر</i>}
+            {peerReady&&(peerMonthCounts.get(day.date)||0)>0&&<small
+              className="ow-unified-peer-month-count">
+              {n(peerMonthCounts.get(day.date))} همکار دارای برنامه
+            </small>}
             {tasks.slice(0,2).map(t=><small className="ow-day-task" key={t.id} title={t.title}>{t.title}</small>)}
             {tasks.length>2&&<small className="ow-task-count">+{n(tasks.length-2)} کار</small>}
           </button>
         })}
       </div>
+      {peerReady&&peerDetail&&<aside className="ow-unified-peer-detail"
+        aria-label={'جزئیات همکاران در '+pretty(peerSelectedDate)}>
+        <div className="ow-presence-section-title">
+          <strong>برنامه همکاران · {pretty(peerSelectedDate)}</strong>
+          <button type="button" className="ow-mini-btn"
+            onClick={()=>setPeerSelectedDate('')}>بستن جزئیات</button>
+        </div>
+        <p className="ow-muted">زمان‌های پیش‌بینی‌شده، صرفاً جهت هماهنگی؛ امکان ویرایش ندارند.</p>
+        <div className="ow-unified-peer-detail-list">
+          {peerDetail.peers.filter(p=>p.windows.length||p.kind==='unavailable'||p.assignedCount>0)
+            .map(person=><div key={person.workerId} className="ow-unified-peer-detail-row">
+              <strong>{person.name}</strong>
+              <span>{person.windows.length
+                ?person.windows.map(w=>w.start+'–'+w.end).join('، ')
+                :person.kind==='unavailable'?'عدم حضور ثبت‌شده':'زمان حضور نامشخص'}
+              </span>
+              {person.assignedCount>0&&<small>{n(person.assignedCount)} فعالیت ثبت‌شده</small>}
+            </div>)}
+          {!peerDetail.peers.some(p=>p.windows.length||p.kind==='unavailable'||p.assignedCount>0)
+            &&<p className="ow-muted">برای این تاریخ، برنامه‌ای ثبت نشده است؛ این به معنای غیبت نیست.</p>}
+        </div>
+      </aside>}
       <dialog ref={dateDialogRef} className="ow-presence-date-dialog" dir="rtl"
         onKeyDown={trapModalTab}
         aria-labelledby="ow-presence-day-dialog-title"
