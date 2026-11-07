@@ -30,6 +30,9 @@ const plugin={
       return '\0qa-v2-no-network'
     if(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operations')
       return '\0qa-worker-no-network'
+    if(importer?.endsWith('/src/components/WorkerTeamCalendar.jsx')
+      &&source==='../lib/operationsV2')
+      return '\0qa-v2-no-network'
     
   if(importer?.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operations')
    return '\0qa-worker-no-network'
@@ -45,6 +48,15 @@ const plugin={
       'export const cancelLibraryDeskShift=async()=>{throw Error("QA_NO_CANCELLATION")};',
       'export const getUnitHourTotals=async()=>({scope:"worker",units:[{unit:"library",name:"کتابخانه",approved_minutes:55,pending_requested_minutes:0,pending_reports:0}]});',
       'export const getAdminWorkV2=async()=>globalThis.__workerFocusFixture;',
+      'export const getWorkerTeamCalendar=async({from,to})=>{',
+      'globalThis.__qaPeerCalls.push({from,to});',
+      'if(globalThis.__qaPeerReject)throw Error("FAKE_SCOPE_DENIED");',
+      'return {ok:true,scope:"coworker_summary_only",start_date:from,end_date:to,',
+      'workers:[{id:"FAKE-WORKER-NOT-REAL",name:"خود من",state:"active"},',
+      '{id:"FAKE-PEER-A",name:"همکار غیرواقعی",state:"active",email:"PRIVATE_PEER_EMAIL"}],',
+      'weekly_slots:Array.from({length:7},(_,i)=>({worker_id:"FAKE-PEER-A",',
+      'weekday_iso:i+1,start_minute:480,end_minute:600,valid_from:"2025-01-01",valid_until:null})),',
+      'exceptions:[],tasks:[]};};',
       'export const getMyWorkV2=async()=>{if(globalThis.__workerWorkPlan?.length)return await globalThis.__workerWorkPlan.shift()();if(globalThis.__workerReadDenied)throw Error("worker_access_denied");return globalThis.__workerFocusFixture;};',
       'export const getMyWorkerProfileV2=async()=>{if(globalThis.__qaProfileReadDenied)throw Error("worker_access_denied");return {worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"};};',
       'export const getMyProfileChangeRequests=async()=>{if(globalThis.__qaProfileHistoryDenied)throw Error("worker_access_denied");return globalThis.__profileChangeRequests;};',
@@ -76,6 +88,8 @@ before(async()=>{
  globalThis.__workerFocusFixture=fixture()
  globalThis.__workerFocusCalls=[]
  globalThis.__workerExceptionCalls=[]
+ globalThis.__qaPeerCalls=[]
+ globalThis.__qaPeerReject=false
  globalThis.__profileChangeCalls=[]
  globalThis.__profileChangeRequests=[]
  globalThis.__workerReadDenied=false
@@ -100,7 +114,7 @@ after(async()=>{
  dom?.window.close()
  for(const p of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT',
   '__workerFocusFixture','__workerFocusCalls','__workerExceptionCalls',
-  '__profileChangeCalls','__profileChangeRequests','__workerReadDenied',
+  '__qaPeerCalls','__qaPeerReject','__profileChangeCalls','__profileChangeRequests','__workerReadDenied',
   '__workerWorkPlan','__qaAllowWorkerSubmit','__qaSubmitFailCount',
   '__qaSubmitCalls','__qaStartCalls','__qaDenyReadAfterSubmission',
   '__qaProfileReadDenied','__qaProfileHistoryDenied','__qaProfileQueueStale',
@@ -152,6 +166,58 @@ test('one worker tasks tab, range choices and safely preserved selection after u
   assert.deepEqual([...ui.host.querySelectorAll('.ow-tabs button')].map(b=>b.textContent.trim()),
     ['کارهای من','فرصت‌های کاری','زمان حضور','سوابق گزارش‌ها','حساب من'])
  }finally{await ui.dispose()}
+})
+test('unified presence defaults to self only and overlays role-scoped peer hours on demand',async()=>{
+ globalThis.__qaPeerCalls=[]
+ globalThis.__qaPeerReject=false
+ const ui=await setup()
+ try{
+  await ui.clickText('زمان حضور')
+  assert.equal(ui.host.querySelectorAll('.ow-week-row').length,7)
+  assert.equal(ui.host.querySelectorAll('.ow-week-slot').length,28)
+  assert.ok(ui.host.querySelector('.ow-month-grid'))
+  assert.equal(ui.host.querySelector('.ow-worker-presence-view-switch'),null)
+  const toggle=ui.host.querySelector('.ow-worker-unified-toggle input')
+  assert.ok(toggle&&!toggle.checked)
+  assert.equal(globalThis.__qaPeerCalls.length,0,'OFF must never request peer data')
+  assert.equal(ui.host.querySelector('.ow-unified-peer-ruler'),null)
+  await act(async()=>{toggle.click();await Promise.resolve();await Promise.resolve()})
+  assert.equal(toggle.checked,true)
+  assert.ok(globalThis.__qaPeerCalls.length>0)
+  const bars=ui.host.querySelectorAll('.ow-unified-peer-bar')
+  assert.ok(bars.length>0)
+  assert.match(bars[0].getAttribute('aria-label'),/همکار غیرواقعی، 08:00 تا 10:00/)
+  assert.ok(ui.host.querySelector('.ow-unified-peer-ruler'))
+  assert.ok(ui.host.querySelector('.ow-unified-peer-month-count'))
+  assert.doesNotMatch(ui.host.textContent,/PRIVATE_PEER_EMAIL|خود من/)
+  assert.equal(ui.host.querySelectorAll('.ow-week-slot').length,28)
+  await act(async()=>bars[0].click())
+  assert.ok(ui.host.querySelector('.ow-unified-peer-detail'))
+  assert.match(ui.host.querySelector('.ow-unified-peer-detail').textContent,/همکار غیرواقعی/)
+  await act(async()=>toggle.click())
+  assert.equal(toggle.checked,false)
+  assert.equal(ui.host.querySelector('.ow-unified-peer-detail'),null)
+  assert.equal(ui.host.querySelector('.ow-unified-peer-ruler'),null)
+  assert.doesNotMatch(ui.host.textContent,/همکار غیرواقعی/)
+  const count=globalThis.__qaPeerCalls.length
+  await ui.click('button[aria-label="ویرایش برنامه شنبه نوبت 1"]')
+  assert.equal(globalThis.__qaPeerCalls.length,count)
+ }finally{await ui.dispose()}
+})
+test('peer authorization failure keeps independent personal schedule editable',async()=>{
+ globalThis.__qaPeerCalls=[]
+ globalThis.__qaPeerReject=true
+ const ui=await setup()
+ try{
+  await ui.clickText('زمان حضور')
+  const toggle=ui.host.querySelector('.ow-worker-unified-toggle input')
+  await act(async()=>{toggle.click();await Promise.resolve();await Promise.resolve()})
+  assert.match(ui.host.textContent,/برنامه همکاران در دسترس نیست/)
+  assert.equal(ui.host.querySelector('.ow-unified-peer-bar'),null)
+  assert.equal(ui.host.querySelectorAll('.ow-week-slot').length,28)
+  await ui.click('button[aria-label="ویرایش برنامه شنبه نوبت 1"]')
+  assert.ok(ui.host.querySelector('.ow-slot-editor'))
+ }finally{globalThis.__qaPeerReject=false;await ui.dispose()}
 })
 test('seven weekday rows render four independent slots and safe per-day single RPC request',async()=>{
  const ui=await setup()
