@@ -1243,3 +1243,33 @@ test('global, presence and opportunities guide triggers open a real tour without
   else proto.close=oldClose
  }
 })
+
+
+test('zero-credit worker history renders an accessible donut and monthly baseline without fake approval',async()=>{
+ const data=fixture()
+ data.tasks[0].unit='library'
+ data.tasks[0].state='completed'
+ data.time_entries=[{
+  id:'QA-ZERO-APPROVED',task_id:'FAKE-TASK',worker_id:worker,
+  work_date:day(),review_state:'approved',reported_minutes:10,approved_minutes:0,
+ }]
+ data.approved_minutes_total=0
+ globalThis.__workerFocusFixture=data
+ const beforeWrites=globalThis.__workerFocusCalls.length
+ const ui=await setup()
+ try{
+  await ui.clickText('سوابق گزارش‌ها')
+  const area=ui.host.querySelector('.ow-worker-performance')
+  assert.ok(area)
+  assert.equal(area.querySelector('.ow-worker-performance-chart-disclosure summary'),null,
+    'charts are not hidden behind a disclosure')
+  const donut=area.querySelector('.ow-worker-unit-donut')
+  assert.ok(donut)
+  assert.match(donut.textContent,/۰ دقیقه/)
+  assert.equal(donut.querySelectorAll('li').length,3,'three real configured work units')
+  assert.match(donut.querySelector('.ow-worker-unit-donut-ring').style.background,/rgb\(227, 236, 239\)|#e3ecef/i)
+  assert.ok(area.querySelector('.ow-worker-performance-bars'),'zero-approved report has a genuine month')
+  assert.equal(globalThis.__workerFocusCalls.length,beforeWrites,
+    'a visual graph must never create approval or presence data')
+ }finally{globalThis.__workerFocusFixture=fixture();await ui.dispose()}
+})
