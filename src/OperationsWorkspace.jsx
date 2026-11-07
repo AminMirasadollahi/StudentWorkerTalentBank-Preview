@@ -20,7 +20,7 @@ import WorkerLifecycleReadOnlyPreview from './components/WorkerLifecycleReadOnly
 import { workerStateLabels } from './lib/workerLifecycle.mjs'
 import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persianWeekBounds, suggestNextWindow, scopeSelfWorkRows } from './lib/weeklyScheduleGrid.mjs'
 import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonthBounds } from './lib/persianMonthCalendar.mjs'
-import {projectUnifiedPeerDay,sharedPeerClockScale,packPeerDayIntervals,labelPeerInterval} from './lib/workerUnifiedPresence.mjs'
+import {projectUnifiedPeerDay,sharedPeerClockScale,packPeerDayIntervals,labelPeerInterval,peerToneIndex} from './lib/workerUnifiedPresence.mjs'
 import {minutesToClock} from './lib/weeklyScheduleGrid.mjs'
 import {useUnifiedPeerCalendar} from './lib/useUnifiedPeerCalendar.js'
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
@@ -87,8 +87,8 @@ function UnitHourSummary({scope,approvedTotal=null,refreshRevision=0}) {
    data-swtb-guide={scope==='worker'?'history-summary':undefined}
    aria-label="مجموع ساعات تأییدشده به تفکیک واحد فعالیت">
    <div className="ow-unit-hours__heading">
-     <div><h3>{scope==='worker'?'خلاصه ساعات تأییدشده':'ساعات به تفکیک واحد فعالیت'}</h3>
-       <small>{scope==='worker'?'به تفکیک واحد انجام کار':'مجموع کل زمان تأییدشده در سرور؛ مستقل از واحد ثبت‌نام دانشجو'}</small></div>
+     <div><h3>{scope==='worker'?'جمع قطعی ساعات تأییدشده':'ساعات به تفکیک واحد فعالیت'}</h3>
+       <small>{scope==='worker'?'تمام دوره‌های مجاز · مستقل از فیلترهای پایین صفحه':'مجموع کل زمان تأییدشده در سرور؛ مستقل از واحد ثبت‌نام دانشجو'}</small></div>
      {scope==='worker'&&<div className="ow-unit-hours__total">
        <span>مجموع تأییدشده</span><strong>{approvedTotal===null?'—':exactDuration(approvedTotal)}</strong>
      </div>}
@@ -490,7 +490,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
                   {lane.map((item,index)=>{
                     const width=percentForMinute(item.end)-percentForMinute(item.start)
                     return <button type="button"
-                      className={'ow-unified-peer-bar'+(laneIndex?' is-second':'')}
+                      className={'ow-unified-peer-bar ow-unified-peer-tone-'+peerToneIndex(item.workerId)+(laneIndex?' is-second':'')}
                       key={item.workerId+'-'+item.start+'-'+index}
                       style={{right:percentForMinute(item.start)+'%',width:width+'%'}}
                       title={labelPeerInterval(item)}
@@ -1911,9 +1911,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
   ['all','همه'],['submitted','منتظر بررسی'],
   ['changes_requested','نیازمند اصلاح'],['rejected','ردشده'],['approved','تأییدشده']
  ]
- const approved=records.filter(e=>e.review_state==='approved')
- const total=approvedMinutesTotal??approved.reduce(
-  (sum,e)=>sum+Number(e.approved_minutes||0),0)
+ const total=approvedMinutesTotal
  useLayoutEffect(()=>{
    if(detail)document.getElementById('ow-report-inspector')?.focus({preventScroll:true})
  },[detail?.id])
@@ -1942,49 +1940,54 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
        onClick={()=>onGuide?.('history')}>؟ راهنمای این بخش</button>
    </div>
    <UnitHourSummary scope="worker" approvedTotal={total} refreshRevision={refreshRevision}/>
-   <div className="ow-history-controls" data-swtb-guide="history-controls">
-   <div className="ow-unit-history-filter">
-     <label className="report-field"><span>فیلتر واحد انجام کار</span>
-       <select aria-label="فیلتر واحد گزارش‌های من" value={unitFilter}
-         onChange={e=>{setUnitFilter(e.target.value);setSelectedReportId(null)}}>
-         <option value="">تمام واحدها</option>
-         {Object.entries(unitLabels).map(([id,name])=><option key={id} value={id}>{name}</option>)}
-       </select>
-     </label>
-   </div>
-   <div className="ow-history-filter" role="group" aria-label="فیلتر وضعیت گزارش‌ها">
-     {options.map(([id,label])=><button type="button" key={id}
-       className={view===id?'is-selected':''} aria-pressed={view===id}
-       onClick={()=>{setSelectedReportId(null);setView(id)}}>
-       <span>{label}</span><b>{n(counts[id])}</b>
-     </button>)}
-   </div>
-   </div>
-   <details className="ow-worker-performance-dates">
-     <summary>فیلتر بازه تاریخ انجام کار{(dateFrom||dateTo)?' · فعال':''}</summary>
-     <div className="ow-worker-performance-date-fields">
-       <div className="report-field"><span>از تاریخ شمسی</span>
+   <section className="ow-history-query" aria-label="فیلترهای گزارش‌ها"
+     data-swtb-guide="history-controls">
+     <div className="ow-history-query-header">
+       <div><h3>پالایش گزارش‌ها</h3>
+         <p>واحد، بازه تاریخ انجام کار و وضعیت بررسی را در یک محل انتخاب کنید.</p></div>
+       {(unitFilter||view!=='all'||dateFrom||dateTo)&&<button type="button"
+         className="report-btn report-btn--light ow-worker-performance-reset"
+         onClick={()=>{setUnitFilter('');setView('all');setDateFrom('');setDateTo('');setSelectedReportId(null)}}>
+         پاک‌کردن فیلترها</button>}
+     </div>
+     <div className="ow-history-query-fields">
+       <label className="report-field ow-history-query-unit">
+         <span>واحد انجام کار</span>
+         <select aria-label="فیلتر واحد گزارش‌های من" value={unitFilter}
+           onChange={e=>{setUnitFilter(e.target.value);setSelectedReportId(null)}}>
+           <option value="">تمام واحدها</option>
+           {Object.entries(unitLabels).map(([id,name])=><option key={id} value={id}>{name}</option>)}
+         </select>
+       </label>
+       <div className="report-field ow-history-query-date">
+         <span>از تاریخ انجام کار (شمسی)</span>
          <JalaliDatePicker value={dateFrom} ariaLabel="تاریخ شروع سوابق من"
            onChange={date=>{setDateFrom(date);setSelectedReportId(null)}}/>
        </div>
-       <div className="report-field"><span>تا تاریخ شمسی</span>
+       <div className="report-field ow-history-query-date">
+         <span>تا تاریخ انجام کار (شمسی)</span>
          <JalaliDatePicker value={dateTo} ariaLabel="تاریخ پایان سوابق من"
            onChange={date=>{setDateTo(date);setSelectedReportId(null)}}/>
        </div>
-       {(dateFrom||dateTo)&&<button type="button" className="report-btn report-btn--light"
-         onClick={()=>{setDateFrom('');setDateTo('');setSelectedReportId(null)}}>حذف بازه تاریخ</button>}
      </div>
-     <small>مبنای بازه، تاریخ انجام کار است؛ نه تاریخ تأیید مدیر.</small>
-   </details>
-   {(unitFilter||view!=='all'||dateFrom||dateTo)&&<button type="button"
-     className="report-btn report-btn--light ow-worker-performance-reset"
-     onClick={()=>{setUnitFilter('');setView('all');setDateFrom('');setDateTo('');setSelectedReportId(null)}}>
-     پاک‌کردن همه فیلترها</button>}
+     <div className="ow-history-query-status">
+       <strong>وضعیت بررسی</strong>
+       <div className="ow-history-filter" role="group" aria-label="فیلتر وضعیت گزارش‌ها">
+         {options.map(([id,label])=><button type="button" key={id}
+           className={view===id?'is-selected':''} aria-pressed={view===id}
+           onClick={()=>{setSelectedReportId(null);setView(id)}}>
+           <span>{label}</span><b>{n(counts[id])}</b>
+         </button>)}
+       </div>
+     </div>
+     <p className="ow-history-query-note">فیلتر تاریخ براساس روز انجام کار است، نه روز تأیید مدیر.
+       تغییر فیلترها روی ساعات قطعی ثبت‌شده تأثیری ندارد.</p>
+   </section>
    {dateResult.invalidRange?<p className="report-alert report-alert--error" role="alert">
      بازه تاریخ نامعتبر است؛ تاریخ شروع نباید پس از تاریخ پایان باشد.
    </p>:<WorkerPerformancePanel rows={entries} tasks={tasks} units={unitLabels}/>}
    <div className="ow-history-results-heading">
-     <h3>دفتر گزارش‌ها</h3><span role="status">{n(entries.length)} گزارش</span>
+     <h3>دفتر گزارش‌ها</h3><span role="status">{n(entries.length)} گزارش در فیلتر فعلی</span>
    </div>
    <div className={`ow-b3-ledger-body ${detail?'ow-b3-ledger-body--detail':''}`}>
     <div className="ow-b3-ledger-list" role="list" aria-label="گزارش‌های ثبت‌شده">
