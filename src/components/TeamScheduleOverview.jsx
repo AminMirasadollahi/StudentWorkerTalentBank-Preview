@@ -122,9 +122,11 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
             </span>
             {coverage?<span className="ow-peer-week-coverage">
               {coverage.entries.map(person=><span key={person.workerId}
-                className={'ow-peer-week-person'+(person.scheduleUnknown?' is-unscheduled':'')}>
+                className={'ow-peer-week-person'+(person.explicitlyUnavailable?' is-unavailable':person.scheduleUnknown?' is-unscheduled':'')}>
                 <strong title={person.name}>{person.name}</strong>
-                {person.scheduleUnknown
+                {person.explicitlyUnavailable
+                  ?<span className="ow-peer-week-time">عدم حضور ثبت‌شده</span>
+                  :person.scheduleUnknown
                   ?<span className="ow-peer-week-time">زمان حضور ثبت نشده</span>
                   :<span className="ow-peer-week-time" dir="ltr">
                     {person.windows.map(window=>window.start+'–'+window.end).join('، ')}
