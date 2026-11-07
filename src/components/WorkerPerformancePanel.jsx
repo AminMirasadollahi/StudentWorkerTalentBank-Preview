@@ -1,4 +1,5 @@
 import {projectWorkerPerformance} from '../lib/workerPerformance.mjs'
+import WorkerInfoHint from './WorkerInfoHint.jsx'
 
 const nf=new Intl.NumberFormat('fa-IR')
 const duration=minutes=>{
@@ -23,18 +24,25 @@ function PerformanceBars({items,labelOf}){
 }
 export default function WorkerPerformancePanel({rows=[],tasks=[],units={}}){
  const metrics=projectWorkerPerformance(rows,tasks)
- const monthlyReady=metrics.approvedMinutes!==null&&
-  metrics.missingWorkDateCount===0&&metrics.byMonth.filter(x=>x.minutes>0).length>=2
- const unitsReady=metrics.approvedMinutes!==null&&
-  metrics.missingUnitCount===0&&metrics.byUnit.filter(x=>x.minutes>0).length>=2
+ // Zero is a real metric only when all approved-minute rows are valid.
+ // The three known work units remain visible as truthful zero-height bars;
+ // do not generate invented work dates or approved credits.
+ const byUnitMap=new Map(metrics.byUnit.map(row=>[row.unit,row.minutes]))
+ const byUnit=[
+  ...Object.keys(units).map(unit=>({unit,minutes:byUnitMap.get(unit)||0})),
+  ...metrics.byUnit.filter(row=>!Object.hasOwn(units,row.unit)),
+ ]
+ const readyUnit=metrics.approvedMinutes!==null&&metrics.missingUnitCount===0
+ const readyMonth=metrics.approvedMinutes!==null&&metrics.missingWorkDateCount===0
  return <section className="ow-worker-performance" aria-label="عملکرد من در گزارش‌های بارگذاری‌شده">
   <header className="ow-worker-performance-heading">
-   <h3>عملکرد من</h3>
-   <p>خلاصه فقط براساس {nf.format(metrics.reportCount)} گزارش موجود و فیلترشده در همین صفحه است؛
-     جمع قطعی تمام‌دوره را در خلاصه سروری بالا ببینید.</p>
+   <div className="ow-worker-title-inline">
+    <h3>عملکرد در نتایج فیلترشده</h3>
+    <WorkerInfoHint label="منبع تحلیل عملکرد" text="آمار این بخش فقط از گزارش‌های مجاز و بارگذاری‌شده‌ای محاسبه می‌شود که با فیلترهای بالا تطبیق دارند؛ ممکن است همه سوابق را پوشش ندهد. ساعات تأییدشده قطعیِ همه دوره‌ها در خلاصه بالای صفحه است. زمان برنامه‌ریزی‌شده یا گزارش درخواستی، ساعت تأییدشده نیست."/>
+   </div>
   </header>
   <div className="ow-worker-performance-kpis">
-   <article><span>زمان تأییدشده در همین نتایج</span>
+   <article><span>زمان تأییدشده در این نتایج</span>
      <strong>{duration(metrics.approvedMinutes)}</strong></article>
    <article><span>کارهای تکمیل‌شده مرتبط</span>
      <strong>{nf.format(metrics.completedTaskCount)}</strong></article>
@@ -50,25 +58,29 @@ export default function WorkerPerformancePanel({rows=[],tasks=[],units={}}){
      <span>{nf.format(metrics.missingTaskCount)} گزارش، وظیفه مرتبط را در فهرست فعلی ندارد؛
        شمار کارهای تکمیل‌شده ممکن است ناقص باشد.</span>}
    </p>}
-  {monthlyReady||unitsReady?<details className="ow-worker-performance-chart-disclosure">
-   <summary>نمودارهای کارکرد تأییدشده</summary>
+  <details className="ow-worker-performance-chart-disclosure" open>
+   <summary>نمای نموداری کارکرد تأییدشده</summary>
    <div className="ow-worker-performance-chart-grid">
-    {monthlyReady&&<section aria-label="روند ماهانه کارکرد تأییدشده">
-     <h4>به تفکیک ماه شمسی</h4>
-     <PerformanceBars items={metrics.byMonth} labelOf={item=>item.label}/>
-    </section>}
-    {unitsReady&&<section aria-label="کارکرد تأییدشده بر اساس واحد">
-     <h4>به تفکیک واحد انجام کار</h4>
-     <PerformanceBars items={metrics.byUnit} labelOf={item=>units[item.unit]||item.unit}/>
-    </section>}
+    <section aria-label="کارکرد تأییدشده بر اساس واحد">
+     <h4>بر اساس واحد انجام کار</h4>
+     {readyUnit?<PerformanceBars items={byUnit}
+       labelOf={item=>units[item.unit]||item.unit}/>:
+      <p className="ow-worker-chart-unavailable">انتساب واحد یا مقدار تأییدشده برای بعضی گزارش‌ها ناقص است؛ نمودار نمایش داده نمی‌شود.</p>}
+    </section>
+    <section aria-label="کارکرد تأییدشده بر اساس ماه شمسی">
+     <h4>بر اساس ماه انجام کار</h4>
+     {!readyMonth?<p className="ow-worker-chart-unavailable">
+       تاریخ انجام یا مقدار تأییدشده برای بعضی گزارش‌ها ناقص است؛ نمودار نمایش داده نمی‌شود.
+      </p>:metrics.byMonth.length>0?
+      <PerformanceBars items={metrics.byMonth} labelOf={item=>item.label}/>:
+      <div className="ow-worker-performance-zero-month" role="img"
+       aria-label="در نتایج فعلی هیچ گزارش تأییدشده‌ای با تاریخ معتبر برای نمودار ماهانه وجود ندارد">
+       <div className="ow-worker-performance-zero-axis" aria-hidden="true"/>
+       <strong>{nf.format(0)} دقیقه</strong>
+       <small>بدون گزارش تأییدشده در این بازه</small>
+      </div>}
+    </section>
    </div>
-   <p className="ow-worker-performance-note">
-    نمودارها فقط از زمان تأییدشده در نتایج فیلترشده ساخته می‌شوند؛
-    زمان برنامه حضور و زمان درخواست‌شده اعتبار کارکرد نیستند.
-   </p>
-  </details>:<p className="ow-worker-performance-chart-empty">
-   با افزایش گزارش‌های دارای کارکرد تأییدشده در دو ماه یا دو واحد،
-   نمودارهای مرتبط در همین بخش نمایش داده می‌شوند. نبود نمودار به معنی نبود فعالیت نیست.
-  </p>}
+  </details>
  </section>
 }
