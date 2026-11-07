@@ -6,8 +6,8 @@ import {WORKER_GUIDE_VERSION,GUIDE_SECTIONS,SECTION_GUIDES,
 test('same contextual definitions power whole application and isolated sections',()=>{
  const full=getWorkerGuideSteps('all')
  assert.equal(WORKER_GUIDE_VERSION,1)
- const counts={tasks:3,availability:4,history:3,profile:4}
- assert.equal(full.length,14,'the V4 overlay and profile shortcuts have own guide steps')
+ const counts={tasks:3,workPool:2,availability:4,history:3,profile:4}
+ assert.equal(full.length,16,'the V4 overlay, optional work pool and profile shortcuts have guide steps')
  assert.deepEqual(full,GUIDE_SECTIONS.flatMap(key=>getWorkerGuideSteps(key)))
  for(const section of GUIDE_SECTIONS){
   assert.equal(SECTION_GUIDES[section].length,counts[section])
@@ -16,6 +16,9 @@ test('same contextual definitions power whole application and isolated sections'
  }
  assert.ok(full.some(item=>item.anchor==='availability-peers'))
  assert.ok(full.some(item=>item.anchor==='profile-shortcuts'))
+ assert.ok(full.some(item=>item.anchor==='work-pool-list'))
+ assert.equal(getWorkerGuideSteps('all',{includeWorkPool:false}).length,14)
+ assert.ok(!getWorkerGuideSteps('all',{includeWorkPool:false}).some(item=>item.section==='workPool'))
 })
 test('every step has an explicit unique visible anchor and human instruction',()=>{
  const full=getWorkerGuideSteps()
@@ -37,5 +40,6 @@ test('invalid scope does not construct a tour or mix worker identities',()=>{
  assert.notEqual(workerGuideStorageKey('worker-a'),workerGuideStorageKey('worker-b'))
  assert.ok(workerGuideStorageKey('worker-a').includes('v'+WORKER_GUIDE_VERSION))
  assert.equal(isWorkerGuideSection('tasks'),true)
+ assert.equal(isWorkerGuideSection('workPool'),true)
  assert.equal(isWorkerGuideSection('admin'),false)
 })
