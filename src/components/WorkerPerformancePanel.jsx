@@ -50,25 +50,25 @@ export default function WorkerPerformancePanel({rows=[],tasks=[],units={}}){
      <span>{nf.format(metrics.missingTaskCount)} گزارش، وظیفه مرتبط را در فهرست فعلی ندارد؛
        شمار کارهای تکمیل‌شده ممکن است ناقص باشد.</span>}
    </p>}
-  <details className="ow-worker-performance-chart-disclosure">
+  {monthlyReady||unitsReady?<details className="ow-worker-performance-chart-disclosure">
    <summary>نمودارهای کارکرد تأییدشده</summary>
    <div className="ow-worker-performance-chart-grid">
-    <section aria-label="روند ماهانه کارکرد تأییدشده">
+    {monthlyReady&&<section aria-label="روند ماهانه کارکرد تأییدشده">
      <h4>به تفکیک ماه شمسی</h4>
-     {monthlyReady?<PerformanceBars items={metrics.byMonth} labelOf={item=>item.label}/>:
-      <p>برای رسم روند، دو ماه دارای کارکرد تأییدشده و تاریخ معتبر لازم است.</p>}
-    </section>
-    <section aria-label="کارکرد تأییدشده بر اساس واحد">
+     <PerformanceBars items={metrics.byMonth} labelOf={item=>item.label}/>
+    </section>}
+    {unitsReady&&<section aria-label="کارکرد تأییدشده بر اساس واحد">
      <h4>به تفکیک واحد انجام کار</h4>
-     {unitsReady?<PerformanceBars items={metrics.byUnit}
-       labelOf={item=>units[item.unit]||item.unit}/>:
-      <p>برای مقایسه، دو واحد دارای زمان تأییدشده و انتساب معتبر لازم است.</p>}
-    </section>
+     <PerformanceBars items={metrics.byUnit} labelOf={item=>units[item.unit]||item.unit}/>
+    </section>}
    </div>
    <p className="ow-worker-performance-note">
-    نمودارها از برنامه حضور یا زمان درخواستی ساخته نمی‌شوند؛ فقط زمان تأییدشده مدیر
-    در گزارش‌های بارگذاری‌شده ملاک است. نبود نمودار به معنای نبود فعالیت نیست.
+    نمودارها فقط از زمان تأییدشده در نتایج فیلترشده ساخته می‌شوند؛
+    زمان برنامه حضور و زمان درخواست‌شده اعتبار کارکرد نیستند.
    </p>
-  </details>
+  </details>:<p className="ow-worker-performance-chart-empty">
+   با افزایش گزارش‌های دارای کارکرد تأییدشده در دو ماه یا دو واحد،
+   نمودارهای مرتبط در همین بخش نمایش داده می‌شوند. نبود نمودار به معنی نبود فعالیت نیست.
+  </p>}
  </section>
 }
