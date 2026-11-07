@@ -30,7 +30,8 @@ import './report.css'
 import './ops.css'
 import './manager-shell.css'
 
-// Enable only after the SMTP provider and Edge delivery switch are tested.
+// UI availability is separately guarded by staff permissions and server-side
+// OPS_EMAIL_INVITES_ENABLED. Enabling this public flag never bypasses the Edge gate.
 const emailInvitesAvailable = import.meta.env.VITE_OPS_EMAIL_INVITES_AVAILABLE === 'true'
 // Rollback-safe preview: preserve the current manager UI until the new shell is accepted.
 const managerShellEnabled=import.meta.env.VITE_SWTB22_MANAGER_SHELL_UI==='true'
@@ -530,9 +531,11 @@ function CandidateCard({
               <button className="report-btn report-btn--primary" type="submit" disabled={saving}>
                 ایجاد حساب و فعال‌سازی
               </button>
-              <small>{onboardingMode === 'secure_link'
-                ? 'لینک اختصاصی فقط یک‌بار نمایش داده می‌شود و باید خصوصی تحویل داده شود. تنظیم Redirect URL در Supabase ضروری است.'
-                : 'رمز موقت فقط یک‌بار نمایش داده می‌شود؛ آن را از مسیر امن تحویل دهید.'}</small>
+              <small>{onboardingMode === 'email_link'
+                ? 'پس از ایجاد حساب، درخواست ارسال لینک امن به ایمیل ثبت‌شده انجام می‌شود. دریافت واقعی پیام را در صندوق ورودی یا هرزنامه بررسی کنید؛ لینک اعتبار محدود دارد.'
+                : onboardingMode === 'secure_link'
+                  ? 'لینک اختصاصی فقط یک‌بار نمایش داده می‌شود و باید خصوصی تحویل داده شود. تنظیم Redirect URL در Supabase ضروری است.'
+                  : 'رمز موقت فقط یک‌بار نمایش داده می‌شود؛ آن را از مسیر امن تحویل دهید.'}</small>
             </form>
           )}
         </>
