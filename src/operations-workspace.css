@@ -3089,3 +3089,104 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-worker-performance-kpis{grid-template-columns:1fr}
  .ow-worker-performance-date-fields .report-field{max-width:none;min-width:0;width:100%}
 }
+
+
+/* SWTB12 — restrained worker-facing visual identity, no manager/global impact.
+   The three KPI tints encode measure families, never a success/paid status.
+   Accessible dark foregrounds remain readable on all pastel surfaces. */
+.ow-b3-layout .ow-b3-brand {
+ min-height:6.1rem;gap:.55rem;padding:.8rem .7rem;
+}
+.ow-b3-layout .ow-b3-brand strong {
+ font-size:.89rem;line-height:1.55;
+}
+.ow-b3-layout .ow-b3-brand small {
+ margin-top:.13rem;font-size:.68rem;line-height:1.65;
+ color:#c4dfe5;font-weight:550;overflow-wrap:break-word;
+}
+.ow-b3-layout:not(.ow-b3-is-collapsed) .ow-b3-brand__icon {
+ min-width:2rem;height:2rem;
+}
+.ops-worker-b3-view .ow-b3-layout {
+ background:linear-gradient(155deg,#eef5f7 0%,#f7f9fa 51%,#f0f7f5 100%);
+}
+.ops-worker-b3-view .ow-b3-stage>.report-panel {
+ border-color:#d4e4e7;
+ box-shadow:0 8px 22px rgba(16,47,67,.045);
+}
+.ow-b3-layout .ow-b3-breadcrumb strong {
+ text-decoration:underline;text-decoration-color:#50a49b;
+ text-decoration-thickness:2px;text-underline-offset:.42rem;
+}
+.ow-b3-ledger .ow-worker-performance {
+ background:linear-gradient(145deg,#f0faf6 0%,#f5f9fd 68%,#f8fbfd 100%);
+ border-color:#c9e4df;box-shadow:0 5px 16px rgba(20,68,73,.04);
+}
+.ow-b3-ledger .ow-worker-performance-heading h3 {
+ display:flex;align-items:center;gap:.48rem;color:#114555;font-size:1.08rem;
+}
+.ow-b3-ledger .ow-worker-performance-heading h3::before {
+ content:"";width:.28rem;height:1.35rem;flex-shrink:0;
+ background:linear-gradient(180deg,#13a18d,#477bb5);border-radius:1rem;
+}
+.ow-b3-ledger .ow-worker-performance-kpis {gap:.7rem}
+.ow-b3-ledger .ow-worker-performance-kpis article {
+ min-height:5.1rem;padding:.78rem .85rem;gap:.3rem;
+ border:1px solid #bfded7;border-top:3px solid #177e6e;
+ background:linear-gradient(150deg,#ffffff 0%,#e6f7f1 100%);
+}
+.ow-b3-ledger .ow-worker-performance-kpis article:nth-child(2) {
+ border-color:#cdddf1;border-top-color:#4a70b5;
+ background:linear-gradient(150deg,#ffffff 0%,#edf3ff 100%);
+}
+.ow-b3-ledger .ow-worker-performance-kpis article:nth-child(3) {
+ border-color:#e8dcbd;border-top-color:#ac7a28;
+ background:linear-gradient(150deg,#ffffff 0%,#fff5de 100%);
+}
+.ow-b3-ledger .ow-worker-performance-kpis article span {
+ color:#435f6b;font-size:.77rem;font-weight:650;
+}
+.ow-b3-ledger .ow-worker-performance-kpis article strong {
+ color:#11695c;font-size:1.14rem;letter-spacing:0;
+}
+.ow-b3-ledger .ow-worker-performance-kpis article:nth-child(2) strong {
+ color:#315a9f;
+}
+.ow-b3-ledger .ow-worker-performance-kpis article:nth-child(3) strong {
+ color:#815513;
+}
+.ow-b3-ledger .ow-worker-performance-chart-disclosure {
+ border-top-color:#d2e4e4;
+}
+.ow-b3-ledger .ow-worker-performance-chart-disclosure>summary {
+ color:#14646b;
+}
+.ow-b3-ledger .ow-worker-performance-chart-grid>section:first-child {
+ background:linear-gradient(155deg,#fff 0%,#f2f7fe 100%);
+ border-color:#d6e2f2;
+}
+.ow-b3-ledger .ow-worker-performance-chart-grid>section:nth-child(2) {
+ background:linear-gradient(155deg,#fff 0%,#f0faf6 100%);
+ border-color:#d1e8de;
+}
+.ow-b3-ledger .ow-worker-performance-chart-grid>section:first-child
+ .ow-worker-performance-bar-track>div {background:#507bbb}
+.ow-b3-ledger .ow-worker-performance-chart-grid>section:nth-child(2)
+ .ow-worker-performance-bar-track>div {background:#138b79}
+.ow-b3-ledger .ow-history-approved-total {
+ background:linear-gradient(115deg,#e8f6ef,#f6fbf7);
+ border-color:#bbded0;
+}
+.ow-b3-layout .ow-self-profile-quicklinks {
+ background:linear-gradient(120deg,#effaf5 0%,#f6fafd 100%);
+ border-color:#cfe5df;
+}
+@media(max-width:700px){
+ .ow-b3-layout .ow-b3-brand{min-height:5.5rem;padding:1rem .35rem}
+ .ops-worker-b3-view .ow-b3-stage>.report-panel{box-shadow:none}
+}
+@media(prefers-reduced-motion:reduce){
+ .ops-worker-b3-view .ow-worker-performance *{
+  scroll-behavior:auto;
+ }
+}
