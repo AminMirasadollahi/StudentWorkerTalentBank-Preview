@@ -6,13 +6,16 @@ import {WORKER_GUIDE_VERSION,GUIDE_SECTIONS,SECTION_GUIDES,
 test('same contextual definitions power whole application and isolated sections',()=>{
  const full=getWorkerGuideSteps('all')
  assert.equal(WORKER_GUIDE_VERSION,1)
- assert.equal(full.length,12)
+ const counts={tasks:3,availability:4,history:3,profile:4}
+ assert.equal(full.length,14,'the V4 overlay and profile shortcuts have own guide steps')
  assert.deepEqual(full,GUIDE_SECTIONS.flatMap(key=>getWorkerGuideSteps(key)))
  for(const section of GUIDE_SECTIONS){
-  assert.equal(SECTION_GUIDES[section].length,3)
-  assert.equal(getWorkerGuideSteps(section).length,3)
+  assert.equal(SECTION_GUIDES[section].length,counts[section])
+  assert.equal(getWorkerGuideSteps(section).length,counts[section])
   assert.ok(getWorkerGuideSteps(section).every(item=>item.section===section))
  }
+ assert.ok(full.some(item=>item.anchor==='availability-peers'))
+ assert.ok(full.some(item=>item.anchor==='profile-shortcuts'))
 })
 test('every step has an explicit unique visible anchor and human instruction',()=>{
  const full=getWorkerGuideSteps()
