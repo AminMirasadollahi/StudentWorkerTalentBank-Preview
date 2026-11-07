@@ -2593,7 +2593,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         refreshRevision={refreshRevision}
         onClaimed={()=>{void refresh();updateNavigation({section:'tasks',taskView:'upcoming'})}}/>
     </Suspense>}
-    {!settingsOpen&&section==='availability'&&<section className="report-panel">
+    {!settingsOpen&&section==='availability'&&<section className="report-panel ow-worker-availability-panel">
       <div className="ow-b3-guide-heading">
         <h2>برنامه حضور</h2>
         <button type="button" className="swtb-guide-launch" data-swtb-guide="help-availability"
