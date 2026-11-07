@@ -4,6 +4,8 @@ import {workerGuideStorageKey} from './lib/workerGuide.mjs'
 import { trapModalTab } from './lib/dialogFocusTrap.mjs'
 import { selectWorkerTaskFocus, summarizeWorkerTaskFocus } from './lib/workerTaskFocus.mjs'
 import {projectWorkerReportActivity,summarizeWorkerReportActivity} from './lib/workerReportActivity.mjs'
+import {filterPerformanceByWorkDate} from './lib/workerPerformance.mjs'
+import WorkerPerformancePanel from './components/WorkerPerformancePanel.jsx'
 import {canonicalWorkerReportPayload,sameWorkerReportPayload,isDefinitiveWorkerReportRejection,WORKER_REPORT_CHANGED_RETRY_NOTICE} from './lib/workerReportRetry.mjs'
 import {
   getAdminWork, getMyWork, setWeeklyDay, setDateException,
@@ -1894,11 +1896,16 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
 function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGuide,refreshRevision=0}) {
  const [view,setView]=useState('all')
  const [unitFilter,setUnitFilter]=useState('')
+ const [dateFrom,setDateFrom]=useState('')
+ const [dateTo,setDateTo]=useState('')
  const [selectedReportId,setSelectedReportId]=useState(null)
  const unitByTask=new Map(tasks.map(t=>[t.id,t.unit||'']))
  const unitRecords=unitFilter?records.filter(r=>unitByTask.get(r.task_id)===unitFilter):records
- const counts=summarizeWorkerReportActivity(unitRecords)
- const entries=projectWorkerReportActivity(unitRecords,tasks,view)
+ const dateResult=filterPerformanceByWorkDate(
+   projectWorkerReportActivity(unitRecords,tasks),dateFrom,dateTo)
+ const counts=summarizeWorkerReportActivity(dateResult.rows)
+ const entries=view==='all'?dateResult.rows:
+   dateResult.rows.filter(row=>row.review_state===view)
  const detail=entries.find(r=>r.id===selectedReportId)
  const options=[
   ['all','همه'],['submitted','منتظر بررسی'],
@@ -1953,6 +1960,29 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
      </button>)}
    </div>
    </div>
+   <details className="ow-worker-performance-dates">
+     <summary>فیلتر بازه تاریخ انجام کار{(dateFrom||dateTo)?' · فعال':''}</summary>
+     <div className="ow-worker-performance-date-fields">
+       <div className="report-field"><span>از تاریخ شمسی</span>
+         <JalaliDatePicker value={dateFrom} ariaLabel="تاریخ شروع سوابق من"
+           onChange={date=>{setDateFrom(date);setSelectedReportId(null)}}/>
+       </div>
+       <div className="report-field"><span>تا تاریخ شمسی</span>
+         <JalaliDatePicker value={dateTo} ariaLabel="تاریخ پایان سوابق من"
+           onChange={date=>{setDateTo(date);setSelectedReportId(null)}}/>
+       </div>
+       {(dateFrom||dateTo)&&<button type="button" className="report-btn report-btn--light"
+         onClick={()=>{setDateFrom('');setDateTo('');setSelectedReportId(null)}}>حذف بازه تاریخ</button>}
+     </div>
+     <small>مبنای بازه، تاریخ انجام کار است؛ نه تاریخ تأیید مدیر.</small>
+   </details>
+   {(unitFilter||view!=='all'||dateFrom||dateTo)&&<button type="button"
+     className="report-btn report-btn--light ow-worker-performance-reset"
+     onClick={()=>{setUnitFilter('');setView('all');setDateFrom('');setDateTo('');setSelectedReportId(null)}}>
+     پاک‌کردن همه فیلترها</button>}
+   {dateResult.invalidRange?<p className="report-alert report-alert--error" role="alert">
+     بازه تاریخ نامعتبر است؛ تاریخ شروع نباید پس از تاریخ پایان باشد.
+   </p>:<WorkerPerformancePanel rows={entries} tasks={tasks} units={unitLabels}/>}
    <div className="ow-history-results-heading">
      <h3>دفتر گزارش‌ها</h3><span role="status">{n(entries.length)} گزارش</span>
    </div>
