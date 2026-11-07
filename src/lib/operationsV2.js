@@ -66,6 +66,16 @@ export const saveOperationsBudgetPool=({id=null,termId,label,units,minutes,reaso
   p_allocated_minutes:minutes,p_reason:reason,
  })
 
+// Administrator-only worker lifecycle; live Postgres RPC validates role,
+// expected state and audit reason, and atomically writes immutable history.
+export const setWorkerState=({workerId,expectedState,newState,reason})=>
+ rpc('ops_set_worker_state',{
+  p_worker_id:workerId,p_expected_state:expectedState,
+  p_new_state:newState,p_reason:reason,
+ })
+export const getWorkerStateHistory=workerId=>
+ rpc('ops_get_worker_state_history',{p_worker_id:workerId})
+
 // SWTB21-B: manager-only term eligibility and explicit assignment-gate mode.
 // Both RPC contracts are installed. The default gate is OBSERVE and remains
 // disabled until the manager explicitly reviews real term eligibility.

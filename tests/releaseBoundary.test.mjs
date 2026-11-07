@@ -9,8 +9,9 @@ function gitBlobSha(path){
   return createHash('sha1').update(`blob ${b.length}\0`).update(b).digest('hex')
 }
 
-// Locked public baseline: fail if any release-review edit touches real intake,
-// Ops Auth/API, the disabled lifecycle placeholder, or the deployment workflow.
+// Locked public baseline: fail if any review edit touches applicant intake,
+// base Ops Auth/API, the original QA-only placeholder, or deployment workflow.
+// The separately reviewed audited manager lifecycle is now intentionally wired.
 const critical=Object.freeze({
   'src/App.jsx':'c3c34f11e7a992015b1ea281828a39386ffce3e9',
   'src/report.css':'88330e1f6469d1763430353a23863f2dd61cf8bb',
@@ -19,18 +20,29 @@ const critical=Object.freeze({
   'vite.config.js':'971c9b048f726bc27199078d41b5a45a263a8595',
   '.github/workflows/pages.yml':'88452575162ef82aea7351c5b915b8c60d8936b8',
 })
-test('production applicant intake, API/auth, disabled lifecycle and deploy pipeline are byte-identical',()=>{
+test('production applicant intake, base API/auth, QA-only placeholder and deployment pipeline are byte-identical',()=>{
   for(const [path,sha] of Object.entries(critical))
     assert.equal(gitBlobSha(path),sha,`BLOCK RELEASE: modified protected public asset ${path}`)
 })
-test('public operations imports read-only lifecycle preview; no mutating component/flag',()=>{
+test('manager lifecycle is explicitly authorized by existing audited RPCs, not raw client writes',()=>{
   const workspace=read('src/OperationsWorkspace.jsx').toString()
-  assert.match(workspace,/import WorkerLifecycleReadOnlyPreview from ['"]\.\/components\/WorkerLifecycleReadOnlyPreview['"]/)
-  assert.match(workspace,/<WorkerLifecycleReadOnlyPreview worker=\{selected\}\s*\/>/)
-  for(const fragment of ['WorkerLifecycleControls','VITE_WORKER_LIFECYCLE_ADMIN_ENABLED',
-    'setWorkerState','getWorkerStateHistory','ops_set_worker_state',
-    'lifecycleEnabled','import.meta.glob'])
-    assert.equal(workspace.includes(fragment),false,`BLOCK RELEASE: ${fragment} in public workspace`)
+  assert.match(workspace,/import WorkerLifecycleManager from ['"]\.\/components\/WorkerLifecycleManager['"]/)
+  assert.match(workspace,/<WorkerLifecycleManager key=\{selected.id\}/)
+  assert.match(workspace,/onChangeState=\{setWorkerState\} onReadHistory=\{getWorkerStateHistory\}/)
+  assert.doesNotMatch(workspace,/WorkerLifecycleControls|VITE_WORKER_LIFECYCLE_ADMIN_ENABLED/)
+  const client=read('src/lib/operationsV2.js').toString()
+  assert.match(client,/rpc\('ops_set_worker_state',\{/)
+  assert.match(client,/p_expected_state:expectedState/)
+  assert.match(client,/p_reason:reason/)
+  assert.match(client,/rpc\('ops_get_worker_state_history',\{/)
+  const manager=read('src/components/WorkerLifecycleManager.jsx').toString()
+  assert.match(manager,/isWorkerStateReasonValid\(reason\)/)
+  assert.match(manager,/expectedState:original,newState:next,reason:auditReason/)
+  assert.match(manager,/lock\.current/)
+  assert.match(manager,/refreshRequired/)
+  assert.match(manager,/تأیید نهایی و ثبت وضعیت/)
+  assert.doesNotMatch(manager,/\.from\(['"]student_workers['"]\)|service_role|createClient\(/)
+  // Preserve historical QA-only placeholder with no accidental exposed actions.
   const placeholder=read('src/components/WorkerLifecycleReadOnlyPreview.jsx').toString()
   assert.match(placeholder,/disabled>\{workerTransitionAction\(next\)\}/)
   assert.doesNotMatch(placeholder,/onClick=|onSubmit=|\.rpc\(/)

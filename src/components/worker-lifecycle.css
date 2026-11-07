@@ -45,3 +45,28 @@
   .wl-review { grid-template-columns:1fr; }
   .wl-actions .report-btn { flex:1 1 10rem; }
 }
+
+/* Production manager-only, two-stage, in-context account transition. */
+.wl-decision{
+ display:grid;gap:.7rem;margin-top:.75rem;padding:.8rem;
+ background:#f5f9fa;border:1px solid #bfd9dd;border-radius:.65rem;
+}
+.wl-decision .wl-review dt{color:#506c78;font-size:.74rem}
+.wl-decision .wl-review dd{color:#163d50}
+.wl-decision .report-field{display:grid;gap:.35rem;font-size:.82rem;font-weight:650}
+.wl-decision .report-field textarea{
+ box-sizing:border-box;width:100%;min-height:5rem;max-height:15rem;
+ border:1px solid #bfd6db;border-radius:.55rem;
+ background:#fff;padding:.7rem .8rem;line-height:1.8;
+ font:inherit;color:#193d4b;resize:vertical;
+}
+.wl-decision .wl-warning{margin:0;font-size:.8rem;line-height:1.8}
+.wl-decision .wl-actions{margin:0}
+.wl-history{margin-top:.75rem}
+.wl-history summary{cursor:pointer;color:#26546a;font-weight:700;font-size:.79rem}
+.wl-panel .wl-warning[role="status"]{display:grid;gap:.45rem}
+.wl-panel .wl-warning[role="status"] button{justify-self:start}
+@media(max-width:600px){
+ .wl-decision{padding:.6rem}
+ .wl-decision .wl-actions{display:grid;grid-template-columns:1fr}
+}
