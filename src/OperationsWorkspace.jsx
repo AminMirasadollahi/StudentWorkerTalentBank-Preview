@@ -1911,7 +1911,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
   ['all','همه'],['submitted','منتظر بررسی'],
   ['changes_requested','نیازمند اصلاح'],['rejected','ردشده'],['approved','تأییدشده']
  ]
- const total=approvedMinutesTotal
+ const total=approvedMinutesTotal??null
  useLayoutEffect(()=>{
    if(detail)document.getElementById('ow-report-inspector')?.focus({preventScroll:true})
  },[detail?.id])
@@ -2015,10 +2015,11 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
          onClick={()=>setSelectedReportId(entry.id)}>جزئیات</button>
      </article>)}
      {!entries.length&&<div className="ow-history-empty" role="status">
-       <strong>{view==='all'
-         ?(unitFilter?'برای واحد انتخاب‌شده هنوز گزارشی ثبت نشده است.':'هنوز گزارشی در سوابق ثبت نشده است.')
+       <strong>{dateResult.invalidRange?'بازه تاریخ انتخاب‌شده نامعتبر است.'
+         :view==='all'?(unitFilter||dateFrom||dateTo
+           ?'برای فیلترهای انتخاب‌شده گزارشی یافت نشد.':'هنوز گزارشی در سوابق ثبت نشده است.')
          :'گزارشی با وضعیت انتخاب‌شده یافت نشد.'}</strong>
-       <p>برای مشاهدهٔ سایر گزارش‌ها، فیلتر وضعیت یا واحد را تغییر دهید.</p>
+       <p>برای مشاهدهٔ سایر گزارش‌ها، فیلترهای بالا را بررسی یا پاک کنید.</p>
      </div>}
     </div>
     {detail&&<aside id="ow-report-inspector" tabIndex={-1} className="ow-b3-inspector" aria-label="جزئیات گزارش">
