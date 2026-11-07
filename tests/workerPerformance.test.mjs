@@ -29,7 +29,7 @@ test('authorized self projection counts distinct completed tasks, not report row
  assert.equal(v.completedTaskCount,2)
  assert.equal(v.missingTaskCount,0)
  assert.deepEqual(v.byUnit.map(x=>[x.unit,x.minutes]),[['research',65],['library',35]])
- assert.equal(v.byMonth.length,3,'Nowruz changes Persian month and year')
+ assert.equal(v.byMonth.length,2,'Nowruz changes Persian month and year; April is still Farvardin')
  assert.equal(v.byMonth.reduce((a,x)=>a+x.minutes,0),100)
  assert.equal(JSON.stringify(rows),snapshot,'never mutate a protected row')
 })
