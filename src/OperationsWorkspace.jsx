@@ -2426,10 +2426,10 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   return <div className={`ow-workspace ow-worker-workspace ow-b3-layout ${sidebarCollapsed?'ow-b3-is-collapsed':''}`}>
     <a className="ow-b3-skip" href="#ow-b3-main">رفتن به محتوای اصلی</a>
     <aside className="ow-b3-sidebar" aria-label="ناوبری اصلی دانشجوکار">
-      <div className="ow-b3-brand" title="فضای کار دانشجوکار">
+      <div className="ow-b3-brand" title="پنل دانشجوکار · دانشکده علوم انسانی شهید رجایی بابل">
         <span className="ow-b3-brand__icon" aria-hidden="true">▤</span>
-        {!sidebarCollapsed&&<div><strong>فضای کار دانشجوکار</strong>
-          <small>دانشگاه فرهنگیان</small></div>}
+        {!sidebarCollapsed&&<div><strong>پنل دانشجوکار</strong>
+          <small>دانشکده علوم انسانی شهید رجایی بابل</small></div>}
       </div>
       {!sidebarCollapsed&&<p className="ow-b3-sidebar-caption">فضای کاری</p>}
       <SectionTabs value={settingsOpen?null:section} onChange={next=>{
