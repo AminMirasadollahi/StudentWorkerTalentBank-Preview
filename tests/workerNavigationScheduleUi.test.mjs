@@ -1223,8 +1223,14 @@ test('global, presence and opportunities guide triggers open a real tour without
    'opening and closing a guide cannot change the personal schedule')
   assert.equal(globalThis.__workerFocusCalls.length,beforeWrites)
   await ui.clickText('فرصت‌های کاری')
-  await act(async()=>{await Promise.resolve();await Promise.resolve()})
-  const poolGuide=ui.host.querySelector('[data-swtb-guide="help-workPool"]')
+  // Work Pool is intentionally code-split; do not assert before React Suspense
+  // commits the loaded component, or turn this into a network/production test.
+  let poolGuide=null
+  for(let attempt=0;attempt<60;attempt++){
+   await act(async()=>{await new Promise(resolve=>setTimeout(resolve,35))})
+   poolGuide=ui.host.querySelector('[data-swtb-guide="help-workPool"]')
+   if(poolGuide)break
+  }
   assert.ok(poolGuide,'work opportunities should have the same local help affordance')
   await ui.click('[data-swtb-guide="help-workPool"]')
   dialog=ui.host.querySelector('.swtb-guide-spotlight')
