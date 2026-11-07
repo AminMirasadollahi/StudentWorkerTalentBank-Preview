@@ -1190,3 +1190,86 @@ test('read-only history shows true current review statuses and never invents tim
   await ui.dispose()
  }
 })
+
+
+test('global and V4 presence tours open, and the optional work-pool guide is wired without a network import',async()=>{
+ const oldRaf=globalThis.requestAnimationFrame
+ const oldCancel=globalThis.cancelAnimationFrame
+ const proto=window.HTMLDialogElement.prototype
+ const oldShowModal=proto.showModal
+ const oldClose=proto.close
+ globalThis.requestAnimationFrame=callback=>window.requestAnimationFrame(callback)
+ globalThis.cancelAnimationFrame=id=>window.cancelAnimationFrame(id)
+ proto.showModal=function(){this.setAttribute('open','')}
+ proto.close=function(){this.removeAttribute('open')}
+ globalThis.__workerFocusFixture=fixture()
+ const beforeWrites=globalThis.__workerFocusCalls.length
+ const ui=await setup()
+ try{
+  await ui.click('[data-swtb-guide="help-global"]')
+  let dialog=ui.host.querySelector('.swtb-guide-spotlight')
+  assert.ok(dialog&&dialog.open,'global worker guide must be visible after click')
+  assert.match(dialog.textContent,/مرحله ۱ از ۱۶/)
+  assert.equal(globalThis.__workerFocusCalls.length,beforeWrites)
+  await ui.click('.swtb-guide-spotlight .swtb-guide-close')
+  assert.equal(ui.host.querySelector('.swtb-guide-spotlight'),null)
+  await ui.clickText('زمان حضور')
+  await ui.click('[data-swtb-guide="help-availability"]')
+  dialog=ui.host.querySelector('.swtb-guide-spotlight')
+  assert.ok(dialog&&dialog.open,'V4 presence help should not use old setAvailabilityView')
+  assert.match(dialog.textContent,/برنامه شخصی قابل ویرایش/)
+  await ui.click('.swtb-guide-spotlight .swtb-guide-close')
+  assert.equal(ui.host.querySelectorAll('.ow-week-slot').length,28,
+   'opening and closing a guide cannot change the personal schedule')
+  assert.equal(globalThis.__workerFocusCalls.length,beforeWrites)
+  // Work Pool is dynamically loaded and its data source is deliberately
+  // outside this mock. Validate the mountable affordance via source contract
+  // and the optional section via the pure guide definitions instead of
+  // mounting an unmocked network-facing module into the isolated test.
+  const poolSource=readFileSync('src/components/WorkPoolWorkerPanel.jsx','utf8')
+  assert.match(poolSource,/data-swtb-guide="help-workPool"/)
+  assert.match(poolSource,/onGuide\?\.\('workPool'\)/)
+  assert.match(poolSource,/data-swtb-guide="work-pool-list"/)
+  assert.equal(globalThis.__workerFocusCalls.length,beforeWrites)
+ }finally{
+  await ui.dispose()
+  if(oldRaf===undefined)delete globalThis.requestAnimationFrame
+  else globalThis.requestAnimationFrame=oldRaf
+  if(oldCancel===undefined)delete globalThis.cancelAnimationFrame
+  else globalThis.cancelAnimationFrame=oldCancel
+  if(oldShowModal===undefined)delete proto.showModal
+  else proto.showModal=oldShowModal
+  if(oldClose===undefined)delete proto.close
+  else proto.close=oldClose
+ }
+})
+
+
+test('zero-credit worker history renders an accessible donut and monthly baseline without fake approval',async()=>{
+ const data=fixture()
+ data.tasks[0].unit='library'
+ data.tasks[0].state='completed'
+ data.time_entries=[{
+  id:'QA-ZERO-APPROVED',task_id:'FAKE-TASK',worker_id:worker,
+  work_date:day(),review_state:'approved',reported_minutes:10,approved_minutes:0,
+ }]
+ data.approved_minutes_total=0
+ globalThis.__workerFocusFixture=data
+ const beforeWrites=globalThis.__workerFocusCalls.length
+ const ui=await setup()
+ try{
+  await ui.clickText('سوابق گزارش‌ها')
+  const area=ui.host.querySelector('.ow-worker-performance')
+  assert.ok(area)
+  assert.equal(area.querySelector('.ow-worker-performance-chart-disclosure summary'),null,
+    'charts are not hidden behind a disclosure')
+  const donut=area.querySelector('.ow-worker-unit-donut')
+  assert.ok(donut)
+  assert.match(donut.textContent,/۰ دقیقه/)
+  assert.equal(donut.querySelectorAll('li').length,3,'three real configured work units')
+  assert.match(donut.querySelector('.ow-worker-unit-donut-ring').style.background,/rgb\(227, 236, 239\)|#e3ecef/i)
+  assert.ok(area.querySelector('.ow-worker-performance-bars'),'zero-approved report has a genuine month')
+  assert.equal(globalThis.__workerFocusCalls.length,beforeWrites,
+    'a visual graph must never create approval or presence data')
+ }finally{globalThis.__workerFocusFixture=fixture();await ui.dispose()}
+})

@@ -9,7 +9,7 @@ const fa=new Intl.NumberFormat('fa-IR')
 const pretty=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{dateStyle:'medium',timeZone:'UTC'})
 const dateName=x=>x?pretty.format(new Date(x+'T12:00:00Z')):'—'
 const units={library:'کتابخانه',research:'پژوهش',public_relations:'روابط عمومی'}
-export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaimed}){
+export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaimed,onGuide}){
  const [view,setView]=useState({status:'loading',items:[]})
  const [busyId,setBusyId]=useState('')
  const [uncertainId,setUncertainId]=useState('')
@@ -73,14 +73,20 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
   Number(a.priority)-Number(b.priority))
  const uncertainItem=items.find(x=>x.id===uncertainId)
  return <section className="report-panel ow-work-pool ow-worker-work-pool"
-  aria-label="فرصت‌های کاری قابل انتخاب">
+  data-swtb-guide="work-pool-list" aria-label="فرصت‌های کاری قابل انتخاب">
   <div className="report-panel-heading">
    <div className="ow-worker-title-inline"><h2>فرصت‌های کاری</h2>
     <WorkerInfoHint label="درباره انتخاب فرصت کاری"
       text="فقط فرصت‌های منتشرشده مدیر و متناسب با مجوز نیمسال، مهلت و ظرفیت قابل انتخاب‌اند. زمان تخمینی فرصت، ساعت تأییدشده نیست. "/>
    </div>
-   <button type="button" className="report-btn report-btn--light"
-    disabled={busyId!==''} onClick={()=>void refresh()}>بازخوانی</button>
+   <div className="ow-worker-pool-actions">
+    <button type="button" className="swtb-guide-launch"
+      data-swtb-guide="help-workPool" onClick={()=>onGuide?.('workPool')}>
+      ؟ راهنمای این بخش
+    </button>
+    <button type="button" className="report-btn report-btn--light"
+      disabled={busyId!==''} onClick={()=>void refresh()}>بازخوانی</button>
+   </div>
   </div>
   
   {notice&&<div role="status" className={uncertainId?'report-alert report-alert--error':'ops-alert-success'}>{notice}</div>}
