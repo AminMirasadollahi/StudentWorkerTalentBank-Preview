@@ -2233,7 +2233,10 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const [localNavigation,setLocalNavigation]=useState({section:'tasks',taskRange:'today'})
   const [submissionReceipt,setSubmissionReceipt]=useState(null)
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
-  const [availabilityView,setAvailabilityView]=useState('mine')
+  // Default OFF for every authenticated principal. Remembering this checkbox
+  // within the same session must never leak across an account switch.
+  const [peerVisibility,setPeerVisibility]=useState({workerId:profile.worker_id,enabled:false})
+  const showCoworkers=peerVisibility.workerId===profile.worker_id&&peerVisibility.enabled
   const [selectedTaskId,setSelectedTaskId]=useState(null)
   const [guideWelcomeOpen,setGuideWelcomeOpen]=useState(false)
   const [guideScope,setGuideScope]=useState(null)
@@ -2533,20 +2536,21 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         <button type="button" className="swtb-guide-launch" data-swtb-guide="help-availability"
           onClick={()=>openWorkerGuide('availability')}>؟ راهنمای این بخش</button>
       </div>
-      <div className="ow-worker-presence-view-switch" role="group" aria-label="نمای برنامه حضور">
-        <button type="button" aria-pressed={availabilityView==='mine'}
-          className={availabilityView==='mine'?'is-selected':''}
-          onClick={()=>setAvailabilityView('mine')}>برنامه من</button>
-        <button type="button" aria-pressed={availabilityView==='team'}
-          className={availabilityView==='team'?'is-selected':''}
-          onClick={()=>setAvailabilityView('team')}>برنامه همکاران</button>
+      <div className="ow-worker-unified-visibility">
+        <label className="ow-worker-unified-toggle">
+          <input type="checkbox" checked={showCoworkers}
+            onChange={event=>setPeerVisibility({
+              workerId:profile.worker_id,enabled:event.target.checked,
+            })}/>
+          <span>نمایش برنامه همکاران</span>
+        </label>
+        <small>برنامه شما همیشه قابل ویرایش است؛ اطلاعات همکاران صرفاً برای هماهنگی نمایش داده می‌شوند.</small>
       </div>
-      {availabilityView==='mine'
-        ?<ScheduleEditor workerId={profile.worker_id} data={data} onSaved={refresh}/>
-        :<Suspense fallback={<p className="ow-muted" role="status">در حال آماده‌سازی تقویم همکاران…</p>}>
-          <WorkerTeamCalendar key={profile.worker_id} todayIso={today()}
-            refreshRevision={refreshRevision}/>
-        </Suspense>}
+      <div className="ow-worker-unified-presence">
+        <ScheduleEditor key={profile.worker_id}
+          workerId={profile.worker_id} data={data} onSaved={refresh}
+          showPeers={showCoworkers} peerRefreshRevision={refreshRevision}/>
+      </div>
     </section>}
     {!settingsOpen&&section==='history'&&<WorkerReportHistory tasks={tasks} records={records}
       onGuide={openWorkerGuide} refreshRevision={refreshRevision} approvedMinutesTotal={data.approved_minutes_total}
