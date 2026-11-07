@@ -2,6 +2,7 @@ import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react'
 import {plusIsoDays,persianMonthCells,previousPersianMonth,nextPersianMonth} from '../lib/persianMonthCalendar.mjs'
 import {persianWeekBounds} from '../lib/weeklyScheduleGrid.mjs'
 import {projectTeamDay,projectTeamCalendarDays} from '../lib/teamCalendarProjection.mjs'
+import {projectWorkerWeekCoverage} from '../lib/workerWeekCoverage.mjs'
 import {trapModalTab} from '../lib/dialogFocusTrap.mjs'
 
 const fa=new Intl.NumberFormat('fa-IR')
@@ -105,10 +106,13 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
      <div className="ow-teamcal-weekdays">
        {weekRows.map((row,index)=>{
         const active=row.people.filter(isVisiblePerson)
+        const coverage=audience==='worker'?projectWorkerWeekCoverage(row):null
         return <button type="button" key={row.date}
           className={'ow-teamcal-week-row'+(row.date===todayIso?' is-today':'')+(inlineManager&&row.date===selectedDate?' is-selected':'')}
           aria-pressed={inlineManager?row.date===selectedDate:undefined}
-          aria-label={accessibleName(row)}
+          // Worker rows expose meaningful person/time text to screen readers.
+          // Manager summary keeps its existing short accessible label.
+          aria-label={audience==='worker'?undefined:accessibleName(row)}
           onClick={event=>openDay(row.date,event)}>
           <span className="ow-teamcal-week-date"><strong>{weekdayLabels[index]}</strong>
             <small>{dayName(row.date)}</small></span>
@@ -116,17 +120,41 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
             <span className="ow-teamcal-counts">
               {fa.format(row.plannedWorkers)} نفر دارای برنامه · {fa.format(row.taskCount)} کار
             </span>
-            <span className="ow-teamcal-chip-list" aria-hidden="true">
+            {coverage?<span className="ow-peer-week-coverage">
+              {coverage.entries.map(person=><span key={person.workerId}
+                className={'ow-peer-week-person'+(person.scheduleUnknown?' is-unscheduled':'')}>
+                <strong title={person.name}>{person.name}</strong>
+                {person.scheduleUnknown
+                  ?<span className="ow-peer-week-time">زمان حضور ثبت نشده</span>
+                  :<span className="ow-peer-week-time" dir="ltr">
+                    {person.windows.map(window=>window.start+'–'+window.end).join('، ')}
+                  </span>}
+                {person.corrected&&<small>برنامه اصلاح‌شده</small>}
+                {person.assignedCount>0&&<small>{fa.format(person.assignedCount)} فعالیت ثبت‌شده</small>}
+              </span>)}
+              {coverage.remaining>0&&<span className="ow-peer-week-extra">
+                +{fa.format(coverage.remaining)} همکار دیگر؛ جزئیات روز
+              </span>}
+              {coverage.explicitlyUnavailable>0&&<span className="ow-peer-week-status">
+                {fa.format(coverage.explicitlyUnavailable)} نفر عدم حضور ثبت کرده‌اند
+              </span>}
+              {!coverage.entries.length&&<span className="ow-peer-week-empty">
+                بازه حضور ثبت نشده است؛ برنامه نامشخص به‌معنای غیبت نیست.
+              </span>}
+            </span>
+            :<span className="ow-teamcal-chip-list" aria-hidden="true">
               {active.slice(0,3).map(p=><span className="ow-teamcal-chip"
                 key={p.workerId} title={p.name}>{p.name}</span>)}
               {active.length>3&&<small>+{fa.format(active.length-3)} نفر</small>}
               {!active.length&&<small>برنامه ثبت‌شده‌ای وجود ندارد؛ وضعیت سایرین نامشخص است.</small>}
-            </span>
+            </span>}
           </span>
         </button>
        })}
      </div>
-     <small className="ow-muted">برای دیدن نام افراد، بازه‌های حضور برنامه‌ریزی‌شده و وظایف همان روز، روی ردیف کلیک کنید.</small>
+     <small className="ow-muted">{audience==='worker'
+       ?'بازه‌ها برنامه‌ریزی‌شده‌اند، نه حضور قطعی یا ساعت تأییدشده. برای دیدن همه همکاران و جزئیات همان روز، روی ردیف کلیک کنید.'
+       :'برای دیدن نام افراد، بازه‌های حضور برنامه‌ریزی‌شده و وظایف همان روز، روی ردیف کلیک کنید.'}</small>
    </section>
 
    <section className="ow-presence-month ow-teamcal-month" aria-label="تقویم ماهانه همه دانشجوکاران">
