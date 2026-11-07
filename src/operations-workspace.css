@@ -2797,3 +2797,170 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 @media(max-width:690px){
  .swtb22-term-focused .ow-term-context-actions{justify-content:flex-start}
 }
+
+
+/* SWTB11 P0 — one unified worker calendar, approved V4 density design.
+   Keep the existing self-editor and its four real buttons. Only supplemental
+   peer visualization becomes more compact, and only while the switch is ON.
+   Manager aggregate presence is not restyled in this release. */
+.ow-worker-unified-visibility{
+ display:flex;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:.45rem .8rem;margin:.5rem 0 .8rem;
+ padding:.55rem .75rem;background:#f5f9f9;border:1px solid #d5e8e6;
+ border-radius:.7rem;
+}
+.ow-worker-unified-toggle{
+ display:inline-flex;align-items:center;gap:.52rem;cursor:pointer;
+ color:#194950;font-size:.83rem;font-weight:700;
+}
+.ow-worker-unified-toggle input{
+ width:1.15rem;height:1.15rem;accent-color:#14887e;cursor:pointer;
+}
+.ow-worker-unified-toggle input:focus-visible{
+ outline:3px solid #167e9d;outline-offset:3px;
+}
+.ow-worker-unified-visibility>small{
+ color:#617a83;font-size:.72rem;line-height:1.6;
+}
+.ow-worker-unified-presence .ow-presence-hub{
+ display:grid;grid-template-columns:minmax(0,1.22fr) minmax(0,1fr);
+ gap:.75rem;align-items:start;
+}
+.ow-worker-unified-presence :is(.ow-presence-week,.ow-presence-month){
+ box-sizing:border-box;height:34.5rem;min-width:0;
+ display:flex;flex-direction:column;overflow:hidden;
+}
+.ow-worker-unified-presence .ow-presence-week .ow-week-grid{
+ display:grid;min-height:0;flex:1;overflow-y:auto;
+ overscroll-behavior:contain;scrollbar-width:thin;
+ scrollbar-gutter:stable;
+ padding:0 .05rem .5rem;
+}
+.ow-worker-unified-presence .ow-presence-month{
+ overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;
+}
+.ow-worker-unified-presence :is(.ow-presence-section-title,.ow-week-grid-header){
+ flex-shrink:0;
+}
+.ow-worker-unified-presence .ow-week-cell .ow-week-slot{
+ box-sizing:border-box;min-height:40px;height:40px;
+ font-size:.73rem;line-height:1.4;
+}
+.ow-worker-unified-presence .is-peer-overlay-visible .ow-week-cell .ow-week-slot{
+ min-height:34px;height:34px;
+ font-size:.73rem;
+}
+.ow-worker-unified-presence .ow-week-row-shell{
+ border-radius:.48rem;
+}
+.ow-worker-unified-presence .ow-unified-peer-day-link{
+ background:transparent;border:0;cursor:pointer;
+ color:#176b68;font:inherit;font-weight:700;text-align:right;
+ padding:.25rem .1rem;text-decoration:underline;text-decoration-style:dotted;
+ text-underline-offset:.2rem;
+}
+.ow-worker-unified-presence .ow-unified-peer-day-link:focus-visible,
+.ow-worker-unified-presence .ow-unified-peer-bar:focus-visible,
+.ow-worker-unified-presence .ow-unified-peer-overflow:focus-visible{
+ outline:3px solid #167e9d;outline-offset:2px;
+}
+.ow-worker-unified-presence .ow-unified-peer-status{
+ color:#59747d;font-size:.69rem;line-height:1.6;
+ margin:.15rem 0 .3rem;
+}
+.ow-worker-unified-presence .ow-unified-peer-status .ow-mini-btn{
+ margin-inline-start:.45rem;
+}
+.ow-worker-unified-presence .ow-unified-peer-ruler,
+.ow-worker-unified-presence .ow-unified-peer-day{
+ display:grid;grid-template-columns:minmax(3.3rem,4rem) minmax(0,1fr);
+ gap:.4rem;align-items:start;min-width:0;
+}
+.ow-worker-unified-presence .ow-unified-peer-ruler{
+ padding:.4rem .55rem .35rem;
+ background:#f2f8f8;border-bottom:1px solid #e0eaea;
+ font-size:.66rem;color:#52727a;
+ flex-shrink:0;
+}
+.ow-worker-unified-presence .ow-unified-peer-ruler-track{
+ height:1.25rem;position:relative;min-width:0;direction:rtl;
+}
+.ow-worker-unified-presence .ow-unified-peer-tick{
+ position:absolute;top:0;transform:translateX(50%);
+ white-space:nowrap;font-size:.63rem;color:#52727a;
+}
+.ow-worker-unified-presence .ow-unified-peer-tick:first-child{
+ transform:translateX(0);
+}
+.ow-worker-unified-presence .ow-unified-peer-tick:last-child{
+ transform:translateX(100%);
+}
+.ow-worker-unified-presence .ow-unified-peer-day{
+ padding:.28rem .4rem .3rem;
+}
+.ow-worker-unified-presence .ow-unified-peer-label{
+ font-size:.64rem;color:#55747c;padding-top:.12rem;
+}
+.ow-worker-unified-presence .ow-unified-peer-tracks{
+ min-width:0;display:grid;gap:.15rem;
+}
+.ow-worker-unified-presence .ow-unified-peer-lane{
+ height:24px;position:relative;overflow:hidden;
+ border:1px solid #dce9e9;border-radius:.35rem;
+ background:repeating-linear-gradient(to left,
+ transparent 0,transparent calc(16.6667% - 1px),
+ #d6e4e4 calc(16.6667% - 1px),#d6e4e4 16.6667%),#f8fbfb;
+}
+.ow-worker-unified-presence .ow-unified-peer-bar{
+ position:absolute;top:2px;height:18px;min-width:0;
+ white-space:nowrap;text-overflow:ellipsis;overflow:hidden;
+ border-radius:.3rem;border:0;padding:0 .13rem;
+ background:#bce3e3;color:#16535c;
+ font:inherit;font-size:.65rem;font-weight:700;
+ cursor:pointer;line-height:1.4;
+}
+.ow-worker-unified-presence .ow-unified-peer-bar.is-second{
+ background:#cbdcf5;color:#244d7a;
+}
+.ow-worker-unified-presence .ow-unified-peer-hint{
+ color:#58727d;font-size:.65rem;line-height:1.5;
+}
+.ow-worker-unified-presence .ow-unified-peer-overflow{
+ justify-self:start;border:0;background:transparent;padding:.16rem;
+ color:#087a73;font:inherit;font-weight:700;font-size:.68rem;cursor:pointer;
+}
+.ow-worker-unified-presence .ow-unified-peer-month-count{
+ color:#236c88;font-size:.59rem;
+}
+.ow-worker-unified-presence .ow-unified-peer-detail{
+ padding:.7rem;margin-top:.6rem;flex-shrink:0;
+ border:1px solid #c9e6e1;background:#f7fcfb;
+ border-radius:.65rem;min-width:0;
+}
+.ow-worker-unified-presence .ow-unified-peer-detail .ow-presence-section-title{
+ margin-bottom:.3rem;
+}
+.ow-worker-unified-presence .ow-unified-peer-detail-list{
+ display:grid;gap:.28rem;max-height:12rem;overflow-y:auto;
+}
+.ow-worker-unified-presence .ow-unified-peer-detail-row{
+ display:flex;justify-content:space-between;align-items:center;
+ gap:.4rem .75rem;flex-wrap:wrap;
+ padding:.36rem .45rem;background:white;border:1px solid #e0eded;border-radius:.35rem;
+}
+.ow-worker-unified-presence .ow-unified-peer-detail-row strong{font-size:.73rem}
+.ow-worker-unified-presence .ow-unified-peer-detail-row span{
+ direction:ltr;unicode-bidi:isolate;font-size:.69rem;
+}
+.ow-worker-unified-presence .ow-unified-peer-detail-row small{
+ font-size:.63rem;color:#58727d;
+}
+@media(max-width:1100px){
+ .ow-worker-unified-presence .ow-presence-hub{grid-template-columns:1fr}
+ .ow-worker-unified-presence :is(.ow-presence-week,.ow-presence-month){
+  height:auto;max-height:34.5rem;overflow-y:auto;
+ }
+ .ow-worker-unified-presence .ow-presence-week .ow-week-grid{
+  overflow-y:visible;
+ }
+}
