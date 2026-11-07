@@ -17,7 +17,7 @@ import JalaliDatePicker from './components/JalaliDatePicker'
 import { scopeWorkerHistory, filterWorkerHistory, summarizeWorkerHistory } from './lib/workerHistory'
 import { assessAssignmentCapacity, assessAvailabilityOverride, firstMatchingWeekday, isoWeekday } from './lib/assignmentCapacity.mjs'
 import { describeTaskWorkflow,selectManagerTasks,summarizeTaskWorkflow,selectPendingApprovals } from './lib/operationsTaskOverview.mjs'
-import WorkerLifecycleReadOnlyPreview from './components/WorkerLifecycleReadOnlyPreview'
+import WorkerLifecycleManager from './components/WorkerLifecycleManager'
 import { workerStateLabels } from './lib/workerLifecycle.mjs'
 import { MAX_DAILY_WINDOWS, selectedWeeklyWindows, validateDailyWindows, persianWeekBounds, suggestNextWindow, scopeSelfWorkRows } from './lib/weeklyScheduleGrid.mjs'
 import { persianMonthCells, previousPersianMonth, nextPersianMonth, persianMonthBounds } from './lib/persianMonthCalendar.mjs'
@@ -969,8 +969,8 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
             worker={selected} task={taskById.get(e.task_id)} onDone={onDone}/>)}
         </div>
       </details>)}
-      <details className="ow-profile-fold"><summary>وضعیت حساب · فقط مشاهده</summary>
-        <WorkerLifecycleReadOnlyPreview worker={selected}/>
+      <details className="ow-profile-fold"><summary>وضعیت حساب و مدیریت دسترسی</summary>
+        <WorkerLifecycleManager key={selected.id} worker={selected} onDone={onDone}/>
       </details>
     </>}
       </div>
