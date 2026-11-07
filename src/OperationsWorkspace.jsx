@@ -2515,10 +2515,20 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         <h4>{inspectedTask.title}</h4>
         <p className="ow-b3-inspector-facts">واحد کار: {unitLabels[inspectedTask.unit]||inspectedTask.unit||'نامشخص'} · {stateLabels[inspectedTask.state]||inspectedTask.state}
           {' · '}{pretty(inspectedTask.planned_date)}{' · '}
-          {minutes(inspectedTask.estimate_minutes)}</p>
+          زمان استاندارد: {minutes(inspectedTask.estimate_minutes)}</p>
         {inspectedTask.instructions
           ?<section><strong>شرح وظیفه</strong><p>{inspectedTask.instructions}</p></section>
           :<p className="ow-muted">توضیح دیگری برای این کار ثبت نشده است.</p>}
+        {inspectedReport&&<section aria-label="زمان‌های گزارش مرتبط با کار">
+          <strong>زمان گزارش‌شده</strong>
+          <p>{inspectedReport.reported_minutes==null?'ثبت نشده':minutes(inspectedReport.reported_minutes)}</p>
+          <strong>زمان تأییدشده</strong>
+          <p>{inspectedReport.review_state==='approved'
+            ? (inspectedReport.approved_minutes==null?'مقدار تأییدشده ثبت نشده':minutes(inspectedReport.approved_minutes))
+            : inspectedReport.review_state==='submitted'?'در انتظار بررسی'
+            : inspectedReport.review_state==='changes_requested'?'نیازمند اصلاح'
+            : 'تأیید نشد'}</p>
+        </section>}
         {inspectedReport?.review_note&&<section className="ow-b3-inspector-note">
           <strong>نظر مدیر دربارهٔ گزارش مرتبط</strong>
           <p>{inspectedReport.review_note}</p>
