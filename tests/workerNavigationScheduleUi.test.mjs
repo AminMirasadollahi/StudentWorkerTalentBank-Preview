@@ -1190,3 +1190,56 @@ test('read-only history shows true current review statuses and never invents tim
   await ui.dispose()
  }
 })
+
+
+test('global, presence and opportunities guide triggers open a real tour without stale availability setter',async()=>{
+ const oldRaf=globalThis.requestAnimationFrame
+ const oldCancel=globalThis.cancelAnimationFrame
+ const proto=window.HTMLDialogElement.prototype
+ const oldShowModal=proto.showModal
+ const oldClose=proto.close
+ globalThis.requestAnimationFrame=callback=>window.requestAnimationFrame(callback)
+ globalThis.cancelAnimationFrame=id=>window.cancelAnimationFrame(id)
+ proto.showModal=function(){this.setAttribute('open','')}
+ proto.close=function(){this.removeAttribute('open')}
+ globalThis.__workerFocusFixture=fixture()
+ const beforeWrites=globalThis.__workerFocusCalls.length
+ const ui=await setup()
+ try{
+  await ui.click('[data-swtb-guide="help-global"]')
+  let dialog=ui.host.querySelector('.swtb-guide-spotlight')
+  assert.ok(dialog&&dialog.open,'global worker guide must be visible after click')
+  assert.match(dialog.textContent,/مرحله ۱ از ۱۶/)
+  assert.equal(globalThis.__workerFocusCalls.length,beforeWrites)
+  await ui.click('.swtb-guide-spotlight .swtb-guide-close')
+  assert.equal(ui.host.querySelector('.swtb-guide-spotlight'),null)
+  await ui.clickText('زمان حضور')
+  await ui.click('[data-swtb-guide="help-availability"]')
+  dialog=ui.host.querySelector('.swtb-guide-spotlight')
+  assert.ok(dialog&&dialog.open,'V4 presence help should not use old setAvailabilityView')
+  assert.match(dialog.textContent,/برنامه شخصی قابل ویرایش/)
+  await ui.click('.swtb-guide-spotlight .swtb-guide-close')
+  assert.equal(ui.host.querySelectorAll('.ow-week-slot').length,28,
+   'opening and closing a guide cannot change the personal schedule')
+  assert.equal(globalThis.__workerFocusCalls.length,beforeWrites)
+  await ui.clickText('فرصت‌های کاری')
+  await act(async()=>{await Promise.resolve();await Promise.resolve()})
+  const poolGuide=ui.host.querySelector('[data-swtb-guide="help-workPool"]')
+  assert.ok(poolGuide,'work opportunities should have the same local help affordance')
+  await ui.click('[data-swtb-guide="help-workPool"]')
+  dialog=ui.host.querySelector('.swtb-guide-spotlight')
+  assert.ok(dialog&&dialog.open)
+  assert.match(dialog.textContent,/فرصت‌های منتشرشده/)
+  assert.equal(globalThis.__workerFocusCalls.length,beforeWrites)
+ }finally{
+  await ui.dispose()
+  if(oldRaf===undefined)delete globalThis.requestAnimationFrame
+  else globalThis.requestAnimationFrame=oldRaf
+  if(oldCancel===undefined)delete globalThis.cancelAnimationFrame
+  else globalThis.cancelAnimationFrame=oldCancel
+  if(oldShowModal===undefined)delete proto.showModal
+  else proto.showModal=oldShowModal
+  if(oldClose===undefined)delete proto.close
+  else proto.close=oldClose
+ }
+})
