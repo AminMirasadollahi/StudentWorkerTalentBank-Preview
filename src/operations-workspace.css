@@ -1940,6 +1940,13 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 .ow-worker-team-calendar .ow-peer-week-person.is-unscheduled .ow-peer-week-time {
  color:#526978;
 }
+.ow-worker-team-calendar .ow-peer-week-person.is-unavailable {
+ background:#fff8ec;
+ border-color:#e8d9b8;
+}
+.ow-worker-team-calendar .ow-peer-week-person.is-unavailable .ow-peer-week-time {
+ color:#805e24;
+}
 .ow-worker-team-calendar .ow-peer-week-extra,
 .ow-worker-team-calendar .ow-peer-week-status,
 .ow-worker-team-calendar .ow-peer-week-empty {
