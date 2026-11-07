@@ -3181,3 +3181,228 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-b3-layout .ow-b3-brand{min-height:5.5rem;padding:1rem .35rem}
  .ops-worker-b3-view .ow-b3-stage>.report-panel{box-shadow:none}
 }
+
+
+/* SWTB12 visual-system pass — worker-only.
+   Shared muted emphasis gives each workflow an identifiable heading, while
+   all meaningful state/credit continues to be expressed in visible text. */
+.ops-worker-b3-view .ow-b3-layout {
+ --ow-w-teal:#157f73;--ow-w-indigo:#486ab0;--ow-w-amber:#a66d22;
+ --ow-w-violet:#7554a3;--ow-w-sky:#267fa0;
+}
+.ops-worker-b3-view .ow-b3-stage>.ow-worker-task-workspace {
+ border-top:3px solid var(--ow-w-indigo);
+}
+.ops-worker-b3-view .ow-b3-stage>.ow-worker-work-pool {
+ border-top:3px solid var(--ow-w-amber);
+}
+.ops-worker-b3-view .ow-b3-stage>.ow-worker-availability-panel {
+ border-top:3px solid var(--ow-w-sky);
+}
+.ops-worker-b3-view .ow-b3-stage>.ow-b3-ledger {
+ border-top:3px solid var(--ow-w-teal);
+}
+.ops-worker-b3-view .ow-b3-stage>.ow-self-profile {
+ border-top:3px solid var(--ow-w-violet);
+}
+.ops-worker-b3-view .ow-worker-task-intro h1,
+.ops-worker-b3-view .ow-worker-work-pool .report-panel-heading h2,
+.ops-worker-b3-view .ow-worker-availability-panel .ow-b3-guide-heading h2,
+.ops-worker-b3-view .ow-b3-ledger .ow-history-heading h2,
+.ops-worker-b3-view .ow-self-profile .ow-b3-guide-heading h2{
+ letter-spacing:0;line-height:1.6;
+}
+.ops-worker-b3-view .ow-worker-task-intro h1{color:#284c83}
+.ops-worker-b3-view .ow-worker-work-pool .report-panel-heading h2{color:#77501c}
+.ops-worker-b3-view .ow-worker-availability-panel .ow-b3-guide-heading h2{color:#246b85}
+.ops-worker-b3-view .ow-b3-ledger .ow-history-heading h2{color:#126b60}
+
+/* Filter area: ONE toolbar, shared grid rhythm and a single scope note.
+   The independent server lifetime total stays ABOVE this toolbar. */
+.ops-worker-b3-view .ow-b3-ledger .ow-history-query {
+ margin:.65rem 0 .8rem;padding:.8rem .9rem .65rem;
+ background:linear-gradient(140deg,#f5f9fc,#f5fbfa);
+ border:1px solid #cfdee6;border-radius:.72rem;
+ display:grid;gap:.55rem;min-width:0;
+}
+.ops-worker-b3-view .ow-history-query-header {
+ display:flex;align-items:center;justify-content:space-between;gap:.4rem 1rem;
+ flex-wrap:wrap;min-width:0;
+}
+.ops-worker-b3-view .ow-history-query-header h3 {
+ font-size:.94rem;line-height:1.6;color:#164659;margin:0;
+}
+.ops-worker-b3-view .ow-history-query-header p {
+ font-size:.76rem;line-height:1.75;color:#5a727d;margin:.08rem 0 0;
+}
+.ops-worker-b3-view .ow-history-query-fields {
+ display:grid;grid-template-columns:minmax(0,1.15fr) repeat(2,minmax(0,1fr));
+ column-gap:.65rem;row-gap:.45rem;align-items:start;min-width:0;
+}
+.ops-worker-b3-view .ow-history-query-fields .report-field {
+ width:100%;min-width:0;margin:0;display:grid;gap:.25rem;
+}
+.ops-worker-b3-view .ow-history-query-fields .report-field>span {
+ color:#2b5467;font-size:.78rem;font-weight:700;line-height:1.65;
+}
+.ops-worker-b3-view .ow-history-query-fields select,
+.ops-worker-b3-view .ow-history-query-fields .jd-control {
+ min-height:2.65rem;width:100%;box-sizing:border-box;
+ background:white;border-color:#c8dae1;border-radius:.55rem;
+}
+.ops-worker-b3-view .ow-history-query-fields .jd-field {
+ width:100%;min-width:0;
+}
+.ops-worker-b3-view .ow-history-query-status {
+ display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;min-width:0;
+ padding-top:.55rem;border-top:1px solid #dce8ec;
+}
+.ops-worker-b3-view .ow-history-query-status>strong {
+ color:#315769;font-size:.78rem;white-space:nowrap;
+}
+.ops-worker-b3-view .ow-history-query-status .ow-history-filter {
+ margin:0;display:flex;flex-wrap:wrap;min-width:0;
+ background:#fff;border:1px solid #d7e5e9;
+}
+.ops-worker-b3-view .ow-history-query-status .ow-history-filter button {
+ min-height:2.35rem;white-space:nowrap;
+}
+.ops-worker-b3-view .ow-history-query-note {
+ color:#607b83;font-size:.72rem;line-height:1.7;margin:0;
+}
+.ops-worker-b3-view .ow-history-query-header .ow-worker-performance-reset {
+ min-height:2.25rem;font-size:.77rem;margin:0;
+ color:#305d73;background:white;border:1px solid #d0dee4;
+}
+.ops-worker-b3-view .ow-b3-ledger .ow-unit-hours--combined {
+ border-inline-start:3px solid #48a28f;
+}
+.ops-worker-b3-view .ow-worker-performance {
+ margin:.65rem 0 .85rem;
+}
+.ops-worker-b3-view .ow-worker-performance-chart-empty {
+ margin:.62rem 0 0;padding:.5rem .68rem;
+ border:1px dashed #d0e3df;border-radius:.5rem;
+ background:#ffffffa8;font-size:.75rem;line-height:1.85;
+ color:#52717a;
+}
+.ops-worker-b3-view .ow-history-results-heading {
+ padding:.45rem .05rem .35rem;border-top:1px solid #e0e9ec;
+}
+
+/* Stable worker identity palette (same id -> same tone across days).
+   Distinct tones are decorative; name/title and time still carry meaning. */
+.ow-worker-unified-presence .ow-unified-peer-label {
+ font-size:.64rem;font-weight:600;color:#426876;
+}
+.ow-worker-unified-presence .ow-unified-peer-bar {
+ --ow-peer-bg:#bde7de;--ow-peer-ink:#124e48;
+ --ow-peer-border:#68b4a5;
+ font-size:.64rem;font-weight:600;line-height:1.5;
+ background:var(--ow-peer-bg);color:var(--ow-peer-ink);
+ box-shadow:inset 0 -2px 0 var(--ow-peer-border);
+}
+.ow-worker-unified-presence .ow-unified-peer-bar.is-second {
+ background:var(--ow-peer-bg);color:var(--ow-peer-ink);
+}
+.ow-worker-unified-presence .ow-unified-peer-tone-0 {
+ --ow-peer-bg:#b7e9dd;--ow-peer-ink:#15564b;--ow-peer-border:#58a999;
+}
+.ow-worker-unified-presence .ow-unified-peer-tone-1 {
+ --ow-peer-bg:#d3e2ff;--ow-peer-ink:#264f89;--ow-peer-border:#7a9cd8;
+}
+.ow-worker-unified-presence .ow-unified-peer-tone-2 {
+ --ow-peer-bg:#f7e3ae;--ow-peer-ink:#77500b;--ow-peer-border:#c79e45;
+}
+.ow-worker-unified-presence .ow-unified-peer-tone-3 {
+ --ow-peer-bg:#e8dcfa;--ow-peer-ink:#5f3f80;--ow-peer-border:#a78bc9;
+}
+.ow-worker-unified-presence .ow-unified-peer-tone-4 {
+ --ow-peer-bg:#f8dcd2;--ow-peer-ink:#804334;--ow-peer-border:#cf907e;
+}
+.ow-worker-unified-presence .ow-unified-peer-tone-5 {
+ --ow-peer-bg:#cde8f0;--ow-peer-ink:#245a74;--ow-peer-border:#70a8c3;
+}
+.ow-worker-unified-presence .ow-unified-peer-day {
+ border-radius:.35rem;
+}
+.ow-worker-unified-presence .ow-presence-week,
+.ow-worker-unified-presence .ow-presence-month {
+ border-color:#cddfe7;background:linear-gradient(155deg,#faffff,#f7fbff);
+}
+.ow-worker-unified-presence .ow-unified-peer-ruler {
+ background:#e9f4f7;
+}
+.ow-worker-unified-presence .ow-unified-peer-tick {
+ color:#265b72;
+}
+
+/* Balanced accents in every worker page, without repainting the dark sidebar
+   or equating mere planning with approved working hours. */
+.ops-worker-b3-view .ow-worker-focus-switch {
+ background:linear-gradient(110deg,#f0f5fb,#f4faf9);
+ border-color:#d7e3eb;
+}
+.ops-worker-b3-view .ow-worker-focus-switch button:nth-child(1) strong{
+ background:#fff0d9;color:#855614;
+}
+.ops-worker-b3-view .ow-worker-focus-switch button:nth-child(2) strong{
+ background:#e7efff;color:#315d9b;
+}
+.ops-worker-b3-view .ow-worker-focus-switch button:nth-child(3) strong{
+ background:#eaf3fb;color:#285e86;
+}
+.ops-worker-b3-view .ow-worker-focus-switch button:nth-child(4) strong{
+ background:#e1f6ec;color:#116a51;
+}
+.ops-worker-b3-view .ow-worker-focus-switch button.is-selected {
+ border-color:#93b4cb;background:#fff;
+ box-shadow:inset 0 -2px 0 #4a84b1;
+}
+.ops-worker-b3-view .ow-worker-task-workspace .ow-worker-results-heading {
+ border-top:1px solid #dce6ee;padding-top:.65rem;
+}
+.ops-worker-b3-view .ow-worker-task-workspace .ow-worker-tasks>.ow-item:hover{
+ background:#f5f9ff;
+}
+.ops-worker-b3-view .ow-worker-work-pool .ow-compact-hint {
+ background:#fff9ec;border-color:#e7d8b2;color:#745623;
+}
+.ops-worker-b3-view .ow-worker-work-pool .ow-work-pool-item {
+ border-color:#d9e4e7;box-shadow:0 3px 10px #123a4e09;
+}
+.ops-worker-b3-view .ow-worker-work-pool .ow-work-pool-facts>span{
+ background:#edf4fb;color:#345873;
+}
+.ops-worker-b3-view .ow-self-profile .ow-self-profile-quicklinks {
+ border-inline-start:3px solid #9676c0;
+ background:linear-gradient(115deg,#f6f3fc,#f0faf8);
+}
+.ops-worker-b3-view .ow-self-profile .ow-profile-identity-grid>div:nth-child(2n) {
+ background:#f2f7ff;
+}
+.ops-worker-b3-view .ow-worker-empty {
+ background:linear-gradient(120deg,#f7fafc,#f5faf8);
+ border-color:#d5e5e9;
+}
+@media(max-width:1050px){
+ .ops-worker-b3-view .ow-history-query-fields{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+ }
+ .ops-worker-b3-view .ow-history-query-unit {grid-column:1/-1}
+}
+@media(max-width:700px){
+ .ops-worker-b3-view .ow-history-query-fields{grid-template-columns:minmax(0,1fr)}
+ .ops-worker-b3-view .ow-history-query-unit{grid-column:auto}
+ .ops-worker-b3-view .ow-history-query-status{align-items:start;flex-direction:column}
+ .ops-worker-b3-view .ow-history-query-status .ow-history-filter {width:100%}
+ .ops-worker-b3-view .ow-b3-ledger .ow-history-query{padding:.65rem}
+}
+@media(forced-colors:active){
+ .ow-worker-unified-presence .ow-unified-peer-bar{
+  border:1px solid ButtonText;
+ }
+ .ops-worker-b3-view .ow-worker-focus-switch button.is-selected{
+  outline:2px solid Highlight;
+ }
+}
