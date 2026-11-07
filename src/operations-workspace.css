@@ -2877,17 +2877,19 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  gap:.4rem;align-items:start;min-width:0;
 }
 .ow-worker-unified-presence .ow-unified-peer-ruler{
- padding:.4rem .55rem .35rem;
+ /* Match the day track's inline padding, so the actual-clock ticks and
+    peer interval bars have the same origin and available width. */
+ padding:.4rem .4rem .35rem;
  background:#f2f8f8;border-bottom:1px solid #e0eaea;
- font-size:.66rem;color:#52727a;
+ font-size:.69rem;color:#52727a;
  flex-shrink:0;
 }
 .ow-worker-unified-presence .ow-unified-peer-ruler-track{
- height:1.25rem;position:relative;min-width:0;direction:rtl;
+ height:1.5rem;position:relative;min-width:0;direction:rtl;
 }
 .ow-worker-unified-presence .ow-unified-peer-tick{
  position:absolute;top:0;transform:translateX(50%);
- white-space:nowrap;font-size:.63rem;color:#52727a;
+ white-space:nowrap;font-size:.7rem;font-weight:650;color:#315e69;
 }
 .ow-worker-unified-presence .ow-unified-peer-tick:first-child{
  transform:translateX(0);
@@ -2907,9 +2909,14 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 .ow-worker-unified-presence .ow-unified-peer-lane{
  height:24px;position:relative;overflow:hidden;
  border:1px solid #dce9e9;border-radius:.35rem;
- background:repeating-linear-gradient(to left,
- transparent 0,transparent calc(16.6667% - 1px),
- #d6e4e4 calc(16.6667% - 1px),#d6e4e4 16.6667%),#f8fbfb;
+ background:#f8fbfb;
+}
+.ow-worker-unified-presence .ow-unified-peer-guides{
+ position:absolute;inset:0;pointer-events:none;
+}
+.ow-worker-unified-presence .ow-unified-peer-guide{
+ position:absolute;top:0;bottom:0;width:1px;
+ background:#bfd8da;pointer-events:none;
 }
 .ow-worker-unified-presence .ow-unified-peer-bar{
  position:absolute;top:2px;height:18px;min-width:0;
@@ -2917,7 +2924,7 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  border-radius:.3rem;border:0;padding:0 .13rem;
  background:#bce3e3;color:#16535c;
  font:inherit;font-size:.65rem;font-weight:700;
- cursor:pointer;line-height:1.4;
+ cursor:pointer;line-height:1.4;z-index:1;
 }
 .ow-worker-unified-presence .ow-unified-peer-bar.is-second{
  background:#cbdcf5;color:#244d7a;
@@ -2963,4 +2970,34 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  .ow-worker-unified-presence .ow-presence-week .ow-week-grid{
   overflow-y:visible;
  }
+}
+
+/* SWTB12: profile is a self-service hub, not a second analytics dashboard. */
+.ow-self-profile .ow-self-profile-quicklinks{
+ display:flex;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:.65rem 1.1rem;min-width:0;
+ margin:.85rem 0 .45rem;padding:.7rem .85rem;
+ border:1px solid #d9e8e8;border-radius:.7rem;background:#f7fbfa;
+}
+.ow-self-profile-quicklinks-copy{
+ display:grid;gap:.2rem;min-width:0;max-width:55ch;
+}
+.ow-self-profile-quicklinks-copy strong{
+ color:var(--report-navy,#12374c);font-size:.87rem;
+}
+.ow-self-profile-quicklinks-copy small{
+ font-size:.74rem;line-height:1.8;color:#52727b;
+}
+.ow-self-profile-quicklinks-actions{
+ display:flex;gap:.4rem;flex-wrap:wrap;
+}
+.ow-self-profile-quicklinks-actions button{
+ min-height:2.45rem;font-size:.8rem;
+}
+.ow-self-profile-quicklinks-actions button:focus-visible{
+ outline:2px solid #14877f;outline-offset:2px;
+}
+@media(max-width:700px){
+ .ow-self-profile-quicklinks-actions{width:100%}
+ .ow-self-profile-quicklinks-actions button{flex:1}
 }
