@@ -2408,7 +2408,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     try{if(key)window.localStorage.setItem(key,'seen')}catch{}
   }
   const openWorkerGuide=scope=>{
-    if(scope==='availability'||scope==='all')setAvailabilityView('mine')
+    // The V4 presence view is unified; there is no legacy availability subview to reset.
     rememberGuideOffer()
     setGuideWelcomeOpen(false)
     setSelectedTaskId(null)
@@ -2643,6 +2643,6 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     {guideScope&&<WorkerGuideSpotlight key={guideScope} scope={guideScope}
       currentSection={section}
       onNavigate={next=>updateNavigation({section:next})}
-      onClose={closeWorkerGuide}/>}
+      includeWorkPool={workPoolUIEnabled} onClose={closeWorkerGuide}/>}
   </div>
 }
