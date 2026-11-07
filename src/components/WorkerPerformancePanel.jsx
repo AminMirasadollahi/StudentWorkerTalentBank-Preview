@@ -22,6 +22,40 @@ function PerformanceBars({items,labelOf}){
   </div>)}
  </div>
 }
+// A donut is used ONLY for a few mutually exclusive work-unit shares.
+function UnitDonut({items,total,labelOf}){
+ const palette=['#087e75','#4b76b9','#b57a28','#8767ac','#447e98']
+ let angle=0
+ const arcs=[]
+ for(let i=0;i<items.length;i++){
+  const value=items[i].minutes
+  if(total<=0||value<=0)continue
+  const next=angle+value/total*360
+  arcs.push(palette[i%palette.length]+' '+angle+'deg '+next+'deg')
+  angle=next
+ }
+ const background=total>0&&arcs.length?('conic-gradient('+arcs.join(', ')+')'):'#e3ecef'
+ return <div className="ow-worker-unit-donut" aria-label="سهم کارکرد تأییدشده بر اساس واحد">
+  <div className="ow-worker-unit-donut-ring" style={{background}}
+    aria-hidden="true">
+   <div className="ow-worker-unit-donut-hole">
+    <strong>{duration(total)}</strong>
+    <small>در همین نتایج</small>
+   </div>
+  </div>
+  <ul className="ow-worker-unit-donut-legend">
+   {items.map((item,i)=><li key={item.unit} aria-label={
+    labelOf(item)+'، '+duration(item.minutes)+
+     (total>0?'، '+nf.format(Math.round(item.minutes/total*100))+' درصد':'، بدون سهم')
+   }>
+    <span className="ow-worker-unit-donut-color" aria-hidden="true"
+      style={{background:palette[i%palette.length]}}/>
+    <span>{labelOf(item)}</span>
+    <strong>{duration(item.minutes)}</strong>
+   </li>)}
+  </ul>
+ </div>
+}
 export default function WorkerPerformancePanel({rows=[],tasks=[],units={}}){
  const metrics=projectWorkerPerformance(rows,tasks)
  // Zero is a real metric only when all approved-minute rows are valid.
@@ -58,17 +92,17 @@ export default function WorkerPerformancePanel({rows=[],tasks=[],units={}}){
      <span>{nf.format(metrics.missingTaskCount)} گزارش، وظیفه مرتبط را در فهرست فعلی ندارد؛
        شمار کارهای تکمیل‌شده ممکن است ناقص باشد.</span>}
    </p>}
-  <details className="ow-worker-performance-chart-disclosure" open>
-   <summary>نمای نموداری کارکرد تأییدشده</summary>
+  <section className="ow-worker-performance-chart-disclosure" aria-label="نمودارهای کارکرد تأییدشده">
+   <h4 className="ow-worker-performance-chart-heading">نمودارهای کارکرد تأییدشده</h4>
    <div className="ow-worker-performance-chart-grid">
     <section aria-label="کارکرد تأییدشده بر اساس واحد">
-     <h4>بر اساس واحد انجام کار</h4>
-     {readyUnit?<PerformanceBars items={byUnit}
+     <h4>سهم واحدهای انجام کار</h4>
+     {readyUnit?<UnitDonut items={byUnit} total={metrics.approvedMinutes}
        labelOf={item=>units[item.unit]||item.unit}/>:
       <p className="ow-worker-chart-unavailable">انتساب واحد یا مقدار تأییدشده برای بعضی گزارش‌ها ناقص است؛ نمودار نمایش داده نمی‌شود.</p>}
     </section>
     <section aria-label="کارکرد تأییدشده بر اساس ماه شمسی">
-     <h4>بر اساس ماه انجام کار</h4>
+     <h4>روند ماهانه انجام کار</h4>
      {!readyMonth?<p className="ow-worker-chart-unavailable">
        تاریخ انجام یا مقدار تأییدشده برای بعضی گزارش‌ها ناقص است؛ نمودار نمایش داده نمی‌شود.
       </p>:metrics.byMonth.length>0?
@@ -81,6 +115,6 @@ export default function WorkerPerformancePanel({rows=[],tasks=[],units={}}){
       </div>}
     </section>
    </div>
-  </details>
+  </section>
  </section>
 }
