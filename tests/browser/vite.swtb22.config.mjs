@@ -15,11 +15,12 @@ const api=[
  'export const getMyWorkerProfileV2=async()=>({});',
  'export const getMyProfileChangeRequests=async()=>[];',
  'export const getUnitHourTotals=async()=>({scope:"admin",units:[]});',
+ 'export const getWorkerStateHistory=async()=>[];',
  'export const getLibraryDeskShifts=async()=>({ok:true,shifts:[]});',
  ...['setWorkerTermMembership','setTermAccessMode',
  'assignGroupTask','assignLibraryDeskShift','cancelLibraryDeskShift',
  'saveOperationsTerm','saveOperationsAllocation','saveOperationsBudgetPool',
- 'requestProfileChange','reviewProfileChange'].map(name=>
+ 'requestProfileChange','reviewProfileChange','setWorkerState'].map(name=>
   `export const ${name}=async()=>{globalThis.__qaWriteAttempts++;throw Error("NO_WRITES")};`),
  ...['createWorkTemplate','createWorkOpportunity','setWorkOpportunityState',
     'createDeskWorkTemplate','createDeskWorkOffer','setDeskWorkOfferState'].map(name=>
