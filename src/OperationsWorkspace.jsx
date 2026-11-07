@@ -414,10 +414,10 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
           <button type="button" className="ow-mini-btn"
             onClick={peerSnapshot.retry}>تلاش مجدد</button>
         </span>}
-        {peerReady&&<span>زمان‌ها برنامه‌ریزی‌شده‌اند، نه حضور قطعی یا ساعات تأییدشده.</span>}
+        {peerReady&&<span>این بازه‌ها برنامه‌ریزی‌شده‌اند، نه حضور قطعی یا ساعات تأییدشده؛ خط‌های عمودی نوارها با ساعت‌های محور بالا منطبق‌اند.</span>}
       </div>}
       {peerReady&&<div className="ow-unified-peer-ruler" aria-label="محور مشترک ساعت برای تمام روزهای این هفته">
-        <span>ساعت</span>
+        <span>محور ساعت</span>
         <div className="ow-unified-peer-ruler-track">
           {clockScale.ticks.map(minute=><span key={minute}
             className="ow-unified-peer-tick"
@@ -480,6 +480,11 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
               <div className="ow-unified-peer-tracks">
                 {packed.lanes.map((lane,laneIndex)=><div
                   className="ow-unified-peer-lane" key={laneIndex}>
+                  <div className="ow-unified-peer-guides" aria-hidden="true">
+                    {clockScale.ticks.map(minute=><span key={minute}
+                      className="ow-unified-peer-guide"
+                      style={{right:percentForMinute(minute)+'%'}}/>)}
+                  </div>
                   {lane.map((item,index)=>{
                     const width=percentForMinute(item.end)-percentForMinute(item.start)
                     return <button type="button"
@@ -2132,6 +2137,19 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
       <div><small>سال ورود</small><strong>{identity?.entry_year||'ثبت نشده'}</strong></div>
       <div><small>واحد اولیهٔ ثبت‌نام</small><strong>{unitLabels[identity?.unit]||identity?.unit||'نامشخص'}</strong></div>
     </div>
+    <nav className="ow-self-profile-quicklinks" data-swtb-guide="profile-shortcuts"
+      aria-label="پیگیری فعالیت دانشجوکار">
+      <div className="ow-self-profile-quicklinks-copy">
+        <strong>پیگیری همکاری</strong>
+        <small>{n(openTasks)} کار ناتمام در فهرست فعلی · جزئیات زمان‌های گزارش‌شده و تأییدشده در سوابق گزارش‌ها قابل بررسی است.</small>
+      </div>
+      <div className="ow-self-profile-quicklinks-actions">
+        <button type="button" className="report-btn report-btn--light"
+          onClick={()=>onNavigate?.('tasks','action')}>کارهای من</button>
+        <button type="button" className="report-btn report-btn--light"
+          onClick={()=>onNavigate?.('history')}>سوابق گزارش‌ها و ساعات</button>
+      </div>
+    </nav>
     <div className="ow-profile-change-launch" data-swtb-guide="profile-correction">
       <button type="button" ref={profileDialogTriggerRef}
         className="report-btn report-btn--light ow-profile-change-trigger"
@@ -2548,7 +2566,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         <button type="button" className="swtb-guide-launch" data-swtb-guide="help-availability"
           onClick={()=>openWorkerGuide('availability')}>؟ راهنمای این بخش</button>
       </div>
-      <div className="ow-worker-unified-visibility">
+      <div className="ow-worker-unified-visibility" data-swtb-guide="availability-peers">
         <label className="ow-worker-unified-toggle">
           <input type="checkbox" checked={showCoworkers}
             onChange={event=>setPeerVisibility({
