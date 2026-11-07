@@ -47,7 +47,16 @@ async function mount(extra={}){
  }]
  const host=document.createElement('div');document.body.append(host)
  const root=createRoot(host)
- let props={worker:fakeWorker,onDone:async()=>true,...extra}
+ const onChangeState=async args=>{
+  globalThis.__wlWrites.push(args)
+  if(globalThis.__wlError)throw Error(globalThis.__wlError)
+  return {worker_id:args.workerId,previous_state:args.expectedState,state:args.newState}
+ }
+ const onReadHistory=async id=>{
+  globalThis.__wlReads.push(id)
+  return globalThis.__wlHistory
+ }
+ let props={worker:fakeWorker,onDone:async()=>true,onChangeState,onReadHistory,...extra}
  async function render(changes={}){
   props={...props,...changes}
   await act(async()=>root.render(createElement(Component,props)))
