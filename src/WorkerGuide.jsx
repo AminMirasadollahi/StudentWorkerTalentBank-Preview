@@ -6,6 +6,7 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react'
 import {getWorkerGuideSteps} from './lib/workerGuide.mjs'
 import {trapModalTab} from './lib/dialogFocusTrap.mjs'
 import './worker-guide.css'
+const faNumber=new Intl.NumberFormat('fa-IR')
 
 function openModal(node){
  if(node&&!node.open&&typeof node.showModal==='function'){
@@ -171,7 +172,7 @@ export function WorkerGuideSpotlight({scope,currentSection,onNavigate,onClose,in
      </p>}
      <div className="swtb-guide-popover__footer">
        <span className="swtb-guide-progress" aria-live="polite">
-         مرحله {index+1} از {steps.length}
+         مرحله {faNumber.format(index+1)} از {faNumber.format(steps.length)}
        </span>
        <div className="swtb-guide-popover__actions">
          <button type="button" className="swtb-guide-button" disabled={index===0}
