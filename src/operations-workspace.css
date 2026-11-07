@@ -3209,7 +3209,7 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 .ops-worker-b3-view .ow-worker-work-pool .report-panel-heading h2,
 .ops-worker-b3-view .ow-worker-availability-panel .ow-b3-guide-heading h2,
 .ops-worker-b3-view .ow-b3-ledger .ow-history-heading h2,
-.ops-worker-b3-view .ow-self-profile .ow-b3-guide-heading h2{
+.ops-worker-b3-view .ow-self-profile .ow-presence-section-title h2{
  letter-spacing:0;line-height:1.6;
 }
 .ops-worker-b3-view .ow-worker-task-intro h1{color:#284c83}
@@ -3378,7 +3378,7 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  border-inline-start:3px solid #9676c0;
  background:linear-gradient(115deg,#f6f3fc,#f0faf8);
 }
-.ops-worker-b3-view .ow-self-profile .ow-profile-identity-grid>div:nth-child(2n) {
+.ops-worker-b3-view .ow-self-profile .ow-self-identity>div:nth-child(2n) {
  background:#f2f7ff;
 }
 .ops-worker-b3-view .ow-worker-empty {
