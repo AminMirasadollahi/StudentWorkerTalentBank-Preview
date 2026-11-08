@@ -199,6 +199,36 @@ function SectionTabs({value,onChange,options}) {
       onClick={()=>onChange(id)}>{title}</button>)}
   </nav>
 }
+// Fixed weekly slots use native, keyboard-accessible hour/minute lists.
+// Preserve the server's one-minute resolution and the valid end-only 24:00.
+const weeklyClockHours=Array.from({length:24},(_,i)=>String(i).padStart(2,'0'))
+const weeklyClockMinutes=Array.from({length:60},(_,i)=>String(i).padStart(2,'0'))
+function WeeklyClockSelect({label,value,onChange,allowDayEnd=false,disabled=false}){
+  const [hour='',minute='']=(typeof value==='string'?value:'').split(':')
+  const isDayEnd=allowDayEnd&&hour==='24'
+  return <div className="ow-slot-clock">
+    <span className="ow-slot-clock__caption">{label}</span>
+    <div className="ow-slot-clock__controls" dir="ltr">
+      <select value={hour} required disabled={disabled}
+        aria-label={`ساعت ${label}`}
+        onChange={event=>{
+          const next=event.target.value
+          onChange(next?`${next}:${next==='24'?'00':minute||'00'}`:'')
+        }}>
+        <option value="" disabled>--</option>
+        {weeklyClockHours.map(h=><option key={h} value={h}>{h}</option>)}
+        {allowDayEnd&&<option value="24">24</option>}
+      </select>
+      <span className="ow-slot-clock__separator" aria-hidden="true">:</span>
+      <select value={isDayEnd?'00':minute} required
+        aria-label={`دقیقه ${label}`} disabled={disabled||isDayEnd}
+        onChange={event=>onChange(hour?`${hour}:${event.target.value}`:`:${event.target.value}`)}>
+        <option value="" disabled>--</option>
+        {(isDayEnd?['00']:weeklyClockMinutes).map(m=><option key={m} value={m}>{m}</option>)}
+      </select>
+    </div>
+  </div>
+}
 function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',showPeers=false,peerRefreshRevision=0}) {
   const [effective,setEffective]=useState(today())
   const [editingDay,setEditingDay]=useState(null)
@@ -452,38 +482,43 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
                 const slot=slots[index]
                 const isEditing=editingDay===id&&editingSlot===index
                 return <div key={index} className={'ow-week-cell'+(isEditing?' is-editing':'')}>
-                  {isEditing?<form className="ow-slot-editor" onSubmit={submitWeek}
-                    aria-label={`ثبت نوبت ${index+1} ${name}`}>
-                    <label><span className="ow-sr-only">شروع</span><input type="text"
-                      inputMode="numeric" dir="ltr" required maxLength={5}
-                      value={draftWindows[index]?.start||''} placeholder="08:00"
-                      onChange={e=>editWindow(setDraftWindows,index,'start',e.target.value)}/></label>
-                    <label><span className="ow-sr-only">پایان</span><input type="text"
-                      inputMode="numeric" dir="ltr" required maxLength={5}
-                      value={draftWindows[index]?.end||''} placeholder="09:00"
-                      onChange={e=>editWindow(setDraftWindows,index,'end',e.target.value)}/></label>
-                    <div className="ow-slot-actions">
-                      <button type="submit" title="ذخیره نوبت" aria-label="ذخیره همین روز"
-                        disabled={busy||!weeklyValidation.ok}>✓</button>
-                      {slot&&<button type="button" title="حذف نوبت" aria-label="حذف نوبت"
-                        onClick={deleteSlot} disabled={busy}>×</button>}
-                      <button type="button" title="انصراف" aria-label="انصراف"
-                        onClick={()=>{setEditingDay(null);setEditingSlot(null)}}>↩</button>
-                    </div>
-                    {!weeklyValidation.ok&&<small role="alert">{weeklyValidation.error}</small>}
-                    {weekPreview?.code==='conflict'&&<small role="status">
-                      تعارض با کارهای قبلی؛ آن‌ها حذف نمی‌شوند.</small>}
-                  </form>:<button type="button"
+                  <button type="button"
                     aria-label={`ویرایش برنامه ${name} نوبت ${index+1}`}
+                    aria-pressed={isEditing}
                     className={'ow-week-slot'+(slot?'':' is-empty')}
                     title={slot?'ویرایش نوبت':'افزودن نوبت'}
                     disabled={busy||index>slots.length} onClick={()=>openSlot(id,index)}>
                     {slot?<span dir="ltr">{slot.start}–{slot.end}</span>:
                       <span aria-hidden="true">＋</span>}
-                  </button>}
+                  </button>
                 </div>
               })}
             </div>
+            {editingDay===id&&editingSlot!==null&&
+              <form className="ow-slot-editor" onSubmit={submitWeek}
+                aria-label={`ثبت نوبت ${editingSlot+1} ${name}`}>
+                <div className="ow-slot-editor__heading">
+                  <strong>نوبت {n(editingSlot+1)} · {name}</strong>
+                  <small>ساعت و دقیقه را انتخاب کنید (قالب ۲۴ساعته)</small>
+                </div>
+                <WeeklyClockSelect label="شروع" disabled={busy}
+                  value={draftWindows[editingSlot]?.start||''}
+                  onChange={value=>editWindow(setDraftWindows,editingSlot,'start',value)}/>
+                <WeeklyClockSelect label="پایان" allowDayEnd disabled={busy}
+                  value={draftWindows[editingSlot]?.end||''}
+                  onChange={value=>editWindow(setDraftWindows,editingSlot,'end',value)}/>
+                <div className="ow-slot-actions">
+                  <button type="submit" aria-label="ذخیره همین روز"
+                    disabled={busy||!weeklyValidation.ok}>✓ ذخیره</button>
+                  {slots[editingSlot]&&<button type="button" aria-label="حذف نوبت"
+                    onClick={deleteSlot} disabled={busy}>حذف نوبت</button>}
+                  <button type="button" aria-label="انصراف" disabled={busy}
+                    onClick={()=>{setEditingDay(null);setEditingSlot(null)}}>انصراف</button>
+                </div>
+                {!weeklyValidation.ok&&<small role="alert">{weeklyValidation.error}</small>}
+                {weekPreview?.code==='conflict'&&<small role="status">
+                  تعارض با کارهای قبلی؛ آن‌ها حذف نمی‌شوند.</small>}
+              </form>}
             {peerReady&&peerDay&&<div className="ow-unified-peer-day" aria-label={'برنامه همکاران در '+name}>
               <span className="ow-unified-peer-label">همکاران</span>
               <div className="ow-unified-peer-tracks">
