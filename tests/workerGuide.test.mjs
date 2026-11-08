@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import {readFileSync} from 'node:fs'
 import {WORKER_GUIDE_VERSION,GUIDE_SECTIONS,SECTION_GUIDES,
  getWorkerGuideSteps,workerGuideStorageKey,isWorkerGuideSection
 } from '../src/lib/workerGuide.mjs'
@@ -42,4 +43,27 @@ test('invalid scope does not construct a tour or mix worker identities',()=>{
  assert.equal(isWorkerGuideSection('tasks'),true)
  assert.equal(isWorkerGuideSection('workPool'),true)
  assert.equal(isWorkerGuideSection('admin'),false)
+})
+
+test('first-login welcome explains 3 genuine actions without replacing the optional tour',()=>{
+ const source=readFileSync(new URL('../src/WorkerGuide.jsx',import.meta.url),'utf8')
+ const css=readFileSync(new URL('../src/worker-guide.css',import.meta.url),'utf8')
+ const welcome=source.slice(source.indexOf('export function WorkerGuideWelcome('),
+  source.indexOf('export function WorkerGuideSpotlight('))
+ assert.ok(welcome.startsWith('export function WorkerGuideWelcome('))
+ assert.match(welcome,/<ol className="swtb-guide-welcome__quickstart">/)
+ assert.equal((welcome.match(/<li>/g)||[]).length,3)
+ for(const word of ['ورود را بررسی کنید','برنامه حضور را تنظیم کنید',
+  'کارها را دنبال کنید','هر روز را جداگانه ذخیره',
+  'بعد از انجام فعالیت واقعی','تأیید مدیر']){
+  assert.ok(welcome.includes(word),'missing first-run guidance: '+word)
+ }
+ assert.match(welcome,/برنامه حضور صرفاً زمان‌های قابل همکاری/)
+ assert.match(welcome,/onClick=\{onBegin\}/,'optional tour remains available')
+ assert.match(welcome,/onClick=\{onSkip\}/,'opt-out remains available')
+ assert.doesNotMatch(welcome,/setWeeklyDay|submitMyTime|assignWorkerTask|\.rpc\(/,
+  'welcome must not auto-write a schedule or a report')
+ assert.match(css,/\.swtb-guide-welcome__quickstart\s*\{/)
+ assert.match(css,/max-height:calc\(100dvh - 2rem\);overflow-y:auto/,
+  'quickstart must not overflow a short laptop viewport')
 })
