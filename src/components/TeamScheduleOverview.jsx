@@ -28,7 +28,7 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
  const initialDate=inlineManager?(selectedDay||todayIso):todayIso
  const [weekAnchor,setWeekAnchor]=useState(initialDate)
  const [monthAnchor,setMonthAnchor]=useState(initialDate)
- const [selectedDate,setSelectedDate]=useState(inlineManager?initialDate:'')
+ const [selectedDate,setSelectedDate]=useState(inlineManager?(selectedDay||''):'')
  const inlineTitleRef=useRef(null)
  const inlineDidMount=useRef(false)
  const [showAll,setShowAll]=useState(Boolean(inlineManager))
@@ -73,23 +73,29 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
   setWeekAnchor(date)
   if(date<month.start||date>month.end)setMonthAnchor(date)
  }
- const closeDay=()=>setSelectedDate('')
+ const closeDay=()=>{
+  setSelectedDate('')
+  if(inlineManager){
+   onSelectedDayChange?.('')
+   lastDateButtonRef.current?.focus?.({preventScroll:true})
+  }
+ }
  const moveWeek=delta=>{
   const next=plusIsoDays(week.start,delta*7)
   setWeekAnchor(next)
-  if(inlineManager){setMonthAnchor(next);setSelectedDate(next);onSelectedDayChange?.(next);setShowAll(true)}
+  if(inlineManager){setMonthAnchor(next);setSelectedDate('');onSelectedDayChange?.('')}
   else closeDay()
  }
  const moveMonth=delta=>{
   const next=delta<0?previousPersianMonth(monthAnchor):nextPersianMonth(monthAnchor)
   setMonthAnchor(next)
   if(inlineManager){const first=persianMonthCells(next).start
-   setWeekAnchor(first);setSelectedDate(first);onSelectedDayChange?.(first);setShowAll(true)}
+   setWeekAnchor(first);setSelectedDate('');onSelectedDayChange?.('')}
   else closeDay()
  }
  const backToToday=()=>{
   setMonthAnchor(todayIso);setWeekAnchor(todayIso)
-  if(inlineManager){setSelectedDate(todayIso);onSelectedDayChange?.(todayIso);setShowAll(true)}
+  if(inlineManager){setSelectedDate('');onSelectedDayChange?.('')}
   else closeDay()
  }
  return <div className={'ow-presence-hub ow-teamcal'+(inlineManager?' swtb22-manager-teamcal':'')} aria-label={`برنامه مشترک هفتگی و ماهانه ${teamLabel}`}>
@@ -193,13 +199,13 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
    </section>
 
    {inlineManager
-    ?<aside id="swtb22-presence-day-inspector" className="swtb22-presence-day-inspector"
+    ?(selected?<aside id="swtb22-presence-day-inspector" className="swtb22-presence-day-inspector"
       role="region" aria-label="جزئیات روز و اشخاص انتخاب‌شده">
       {selected&&<div className="ow-teamcal-detail">
        <div className="ow-presence-section-title ow-presence-date-dialog__head">
          <h3 id="ow-teamcal-day-title" tabIndex={-1} data-team-calendar-title ref={inlineManager?inlineTitleRef:undefined}>
            برنامه گروهی · {dayName(selected.date)}</h3>
-         <button className="ow-mini-btn" type="button" onClick={inlineManager?backToToday:closeDay}>{inlineManager?'بازگشت به امروز':'بستن'}</button>
+         <button className="ow-mini-btn" type="button" onClick={closeDay}>{inlineManager?'بستن جزئیات':'بستن'}</button>
        </div>
        <p className="ow-muted">
          {fa.format(selected.plannedWorkers)} نفر دارای برنامه ·
@@ -248,7 +254,7 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
            }} disabled={inlineManager&&selected.date<todayIso}>+ تعریف کار در این تاریخ</button>
        </div>}
      </div>}
-     </aside>
+     </aside>:null)
     :<dialog ref={dateDialogRef} dir="rtl" className="ow-presence-date-dialog ow-teamcal-dialog"
       aria-labelledby="ow-teamcal-day-title" onKeyDown={trapModalTab}
       onCancel={event=>{event.preventDefault();closeDay()}}
@@ -257,7 +263,7 @@ export default function TeamScheduleOverview({data,todayIso,onPlanAssignment,
        <div className="ow-presence-section-title ow-presence-date-dialog__head">
          <h3 id="ow-teamcal-day-title" tabIndex={-1} data-team-calendar-title ref={inlineManager?inlineTitleRef:undefined}>
            برنامه گروهی · {dayName(selected.date)}</h3>
-         <button className="ow-mini-btn" type="button" onClick={inlineManager?backToToday:closeDay}>{inlineManager?'بازگشت به امروز':'بستن'}</button>
+         <button className="ow-mini-btn" type="button" onClick={closeDay}>{inlineManager?'بستن جزئیات':'بستن'}</button>
        </div>
        <p className="ow-muted">
          {fa.format(selected.plannedWorkers)} نفر دارای برنامه ·
