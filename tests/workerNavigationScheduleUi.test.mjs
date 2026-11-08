@@ -291,6 +291,72 @@ test('seven weekday rows render four independent slots and safe per-day single R
   assert.match(effective,/^\d{4}-\d{2}-\d{2}$/)
  }finally{await ui.dispose()}
 })
+test('weekly presence uses keyboard-accessible hour/minute dropdowns without rounding precise minutes',async()=>{
+ const ui=await setup()
+ globalThis.__workerFocusCalls=[]
+ const choose=async(label,value)=>{
+  const picker=ui.host.querySelector(`select[aria-label="${label}"]`)
+  assert.ok(picker,`missing ${label}`)
+  await act(async()=>{
+   picker.value=value
+   picker.dispatchEvent(new window.Event('change',{bubbles:true}))
+  })
+ }
+ try{
+  await ui.clickText('زمان حضور')
+  assert.equal(ui.host.querySelectorAll('.ow-slot-editor').length,0,
+   'time editor must stay progressively disclosed until a slot is chosen')
+  await ui.click('button[aria-label="ویرایش برنامه شنبه نوبت 1"]')
+  const form=ui.host.querySelector('form.ow-slot-editor')
+  assert.ok(form,'one day-level time editor follows the selected weekly row')
+  assert.ok(form.previousElementSibling.classList.contains('ow-week-row'))
+  assert.equal(form.querySelectorAll('select').length,4,'hour and minute for both endpoints')
+  assert.equal(form.querySelector('select[aria-label="ساعت شروع"]').value,'08')
+  assert.equal(form.querySelector('select[aria-label="دقیقه شروع"]').value,'00')
+  await choose('ساعت شروع','11')
+  await choose('دقیقه شروع','17')
+  assert.equal(ui.host.querySelector('button[aria-label="ذخیره همین روز"]').disabled,true,
+   'start after end must not submit')
+  await choose('ساعت پایان','12')
+  await choose('دقیقه پایان','43')
+  assert.equal(ui.host.querySelector('button[aria-label="ذخیره همین روز"]').disabled,false)
+  await ui.click('button[aria-label="ذخیره همین روز"]')
+  assert.equal(globalThis.__workerFocusCalls.length,1,'exactly one existing RPC write')
+  assert.deepEqual(globalThis.__workerFocusCalls[0][2],[{start:677,end:763}])
+  assert.equal(ui.host.querySelector('.ow-slot-editor'),null)
+ }finally{globalThis.__workerFocusCalls=[];await ui.dispose()}
+})
+test('weekly existing odd-minute interval survives editing; 24:00 only allowed at the end',async()=>{
+ const previous=globalThis.__workerFocusFixture
+ globalThis.__workerFocusFixture={...fixture(),weekly_slots:[{
+  weekday_iso:6,start_minute:497,end_minute:573,valid_from:'2026-10-01',valid_until:null,
+ }]}
+ globalThis.__workerFocusCalls=[]
+ const ui=await setup()
+ try{
+  await ui.clickText('زمان حضور')
+  assert.match(ui.host.querySelector('button[aria-label="ویرایش برنامه شنبه نوبت 1"]').textContent,/08:17.*09:33/)
+  await ui.click('button[aria-label="ویرایش برنامه شنبه نوبت 1"]')
+  const value=label=>ui.host.querySelector(`select[aria-label="${label}"]`)?.value
+  assert.equal(value('دقیقه شروع'),'17')
+  assert.equal(value('دقیقه پایان'),'33')
+  assert.equal(ui.host.querySelectorAll('select[aria-label="ساعت شروع"] option[value="24"]').length,0)
+  const endHour=ui.host.querySelector('select[aria-label="ساعت پایان"]')
+  await act(async()=>{
+    endHour.value='24'
+    endHour.dispatchEvent(new window.Event('change',{bubbles:true}))
+  })
+  assert.equal(value('دقیقه پایان'),'00')
+  assert.equal(ui.host.querySelector('select[aria-label="دقیقه پایان"]').disabled,true)
+  await ui.click('button[aria-label="ذخیره همین روز"]')
+  assert.equal(globalThis.__workerFocusCalls.length,1)
+  assert.deepEqual(globalThis.__workerFocusCalls[0][2],[{start:497,end:1440}])
+ }finally{
+  globalThis.__workerFocusFixture=previous
+  globalThis.__workerFocusCalls=[]
+  await ui.dispose()
+ }
+})
 test('worker exposes This Month and personal profile without permanent password controls',async()=>{
  const ui=await setup()
  try{
