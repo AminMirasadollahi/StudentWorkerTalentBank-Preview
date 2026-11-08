@@ -329,7 +329,8 @@ try{
  await page.screenshot({path:resolve(output,'27-d6b-unit-and-week-drilldowns-1440.png'),fullPage:true})
  await page.locator('.swtb22-term-advanced-filter>summary').click()
  await page.locator('[aria-label="فیلتر واحد بودجه"]').selectOption('library')
- await page.waitForFunction(()=>globalThis.__qaBudgetReads.at(-1)?.unit==='library')
+ await page.waitForFunction(()=>globalThis.__qaBudgetReads.at(-1)?.unit==='library'
+  && document.querySelectorAll('.ow-term-pool').length===1,null,{timeout:10000})
  assert.equal(await page.locator('.swtb22-term-audit').count(),0,
   'shared group consumption must not be compared with one-unit consumption')
  assert.equal(await page.locator('.ow-term-pool').count(),1)
@@ -342,13 +343,17 @@ try{
  assert.equal(await page.evaluate(()=>globalThis.__qaWriteAttempts),0)
  await page.screenshot({path:resolve(output,'28-d6b-shared-pool-single-unit-readonly-1440.png'),fullPage:true})
  await page.locator('[aria-label="فیلتر دانشجوکار بودجه"]').selectOption('QA-A')
- await page.waitForFunction(()=>globalThis.__qaBudgetReads.at(-1)?.workerId==='QA-A')
+ await page.waitForFunction(()=>globalThis.__qaBudgetReads.at(-1)?.workerId==='QA-A'
+  && [...document.querySelectorAll('.ow-term-kpis strong')].at(-1)?.textContent?.trim()==='—'
+  && document.querySelector('.swtb22-term-scope')?.textContent?.includes('نمای فردی در یک واحد'),null,{timeout:10000})
  assert.equal(await page.locator('.swtb22-term-audit').count(),0)
  assert.equal(await page.locator('.ow-term-kpis strong').nth(3).textContent(),'—',
   'individual workers must not have a misleading collective remaining quota')
  assert.match(await page.locator('.swtb22-term-scope').textContent(),/نمای فردی در یک واحد/)
  await page.getByRole('button',{name:'بازگشت به نمای کل نیمسال'}).click()
- await page.waitForFunction(()=>!globalThis.__qaBudgetReads.at(-1)?.unit&&!globalThis.__qaBudgetReads.at(-1)?.workerId)
+ await page.waitForFunction(()=>!globalThis.__qaBudgetReads.at(-1)?.unit
+  && !globalThis.__qaBudgetReads.at(-1)?.workerId
+  && document.querySelectorAll('.ow-term-pool').length===2,null,{timeout:10000})
  assert.equal(await page.locator('.ow-term-pool').count(),2)
  assert.equal(await page.locator('.ow-term-kpis strong').nth(3).textContent(),'۵۰۲ ساعت')
  // Deliberately corrupt only an in-memory fake pool on fresh read. The new
