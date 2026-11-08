@@ -439,21 +439,58 @@
 }
 .ow-workspace .ow-history-results .ow-item { padding:0.5rem 0.65rem; }
 
-/* In-place fixed weekly slot editing. Do not expand the entire seven-day table. */
+/* Single-day, progressive weekly time editor: readable native selectors rather
+   than four miniature controls squeezed into one quarter-width slot. */
 .ow-week-cell {min-width:0; position:relative; display:flex; }
 .ow-week-cell .ow-week-slot {width:100%; height:100%; min-height:2.25rem; border:0; cursor:pointer; font:inherit; }
 .ow-week-cell .ow-week-slot:disabled {cursor:not-allowed; opacity:.35; }
-.ow-slot-editor {position:relative; isolation:isolate; width:100%; min-width:0; display:grid;
- grid-template-columns:repeat(2,minmax(0,1fr)); gap:.18rem; padding:.2rem;
- border:1px solid var(--report-teal); background:white; border-radius:.4rem; }
-.ow-slot-editor input {width:100%; min-width:0; padding:.15rem .08rem; font:inherit; font-size:.71rem;
- color:var(--report-navy); border:1px solid var(--report-border); border-radius:.23rem; text-align:center; }
-.ow-slot-actions {grid-column:1/-1; display:flex; align-items:center; justify-content:center; gap:.25rem; }
-.ow-slot-actions button {border:1px solid var(--report-border); background:white;
- color:var(--report-navy); min-width:1.4rem; min-height:1.3rem; border-radius:.25rem; cursor:pointer; }
-.ow-slot-actions button[type=submit] {background:var(--report-teal); color:white; }
+.ow-week-cell.is-editing .ow-week-slot {
+ outline:2px solid var(--report-teal);outline-offset:-2px;background:#e0f4f0;
+}
+.ow-slot-editor {
+ width:100%;min-width:0;box-sizing:border-box;display:grid;
+ grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;
+ align-items:end;gap:.45rem;padding:.6rem .7rem;margin:.3rem 0 .5rem;
+ border:1px solid var(--report-teal);background:#f7fcfb;border-radius:.52rem;
+}
+.ow-slot-editor__heading {
+ grid-column:1/-1;display:flex;gap:.3rem .8rem;align-items:baseline;flex-wrap:wrap;
+ text-align:right;color:var(--report-navy);
+}
+.ow-slot-editor__heading strong {font-size:.78rem;}
+.ow-slot-editor__heading small {font-size:.68rem;color:var(--report-muted);}
+.ow-slot-clock {display:grid;gap:.18rem;min-width:0;text-align:right;}
+.ow-slot-clock__caption {font-size:.72rem;font-weight:700;color:var(--report-navy);}
+.ow-slot-clock__controls {display:flex;align-items:center;gap:.18rem;min-width:0;}
+.ow-slot-clock__controls select {
+ flex:1 1 0;width:0;min-width:0;max-width:5.5rem;box-sizing:border-box;
+ height:2.25rem;padding:.28rem .2rem;font:inherit;font-size:.77rem;
+ font-variant-numeric:tabular-nums;color:var(--report-navy);
+ border:1px solid var(--report-border);border-radius:.35rem;background:white;
+ cursor:pointer;direction:ltr;
+}
+.ow-slot-clock__controls select:focus-visible,
+.ow-slot-actions button:focus-visible {outline:2px solid var(--report-teal);outline-offset:2px;}
+.ow-slot-clock__controls select:disabled {opacity:.65;cursor:not-allowed;}
+.ow-slot-clock__separator {font-weight:700;color:var(--report-navy);}
+.ow-slot-actions {display:flex;align-items:center;justify-content:flex-end;gap:.3rem;flex-wrap:wrap;}
+.ow-slot-actions button {
+ border:1px solid var(--report-border);background:white;color:var(--report-navy);
+ padding:.3rem .55rem;min-height:2.25rem;border-radius:.4rem;cursor:pointer;
+ font:inherit;font-size:.74rem;white-space:nowrap;
+}
+.ow-slot-actions button[type=submit] {background:var(--report-teal);border-color:var(--report-teal);color:white;}
 .ow-slot-actions button:disabled {opacity:.45;cursor:not-allowed;}
-.ow-slot-editor small {grid-column:1/-1; font-size:.6rem; overflow-wrap:anywhere;}
+.ow-slot-editor>small {grid-column:1/-1;font-size:.67rem;text-align:right;overflow-wrap:anywhere;}
+@media(max-width:900px) {
+ .ow-slot-editor {grid-template-columns:repeat(2,minmax(0,1fr));}
+ .ow-slot-actions {grid-column:1/-1;justify-content:flex-start;}
+}
+@media(max-width:420px) {
+ .ow-slot-editor {grid-template-columns:minmax(0,1fr);}
+ .ow-slot-actions {grid-column:1;}
+ .ow-slot-clock__controls select {max-width:7rem;}
+}
 .ow-slot-delete-confirm {display:flex; align-items:center; gap:.3rem; flex-wrap:wrap; padding:.25rem; font-size:.72rem; }
 .ow-sr-only {position:absolute!important; width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
 .ow-month-day .ow-day-task {display:block; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
