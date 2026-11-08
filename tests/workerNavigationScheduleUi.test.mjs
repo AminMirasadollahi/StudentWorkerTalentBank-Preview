@@ -58,7 +58,7 @@ const plugin={
       'weekday_iso:i+1,start_minute:480,end_minute:600,valid_from:"2025-01-01",valid_until:null})),',
       'exceptions:[],tasks:[]};};',
       'export const getMyWorkV2=async()=>{if(globalThis.__workerWorkPlan?.length)return await globalThis.__workerWorkPlan.shift()();if(globalThis.__workerReadDenied)throw Error("worker_access_denied");return globalThis.__workerFocusFixture;};',
-      'export const getMyWorkerProfileV2=async()=>{if(globalThis.__qaProfileReadDenied)throw Error("worker_access_denied");return {worker_id:"FAKE-WORKER",name:"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"};};',
+      'export const getMyWorkerProfileV2=async()=>{if(globalThis.__qaProfileReadDenied)throw Error("worker_access_denied");return {worker_id:globalThis.__qaProfileWorkerId||"FAKE-WORKER-NOT-REAL",name:globalThis.__qaProfileName||"نمونه غیرواقعی",major:"پژوهش",entry_year:"1405",unit:"library"};};',
       'export const getMyProfileChangeRequests=async()=>{if(globalThis.__qaProfileHistoryDenied)throw Error("worker_access_denied");return globalThis.__profileChangeRequests;};',
       'export const requestProfileChange=async args=>{globalThis.__profileChangeCalls.push(args);if(globalThis.__qaProfileRequestError)throw Error("synthetic request failure");const id="FAKE-REQUEST-"+globalThis.__profileChangeCalls.length;if(!globalThis.__qaProfileQueueStale)globalThis.__profileChangeRequests.push({id,field_code:args.field,proposed_value:args.value,review_state:"pending"});if(globalThis.__qaProfileReadDeniedAfterSubmit)globalThis.__qaProfileHistoryDenied=true;return {ok:true,request_id:id};};',
       ...['reviewProfileChange','assignGroupTask'].map(name=>
@@ -100,6 +100,8 @@ before(async()=>{
  globalThis.__qaStartCalls=[]
  globalThis.__qaDenyReadAfterSubmission=false
  globalThis.__qaProfileReadDenied=false
+ globalThis.__qaProfileWorkerId=worker
+ globalThis.__qaProfileName='نمونه غیرواقعی'
  globalThis.__qaProfileHistoryDenied=false
  globalThis.__qaProfileQueueStale=false
  globalThis.__qaProfileRequestError=false
@@ -117,7 +119,8 @@ after(async()=>{
   '__qaPeerCalls','__qaPeerReject','__profileChangeCalls','__profileChangeRequests','__workerReadDenied',
   '__workerWorkPlan','__qaAllowWorkerSubmit','__qaSubmitFailCount',
   '__qaSubmitCalls','__qaStartCalls','__qaDenyReadAfterSubmission',
-  '__qaProfileReadDenied','__qaProfileHistoryDenied','__qaProfileQueueStale',
+  '__qaProfileReadDenied','__qaProfileWorkerId','__qaProfileName',
+  '__qaProfileHistoryDenied','__qaProfileQueueStale',
   '__qaProfileRequestError','__qaProfileReadDeniedAfterSubmit'])delete globalThis[p]
 })
 function Harness(){
@@ -129,11 +132,11 @@ function Harness(){
    navigation:nav,setNavigation:setNav}):null,
  ])
 }
-async function setup(){
+async function setup(HarnessComponent=Harness){
  const host=document.createElement('div')
  document.body.append(host)
  const root=createRoot(host)
- await act(async()=>root.render(createElement(Harness)))
+ await act(async()=>root.render(createElement(HarnessComponent)))
  const click=async(selector)=>{
   const button=host.querySelector(selector)
   assert.ok(button,`missing ${selector}`)
@@ -147,6 +150,55 @@ async function setup(){
  const dispose=async()=>{await act(async()=>root.unmount());host.remove()}
  return {host,click,clickText,dispose}
 }
+
+function IdentityHarness(){
+ const [nav,setNav]=useState({section:'tasks',taskRange:'today'})
+ const [revision,setRevision]=useState(0)
+ return createElement('div',{},[
+  createElement('button',{key:'refresh','data-testid':'profile-refresh',
+   onClick:()=>setRevision(v=>v+1)},'refresh synthetic worker'),
+  createElement(WorkerOperations,{key:'worker',profile:{worker_id:worker},
+   workerName:'دانشجوکار آزمایشی QA',
+   navigation:nav,setNavigation:setNav,refreshRevision:revision,
+   onRefresh:()=>setRevision(v=>v+1)}),
+ ])
+}
+test('approved self-profile name reaches sidebar, avatar and title without new login',async()=>{
+ globalThis.__qaProfileName='دانشجوکار آزمایشی QA'
+ const ui=await setup(IdentityHarness)
+ const label=()=>ui.host.querySelector('.ow-b3-worker strong')?.textContent
+ try{
+  assert.equal(label(),'دانشجوکار آزمایشی QA')
+  // An administrator approved a replacement between two authorized reads.
+  globalThis.__qaProfileName='کتابدار'
+  await ui.clickText('حساب من')
+  assert.equal(label(),'کتابدار')
+  assert.equal(ui.host.querySelector('.ow-b3-worker').title,'کتابدار')
+  assert.equal(ui.host.querySelector('.ow-b3-worker__avatar').textContent,'ک')
+  await ui.clickText('کارهای من')
+  assert.equal(label(),'کتابدار','new display name survives section navigation')
+  globalThis.__qaProfileName='کتابدار ارشد'
+  await ui.click('[data-testid="profile-refresh"]')
+  assert.equal(label(),'کتابدار ارشد','explicit refresh retrieves current authorized name')
+ }finally{globalThis.__qaProfileName='نمونه غیرواقعی';await ui.dispose()}
+})
+test('foreign self-profile response cannot replace the signed-in worker sidebar identity',async()=>{
+ globalThis.__qaProfileWorkerId='FAKE-OTHER-ACCOUNT'
+ globalThis.__qaProfileName='OTHER_PRIVATE_PROFILE_NAME'
+ const ui=await setup(IdentityHarness)
+ try{
+  const footer=ui.host.querySelector('.ow-b3-worker')
+  assert.equal(footer.querySelector('strong').textContent,'دانشجوکار آزمایشی QA')
+  assert.doesNotMatch(ui.host.textContent,/OTHER_PRIVATE_PROFILE_NAME/)
+  await ui.clickText('حساب من')
+  assert.match(ui.host.textContent,/مشخصات شخصی در دسترس نیستند/)
+  assert.doesNotMatch(ui.host.textContent,/OTHER_PRIVATE_PROFILE_NAME/)
+ }finally{
+  globalThis.__qaProfileWorkerId=worker
+  globalThis.__qaProfileName='نمونه غیرواقعی'
+  await ui.dispose()
+ }
+})
 test('one worker tasks tab, range choices and safely preserved selection after unmount/resume',async()=>{
  const ui=await setup()
  try{

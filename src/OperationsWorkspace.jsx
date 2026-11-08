@@ -2063,7 +2063,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
  </section>
 }
 
-function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal,onNavigate,onGuide,refreshRevision=0}) {
+function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal,onNavigate,onGuide,onIdentityLoaded,onIdentityInvalidated,refreshRevision=0}) {
  const [identity,setIdentity]=useState(null)
  const [identityOwner,setIdentityOwner]=useState(null)
  const [requests,setRequests]=useState([])
@@ -2105,7 +2105,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
    try{
      const [personal,items]=await Promise.all([getMyWorkerProfileV2(),getMyProfileChangeRequests()])
      if(sequence!==profileReadSequence.current)return false
-     if(!personal||typeof personal!=='object'||!Array.isArray(items))
+     if(!personal||typeof personal!=='object'||personal.worker_id!==profile.worker_id||!Array.isArray(items))
        throw Error('INVALID_PROFILE_PROJECTION')
      // Release the local receipt ONLY when its exact server request appears
      // in a completed state. A stale queue with no row cannot unlock it.
@@ -2115,6 +2115,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
      }
      setIdentity(personal)
      setIdentityOwner(profile.worker_id)
+     onIdentityLoaded?.(personal)
      setRequests(items)
      setProfileReadFailed(false)
      setRequestsError('')
@@ -2123,6 +2124,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
      if(sequence!==profileReadSequence.current)return false
      // Fail closed for the independently fetched self-profile and request history.
      setIdentity(null)
+     onIdentityInvalidated?.()
      setRequests([])
      setProfileReadFailed(true)
      setRequestsError('مشخصات یا درخواست‌ها دریافت نشدند. برای نمایش دوباره، دسترسی را بررسی کنید.')
@@ -2292,6 +2294,40 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const [workSnapshot,setWorkSnapshot]=useState({workerId:null,data:null})
   const data=workSnapshot.workerId===profile.worker_id&&workSnapshot.data
     ?workSnapshot.data:{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]}
+  // Login identity may hold the original applicant name, while the protected V2
+  // self-profile reflects a manager-approved display-name override.
+  const [nameSnapshot,setNameSnapshot]=useState({workerId:null,name:''})
+  const nameReadVersion=useRef(0)
+  const visibleWorkerName=nameSnapshot.workerId===profile.worker_id
+    ?nameSnapshot.name:workerName
+  const acceptCanonicalName=personal=>{
+    if(personal?.worker_id!==profile.worker_id||
+       typeof personal.name!=='string'||!personal.name.trim())return
+    ++nameReadVersion.current
+    setNameSnapshot({workerId:profile.worker_id,name:personal.name.trim()})
+  }
+  const invalidateCanonicalName=()=>{
+    // A failed self-profile/request-history scope invalidates the secondary
+    // approved-name projection too, without changing the login identity.
+    ++nameReadVersion.current
+    setNameSnapshot({workerId:null,name:''})
+  }
+  useEffect(()=>{
+    const workerId=profile.worker_id
+    const version=++nameReadVersion.current
+    let cancelled=false
+    // Re-fetch only the signed-in worker's approved name; never substitute
+    // manager data or another account's cached/late profile response.
+    void getMyWorkerProfileV2().then(personal=>{
+      if(cancelled||nameReadVersion.current!==version||
+         personal?.worker_id!==workerId||
+         typeof personal.name!=='string'||!personal.name.trim())return
+      setNameSnapshot({workerId,name:personal.name.trim()})
+    }).catch(()=>{
+      // A transient name-read failure must not affect the existing work RPC.
+    })
+    return ()=>{cancelled=true}
+  },[profile.worker_id,refreshRevision])
   // Task acknowledgements survive switching work/profile/presence tabs, but
   // are strictly scoped to this authenticated worker and this React session.
   const acknowledgedActions=useRef({workerId:profile.worker_id,items:new Map(),profileRequests:new Map()})
@@ -2462,9 +2498,9 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           onClick={()=>openWorkerGuide('all')}>
           <span aria-hidden="true">؟</span>{!sidebarCollapsed&&' راهنمای سامانه'}
         </button>
-        <div className="ow-b3-worker" title={workerName}>
-          <span className="ow-b3-worker__avatar" aria-hidden="true">{workerName?.trim()?.[0]||'د'}</span>
-          {!sidebarCollapsed&&<div><strong>{workerName}</strong>
+        <div className="ow-b3-worker" title={visibleWorkerName}>
+          <span className="ow-b3-worker__avatar" aria-hidden="true">{visibleWorkerName?.trim()?.[0]||'د'}</span>
+          {!sidebarCollapsed&&<div><strong>{visibleWorkerName}</strong>
             {loginEmail&&<small className="ow-b3-login-email">
               ایمیل ورود: <bdi dir="ltr">{loginEmail}</bdi></small>}
           </div>}
@@ -2634,7 +2670,9 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}/>}
     {!settingsOpen&&section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}
-      onGuide={openWorkerGuide} requestLedger={acknowledgedActions.current.profileRequests}
+      onGuide={openWorkerGuide} onIdentityLoaded={acceptCanonicalName}
+      onIdentityInvalidated={invalidateCanonicalName}
+      requestLedger={acknowledgedActions.current.profileRequests}
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}
       approvedMinutesTotal={data.approved_minutes_total} refreshRevision={refreshRevision}/>}
