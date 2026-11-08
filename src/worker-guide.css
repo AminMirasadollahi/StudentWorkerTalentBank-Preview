@@ -6,6 +6,7 @@
 }
 .swtb-guide-welcome {
  width:min(32rem,calc(100vw - 2rem));max-width:none;
+ max-height:calc(100dvh - 2rem);overflow-y:auto;overscroll-behavior:contain;
  border:1px solid #cde1e5;border-radius:1rem;
  background:#fff;padding:1.45rem 1.5rem;
  box-shadow:0 20px 65px #092c4255;
@@ -23,6 +24,16 @@
  outline:2px solid #168783;outline-offset:3px;border-radius:.2rem;
 }
 .swtb-guide-welcome p {font-size:.91rem;line-height:1.85;color:#475f6f;margin:.5rem 0}
+.swtb-guide-welcome__quickstart {
+ margin:.5rem 0;padding:0 1.25rem 0 0;list-style:persian;
+ display:grid;gap:.38rem;color:#334f5e;font-size:.84rem;line-height:1.8;
+}
+.swtb-guide-welcome__quickstart li{padding-inline-start:.2rem}
+.swtb-guide-welcome__quickstart strong{color:#15445a}
+.swtb-guide-welcome .swtb-guide-welcome__note{
+ font-weight:650;color:#245a59;background:#f1f8f6;
+ padding:.45rem .6rem;border-radius:.45rem;
+}
 .swtb-guide-welcome__actions {display:flex;flex-wrap:wrap;gap:.55rem;margin-top:1.15rem}
 .swtb-guide-button {
  min-height:2.35rem;border:1px solid #cddfe2;background:#fff;border-radius:.55rem;
