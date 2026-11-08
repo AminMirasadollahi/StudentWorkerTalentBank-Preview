@@ -37,6 +37,8 @@ import {managerReviewItems} from './lib/managerReviewRows.mjs'
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
 const WorkPoolManagerPanel = lazy(()=>import('./components/WorkPoolManagerPanel'))
 const WorkPoolWorkerPanel = lazy(()=>import('./components/WorkPoolWorkerPanel'))
+// Deliberately OFF until an approved server acknowledgement contract is installed.
+const WorkerAgreementReview = lazy(()=>import('./components/WorkerAgreementReview.jsx'))
 import * as unifiedPeerApi from './lib/operationsV2'
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
  requestProfileChange,reviewProfileChange,getUnitHourTotals,
@@ -59,6 +61,8 @@ const termMembershipUIEnabled=import.meta.env?.VITE_SWTB21_TERM_MEMBERSHIP_UI!==
 // zero offers and zero claims. Enable only the manager-authorized, worker-self
 // surfaces; keep emergency build-time UI kill switch without altering DB policy.
 const workPoolUIEnabled=import.meta.env?.VITE_SWTB21_WORK_POOL_UI!=='false'
+// Draft visual only: NO read/write RPC, NO checkbox submission, NO operational block.
+const agreementReviewUIEnabled=import.meta.env?.VITE_SWTB_WORKER_AGREEMENT_REVIEW==='true'
 // SWTB22-D3 is a presentation-only, independently reversible manager release.
 // Legacy manager route and all TaskAssignmentEditor server guards remain unchanged.
 const focusTaskUIEnabled=import.meta.env?.VITE_SWTB22_TASKS_FOCUS_UI==='true'
@@ -2385,7 +2389,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     const fn=previous=>({...previous,...patch})
     ;(setNavigation||setLocalNavigation)(fn)
   }
-  const section=['tasks','availability','history','profile',...(workPoolUIEnabled?['workPool']:[])].includes(selected.section)?selected.section:'tasks'
+  const section=['tasks','availability','history','profile',...(workPoolUIEnabled?['workPool']:[]),...(agreementReviewUIEnabled?['agreementReview']:[])].includes(selected.section)?selected.section:'tasks'
   const taskRange=['today','week','month','upcoming'].includes(selected.taskRange)?selected.taskRange:'today'
   const taskView=['action','pending','upcoming','completed','calendar'].includes(selected.taskView)
     ?selected.taskView:'action'
@@ -2465,7 +2469,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     return()=>document.removeEventListener('keydown',onKeyDown)
   },[inspectedTask?.id])
   const sectionNames={tasks:'کارهای من',availability:'زمان حضور',workPool:'فرصت‌های کاری',
-    history:'سوابق گزارش‌ها',profile:'حساب من'}
+    history:'سوابق گزارش‌ها',profile:'حساب من',agreementReview:'چارچوب همکاری (پیش‌نویس)'}
   // Offer once per authenticated worker/version only after an authorized read.
   useEffect(()=>{
     if(guideOfferedFor.current===profile.worker_id||loading||readFailed||
@@ -2526,6 +2530,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       }} options={[
         ['tasks','کارهای من'],...(workPoolUIEnabled?[['workPool','فرصت‌های کاری']]:[]),
         ['availability','زمان حضور'],['history','سوابق گزارش‌ها'],['profile','حساب من'],
+        ...(agreementReviewUIEnabled?[['agreementReview','چارچوب همکاری · پیش‌نویس']]:[]),
       ]}/>
       <div className="ow-b3-sidebar__footer">
         <button type="button" className="swtb-guide-launch" data-swtb-guide="help-global"
@@ -2700,6 +2705,10 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           showPeers={showCoworkers} peerRefreshRevision={refreshRevision}/>
       </div>
     </section>}
+    {!settingsOpen&&agreementReviewUIEnabled&&section==='agreementReview'&&
+      <Suspense fallback={<p className="ow-muted" role="status">در حال نمایش پیش‌نویس چارچوب…</p>}>
+        <WorkerAgreementReview/>
+      </Suspense>}
     {!settingsOpen&&section==='history'&&<WorkerReportHistory tasks={tasks} records={records}
       onGuide={openWorkerGuide} refreshRevision={refreshRevision} approvedMinutesTotal={data.approved_minutes_total}
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
