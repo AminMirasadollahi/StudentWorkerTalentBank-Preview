@@ -1043,7 +1043,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const focusedHistory=hideSectionTabs&&focusHistoryUIEnabled
   const focusedPresence=hideSectionTabs&&focusPresenceUIEnabled
   const [presenceEditingDate,setPresenceEditingDate]=useState('')
-  const [presenceSelectedDate,setPresenceSelectedDate]=useState(today())
+  const [presenceSelectedDate,setPresenceSelectedDate]=useState('')
   const openPersonPresence=(id,date)=>{
     if(date)setPresenceSelectedDate(date)
     setPresenceEditingDate(date||'')

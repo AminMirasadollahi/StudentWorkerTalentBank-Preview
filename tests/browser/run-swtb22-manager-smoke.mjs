@@ -132,37 +132,43 @@ try{
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1),false)
  await page.screenshot({path:resolve(output,'11-task-list-1920.png'),fullPage:true})
  await page.setViewportSize({width:1440,height:900})
- // D4: real manager presence component, week/month + day/person inspector.
+ // D4: manager week and Jalali month share one desktop row. Details are
+ // contextual and do not consume a permanent third column or auto-open.
  await page.locator('[data-swtb22-route="availability"]').click()
  await page.locator('.swtb22-manager-teamcal .ow-teamcal-week-row').first().waitFor()
  assert.equal(await page.locator('.swtb22-manager-teamcal .ow-teamcal-week-row').count(),7)
  assert.ok(await page.locator('.swtb22-manager-teamcal .ow-teamcal-day').count()>=29)
- assert.equal(await page.locator('.swtb22-manager-teamcal dialog').count(),0,
-  'manager group day inspector must be inline, unlike legacy worker popup')
- assert.equal(await page.locator('.swtb22-presence-day-inspector').count(),1)
- assert.equal(await page.locator('.ow-teamcal-day[aria-pressed="true"]').count(),1)
- assert.equal(await page.locator('.ow-teamcal-week-row[aria-pressed="true"]').count(),1)
+ assert.equal(await page.locator('.swtb22-manager-teamcal dialog').count(),0)
+ assert.equal(await page.locator('.swtb22-presence-day-inspector').count(),0)
+ assert.equal(await page.locator('.ow-teamcal-day[aria-pressed="true"]').count(),0)
+ assert.equal(await page.locator('.ow-teamcal-week-row[aria-pressed="true"]').count(),0)
  const presenceLayout=await page.locator('.swtb22-manager-teamcal').evaluate(root=>{
   const week=root.querySelector('.ow-teamcal-week').getBoundingClientRect()
-  const aside=root.querySelector('.swtb22-presence-day-inspector').getBoundingClientRect()
-  return {weekWidth:week.width,inspectorWidth:aside.width,
-   sideBySide:week.right<=aside.left+4||aside.right<=week.left+4,
+  const month=root.querySelector('.ow-teamcal-month').getBoundingClientRect()
+  return {weekWidth:week.width,monthWidth:month.width,
+   sideBySide:Math.abs(week.top-month.top)<12 && (
+    week.right<=month.left+5||month.right<=week.left+5),
    overflow:document.documentElement.scrollWidth>window.innerWidth+1}
  })
- assert.ok(presenceLayout.weekWidth>430,'calendar needs a usable week/month column: '+JSON.stringify(presenceLayout))
- assert.ok(presenceLayout.inspectorWidth>260,'inspector must not be a collapsed sliver: '+JSON.stringify(presenceLayout))
- assert.equal(presenceLayout.sideBySide,true,'desktop day inspector sits beside the calendar')
+ assert.ok(presenceLayout.weekWidth>320&&presenceLayout.monthWidth>260,
+  'readable manager week/month widths: '+JSON.stringify(presenceLayout))
+ assert.equal(presenceLayout.sideBySide,true,
+  'week and month should be adjacent on desktop: '+JSON.stringify(presenceLayout))
  assert.equal(presenceLayout.overflow,false)
  await page.screenshot({path:resolve(output,'12-integrated-manager-week-month-day-1440.png'),fullPage:true})
  await page.getByRole('button',{name:'هفته بعد'}).click()
+ assert.equal(await page.locator('.swtb22-presence-day-inspector').count(),0)
+ await page.locator('.swtb22-manager-teamcal .ow-teamcal-week-row').first().click()
  assert.equal(await page.locator('.ow-teamcal-day[aria-pressed="true"]').count(),1)
  assert.equal(await page.locator('.ow-teamcal-week-row[aria-pressed="true"]').count(),1)
+ assert.equal(await page.locator('.swtb22-presence-day-inspector').count(),1)
+ assert.ok(await page.locator('#ow-teamcal-day-title').evaluate(
+  el=>document.activeElement===el),'focus follows explicit day selection')
  await page.screenshot({path:resolve(output,'13-selected-future-day-inspector-1440.png'),fullPage:true})
  const currentInspectorLabel=await page.locator('.swtb22-presence-day-inspector h3').textContent()
  await page.locator('.swtb22-presence-person-actions button:not([disabled])').first().click()
  await page.locator('dialog.ow-presence-date-dialog[open]').waitFor()
- assert.equal(await page.locator('.swtb22-manager-teamcal').count(),0,
-  'person/date editor is shown only after an explicit user selection')
+ assert.equal(await page.locator('.swtb22-manager-teamcal').count(),0)
  assert.equal(await page.locator('dialog.ow-presence-date-dialog[open]').count(),1)
  assert.match(await page.locator('#ow-presence-day-dialog-title').textContent(),/برنامه و تغییرات روز/)
  await page.screenshot({path:resolve(output,'14-existing-date-edit-dialog-opened-from-person.png')})
@@ -170,14 +176,14 @@ try{
  await page.getByRole('button',{name:'بازگشت به برنامه همه دانشجوکارها'}).click()
  assert.equal(await page.locator('.swtb22-manager-teamcal').count(),1)
  assert.equal(await page.locator('.ow-teamcal-day[aria-pressed="true"]').count(),1)
- assert.equal(await page.locator('.swtb22-presence-day-inspector h3').textContent(),currentInspectorLabel,
-  'return to group restores exact selected day and context')
+ assert.equal(await page.locator('.swtb22-presence-day-inspector h3').textContent(),currentInspectorLabel)
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1),false)
  await page.setViewportSize({width:1920,height:1080})
  assert.ok(await page.locator('.swtb22-presence-day-inspector').evaluate(
-  el=>el.getBoundingClientRect().width>340))
+  el=>el.getBoundingClientRect().width>500))
  await page.screenshot({path:resolve(output,'15-integrated-manager-presence-1920.png'),fullPage:true})
  await page.setViewportSize({width:1440,height:900})
+
  // D5: real manager approvals / inbox / selected worker review / term roster.
  // Every entry is fake; getAdminWorkV2 and the term RPC are replaced by Vite
  // before module resolution. Network outside localhost remains blocked.
@@ -323,7 +329,8 @@ try{
  await page.screenshot({path:resolve(output,'27-d6b-unit-and-week-drilldowns-1440.png'),fullPage:true})
  await page.locator('.swtb22-term-advanced-filter>summary').click()
  await page.locator('[aria-label="فیلتر واحد بودجه"]').selectOption('library')
- await page.waitForFunction(()=>globalThis.__qaBudgetReads.at(-1)?.unit==='library')
+ await page.waitForFunction(()=>globalThis.__qaBudgetReads.at(-1)?.unit==='library'
+  && document.querySelectorAll('.ow-term-pool').length===1,null,{timeout:10000})
  assert.equal(await page.locator('.swtb22-term-audit').count(),0,
   'shared group consumption must not be compared with one-unit consumption')
  assert.equal(await page.locator('.ow-term-pool').count(),1)
@@ -336,13 +343,17 @@ try{
  assert.equal(await page.evaluate(()=>globalThis.__qaWriteAttempts),0)
  await page.screenshot({path:resolve(output,'28-d6b-shared-pool-single-unit-readonly-1440.png'),fullPage:true})
  await page.locator('[aria-label="فیلتر دانشجوکار بودجه"]').selectOption('QA-A')
- await page.waitForFunction(()=>globalThis.__qaBudgetReads.at(-1)?.workerId==='QA-A')
+ await page.waitForFunction(()=>globalThis.__qaBudgetReads.at(-1)?.workerId==='QA-A'
+  && [...document.querySelectorAll('.ow-term-kpis strong')].at(-1)?.textContent?.trim()==='—'
+  && document.querySelector('.swtb22-term-scope')?.textContent?.includes('نمای فردی در یک واحد'),null,{timeout:10000})
  assert.equal(await page.locator('.swtb22-term-audit').count(),0)
  assert.equal(await page.locator('.ow-term-kpis strong').nth(3).textContent(),'—',
   'individual workers must not have a misleading collective remaining quota')
  assert.match(await page.locator('.swtb22-term-scope').textContent(),/نمای فردی در یک واحد/)
  await page.getByRole('button',{name:'بازگشت به نمای کل نیمسال'}).click()
- await page.waitForFunction(()=>!globalThis.__qaBudgetReads.at(-1)?.unit&&!globalThis.__qaBudgetReads.at(-1)?.workerId)
+ await page.waitForFunction(()=>!globalThis.__qaBudgetReads.at(-1)?.unit
+  && !globalThis.__qaBudgetReads.at(-1)?.workerId
+  && document.querySelectorAll('.ow-term-pool').length===2,null,{timeout:10000})
  assert.equal(await page.locator('.ow-term-pool').count(),2)
  assert.equal(await page.locator('.ow-term-kpis strong').nth(3).textContent(),'۵۰۲ ساعت')
  // Deliberately corrupt only an in-memory fake pool on fresh read. The new

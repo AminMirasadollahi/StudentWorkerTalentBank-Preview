@@ -1,4 +1,5 @@
 import test,{before,after} from 'node:test'
+import {readFileSync} from 'node:fs'
 import assert from 'node:assert/strict'
 import {JSDOM} from 'jsdom'
 import {createElement,act} from 'react'
@@ -53,7 +54,7 @@ async function mount(props={}){
  const host=document.createElement('div');document.body.append(host)
  const root=createRoot(host)
  const calls={selected:[],edit:[],assign:[]}
- let config={data:fakeData,todayIso,inlineManager:true,selectedDay:todayIso,
+ let config={data:fakeData,todayIso,inlineManager:true,selectedDay:'',
   onSelectedDayChange:d=>calls.selected.push(d),
   onEditWorker:(id,date)=>calls.edit.push({id,date}),
   onPlanAssignment:d=>calls.assign.push(d),...props}
@@ -66,94 +67,113 @@ async function mount(props={}){
 const btn=(host,text)=>[...host.querySelectorAll('button')].find(
  b=>b.textContent.includes(text))
 
-test('manager calendar renders an in-page day inspector next to two real calendar views, not a dialog',async()=>{
+
+test('manager desktop calendar shows adjacent week/month with details closed until selection',async()=>{
  const ui=await mount()
  try{
+  const css=readFileSync(new URL('../src/operations-workspace.css',import.meta.url),'utf8')
+  assert.match(css,/\.swtb22-manager-teamcal>\.ow-teamcal-week\{\s*grid-column:1;grid-row:1/)
+  assert.match(css,/\.swtb22-manager-teamcal>\.ow-teamcal-month\{\s*grid-column:2;grid-row:1/)
+  assert.match(css,/\.swtb22-presence-day-inspector\{\s*grid-column:1 \/ -1;grid-row:2/)
   assert.ok(ui.host.querySelector('.swtb22-manager-teamcal'))
   assert.ok(ui.host.querySelector('.ow-teamcal-week'))
   assert.ok(ui.host.querySelector('.ow-teamcal-month'))
+  assert.equal(ui.host.querySelector('#swtb22-presence-day-inspector'),null)
+  assert.equal(ui.host.querySelector('dialog'),null,'manager view must remain nonmodal')
+  assert.equal(ui.host.querySelectorAll('[aria-pressed="true"]').length,0)
+  assert.equal(ui.calls.assign.length,0)
+  await act(async()=>ui.host.querySelector('.ow-teamcal-week-row.is-today').click())
   assert.ok(ui.host.querySelector('#swtb22-presence-day-inspector'))
-  assert.equal(ui.host.querySelector('dialog'),null,'manager inspector is inline, not modal')
   assert.equal(ui.host.querySelectorAll('.ow-teamcal-week-row[aria-pressed="true"]').length,1)
   assert.equal(ui.host.querySelectorAll('.ow-teamcal-day[aria-pressed="true"]').length,1)
-  assert.match(ui.host.textContent,/برنامه نامشخص/)
+  assert.equal(ui.calls.selected.at(-1),todayIso)
+  assert.match(ui.host.textContent,/برنامه نامشخص|برنامه ثبت نشده/)
   assert.match(ui.host.textContent,/کار نمونه/)
   assert.doesNotMatch(ui.host.textContent,/PRIVATE_|9999|حساب تعلیق‌شده/)
-  assert.equal(ui.calls.assign.length,0)
+  assert.equal(document.activeElement?.id,'ow-teamcal-day-title')
+  await act(async()=>btn(ui.host,'بستن جزئیات').click())
+  assert.equal(ui.host.querySelector('#swtb22-presence-day-inspector'),null)
+  assert.equal(ui.host.querySelectorAll('[aria-pressed="true"]').length,0)
+  assert.equal(ui.calls.selected.at(-1),'')
+  assert.match(document.activeElement?.className||'',/ow-teamcal-week-row/,
+   'focus returns to day button, not removed inspector')
  }finally{await ui.cleanup()}
 })
-test('navigating week or Persian month keeps selection, month, week and inspector synchronized',async()=>{
+test('week/month navigation does not implicitly open a new inspector',async()=>{
  const ui=await mount()
  try{
-  const firstSelected=ui.host.querySelector('.ow-teamcal-week-row[aria-pressed="true"]')
-  assert.ok(firstSelected)
   await act(async()=>btn(ui.host,'هفته بعد').click())
-  const next=ui.calls.selected.at(-1)
-  assert.ok(next>todayIso)
-  assert.equal(ui.host.querySelectorAll('.ow-teamcal-week-row[aria-pressed="true"]').length,1)
-  assert.equal(ui.host.querySelectorAll('.ow-teamcal-day[aria-pressed="true"]').length,1)
-  assert.ok(ui.host.querySelector('.swtb22-presence-day-inspector'))
+  assert.equal(ui.host.querySelector('#swtb22-presence-day-inspector'),null)
+  assert.equal(ui.calls.selected.at(-1),'')
+  await act(async()=>ui.host.querySelector('.ow-teamcal-week-row').click())
+  const selected=ui.calls.selected.at(-1)
+  assert.ok(selected>todayIso)
+  assert.ok(ui.host.querySelector('#swtb22-presence-day-inspector'))
   assert.equal(document.activeElement?.id,'ow-teamcal-day-title')
   await act(async()=>btn(ui.host,'ماه بعد').click())
-  assert.equal(ui.host.querySelectorAll('.ow-teamcal-week-row[aria-pressed="true"]').length,1)
-  assert.equal(ui.host.querySelectorAll('.ow-teamcal-day[aria-pressed="true"]').length,1)
-  assert.ok(ui.calls.selected.at(-1)>next)
-  await act(async()=>btn(ui.host,'بازگشت به امروز').click())
-  assert.equal(ui.calls.selected.at(-1),todayIso)
-  assert.equal(ui.host.querySelectorAll('.ow-teamcal-day[aria-pressed="true"]').length,1)
+  assert.equal(ui.calls.selected.at(-1),'')
+  assert.equal(ui.host.querySelector('#swtb22-presence-day-inspector'),null)
+  assert.equal(ui.host.querySelectorAll('[aria-pressed="true"]').length,0)
+  await act(async()=>btn(ui.host,'امروز').click())
+  assert.equal(ui.calls.selected.at(-1),'')
+  assert.ok(ui.host.querySelector('.ow-teamcal-week-row.is-today'))
+  assert.equal(ui.host.querySelector('#swtb22-presence-day-inspector'),null)
  }finally{await ui.cleanup()}
 })
-test('clicking worker/date edits only the selected person, not an arbitrary day or private record',async()=>{
+test('manager actions still edit/assign only an explicitly selected day and person',async()=>{
  const ui=await mount()
  try{
+  assert.equal(ui.host.querySelectorAll('.swtb22-presence-person-actions button').length,0)
+  await act(async()=>ui.host.querySelector('.ow-teamcal-week-row.is-today').click())
   const actions=[...ui.host.querySelectorAll('.swtb22-presence-person-actions button')]
   assert.equal(actions.length,2)
-  const firstA=actions.find(button=>button.closest('.ow-teamcal-person')?.textContent
-   .includes('دانشجوکار نمونه کتابخانه'))
-  assert.ok(firstA,'select a named worker, not an unstable task-priority list index')
-  await act(async()=>firstA.click())
+  const workerButton=actions.find(b=>b.closest('.ow-teamcal-person')?.textContent.includes('دانشجوکار نمونه کتابخانه'))
+  assert.ok(workerButton)
+  await act(async()=>workerButton.click())
   assert.deepEqual(ui.calls.edit,[{id:'FAKE-A',date:todayIso}])
   assert.deepEqual(ui.calls.assign,[])
   await act(async()=>btn(ui.host,'+ تعریف کار در این تاریخ').click())
   assert.deepEqual(ui.calls.assign,[todayIso])
-  assert.equal(ui.host.querySelector('#swtb22-presence-day-inspector')!==null,true)
+  assert.ok(ui.host.querySelector('#swtb22-presence-day-inspector'))
  }finally{await ui.cleanup()}
 })
-test('past-day review remains available but legacy RPC action routes cannot edit or assign a past day',async()=>{
+test('review of a selected past day is read only',async()=>{
  const ui=await mount()
  try{
   await act(async()=>btn(ui.host,'هفته قبل').click())
-  const buttons=[...ui.host.querySelectorAll('.swtb22-presence-person-actions button')]
-  assert.ok(buttons.length>0)
-  assert.ok(buttons.every(b=>b.disabled))
+  assert.equal(ui.host.querySelector('#swtb22-presence-day-inspector'),null)
+  await act(async()=>ui.host.querySelector('.ow-teamcal-week-row').click())
+  const actions=[...ui.host.querySelectorAll('.swtb22-presence-person-actions button')]
+  assert.ok(actions.length>0)
+  assert.ok(actions.every(b=>b.disabled))
   assert.ok(btn(ui.host,'+ تعریف کار در این تاریخ').disabled)
   assert.match(ui.host.textContent,/روزهای گذشته/)
   assert.deepEqual(ui.calls.edit,[])
   assert.deepEqual(ui.calls.assign,[])
  }finally{await ui.cleanup()}
 })
-test('selected day survives unmount from a person editor and return to group calendar',async()=>{
+test('an explicitly selected day restores after returning from the worker editor',async()=>{
  const ui=await mount()
+ let selected
  try{
   await act(async()=>btn(ui.host,'هفته بعد').click())
-  const selected=ui.calls.selected.at(-1)
-  await ui.cleanup()
-  const again=await mount({selectedDay:selected})
-  try{
-   const inspector=again.host.querySelector('#swtb22-presence-day-inspector')
-   assert.ok(inspector)
-   assert.equal(again.host.querySelectorAll('.ow-teamcal-day[aria-pressed="true"]').length,1)
-   assert.equal(again.host.querySelectorAll('.ow-teamcal-week-row[aria-pressed="true"]').length,1)
-   assert.equal(again.calls.selected.length,0,'restoring state must not call external navigation')
-  }finally{await again.cleanup()}
- }catch(err){throw err}
+  await act(async()=>ui.host.querySelector('.ow-teamcal-week-row').click())
+  selected=ui.calls.selected.at(-1)
+  assert.ok(selected)
+ }finally{await ui.cleanup()}
+ const again=await mount({selectedDay:selected})
+ try{
+  assert.ok(again.host.querySelector('#swtb22-presence-day-inspector'))
+  assert.equal(again.host.querySelectorAll('.ow-teamcal-day[aria-pressed="true"]').length,1)
+  assert.equal(again.host.querySelectorAll('.ow-teamcal-week-row[aria-pressed="true"]').length,1)
+  assert.equal(again.calls.selected.length,0)
+ }finally{await again.cleanup()}
 })
-test('legacy/worker team calendar still opens native dialog and has no manager edit buttons',async()=>{
+test('worker and legacy calendar remain the existing native-dialog behavior',async()=>{
  const ui=await mount({inlineManager:false,onEditWorker:null})
  try{
   assert.equal(ui.host.querySelector('#swtb22-presence-day-inspector'),null)
-  const day=ui.host.querySelector('.ow-teamcal-week-row')
-  await act(async()=>day.click())
+  await act(async()=>ui.host.querySelector('.ow-teamcal-week-row').click())
   assert.ok(ui.host.querySelector('dialog[open]'))
   assert.equal(ui.host.querySelectorAll('.swtb22-presence-person-actions button').length,0)
  }finally{await ui.cleanup()}
