@@ -164,7 +164,7 @@ test('one-day zero-availability overrides recurring slot with warning',async()=>
     assert.match(host.textContent,/تغییر موقت همین روز/)
   }finally{await teardown()}
 })
-test('weekly schedule exposes 28 in-cell actions and preserves compact Jalali exception editor',async()=>{
+test('weekly schedule keeps 28 actions and reveals day-level picker beside Jalali exceptions',async()=>{
  const {host,teardown}=await setup({start:'availability'})
  try{
   assert.equal(host.querySelectorAll('.ow-week-row').length,7)
@@ -174,9 +174,11 @@ test('weekly schedule exposes 28 in-cell actions and preserves compact Jalali ex
   const button=host.querySelector('button[aria-label="ویرایش برنامه شنبه نوبت 1"]')
   assert.ok(button)
   await act(async()=>button.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
-  const editor=host.querySelector('.ow-week-cell .ow-slot-editor')
-  assert.ok(editor,'editor appears in the exact cell, without an expanded row')
-  assert.equal(editor.querySelectorAll('input').length,2)
+  const editor=host.querySelector('.ow-week-row-shell > .ow-slot-editor')
+  assert.ok(editor,'the selected day shows one accessible editor below its weekly row')
+  assert.ok(editor.previousElementSibling.classList.contains('ow-week-row'))
+  assert.equal(editor.querySelectorAll('select').length,4,
+    'start and end both have native hour/minute selectors')
   assert.equal(host.querySelectorAll('.ow-week-day-form').length,0)
   assert.equal(editor.querySelector('button[aria-label="ذخیره همین روز"]').disabled,false)
   await act(async()=>host.querySelector('.ow-month-day.is-today')
@@ -188,16 +190,23 @@ test('weekly schedule exposes 28 in-cell actions and preserves compact Jalali ex
   assert.match(exceptionForm.textContent,/ظرفیت این روز با/)
  }finally{await teardown()}
 })
-test('invalid local in-cell interval blocks weekly saving',async()=>{
+test('invalid local selected-hour interval blocks weekly saving',async()=>{
  const {host,teardown}=await setup({start:'availability'})
  try{
   const day=host.querySelector('button[aria-label="ویرایش برنامه شنبه نوبت 1"]')
   await act(async()=>day.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
   const form=host.querySelector('.ow-slot-editor')
-  const fields=Array.from(form.querySelectorAll('input[type="text"]'))
-  assert.equal(fields.length,2)
-  await fill(fields[0],'14:00')
-  await fill(fields[1],'12:00')
+  const startHour=form.querySelector('select[aria-label="ساعت شروع"]')
+  const endHour=form.querySelector('select[aria-label="ساعت پایان"]')
+  assert.ok(startHour&&endHour)
+  await act(async()=>{
+    startHour.value='14'
+    startHour.dispatchEvent(new window.Event('change',{bubbles:true}))
+  })
+  await act(async()=>{
+    endHour.value='12'
+    endHour.dispatchEvent(new window.Event('change',{bubbles:true}))
+  })
   assert.match(form.textContent,/پایان هر بازه باید بعد از شروع/)
   assert.equal(form.querySelector('button[aria-label="ذخیره همین روز"]').disabled,true)
  }finally{await teardown()}
