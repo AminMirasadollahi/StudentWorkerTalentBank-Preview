@@ -2063,7 +2063,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
  </section>
 }
 
-function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal,onNavigate,onGuide,onIdentityLoaded,refreshRevision=0}) {
+function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal,onNavigate,onGuide,onIdentityLoaded,onIdentityInvalidated,refreshRevision=0}) {
  const [identity,setIdentity]=useState(null)
  const [identityOwner,setIdentityOwner]=useState(null)
  const [requests,setRequests]=useState([])
@@ -2124,6 +2124,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
      if(sequence!==profileReadSequence.current)return false
      // Fail closed for the independently fetched self-profile and request history.
      setIdentity(null)
+     onIdentityInvalidated?.()
      setRequests([])
      setProfileReadFailed(true)
      setRequestsError('مشخصات یا درخواست‌ها دریافت نشدند. برای نمایش دوباره، دسترسی را بررسی کنید.')
@@ -2304,6 +2305,12 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
        typeof personal.name!=='string'||!personal.name.trim())return
     ++nameReadVersion.current
     setNameSnapshot({workerId:profile.worker_id,name:personal.name.trim()})
+  }
+  const invalidateCanonicalName=()=>{
+    // A failed self-profile/request-history scope invalidates the secondary
+    // approved-name projection too, without changing the login identity.
+    ++nameReadVersion.current
+    setNameSnapshot({workerId:null,name:''})
   }
   useEffect(()=>{
     const workerId=profile.worker_id
@@ -2664,6 +2671,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         ...(nextView?{taskView:nextView}:{})})}/>}
     {!settingsOpen&&section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}
       onGuide={openWorkerGuide} onIdentityLoaded={acceptCanonicalName}
+      onIdentityInvalidated={invalidateCanonicalName}
       requestLedger={acknowledgedActions.current.profileRequests}
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}
