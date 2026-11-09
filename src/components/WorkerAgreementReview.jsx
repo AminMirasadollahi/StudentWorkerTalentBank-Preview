@@ -28,14 +28,17 @@ export default function WorkerAgreementReview({policy=workerAgreementDraft}){
    <header className="swtb-policy-head">
      <span className="swtb-policy-kicker">پیش‌نمایش محتوایی · نسخه {policy.version}</span>
      <h1 id="swtb-policy-title">{policy.title}</h1>
+     {policy.studyNote&&<p className="swtb-policy-study-note">
+       <AgreementIcon name="document"/><span>{policy.studyNote}</span>
+     </p>}
      <p className="swtb-policy-institution">{policy.institution}</p>
-     <p>{policy.intro}</p>
+     {policy.intro.split(/\n\s*\n/).map((paragraph,i)=><p key={i} className="swtb-policy-intro-paragraph">{paragraph}</p>)}
      <p className="swtb-policy-caution" role="status">
        {policy.notice||'این صفحه فقط برای بازبینی متن و طراحی است؛ هنوز چارچوب رسمی منتشر نشده و هیچ موافقتی ثبت نمی‌شود.'}
      </p>
    </header>
    <ol className="swtb-policy-sections" aria-label="هفت اصل چارچوب همکاری">
-     {policy.sections.map((item,index)=><li key={item.id} className="swtb-policy-card">
+     {policy.sections.map((item,index)=><li key={item.id} className="swtb-policy-card" data-policy-section={item.id}>
        <div className="swtb-policy-card-heading">
          <span className="swtb-policy-icon-box"><AgreementIcon name={item.icon}/></span>
          <h2><span className="swtb-policy-index" aria-hidden="true">{new Intl.NumberFormat('fa-IR').format(index+1)}.</span>{' '}{item.title}</h2>
