@@ -19,7 +19,7 @@ const fake={
   return [
    'export const getWorkerWorkPool=async()=>{',
    'globalThis.__poolReads++;',
-   'if(globalThis.__poolDenied)throw Error("NO_ACCESS");',
+   'if(globalThis.__poolDenied||globalThis.__poolDeniedAfterClaim&&globalThis.__poolClaimed)throw Error("NO_ACCESS");',
    'return {ok:true,scope:"worker_published_work_pool",opportunities:[',
    '{id:"op-1",title:"کار منتشرشده",description:"ثبت داده‌های عمومی کتابخانه",',
    'unit:"library",date:"2026-11-15",claim_deadline:"2026-11-13",',
@@ -54,7 +54,7 @@ after(async()=>{
  await server?.close();dom?.window.close()
  for(const p of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT',
   '__poolReads','__poolClaims','__poolClaimed','__poolDenied','__claimDenied',
-  '__poolCommitOnDenied'])
+  '__poolCommitOnDenied','__poolDeniedAfterClaim'])
    delete globalThis[p]
 })
 async function flush(){
@@ -67,6 +67,7 @@ async function mount(props={}){
  globalThis.__poolDenied=false
  globalThis.__claimDenied=false
  globalThis.__poolCommitOnDenied=false
+ globalThis.__poolDeniedAfterClaim=false
  const host=document.createElement('div');document.body.append(host)
  const root=createRoot(host)
  const render=async next=>{
@@ -103,6 +104,40 @@ test('a confirmed claim creates one client call, never claims approved minutes',
   assert.deepEqual(results,['task-1'])
   assert.match(host.textContent,/قبلاً توسط شما انتخاب شده/)
   assert.doesNotMatch(host.textContent,/ساعت تأییدشده ثبت شد/)
+ }finally{await cleanup()}
+})
+test('confirmed claim remains confirmed when post-commit opportunity refresh is denied',async()=>{
+ const receipts=[]
+ const {host,cleanup}=await mount({onClaimed:id=>receipts.push(id)})
+ try{
+  globalThis.__poolDeniedAfterClaim=true
+  await act(async()=>findButton(host,'انتخاب این کار').click())
+  await flush()
+  assert.equal(globalThis.__poolClaims.length,1,'exactly one mutation is sent')
+  assert.deepEqual(receipts,['task-1'],'confirmed receipt still reaches task navigation')
+  assert.match(host.textContent,/انتخاب کار در سرور تأیید شد/)
+  assert.match(host.textContent,/فهرست فرصت‌ها به‌روزرسانی نشد/)
+  assert.match(host.textContent,/دریافت فرصت‌ها موفق نبود/)
+  assert.doesNotMatch(host.textContent,/نتیجه انتخاب مشخص نیست/)
+  assert.ok(!findButton(host,'تلاش مجدد با همان شناسه'))
+ }finally{await cleanup()}
+})
+test('failed async navigation after confirmed claim cannot misclassify receipt as unknown',async()=>{
+ const receipts=[]
+ const {host,cleanup}=await mount({onClaimed:async id=>{
+  receipts.push(id)
+  throw Error('SYNTHETIC_NAVIGATION_FAILURE')
+ }})
+ try{
+  await act(async()=>findButton(host,'انتخاب این کار').click())
+  await flush()
+  assert.deepEqual(receipts,['task-1'])
+  assert.equal(globalThis.__poolClaims.length,1)
+  assert.match(host.textContent,/انتخاب کار در سرور تأیید شد/)
+  assert.match(host.textContent,/انتقال به «کارهای من» انجام نشد/)
+  assert.doesNotMatch(host.textContent,/نتیجه انتخاب مشخص نیست/)
+  assert.ok(!findButton(host,'تلاش مجدد با همان شناسه'))
+  assert.match(host.textContent,/قبلاً توسط شما انتخاب شده/)
  }finally{await cleanup()}
 })
 test('unknown general claim requires server read-back before any same-key retry',async()=>{
