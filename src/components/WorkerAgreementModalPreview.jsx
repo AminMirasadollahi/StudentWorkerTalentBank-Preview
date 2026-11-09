@@ -24,7 +24,11 @@ export default function WorkerAgreementModalPreview({open,onClose}){
  if(!open)return null
  const close=()=>{
   const dialog=dialogRef.current
-  if(dialog?.open&&typeof dialog.close==='function')dialog.close()
+  // Native close emits an onClose event. Don't fire that callback twice.
+  if(dialog?.open&&typeof dialog.close==='function'){
+   dialog.close()
+   return
+  }
   onClose?.()
  }
  return <dialog ref={dialogRef} className="swtb-policy-modal"
