@@ -54,9 +54,13 @@ export default function DeskWorkPoolWorkerSection({
   void read()
   return ()=>{seq.current+=1}
  },[read,workerId,refreshRevision])
+ useEffect(()=>{
+  // An unresolved receipt belongs only to the worker who initiated it.
+  setUncertainId('');setRetryReady(false);setNotice('')
+ },[workerId])
  const refresh=async()=>{
   const items=await read()
-  if(!items)return
+  if(!items||requestKeys.current.workerId!==workerId)return
   if(uncertainId){
    const offer=items.find(x=>x.id===uncertainId)
    if(offer?.my_task_id){
@@ -74,7 +78,7 @@ export default function DeskWorkPoolWorkerSection({
  }
  const claim=async o=>{
   if(pending.current||snapshot.status!=='ready'||o.claimable!==true
-   ||o.my_task_id||uncertainId&&uncertainId!==o.id)return
+   ||o.my_task_id||uncertainId&&(uncertainId!==o.id||!retryReady))return
   if(!globalThis.crypto?.randomUUID){
    setNotice('تولید شناسه امن درخواست در مرورگر ممکن نیست؛ هیچ رزروی ارسال نشد.')
    return
@@ -87,23 +91,38 @@ export default function DeskWorkPoolWorkerSection({
   pending.current=true
   setBusy(true);setNotice('')
   try{
-   const reply=await claimDeskWorkOffer({offerId:o.id,requestId})
-   if(reply?.ok!==true||typeof reply.task_id!=='string'
-      ||typeof reply.shift_id!=='string')throw Error('desk_claim_unconfirmed')
+   let reply
+   try{
+    reply=await claimDeskWorkOffer({offerId:o.id,requestId})
+    if(reply?.ok!==true||typeof reply.task_id!=='string'
+       ||typeof reply.shift_id!=='string')throw Error('desk_claim_unconfirmed')
+   }catch{
+    // Only claim transport/receipt errors can make the outcome unknown.
+    // A later read or navigation error cannot undo a confirmed reservation.
+    if(requestKeys.current.workerId===workerId){
+     setUncertainId(o.id)
+     setRetryReady(false)
+     setNotice('نتیجه رزرو مشخص نیست. ابتدا اطلاعات سرور را بازخوانی کنید؛ تا آن زمان رزرو دوباره مجاز نیست.')
+    }
+    return
+   }
+   if(requestKeys.current.workerId!==workerId)return
    requestKeys.current.ids.delete(o.id)
    setUncertainId('')
    setRetryReady(false)
-   await read()
-   setNotice(reply.replayed
+   const refreshed=await read()
+   if(requestKeys.current.workerId!==workerId)return
+   setNotice(refreshed===false
+    ?'رزرو نوبت در سرور تأیید شد، اما دریافت فهرست تازه موفق نبود. نتیجه را در «کارهای من» بررسی کنید.'
+    :reply.replayed
      ?'رزرو قبلی تأیید شد؛ نوبت یا وظیفه تکراری ایجاد نشده است.'
      :'رزرو نوبت ثبت شد. ساعات انجام کار باید بعداً ثبت و توسط مدیر تأیید شوند.')
-   onClaimed?.(reply.task_id)
-  }catch{
-   // Network failure may follow a successful commit. Never issue a new
-   // request ID for a retry. Require server refresh before explicit retry.
-   setUncertainId(o.id)
-   setRetryReady(false)
-   setNotice('نتیجه رزرو مشخص نیست. ابتدا اطلاعات سرور را بازخوانی کنید؛ تا آن زمان رزرو دوباره مجاز نیست.')
+   try{
+    await onClaimed?.(reply.task_id)
+   }catch{
+    if(requestKeys.current.workerId===workerId)
+     setNotice('رزرو نوبت در سرور تأیید شد، اما انتقال به «کارهای من» انجام نشد. این بخش را دستی باز کنید.')
+   }
   }finally{
    pending.current=false
    setBusy(false)
