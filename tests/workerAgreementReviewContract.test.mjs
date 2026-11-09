@@ -225,3 +225,21 @@ test('SWTB14 RC6 maths graphic is screen-readable, non-interactive, and preserve
  assert.equal(model.quotaExample.payAllocation,40)
  assert.doesNotMatch(jsx,/dangerouslySetInnerHTML|fetch\(|\.rpc\(/)
 })
+
+
+test('SWTB14 RC6 offline HTML follows the owner-edited text and shows a true 50-of-500 to 40-of-400 proportion',()=>{
+ const html=read('../design/previews/SWTB14_RC6_Worker_Charter_Proportion_REVIEW_ONLY.html')
+ assert.match(html,/<html lang="fa" dir="rtl">/)
+ assert.equal((html.match(/class="card" data-section=/g)||[]).length,7)
+ assert.equal((html.match(/class="icon" aria-hidden="true"><svg/g)||[]).length,7)
+ assert.match(html,/۴ تا ۵ دقیقه/)
+ assert.match(html,/سهمیه هر واحد یا مجموعه واحدهای مرتبط در هر نیمسال/)
+ assert.match(html,/پرسش‌ها، نماینده و ارتباط با مسئول/)
+ assert.match(html,/role="img"/)
+ assert.match(html,/class="fraction"/)
+ assert.match(html,/class="compare"/)
+ assert.match(html,/۵۰ ساعت کار واقعی همچنان در سوابق شما باقی می‌ماند/)
+ assert.match(html,/type="checkbox" disabled/)
+ assert.match(html,/d.showModal\(\)/)
+ assert.doesNotMatch(html,/fetch\(|XMLHttpRequest|supabase|\.rpc\(|<script\s+src=|<link\s+href=/)
+})
