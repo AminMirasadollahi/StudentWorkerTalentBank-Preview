@@ -22,6 +22,15 @@ function AgreementIcon({name}){
   {(iconStrokes[name]||iconStrokes.document).map((d,i)=><path key={i} d={d}/>)}
  </svg>
 }
+// Keep owner-authored **emphasis** without HTML injection or a Markdown parser.
+function policyInline(raw){
+ return String(raw).split(/(\*\*[^*]+\*\*)/g).map((part,i)=>
+   part.startsWith('**')&&part.endsWith('**')
+     ?<strong key={i}>{part.slice(2,-2)}</strong>
+     :part)
+}
+const faNumber=value=>new Intl.NumberFormat('fa-IR',{maximumFractionDigits:2}).format(value)
+
 export default function WorkerAgreementReview({policy=workerAgreementDraft}){
  return <section className="swtb-policy-review" dir="rtl"
    aria-labelledby="swtb-policy-title" data-policy-status="draft">
@@ -29,23 +38,53 @@ export default function WorkerAgreementReview({policy=workerAgreementDraft}){
      <span className="swtb-policy-kicker">پیش‌نمایش محتوایی · نسخه {policy.version}</span>
      <h1 id="swtb-policy-title">{policy.title}</h1>
      {policy.studyNote&&<p className="swtb-policy-study-note">
-       <AgreementIcon name="document"/><span>{policy.studyNote}</span>
+       <AgreementIcon name="document"/><span>{policyInline(policy.studyNote)}</span>
      </p>}
      <p className="swtb-policy-institution">{policy.institution}</p>
-     {policy.intro.split(/\n\s*\n/).map((paragraph,i)=><p key={i} className="swtb-policy-intro-paragraph">{paragraph}</p>)}
+     {policy.intro.split(/\n\s*\n/).map((paragraph,i)=><p key={i} className="swtb-policy-intro-paragraph">{policyInline(paragraph)}</p>)}
      <p className="swtb-policy-caution" role="status">
        {policy.notice||'این صفحه فقط برای بازبینی متن و طراحی است؛ هنوز چارچوب رسمی منتشر نشده و هیچ موافقتی ثبت نمی‌شود.'}
      </p>
    </header>
    <ol className="swtb-policy-sections" aria-label="هفت اصل چارچوب همکاری">
-     {policy.sections.map((item,index)=><li key={item.id} className="swtb-policy-card" data-policy-section={item.id}>
+     {policy.sections.map((item,index)=><li key={item.id} className="swtb-policy-card" data-policy-section={item.id}
+         data-policy-has-timeline={item.id==='continuity'&&Array.isArray(policy.timeline)?'true':'false'}
+         data-policy-has-quota={item.id==='finance'&&Boolean(policy.quotaExample)?'true':'false'}>
        <div className="swtb-policy-card-heading">
          <span className="swtb-policy-icon-box"><AgreementIcon name={item.icon}/></span>
          <h2><span className="swtb-policy-index" aria-hidden="true">{new Intl.NumberFormat('fa-IR').format(index+1)}.</span>{' '}{item.title}</h2>
        </div>
        {Array.isArray(item.paragraphs)
-         ?item.paragraphs.map((p,i)=><p key={i}>{p}</p>)
+         ?item.paragraphs.map((p,i)=><p key={i}>{policyInline(p)}</p>)
          :<p>{item.body}</p>}
+       {item.id==='finance'&&policy.quotaExample&&<section
+         className="swtb-policy-quota-example" aria-labelledby="swtb-policy-quota-example-title">
+         <h3 id="swtb-policy-quota-example-title">نمونه محاسبه سهمیه نیمسال</h3>
+         <p>{policyInline(policy.quotaExample.preamble)}</p>
+         <div className="swtb-policy-quota-math" role="img"
+           aria-label={`${policy.quotaExample.individualApproved} تقسیم بر ${policy.quotaExample.totalApproved} ضرب در ${policy.quotaExample.quota} برابر با ${policy.quotaExample.payAllocation} ساعت؛ یعنی ${policy.quotaExample.proportionalPercent} درصد از سهمیه`}>
+           <div className="swtb-policy-quota-ratio">
+             <span className="swtb-policy-quota-fraction" aria-hidden="true">
+               <b>{faNumber(policy.quotaExample.individualApproved)}</b>
+               <b>{faNumber(policy.quotaExample.totalApproved)}</b>
+             </span>
+             <small>{faNumber(policy.quotaExample.proportionalPercent)}٪ از کل کارکرد</small>
+           </div>
+           <span className="swtb-policy-quota-operator" aria-hidden="true">×</span>
+           <span className="swtb-policy-quota-value" aria-hidden="true">
+             {faNumber(policy.quotaExample.quota)} <small>ساعت سهمیه</small>
+           </span>
+           <span className="swtb-policy-quota-operator" aria-hidden="true">=</span>
+           <strong className="swtb-policy-quota-total" aria-hidden="true">
+             {faNumber(policy.quotaExample.payAllocation)} <small>ساعت مبنای پرداخت</small>
+           </strong>
+         </div>
+         <div className="swtb-policy-quota-comparison">
+           <div><small>ساعات واقعی تأییدشده</small><strong>{faNumber(policy.quotaExample.individualApproved)} ساعت</strong></div>
+           <div><small>سهم مبنای پرداخت</small><strong>{faNumber(policy.quotaExample.payAllocation)} ساعت</strong></div>
+         </div>
+         <p>{policyInline(policy.quotaExample.note)}</p>
+       </section>}
        {item.id==='continuity'&&Array.isArray(policy.timeline)&&<section
          className="swtb-policy-timeline" aria-labelledby="swtb-policy-timeline-heading">
          <h3 id="swtb-policy-timeline-heading">مراحل و مهلت‌های مشخص پیگیری همکاری</h3>
@@ -73,7 +112,7 @@ export default function WorkerAgreementReview({policy=workerAgreementDraft}){
        </details>}
      </li>)}
    </ol>
-   <section className="swtb-policy-concepts" aria-labelledby="swtb-policy-concepts-heading">
+   {policy.showTimeConcepts!==false&&<section className="swtb-policy-concepts" aria-labelledby="swtb-policy-concepts-heading">
      <h2 id="swtb-policy-concepts-heading">سه مفهوم که نباید با هم اشتباه شوند</h2>
      <div className="swtb-policy-concepts-grid">
        {workerTimeConcepts.map((concept,i)=><div className="swtb-policy-concept" key={concept.id}>
@@ -82,12 +121,12 @@ export default function WorkerAgreementReview({policy=workerAgreementDraft}){
          {i<workerTimeConcepts.length-1&&<span className="swtb-policy-concept-arrow" aria-hidden="true">←</span>}
        </div>)}
      </div>
-   </section>
+   </section>}
    <footer className="swtb-policy-footer">
      <p>{policy.notice}</p>
      <label className="swtb-policy-accept-disabled">
        <input type="checkbox" disabled aria-describedby="swtb-policy-future-gate-note"/>
-       <span>{policy.acknowledgement||policy.acceptance}</span>
+       <span>{policyInline(policy.acknowledgement||policy.acceptance)}</span>
      </label>
      <button type="button" className="report-btn report-btn--primary" disabled>
        تأیید و شروع همکاری
