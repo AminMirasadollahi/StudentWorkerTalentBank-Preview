@@ -4,6 +4,8 @@ import {JSDOM} from 'jsdom'
 import {act,createElement,useState} from 'react'
 import {createServer} from 'vite'
 import {readFileSync} from 'node:fs'
+import {workerGuideStorageKey,workerGuideSessionStorageKey,
+ WORKER_GUIDE_SUPPRESSED,WORKER_GUIDE_OFFERED_SESSION} from '../src/lib/workerGuide.mjs'
 
 const day=()=>{
  const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{
@@ -1309,6 +1311,109 @@ test('read-only history shows true current review statuses and never invents tim
  }
 })
 
+
+
+test('welcome dismissal is tab-session-only and manual help never creates suppression',async()=>{
+ const key=workerGuideStorageKey(worker)
+ const session=workerGuideSessionStorageKey(worker)
+ const proto=window.HTMLDialogElement.prototype
+ const oldConstructor=globalThis.HTMLDialogElement
+ const oldShowModal=proto.showModal,oldClose=proto.close
+ const oldRaf=globalThis.requestAnimationFrame,oldCancel=globalThis.cancelAnimationFrame
+ globalThis.HTMLDialogElement=window.HTMLDialogElement
+ globalThis.requestAnimationFrame=callback=>window.requestAnimationFrame(callback)
+ globalThis.cancelAnimationFrame=id=>window.cancelAnimationFrame(id)
+ proto.showModal=function(){this.setAttribute('open','')}
+ proto.close=function(){this.removeAttribute('open')}
+ window.localStorage.removeItem(key)
+ window.sessionStorage.removeItem(session)
+ let ui=null
+ try{
+  ui=await setup()
+  assert.ok(ui.host.querySelector('.swtb-guide-welcome[open]'),
+   'first authorized read should present the optional welcome')
+  assert.equal(window.sessionStorage.getItem(session),WORKER_GUIDE_OFFERED_SESSION)
+  assert.equal(window.localStorage.getItem(key),null)
+  await ui.click('.swtb-guide-welcome__actions button:last-child')
+  assert.equal(ui.host.querySelector('.swtb-guide-welcome'),null)
+  assert.equal(window.localStorage.getItem(key),null,
+   'temporary dismissal cannot become a permanent opt-out')
+  await ui.dispose();ui=await setup()
+  assert.equal(ui.host.querySelector('.swtb-guide-welcome'),null,
+   'reload/remount in same tab session cannot repeat welcome')
+  await ui.click('[data-swtb-guide="help-global"]')
+  assert.ok(ui.host.querySelector('.swtb-guide-spotlight[open]'),
+   'manual guidance still available')
+  assert.equal(window.localStorage.getItem(key),null,
+   'manual tour cannot silently suppress future offers')
+  await ui.click('.swtb-guide-spotlight .swtb-guide-close')
+  await ui.dispose();ui=null
+  window.sessionStorage.removeItem(session)
+  ui=await setup()
+  assert.ok(ui.host.querySelector('.swtb-guide-welcome[open]'),
+   'new browser-tab session reoffers when suppression was never requested')
+ }finally{
+  if(ui)await ui.dispose()
+  window.localStorage.removeItem(key)
+  window.sessionStorage.removeItem(session)
+  if(oldConstructor===undefined)delete globalThis.HTMLDialogElement
+  else globalThis.HTMLDialogElement=oldConstructor
+  if(oldRaf===undefined)delete globalThis.requestAnimationFrame
+  else globalThis.requestAnimationFrame=oldRaf
+  if(oldCancel===undefined)delete globalThis.cancelAnimationFrame
+  else globalThis.cancelAnimationFrame=oldCancel
+  if(oldShowModal===undefined)delete proto.showModal
+  else proto.showModal=oldShowModal
+  if(oldClose===undefined)delete proto.close
+  else proto.close=oldClose
+ }
+})
+
+test('explicit worker welcome opt-out survives new tab session; legacy seen stays quiet',async()=>{
+ const key=workerGuideStorageKey(worker)
+ const session=workerGuideSessionStorageKey(worker)
+ const proto=window.HTMLDialogElement.prototype
+ const oldConstructor=globalThis.HTMLDialogElement
+ const oldShowModal=proto.showModal,oldClose=proto.close
+ globalThis.HTMLDialogElement=window.HTMLDialogElement
+ proto.showModal=function(){this.setAttribute('open','')}
+ proto.close=function(){this.removeAttribute('open')}
+ window.localStorage.removeItem(key);window.sessionStorage.removeItem(session)
+ let ui=null
+ try{
+  ui=await setup()
+  assert.ok(ui.host.querySelector('.swtb-guide-welcome[open]'))
+  const input=ui.host.querySelector('.swtb-guide-welcome__preference input')
+  assert.ok(input)
+  await act(async()=>input.click())
+  assert.equal(input.checked,true)
+  await ui.click('.swtb-guide-welcome__actions button:last-child')
+  assert.equal(window.localStorage.getItem(key),WORKER_GUIDE_SUPPRESSED)
+  await ui.dispose();ui=null
+  window.sessionStorage.removeItem(session)
+  ui=await setup()
+  assert.equal(ui.host.querySelector('.swtb-guide-welcome'),null,
+   'permanent checkbox suppresses auto-offer in a new session')
+  await ui.click('[data-swtb-guide="help-global"]')
+  assert.ok(ui.host.querySelector('.swtb-guide-spotlight[open]'),
+   'manual help is never disabled by permanent auto opt-out')
+  await ui.dispose();ui=null
+  window.localStorage.setItem(key,'seen')
+  window.sessionStorage.removeItem(session)
+  ui=await setup()
+  assert.equal(ui.host.querySelector('.swtb-guide-welcome'),null,
+   'prior seen flags are treated as quiet legacy preference')
+ }finally{
+  if(ui)await ui.dispose()
+  window.localStorage.removeItem(key);window.sessionStorage.removeItem(session)
+  if(oldConstructor===undefined)delete globalThis.HTMLDialogElement
+  else globalThis.HTMLDialogElement=oldConstructor
+  if(oldShowModal===undefined)delete proto.showModal
+  else proto.showModal=oldShowModal
+  if(oldClose===undefined)delete proto.close
+  else proto.close=oldClose
+ }
+})
 
 test('global and V4 presence tours open, and the optional work-pool guide is wired without a network import',async()=>{
  const oldRaf=globalThis.requestAnimationFrame
