@@ -133,7 +133,8 @@
 
 /* RC3: clause five is a full-width decision table; each other card sizes itself
  * to its own content, irrespective of its grid neighbor. */
-.swtb-policy-sections > .swtb-policy-card[data-policy-section="continuity"]{
+.swtb-policy-sections > .swtb-policy-card[data-policy-section="continuity"][data-policy-has-timeline="true"],
+.swtb-policy-sections > .swtb-policy-card[data-policy-section="finance"][data-policy-has-quota="true"]{
  grid-column:1 / -1;
 }
 .swtb-policy-card[data-policy-section="continuity"] > p{
@@ -157,4 +158,50 @@
 .swtb-policy-continuity-details > div p{margin-top:.65rem}
 .swtb-policy-timeline-scroll:focus-visible{
  outline:3px solid #118987;outline-offset:2px
+}
+
+
+/* RC6: the finance example has a genuine visible ratio (not only prose).
+ * No calculation fetches financial or personal data: figures are static
+ * review-only illustrations from the owner-approved draft example. */
+.swtb-policy-quota-example{border-top:1px solid var(--swtb-edge);
+ margin-top:1rem;padding-top:.8rem}
+.swtb-policy-quota-example h3{font-size:.94rem;color:#204b5e;
+ margin:0 0 .45rem}
+.swtb-policy-quota-example>p{max-width:85ch}
+.swtb-policy-quota-math{display:flex;align-items:center;justify-content:center;
+ flex-wrap:wrap;gap:.55rem .85rem;padding:1.1rem .75rem;margin:.85rem 0;
+ border:1px solid #d1e4e3;border-radius:12px;background:#f2f9f8;
+ direction:rtl;color:#1f5661}
+.swtb-policy-quota-ratio{display:flex;align-items:center;gap:.5rem}
+.swtb-policy-quota-ratio small{max-width:5rem;line-height:1.65;font-size:.7rem;
+ color:#486972}
+.swtb-policy-quota-fraction{display:grid;min-width:3.9rem;text-align:center;
+ font-size:1.28rem;font-weight:800;line-height:1.35;font-variant-numeric:tabular-nums}
+.swtb-policy-quota-fraction b:first-child{border-bottom:2px solid #427b80;
+ padding-bottom:.12rem}
+.swtb-policy-quota-fraction b:last-child{padding-top:.12rem}
+.swtb-policy-quota-operator{font-size:1.5rem;font-weight:700;color:#567985}
+.swtb-policy-quota-value,.swtb-policy-quota-total{display:flex;flex-direction:column;
+ align-items:center;gap:.1rem;font-weight:800;font-size:1.25rem;
+ font-variant-numeric:tabular-nums}
+.swtb-policy-quota-value small,.swtb-policy-quota-total small{
+ font-size:.72rem;font-weight:600;line-height:1.55}
+.swtb-policy-quota-total{color:#176d5e;border-radius:10px;
+ border:1px solid #b7dacc;background:#e7f5ee;padding:.45rem .7rem}
+.swtb-policy-quota-comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:.6rem;margin:.65rem 0}
+.swtb-policy-quota-comparison>div{display:flex;flex-direction:column;gap:.2rem;
+ padding:.65rem .75rem;border:1px solid #d9e8e8;border-radius:10px;background:#fff}
+.swtb-policy-quota-comparison>div small{font-size:.78rem;color:#496974}
+.swtb-policy-quota-comparison>div strong{font-size:1.05rem;color:#224c61}
+.swtb-policy-quota-comparison>div:last-child strong{color:#176d5e}
+@media(max-width:560px){
+ .swtb-policy-quota-comparison{grid-template-columns:1fr}
+ .swtb-policy-quota-math{gap:.45rem .6rem}
+ .swtb-policy-quota-fraction{font-size:1.1rem;min-width:3rem}
+ .swtb-policy-quota-value,.swtb-policy-quota-total{font-size:1.08rem}
+}
+@media(prefers-contrast:more){
+ .swtb-policy-quota-math,.swtb-policy-quota-total{background:white;border-width:2px}
 }
