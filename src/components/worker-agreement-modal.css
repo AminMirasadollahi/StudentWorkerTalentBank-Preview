@@ -7,8 +7,9 @@
  padding:0;overflow:hidden;box-shadow:0 22px 58px #0d263a4a;
  color:#193e52;
 }
+.swtb-policy-modal[open]{display:flex;flex-direction:column}
 .swtb-policy-modal::backdrop{background:#09253c98}
-.swtb-policy-modal-head{display:flex;justify-content:space-between;align-items:center;
+.swtb-policy-modal-head{display:flex;flex:0 0 auto;justify-content:space-between;align-items:center;
  gap:.9rem;background:white;border-bottom:1px solid #dde9ec;padding:1rem 1.1rem}
 .swtb-policy-modal-head h2{margin:0;font-size:1.09rem}
 .swtb-policy-modal-head p{font-size:.77rem;color:#576f7e;line-height:1.7;margin:.2rem 0 0}
@@ -16,7 +17,7 @@
  border:1px solid #cadae0;border-radius:9px;background:#f8fafb;color:#18445a;
  padding:.4rem .75rem;min-height:2.35rem}
 .swtb-policy-modal-close:focus-visible{outline:3px solid #168c85;outline-offset:2px}
-.swtb-policy-modal-body{overflow:auto;box-sizing:border-box;height:calc(100% - 86px);
+.swtb-policy-modal-body{flex:1 1 auto;min-height:0;overflow:auto;box-sizing:border-box;
  padding:1rem;overscroll-behavior:contain}
 .swtb-policy-modal .swtb-policy-review{max-width:none}
 .swtb-policy-modal .swtb-policy-sections{grid-template-columns:repeat(2,minmax(0,1fr))}
