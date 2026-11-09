@@ -1375,7 +1375,10 @@ test('explicit worker welcome opt-out survives new tab session; legacy seen stay
  const proto=window.HTMLDialogElement.prototype
  const oldConstructor=globalThis.HTMLDialogElement
  const oldShowModal=proto.showModal,oldClose=proto.close
+ const oldRaf=globalThis.requestAnimationFrame,oldCancel=globalThis.cancelAnimationFrame
  globalThis.HTMLDialogElement=window.HTMLDialogElement
+ globalThis.requestAnimationFrame=callback=>window.requestAnimationFrame(callback)
+ globalThis.cancelAnimationFrame=id=>window.cancelAnimationFrame(id)
  proto.showModal=function(){this.setAttribute('open','')}
  proto.close=function(){this.removeAttribute('open')}
  window.localStorage.removeItem(key);window.sessionStorage.removeItem(session)
@@ -1408,6 +1411,10 @@ test('explicit worker welcome opt-out survives new tab session; legacy seen stay
   window.localStorage.removeItem(key);window.sessionStorage.removeItem(session)
   if(oldConstructor===undefined)delete globalThis.HTMLDialogElement
   else globalThis.HTMLDialogElement=oldConstructor
+  if(oldRaf===undefined)delete globalThis.requestAnimationFrame
+  else globalThis.requestAnimationFrame=oldRaf
+  if(oldCancel===undefined)delete globalThis.cancelAnimationFrame
+  else globalThis.cancelAnimationFrame=oldCancel
   if(oldShowModal===undefined)delete proto.showModal
   else proto.showModal=oldShowModal
   if(oldClose===undefined)delete proto.close
