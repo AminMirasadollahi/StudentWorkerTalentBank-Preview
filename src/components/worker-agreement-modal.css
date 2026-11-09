@@ -22,12 +22,23 @@
 .swtb-policy-modal .swtb-policy-sections{grid-template-columns:repeat(2,minmax(0,1fr))}
 .swtb-policy-timeline{border-top:1px solid #dce8ea;margin-top:.9rem;padding-top:.75rem}
 .swtb-policy-timeline h3{font-size:.94rem;margin:.2rem 0 .75rem}
-.swtb-policy-timeline ol{list-style:none;margin:0;padding:0;display:grid;gap:.48rem}
-.swtb-policy-timeline li{display:grid;grid-template-columns:9rem minmax(0,1fr);gap:.3rem .7rem;
- padding:.7rem;border:1px solid #d7e7e8;background:#f7fbfb;border-radius:9px}
-.swtb-policy-timeline li strong{font-size:.8rem;color:#0c6f65}
-.swtb-policy-timeline li span{font-size:.79rem}
-.swtb-policy-timeline li p{grid-column:1 / -1;margin:.1rem 0 0!important}
+.swtb-policy-timeline-scroll{max-width:100%;overflow-x:auto;border-radius:10px}
+.swtb-policy-timeline table{width:100%;border-spacing:0;border-collapse:separate;
+ border:1px solid #d6e5e8;border-radius:10px;overflow:hidden;
+ font-size:.81rem;line-height:1.75;text-align:right}
+.swtb-policy-timeline caption{caption-side:top;text-align:right;
+ font-size:.78rem;color:#4d6974;padding:.15rem 0 .55rem}
+.swtb-policy-timeline th,.swtb-policy-timeline td{padding:.63rem .75rem;
+ vertical-align:top;overflow-wrap:anywhere;border-bottom:1px solid #e2ebee}
+.swtb-policy-timeline thead th{background:#e9f3f5;color:#1a5263;font-size:.8rem}
+.swtb-policy-timeline thead th:nth-child(1){width:22%}
+.swtb-policy-timeline thead th:nth-child(2){width:31%}
+.swtb-policy-timeline tbody th{font-weight:750;color:#20677a}
+.swtb-policy-timeline tbody tr:nth-child(even){background:#f5f9fa}
+.swtb-policy-timeline tbody tr:last-child>*{border-bottom:0}
+.swtb-policy-timeline p.swtb-policy-muted{font-size:.79rem;color:#486574;
+ margin:.7rem 0 .2rem!important;line-height:1.85}
+
 .swtb-policy-sidebar-actions{display:flex;gap:.3rem;align-items:stretch;margin-bottom:.6rem}
 .ow-b3-sidebar__footer .swtb-policy-sidebar-actions button{
  flex:1 1 50%;min-width:0;min-height:2.4rem;font:inherit;
@@ -44,6 +55,7 @@
 @media(max-width:600px){
  .swtb-policy-modal-body{padding:.45rem}
  .swtb-policy-modal-head{padding:.6rem;align-items:flex-start}
- .swtb-policy-timeline li{grid-template-columns:1fr}
+ .swtb-policy-timeline table{min-width:610px}
+ .swtb-policy-timeline-scroll{overscroll-behavior-inline:contain}
  .ow-b3-sidebar__footer .swtb-policy-sidebar-actions{flex-direction:column}
 }
