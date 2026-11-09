@@ -22,8 +22,7 @@ function AgreementIcon({name}){
   {(iconStrokes[name]||iconStrokes.document).map((d,i)=><path key={i} d={d}/>)}
  </svg>
 }
-export default function WorkerAgreementReview(){
- const policy=workerAgreementDraft
+export default function WorkerAgreementReview({policy=workerAgreementDraft}){
  return <section className="swtb-policy-review" dir="rtl"
    aria-labelledby="swtb-policy-title" data-policy-status="draft">
    <header className="swtb-policy-head">
@@ -32,7 +31,7 @@ export default function WorkerAgreementReview(){
      <p className="swtb-policy-institution">{policy.institution}</p>
      <p>{policy.intro}</p>
      <p className="swtb-policy-caution" role="status">
-       این صفحه فقط برای بازبینی متن و طراحی است؛ هنوز چارچوب رسمی منتشر نشده و هیچ موافقتی ثبت نمی‌شود.
+       {policy.notice||'این صفحه فقط برای بازبینی متن و طراحی است؛ هنوز چارچوب رسمی منتشر نشده و هیچ موافقتی ثبت نمی‌شود.'}
      </p>
    </header>
    <ol className="swtb-policy-sections" aria-label="هفت اصل چارچوب همکاری">
@@ -41,7 +40,20 @@ export default function WorkerAgreementReview(){
          <span className="swtb-policy-icon-box"><AgreementIcon name={item.icon}/></span>
          <h2><span className="swtb-policy-index" aria-hidden="true">{new Intl.NumberFormat('fa-IR').format(index+1)}.</span>{' '}{item.title}</h2>
        </div>
-       <p>{item.body}</p>
+       {Array.isArray(item.paragraphs)
+         ?item.paragraphs.map((p,i)=><p key={i}>{p}</p>)
+         :<p>{item.body}</p>}
+       {item.id==='continuity'&&Array.isArray(policy.timeline)&&<section
+         className="swtb-policy-timeline" aria-label="جدول زمانی پیگیری همکاری">
+         <h3>مراحل و مهلت‌های پیگیری</h3>
+         <ol>{policy.timeline.map((step,i)=><li key={i}>
+           <strong>{step.when}</strong>
+           <span>{step.trigger}</span>
+           <p>{step.action}</p>
+         </li>)}</ol>
+         <p className="swtb-policy-muted">این زمان‌ها فقط مبنای بررسی فردی‌اند؛ تصمیم محدودکننده خودکار نیست.</p>
+       </section>}
+       {Array.isArray(item.detailParagraphs)&&item.detailParagraphs.map((p,i)=><p key={'detail-'+i}>{p}</p>)}
      </li>)}
    </ol>
    <section className="swtb-policy-concepts" aria-labelledby="swtb-policy-concepts-heading">
@@ -58,7 +70,7 @@ export default function WorkerAgreementReview(){
      <p>{policy.notice}</p>
      <label className="swtb-policy-accept-disabled">
        <input type="checkbox" disabled aria-describedby="swtb-policy-future-gate-note"/>
-       <span>{policy.acknowledgement}</span>
+       <span>{policy.acknowledgement||policy.acceptance}</span>
      </label>
      <button type="button" className="report-btn report-btn--primary" disabled>
        تأیید و شروع همکاری
