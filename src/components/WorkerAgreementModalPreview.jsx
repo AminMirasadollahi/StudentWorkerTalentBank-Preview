@@ -22,17 +22,23 @@ export default function WorkerAgreementModalPreview({open,onClose}){
   }
  },[open])
  if(!open)return null
- const close=()=>{
-  const dialog=dialogRef.current
-  // Native close emits an onClose event. Don't fire that callback twice.
-  if(dialog?.open&&typeof dialog.close==='function'){
-   dialog.close()
-   return
-  }
+ const handleNativeClose=()=>{
+  // StrictMode may run effect cleanup and immediately showModal again.
+  // A delayed 'close' event from that internal cleanup MUST NOT dismiss
+  // the newly opened preview.
+  if(dialogRef.current?.open)return
   onClose?.()
  }
+ const close=()=>{
+  const dialog=dialogRef.current
+  if(dialog?.open&&typeof dialog.close==='function'){
+   dialog.close() // native 'close' event owns the single onClose notification
+   return
+  }
+  onClose?.() // older non-modal fallback
+ }
  return <dialog ref={dialogRef} className="swtb-policy-modal"
-   onClose={onClose} onCancel={onClose}
+   onClose={handleNativeClose}
    aria-labelledby="swtb-policy-modal-heading" dir="rtl">
    <div className="swtb-policy-modal-head">
     <div>
