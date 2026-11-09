@@ -6,6 +6,7 @@
 }
 .swtb-guide-welcome {
  width:min(32rem,calc(100vw - 2rem));max-width:none;
+ max-height:calc(100dvh - 2rem);overflow-y:auto;overscroll-behavior:contain;
  border:1px solid #cde1e5;border-radius:1rem;
  background:#fff;padding:1.45rem 1.5rem;
  box-shadow:0 20px 65px #092c4255;
