@@ -37,6 +37,8 @@ import {managerReviewItems} from './lib/managerReviewRows.mjs'
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
 const WorkPoolManagerPanel = lazy(()=>import('./components/WorkPoolManagerPanel'))
 const WorkPoolWorkerPanel = lazy(()=>import('./components/WorkPoolWorkerPanel'))
+// Deliberately OFF until an approved server acknowledgement contract is installed.
+const WorkerAgreementModalPreview = lazy(()=>import('./components/WorkerAgreementModalPreview.jsx'))
 import * as unifiedPeerApi from './lib/operationsV2'
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
  requestProfileChange,reviewProfileChange,getUnitHourTotals,
@@ -59,6 +61,8 @@ const termMembershipUIEnabled=import.meta.env?.VITE_SWTB21_TERM_MEMBERSHIP_UI!==
 // zero offers and zero claims. Enable only the manager-authorized, worker-self
 // surfaces; keep emergency build-time UI kill switch without altering DB policy.
 const workPoolUIEnabled=import.meta.env?.VITE_SWTB21_WORK_POOL_UI!=='false'
+// Draft visual only: NO read/write RPC, NO checkbox submission, NO operational block.
+const agreementReviewUIEnabled=import.meta.env?.VITE_SWTB_WORKER_AGREEMENT_REVIEW==='true'
 // SWTB22-D3 is a presentation-only, independently reversible manager release.
 // Legacy manager route and all TaskAssignmentEditor server guards remain unchanged.
 const focusTaskUIEnabled=import.meta.env?.VITE_SWTB22_TASKS_FOCUS_UI==='true'
@@ -2371,6 +2375,9 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const [localNavigation,setLocalNavigation]=useState({section:'tasks',taskRange:'today'})
   const [submissionReceipt,setSubmissionReceipt]=useState(null)
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
+ const [agreementPreviewOpen,setAgreementPreviewOpen]=useState(false)
+ const agreementPreviewTriggerRef=useRef(null)
+ useEffect(()=>setAgreementPreviewOpen(false),[profile.worker_id])
   // Default OFF for every authenticated principal. Remembering this checkbox
   // within the same session must never leak across an account switch.
   const [peerVisibility,setPeerVisibility]=useState({workerId:profile.worker_id,enabled:false})
@@ -2385,7 +2392,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     const fn=previous=>({...previous,...patch})
     ;(setNavigation||setLocalNavigation)(fn)
   }
-  const section=['tasks','availability','history','profile',...(workPoolUIEnabled?['workPool']:[])].includes(selected.section)?selected.section:'tasks'
+  const section=['tasks','availability','history','profile',...(workPoolUIEnabled?['workPool']:[]),].includes(selected.section)?selected.section:'tasks'
   const taskRange=['today','week','month','upcoming'].includes(selected.taskRange)?selected.taskRange:'today'
   const taskView=['action','pending','upcoming','completed','calendar'].includes(selected.taskView)
     ?selected.taskView:'action'
@@ -2526,13 +2533,27 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       }} options={[
         ['tasks','کارهای من'],...(workPoolUIEnabled?[['workPool','فرصت‌های کاری']]:[]),
         ['availability','زمان حضور'],['history','سوابق گزارش‌ها'],['profile','حساب من'],
+        
       ]}/>
       <div className="ow-b3-sidebar__footer">
-        <button type="button" className="swtb-guide-launch" data-swtb-guide="help-global"
-          title="راهنمای تصویری سامانه" aria-label="راهنمای سامانه"
-          onClick={()=>openWorkerGuide('all')}>
-          <span aria-hidden="true">؟</span>{!sidebarCollapsed&&' راهنمای سامانه'}
-        </button>
+        <div className="swtb-policy-sidebar-actions">
+          <button type="button" className="swtb-guide-launch" data-swtb-guide="help-global"
+            title="راهنمای تصویری سامانه" aria-label="راهنمای سامانه"
+            onClick={()=>openWorkerGuide('all')}>
+            <span aria-hidden="true">؟</span>{!sidebarCollapsed&&' راهنمای سامانه'}
+          </button>
+          {agreementReviewUIEnabled&&<button type="button"
+            ref={agreementPreviewTriggerRef}
+            title="چارچوب همکاری دانشجوکاران (پیش‌نمایش)"
+            aria-label="نمایش چارچوب همکاری دانشجوکاران (پیش‌نمایش)"
+            onClick={()=>{
+              setGuideScope(null)
+              setGuideWelcomeOpen(false)
+              setAgreementPreviewOpen(true)
+            }}>
+            <span aria-hidden="true">▤</span>{!sidebarCollapsed&&' چارچوب همکاری'}
+          </button>}
+        </div>
         <div className="ow-b3-worker" title={visibleWorkerName}>
           <span className="ow-b3-worker__avatar" aria-hidden="true">{visibleWorkerName?.trim()?.[0]||'د'}</span>
           {!sidebarCollapsed&&<div><strong>{visibleWorkerName}</strong>
@@ -2712,6 +2733,12 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         ...(nextView?{taskView:nextView}:{})})}
       approvedMinutesTotal={data.approved_minutes_total} refreshRevision={refreshRevision}/>}
     </div>
+    {agreementReviewUIEnabled&&agreementPreviewOpen&&<Suspense fallback={<p role="status">در حال بارگذاری پیش‌نمایش چارچوب…</p>}>
+      <WorkerAgreementModalPreview open={agreementPreviewOpen} onClose={()=>{
+        setAgreementPreviewOpen(false)
+        requestAnimationFrame(()=>agreementPreviewTriggerRef.current?.focus({preventScroll:true}))
+      }}/>
+    </Suspense>}
     {guideWelcomeOpen&&<WorkerGuideWelcome
       onBegin={()=>openWorkerGuide('all')}
       onSkip={()=>{rememberGuideOffer();setGuideWelcomeOpen(false)}}/>}
