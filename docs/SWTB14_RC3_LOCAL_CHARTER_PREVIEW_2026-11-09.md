@@ -11,7 +11,7 @@
 
 ## آزمون محلی با PowerShell 5.1 (بدون تغییر سامانه عملیاتی)
 
-پیش‌نیاز: `git` و `node/npm` نصب باشند. برای Vite 7 از Node جدید پشتیبانی‌شده (۲۰.۱۹+ یا ۲۲.۱۲+) استفاده کنید. در PowerShell:
+پیش‌نیاز: `git` و `node/npm` نصب باشند. در PowerShell از `npm.cmd` استفاده شده تا محدودیت اجرای اسکریپت‌های PowerShell مانع اجرای npm نشود. برای Vite 7 از Node جدید پشتیبانی‌شده (۲۰.۱۹+ یا ۲۲.۱۲+) استفاده کنید. در PowerShell:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -24,9 +24,9 @@ if (Test-Path -LiteralPath $folder) {
 & git clone --depth 1 --single-branch --branch $branch $repo $folder
 if ($LASTEXITCODE -ne 0) { throw 'GIT_CLONE_FAILED' }
 Set-Location -LiteralPath $folder
-& npm install --no-audit --no-fund --no-package-lock
+& npm.cmd install --no-audit --no-fund --no-package-lock
 if ($LASTEXITCODE -ne 0) { throw 'NPM_INSTALL_FAILED' }
-& npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
+& npm.cmd run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
 بعد از نمایش `ready` در همین پنجره PowerShell، در Chrome باز کنید:
