@@ -291,6 +291,13 @@ test('seven weekday rows render four independent slots and safe per-day single R
   assert.match(effective,/^\d{4}-\d{2}-\d{2}$/)
  }finally{await ui.dispose()}
 })
+test('compact weekly clock CSS keeps time labels inline and wraps by real panel width',()=>{
+ const css=readFileSync(new URL('../src/operations-workspace.css',import.meta.url),'utf8')
+ assert.match(css,/\.ow-slot-editor\s*\{[^}]*display:flex;/s)
+ assert.match(css,/\.ow-slot-editor\s*\{[^}]*flex-wrap:wrap;/s)
+ assert.match(css,/\.ow-slot-clock\s*\{[^}]*display:flex;/s)
+ assert.match(css,/\.ow-slot-clock__controls\s*\{[^}]*min-width:0;/s)
+})
 test('weekly presence uses keyboard-accessible hour/minute dropdowns without rounding precise minutes',async()=>{
  const ui=await setup()
  globalThis.__workerFocusCalls=[]
@@ -310,6 +317,11 @@ test('weekly presence uses keyboard-accessible hour/minute dropdowns without rou
   const form=ui.host.querySelector('form.ow-slot-editor')
   assert.ok(form,'one day-level time editor follows the selected weekly row')
   assert.ok(form.previousElementSibling.classList.contains('ow-week-row'))
+  assert.equal(form.querySelector('.ow-slot-editor__heading'),null,
+   'compact editor must not consume a redundant heading row')
+  assert.deepEqual([...form.children].slice(0,3).map(element=>element.className),
+   ['ow-slot-clock','ow-slot-clock','ow-slot-actions'],
+   'the two time endpoints and actions remain adjacent for responsive inline layout')
   assert.equal(form.querySelectorAll('select').length,4,'hour and minute for both endpoints')
   assert.equal(form.querySelector('select[aria-label="ساعت شروع"]').value,'08')
   assert.equal(form.querySelector('select[aria-label="دقیقه شروع"]').value,'00')
