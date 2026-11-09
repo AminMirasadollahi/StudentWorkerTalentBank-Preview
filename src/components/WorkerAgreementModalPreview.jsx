@@ -43,7 +43,7 @@ export default function WorkerAgreementModalPreview({open,onClose}){
    <div className="swtb-policy-modal-head">
     <div>
      <h2 id="swtb-policy-modal-heading">چارچوب همکاری دانشجوکاران</h2>
-     <p>پیش‌نمایش محتوایی نسخه ۱.۰ (RC3) · هنوز فاقد ثبت پذیرش یا محدودیت عملیاتی</p>
+     <p>پیش‌نمایش محتوایی نسخه {workerAgreementApprovalCandidate.version} · هنوز فاقد ثبت پذیرش یا محدودیت عملیاتی</p>
     </div>
     <button type="button" className="swtb-policy-modal-close" onClick={close}
      aria-label="بستن پیش‌نمایش چارچوب همکاری">بستن ×</button>
