@@ -74,3 +74,56 @@
  .swtb-policy-footer{padding:.9rem}
  .swtb-policy-head h1{font-size:1.13rem}
 }
+
+
+/* SWTB14 RC2: restrained semantic accents, never rainbow paragraph text.
+ * All body copy remains dark on a very light surface for legibility. */
+.swtb-policy-study-note{
+ display:flex;align-items:flex-start;gap:.55rem;line-height:1.9;
+ margin:.75rem 0 .8rem!important;padding:.7rem .9rem;
+ background:#eef6f7;border:1px solid #d6e7ea;border-inline-start:3px solid #407d83;
+ border-radius:10px;color:#335c68;font-size:.85rem!important;
+}
+.swtb-policy-study-note .swtb-policy-icon{flex:0 0 1.25rem;width:1.25rem;
+ height:1.25rem;margin-top:.3rem;color:#2e7379}
+.swtb-policy-intro-paragraph{margin-top:.55rem!important}
+.swtb-policy-card{
+ --swtb-tone:#296e71;--swtb-soft:#eff7f6;--swtb-edge:#d6e9e5;
+ border-color:var(--swtb-edge);
+ border-inline-start:4px solid var(--swtb-tone);
+ background:linear-gradient(180deg,var(--swtb-soft) 0,white 58px);
+}
+.swtb-policy-card[data-policy-section="learning"]{
+ --swtb-tone:#24786e;--swtb-soft:#eff8f5;--swtb-edge:#cfe5dd;
+}
+.swtb-policy-card[data-policy-section="choice"]{
+ --swtb-tone:#40689b;--swtb-soft:#f0f5fb;--swtb-edge:#d5e3f1;
+}
+.swtb-policy-card[data-policy-section="presence"]{
+ --swtb-tone:#6a5b9d;--swtb-soft:#f5f2fa;--swtb-edge:#e3dcf0;
+}
+.swtb-policy-card[data-policy-section="library-routine"]{
+ --swtb-tone:#8c692d;--swtb-soft:#fbf7ec;--swtb-edge:#eadfc4;
+}
+.swtb-policy-card[data-policy-section="continuity"]{
+ --swtb-tone:#226f81;--swtb-soft:#edf7f9;--swtb-edge:#cde5ea;
+}
+.swtb-policy-card[data-policy-section="privacy"]{
+ --swtb-tone:#56744f;--swtb-soft:#f3f8f0;--swtb-edge:#dce8d4;
+}
+.swtb-policy-card[data-policy-section="finance"]{
+ --swtb-tone:#82577a;--swtb-soft:#faf2f8;--swtb-edge:#e8d6e3;
+}
+.swtb-policy-card .swtb-policy-icon-box{
+ background:var(--swtb-soft);color:var(--swtb-tone);
+ border:1px solid var(--swtb-edge);
+}
+.swtb-policy-card .swtb-policy-index{color:var(--swtb-tone)}
+.swtb-policy-card p{color:#344f5f}
+.swtb-policy-card[data-policy-section="finance"] p+p{
+ border-top:1px solid var(--swtb-edge);padding-top:.6rem;margin-top:.7rem
+}
+@media(prefers-contrast:more){
+ .swtb-policy-card{background:white;border-width:2px;border-inline-start-width:5px}
+ .swtb-policy-study-note{background:white;color:#173f54}
+}
