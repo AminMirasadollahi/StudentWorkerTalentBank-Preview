@@ -13,6 +13,7 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
  const [view,setView]=useState({status:'loading',items:[]})
  const [busyId,setBusyId]=useState('')
  const [uncertainId,setUncertainId]=useState('')
+ const [retryReady,setRetryReady]=useState(false)
  const [notice,setNotice]=useState('')
  const keys=useRef({workerId,requests:new Map()})
  if(keys.current.workerId!==workerId)
@@ -27,18 +28,22 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
    if(stamp!==seq.current)return
    if(data?.ok!==true||data.scope!=='worker_published_work_pool'
      ||!Array.isArray(data.opportunities))throw Error('invalid_worker_pool_response')
-   // Only server-published, title-safe work offers are received here.
+   // An authorized read must not silently discard an unresolved claim.
    setView({status:'ready',items:data.opportunities})
-   setUncertainId('')
-   setNotice('')
+   return data.opportunities
   }catch{
-   if(stamp===seq.current)
-    setView({status:'error',items:[]})
+   if(stamp===seq.current)setView({status:'error',items:[]})
+   return null
   }
  },[])
  useEffect(()=>{void load();return()=>{seq.current+=1}},[load,workerId,refreshRevision])
+ useEffect(()=>{
+  // A reused worker panel must not carry another worker's pending notice.
+  setUncertainId('');setRetryReady(false);setNotice('')
+ },[workerId])
  const claim=async item=>{
-  if(inFlight.current||view.status!=='ready'||item.claimable!==true||item.my_task_id)return
+  if(inFlight.current||view.status!=='ready'||item.claimable!==true||item.my_task_id
+    ||uncertainId===item.id&&!retryReady)return
   if(!globalThis.crypto?.randomUUID){
    setNotice('امکان تولید شناسه امن درخواست وجود ندارد؛ انتخاب کار انجام نشد.')
    return
@@ -54,24 +59,47 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
    const receipt=await claimWorkOpportunity({opportunityId:item.id,requestId})
    if(receipt?.ok!==true||typeof receipt?.task_id!=='string')
     throw Error('claim_not_confirmed')
+   // Never leak a late receipt into a different authenticated worker view.
+   if(keys.current.workerId!==workerId)return
    keys.current.requests.delete(item.id)
    setUncertainId('')
+   setRetryReady(false)
    await load()
+   if(keys.current.workerId!==workerId)return
    setNotice(receipt.replayed===true
      ?'انتخاب قبلی تأیید شد؛ وظیفه تکراری ساخته نشده است.'
      :'انتخاب کار ثبت شد. ثبت ساعت و تأیید نهایی، مراحل جداگانه‌اند.')
    onClaimed?.(receipt.task_id)
   }catch{
-   // Lost HTTP response is ambiguous: preserve same key for explicit retry.
-   setUncertainId(item.id)
-   setNotice('نتیجه انتخاب مشخص نیست. ابتدا وضعیت را از سرور بازخوانی کنید؛ در صورت لزوم، تلاش مجدد با همان شناسه انجام می‌شود.')
+   // A lost HTTP response might follow a committed claim.
+   if(keys.current.workerId===workerId){
+    setUncertainId(item.id)
+    setRetryReady(false)
+    setNotice('نتیجه انتخاب مشخص نیست. ابتدا وضعیت را از سرور بازخوانی کنید؛ تا آن زمان تلاش مجدد غیرفعال است.')
+   }
   }finally{inFlight.current=false;setBusyId('')}
  }
- const refresh=async()=>{await load()}
+ const refresh=async()=>{
+  const items=await load()
+  if(!items||!uncertainId||keys.current.workerId!==workerId)return
+  const offer=items.find(item=>item.id===uncertainId)
+  if(offer?.my_task_id){
+   keys.current.requests.delete(uncertainId)
+   setUncertainId('')
+   setRetryReady(false)
+   setNotice('انتخاب قبلی شما در اطلاعات سرور تأیید شد؛ کار تکراری ایجاد نمی‌شود.')
+   onClaimed?.(offer.my_task_id)
+  }else{
+   const mayRetry=offer?.claimable===true
+   setRetryReady(mayRetry)
+   setNotice(mayRetry
+    ?'در بازخوانی فعلی، انتخاب قطعی دیده نشد؛ نتیجه اولیه همچنان ممکن است نامشخص باشد. در صورت نیاز فقط با همان شناسه قبلی تلاش کنید.'
+    :'انتخاب قبلی هنوز تأیید نشده و این فرصت فعلاً قابل انتخاب نیست؛ بدون بررسی جدید دوباره درخواست ندهید.')
+  }
+ }
  const items=view.items.slice().sort((a,b)=>
   String(a.date).localeCompare(String(b.date))||
   Number(a.priority)-Number(b.priority))
- const uncertainItem=items.find(x=>x.id===uncertainId)
  return <section className="report-panel ow-work-pool ow-worker-work-pool"
   data-swtb-guide="work-pool-list" aria-label="فرصت‌های کاری قابل انتخاب">
   <div className="report-panel-heading">
@@ -127,8 +155,8 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
        <p>ممکن است انتخاب شما ثبت شده باشد. پیش از اقدام دوباره، وضعیت را بازخوانی کنید.</p>
        <button type="button" className="ow-mini-btn" disabled={busyId!==''}
         onClick={()=>void refresh()}>بررسی وضعیت از سرور</button>
-       <button type="button" className="ow-mini-btn" disabled={busyId!==''}
-        onClick={()=>{setUncertainId('');void claim(item)}}>
+       <button type="button" className="ow-mini-btn" disabled={busyId!==''||!retryReady}
+        onClick={()=>void claim(item)}>
         تلاش مجدد با همان شناسه</button>
       </div>}
     </article>)}
