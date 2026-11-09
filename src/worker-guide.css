@@ -24,6 +24,16 @@
  outline:2px solid #168783;outline-offset:3px;border-radius:.2rem;
 }
 .swtb-guide-welcome p {font-size:.91rem;line-height:1.85;color:#475f6f;margin:.5rem 0}
+.swtb-guide-welcome__quickstart {
+ margin:.5rem 0;padding:0 1.25rem 0 0;list-style:persian;
+ display:grid;gap:.38rem;color:#334f5e;font-size:.84rem;line-height:1.8;
+}
+.swtb-guide-welcome__quickstart li{padding-inline-start:.2rem}
+.swtb-guide-welcome__quickstart strong{color:#15445a}
+.swtb-guide-welcome .swtb-guide-welcome__note{
+ font-weight:650;color:#245a59;background:#f1f8f6;
+ padding:.45rem .6rem;border-radius:.45rem;
+}
 .swtb-guide-welcome__preference {
  display:flex;align-items:center;gap:.55rem;margin:.8rem 0 .1rem;
  font-size:.86rem;font-weight:700;color:#18465b;cursor:pointer;
