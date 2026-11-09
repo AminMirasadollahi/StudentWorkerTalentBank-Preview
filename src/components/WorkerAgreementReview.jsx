@@ -47,16 +47,30 @@ export default function WorkerAgreementReview({policy=workerAgreementDraft}){
          ?item.paragraphs.map((p,i)=><p key={i}>{p}</p>)
          :<p>{item.body}</p>}
        {item.id==='continuity'&&Array.isArray(policy.timeline)&&<section
-         className="swtb-policy-timeline" aria-label="جدول زمانی پیگیری همکاری">
-         <h3>مراحل و مهلت‌های پیگیری</h3>
-         <ol>{policy.timeline.map((step,i)=><li key={i}>
-           <strong>{step.when}</strong>
-           <span>{step.trigger}</span>
-           <p>{step.action}</p>
-         </li>)}</ol>
-         <p className="swtb-policy-muted">این زمان‌ها فقط مبنای بررسی فردی‌اند؛ تصمیم محدودکننده خودکار نیست.</p>
+         className="swtb-policy-timeline" aria-labelledby="swtb-policy-timeline-heading">
+         <h3 id="swtb-policy-timeline-heading">مراحل و مهلت‌های مشخص پیگیری همکاری</h3>
+         <div className="swtb-policy-timeline-scroll" role="region" tabIndex={0}
+           aria-label="جدول زمان‌بندی استمرار همکاری">
+           <table>
+             <caption>مبنای بررسی وضعیت همکاری، نه مجازات خودکار</caption>
+             <thead><tr>
+               <th scope="col">زمان</th>
+               <th scope="col">شرایط بررسی</th>
+               <th scope="col">اقدام احتمالی</th>
+             </tr></thead>
+             <tbody>{policy.timeline.map((step,i)=><tr key={i}>
+               <th scope="row">{step.when}</th>
+               <td>{step.trigger}</td>
+               <td>{step.action}</td>
+             </tr>)}</tbody>
+           </table>
+         </div>
+         <p className="swtb-policy-muted">بیماری، امتحان، تغییر موجه برنامه یا روز بدون کار واگذارشده به‌خودی‌خود تخلف نیست. تصمیم هر مرحله پس از شنیدن توضیحات فرد و با اختیار مسئول مجاز بررسی می‌شود.</p>
        </section>}
-       {Array.isArray(item.detailParagraphs)&&item.detailParagraphs.map((p,i)=><p key={'detail-'+i}>{p}</p>)}
+       {Array.isArray(item.detailParagraphs)&&<details className="swtb-policy-continuity-details">
+         <summary>شرایط تعهدهای انجام‌نشده، حق توضیح و درخواست بازبینی — متن کامل</summary>
+         <div>{item.detailParagraphs.map((p,i)=><p key={'detail-'+i}>{p}</p>)}</div>
+       </details>}
      </li>)}
    </ol>
    <section className="swtb-policy-concepts" aria-labelledby="swtb-policy-concepts-heading">
