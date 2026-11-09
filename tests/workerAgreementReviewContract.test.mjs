@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {workerAgreementDraft,workerTimeConcepts} from '../src/lib/workerAgreementDraft.mjs'
+import {workerAgreementApprovalCandidate} from '../src/lib/workerAgreementApprovalCandidate.mjs'
 
 const read=path=>readFileSync(new URL(path,import.meta.url),'utf8')
 
@@ -52,8 +53,59 @@ test('policy UI is honest about preview-only acknowledgement and is keyboard rea
 test('public deployment never enables policy gating without an explicit build flag',()=>{
  const app=read('../src/OperationsWorkspace.jsx')
  assert.match(app,/VITE_SWTB_WORKER_AGREEMENT_REVIEW==='true'/)
- assert.match(app,/agreementReviewUIEnabled\?\['agreementReview'\]:\[\]/)
- assert.match(app,/agreementReviewUIEnabled&&section==='agreementReview'/)
- assert.match(app,/lazy\(\(\)=>import\('\.\/components\/WorkerAgreementReview\.jsx'\)\)/)
+ assert.match(app,/agreementReviewUIEnabled&&<button/)
+ assert.match(app,/agreementReviewUIEnabled&&agreementPreviewOpen/)
+ assert.match(app,/lazy\(\(\)=>import\('\.\/components\/WorkerAgreementModalPreview\.jsx'\)\)/)
+ assert.doesNotMatch(app,/section==='agreementReview'/)
  assert.doesNotMatch(app,/ops_accept_worker_policy|ops_require_current_worker_policy/)
+})
+
+test('SWTB14 RC1 review candidate shows all seven clauses and nonautomatic dated stages',()=>{
+ const v=workerAgreementApprovalCandidate
+ assert.equal(v.version,'1.0-rc1')
+ assert.equal(v.status,'draft')
+ assert.equal(v.sections.length,7)
+ assert.equal(new Set(v.sections.map(x=>x.id)).size,7)
+ assert.equal(new Set(v.sections.map(x=>x.icon)).size,7)
+ assert.equal(v.timeline.length,5)
+ assert.deepEqual(v.timeline.map(x=>x.when).slice(0,3),['روز ۰','پایان روز سوم تقویمی','پایان روز هفتم تقویمی'])
+ assert.match(v.timeline[3].when,/۱۴ روز تقویمی/)
+ assert.match(v.timeline[4].when,/۳۰ روز تقویمی/)
+ const words=v.sections.flatMap(x=>[...(x.paragraphs||[]),...(x.detailParagraphs||[])]).join(' ')
+ assert.match(words,/دو تعهد پذیرفته‌شده/)
+ assert.match(words,/۶۰ روز تقویمی/)
+ assert.match(words,/فرصت طرح درخواست بازبینی/)
+ assert.match(words,/ساعت/)
+ assert.match(words,/محرمانه/)
+ assert.match(words,/بدون حذف/)
+ assert.match(v.acceptance,/نسخه ۱\.۰ مصوب را مطالعه/)
+ assert.match(v.notice,/هیچ موافقتی/)
+})
+
+test('SWTB14 charter preview opens in native dialog, with no policy RPC and no fake consent',()=>{
+ const modal=read('../src/components/WorkerAgreementModalPreview.jsx')
+ const css=read('../src/components/worker-agreement-modal.css')
+ const card=read('../src/components/WorkerAgreementReview.jsx')
+ assert.match(modal,/<dialog ref=\{dialogRef\}/)
+ assert.match(modal,/showModal/)
+ assert.match(modal,/onCancel=\{onClose\}/)
+ assert.match(modal,/onClose=\{onClose\}/)
+ assert.match(modal,/WorkerAgreementReview policy=\{workerAgreementApprovalCandidate\}/)
+ assert.match(modal,/بستن پیش‌نمایش/)
+ assert.match(card,/policy\.timeline\.map/)
+ assert.match(card,/type="checkbox" disabled/)
+ assert.match(card,/className="report-btn report-btn--primary" disabled/)
+ assert.match(css,/max-height:calc\(100dvh - 2\.2rem\)/)
+ assert.match(css,/overscroll-behavior:contain/)
+ assert.doesNotMatch(modal,/opsClient|supabase|localStorage|sessionStorage|\.rpc\(/)
+})
+
+test('SWTB14 review-only sidebar aligns guide and charter and does not force a login block',()=>{
+ const app=read('../src/OperationsWorkspace.jsx')
+ assert.match(app,/className="swtb-policy-sidebar-actions"/)
+ assert.match(app,/data-swtb-guide="help-global"/)
+ assert.match(app,/چارچوب همکاری دانشجوکاران \(پیش‌نمایش\)/)
+ assert.match(app,/useEffect\(\(\)=>setAgreementPreviewOpen\(false\),\[profile\.worker_id\]\)/)
+ assert.doesNotMatch(app,/ops_accept_worker_agreement|require_current_worker_agreement/)
+ assert.doesNotMatch(app,/agreementReviewUIEnabled\?\['agreementReview'\]/)
 })
