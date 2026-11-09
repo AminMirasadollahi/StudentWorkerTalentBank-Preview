@@ -165,6 +165,8 @@ test('SWTB14 RC3 cards use independent intrinsic heights and make the long fifth
  assert.match(jsx,/حق توضیح و درخواست بازبینی/)
  assert.match(modalCss,/\.swtb-policy-timeline-scroll\{max-width:100%;overflow-x:auto/)
  assert.match(modalCss,/\.swtb-policy-timeline table\{width:100%/)
+ assert.match(modalCss,/\.swtb-policy-modal\[open\]\{display:flex;flex-direction:column\}/)
+ assert.match(modalCss,/min-height:0;overflow:auto/)
  assert.doesNotMatch(modalCss,/\.swtb-policy-timeline ol\{list-style:none/)
 })
 
@@ -175,6 +177,7 @@ test('SWTB14 RC3 standalone browser demo retains every clause and uses line SVGs
  assert.match(html,/\.card\[data-kind=continuity\]\{grid-column:1\/-1\}/)
  assert.match(html,/align-items:start/)
  assert.match(html,/<table><caption>/)
+ assert.match(html,/dialog\[open\]\{display:flex;flex-direction:column\}/)
  assert.equal((html.match(/<tr>/g)||[]).length,6)
  assert.match(html,/<details class="additional">/)
  assert.match(html,/type="checkbox" disabled/)
