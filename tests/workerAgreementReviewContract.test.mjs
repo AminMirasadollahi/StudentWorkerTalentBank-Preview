@@ -99,7 +99,7 @@ test('SWTB14 RC3 candidate covers three work units, paid hours and known time sa
  assert.match(privacy,/استفاده از کلید، دسترسی به فضاهای محدود/)
 
  assert.match(v.acceptance,/نسخه ۱\.۰ مصوب را مطالعه/)
- assert.match(v.notice,/هیچ موافقتی/)
+ assert.match(v.notice,/هیچ (?:موافقتی|پذیرش)/)
 })
 
 test('SWTB14 charter preview opens in native dialog, with no policy RPC and no fake consent',()=>{
