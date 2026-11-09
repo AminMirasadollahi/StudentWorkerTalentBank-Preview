@@ -21,12 +21,13 @@ main p{max-width:47rem;color:#506777}
 .open-main{border:0;background:#186c70;color:#fff;border-radius:12px;padding:.7rem 1rem;margin-top:1rem}
 .muted{color:#55717c;font-size:.85rem}
 dialog{position:fixed;inset:0;width:min(975px,calc(100vw - 1.5rem));height:min(91dvh,940px);max-height:91dvh;max-width:none;margin:auto;overflow:hidden;background:#f6f9fa;border:1px solid #b6d0d8;border-radius:17px;padding:0;color:#173e52;box-shadow:0 25px 65px #071c2c50}
+dialog[open]{display:flex;flex-direction:column}
 dialog::backdrop{background:#081d3199}
-.dialog-header{background:white;border-bottom:1px solid #dbe7ec;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:1rem 1.3rem}
+.dialog-header{flex:0 0 auto;background:white;border-bottom:1px solid #dbe7ec;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:1rem 1.3rem}
 .dialog-header h2{margin:0;font-size:1.14rem}
 .dialog-header small{color:#567681}
 .close{background:#f2f6f8;color:#173e52;border:1px solid #ccdade;border-radius:9px;white-space:nowrap;padding:.3rem .8rem}
-.scroller{height:calc(100% - 89px);overflow:auto;padding:1.05rem;overscroll-behavior:contain}
+.scroller{flex:1 1 auto;min-height:0;overflow:auto;padding:1.05rem;overscroll-behavior:contain}
 .intro{background:white;padding:1.2rem;border:1px solid #dce8e9;border-radius:14px}
 .intro h1{margin:0;font-size:1.3rem}
 .kicker{color:#27746d;font-size:.75rem;font-weight:700}
