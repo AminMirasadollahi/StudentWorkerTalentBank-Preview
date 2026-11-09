@@ -129,3 +129,20 @@ test('SWTB14 review-only sidebar aligns guide and charter and does not force a l
  assert.doesNotMatch(app,/ops_accept_worker_agreement|require_current_worker_agreement/)
  assert.doesNotMatch(app,/agreementReviewUIEnabled\?\['agreementReview'\]/)
 })
+
+
+test('SWTB14 RC2 standalone HTML has readable offline seven-color dialog with no external dependencies',()=>{
+ const html=read('../design/previews/SWTB14_RC2_Worker_Charter_Modal_REVIEW_ONLY.html')
+ assert.match(html,/<html lang="fa" dir="rtl">/)
+ assert.equal((html.match(/class="card" data-kind=/g)||[]).length,7)
+ assert.equal((html.match(/class="card-icon"/g)||[]).length,7)
+ assert.match(html,/زمان تقریبی مطالعه: ۷ تا ۹ دقیقه/)
+ assert.match(html,/مسئولیت دانشگاه و مسئولان مربوطه است/)
+ assert.doesNotMatch(html,/هرگونه پرداخت تابع سهمیه‌ها|تضمینی برای پرداخت مبلغ مشخص/)
+ assert.match(html,/dialog.showModal\(\)/)
+ assert.match(html,/aria-labelledby="modalTitle"/)
+ assert.match(html,/type="checkbox" disabled/)
+ assert.doesNotMatch(html,/<script\s+src=|<link\s+href=|fetch\(|XMLHttpRequest|\.rpc\(/)
+ assert.match(html,/prefers-contrast:more/)
+ assert.match(html,/overscroll-behavior:contain/)
+})
