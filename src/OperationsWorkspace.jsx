@@ -38,7 +38,7 @@ const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
 const WorkPoolManagerPanel = lazy(()=>import('./components/WorkPoolManagerPanel'))
 const WorkPoolWorkerPanel = lazy(()=>import('./components/WorkPoolWorkerPanel'))
 // Deliberately OFF until an approved server acknowledgement contract is installed.
-const WorkerAgreementReview = lazy(()=>import('./components/WorkerAgreementReview.jsx'))
+const WorkerAgreementModalPreview = lazy(()=>import('./components/WorkerAgreementModalPreview.jsx'))
 import * as unifiedPeerApi from './lib/operationsV2'
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
  requestProfileChange,reviewProfileChange,getUnitHourTotals,
@@ -2375,6 +2375,9 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const [localNavigation,setLocalNavigation]=useState({section:'tasks',taskRange:'today'})
   const [submissionReceipt,setSubmissionReceipt]=useState(null)
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
+ const [agreementPreviewOpen,setAgreementPreviewOpen]=useState(false)
+ const agreementPreviewTriggerRef=useRef(null)
+ useEffect(()=>setAgreementPreviewOpen(false),[profile.worker_id])
   // Default OFF for every authenticated principal. Remembering this checkbox
   // within the same session must never leak across an account switch.
   const [peerVisibility,setPeerVisibility]=useState({workerId:profile.worker_id,enabled:false})
@@ -2389,7 +2392,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     const fn=previous=>({...previous,...patch})
     ;(setNavigation||setLocalNavigation)(fn)
   }
-  const section=['tasks','availability','history','profile',...(workPoolUIEnabled?['workPool']:[]),...(agreementReviewUIEnabled?['agreementReview']:[])].includes(selected.section)?selected.section:'tasks'
+  const section=['tasks','availability','history','profile',...(workPoolUIEnabled?['workPool']:[]),].includes(selected.section)?selected.section:'tasks'
   const taskRange=['today','week','month','upcoming'].includes(selected.taskRange)?selected.taskRange:'today'
   const taskView=['action','pending','upcoming','completed','calendar'].includes(selected.taskView)
     ?selected.taskView:'action'
@@ -2469,7 +2472,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     return()=>document.removeEventListener('keydown',onKeyDown)
   },[inspectedTask?.id])
   const sectionNames={tasks:'کارهای من',availability:'زمان حضور',workPool:'فرصت‌های کاری',
-    history:'سوابق گزارش‌ها',profile:'حساب من',agreementReview:'چارچوب همکاری (پیش‌نویس)'}
+    history:'سوابق گزارش‌ها',profile:'حساب من'}
   // Offer once per authenticated worker/version only after an authorized read.
   useEffect(()=>{
     if(guideOfferedFor.current===profile.worker_id||loading||readFailed||
@@ -2530,14 +2533,27 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       }} options={[
         ['tasks','کارهای من'],...(workPoolUIEnabled?[['workPool','فرصت‌های کاری']]:[]),
         ['availability','زمان حضور'],['history','سوابق گزارش‌ها'],['profile','حساب من'],
-        ...(agreementReviewUIEnabled?[['agreementReview','چارچوب همکاری · پیش‌نویس']]:[]),
+        
       ]}/>
       <div className="ow-b3-sidebar__footer">
-        <button type="button" className="swtb-guide-launch" data-swtb-guide="help-global"
-          title="راهنمای تصویری سامانه" aria-label="راهنمای سامانه"
-          onClick={()=>openWorkerGuide('all')}>
-          <span aria-hidden="true">؟</span>{!sidebarCollapsed&&' راهنمای سامانه'}
-        </button>
+        <div className="swtb-policy-sidebar-actions">
+          <button type="button" className="swtb-guide-launch" data-swtb-guide="help-global"
+            title="راهنمای تصویری سامانه" aria-label="راهنمای سامانه"
+            onClick={()=>openWorkerGuide('all')}>
+            <span aria-hidden="true">؟</span>{!sidebarCollapsed&&' راهنمای سامانه'}
+          </button>
+          {agreementReviewUIEnabled&&<button type="button"
+            ref={agreementPreviewTriggerRef}
+            title="چارچوب همکاری دانشجوکاران (پیش‌نمایش)"
+            aria-label="نمایش چارچوب همکاری دانشجوکاران (پیش‌نمایش)"
+            onClick={()=>{
+              setGuideScope(null)
+              setGuideWelcomeOpen(false)
+              setAgreementPreviewOpen(true)
+            }}>
+            <span aria-hidden="true">▤</span>{!sidebarCollapsed&&' چارچوب همکاری'}
+          </button>}
+        </div>
         <div className="ow-b3-worker" title={visibleWorkerName}>
           <span className="ow-b3-worker__avatar" aria-hidden="true">{visibleWorkerName?.trim()?.[0]||'د'}</span>
           {!sidebarCollapsed&&<div><strong>{visibleWorkerName}</strong>
@@ -2705,10 +2721,6 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           showPeers={showCoworkers} peerRefreshRevision={refreshRevision}/>
       </div>
     </section>}
-    {!settingsOpen&&agreementReviewUIEnabled&&section==='agreementReview'&&
-      <Suspense fallback={<p className="ow-muted" role="status">در حال نمایش پیش‌نویس چارچوب…</p>}>
-        <WorkerAgreementReview/>
-      </Suspense>}
     {!settingsOpen&&section==='history'&&<WorkerReportHistory tasks={tasks} records={records}
       onGuide={openWorkerGuide} refreshRevision={refreshRevision} approvedMinutesTotal={data.approved_minutes_total}
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
@@ -2721,6 +2733,12 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         ...(nextView?{taskView:nextView}:{})})}
       approvedMinutesTotal={data.approved_minutes_total} refreshRevision={refreshRevision}/>}
     </div>
+    {agreementReviewUIEnabled&&agreementPreviewOpen&&<Suspense fallback={<p role="status">در حال بارگذاری پیش‌نمایش چارچوب…</p>}>
+      <WorkerAgreementModalPreview open={agreementPreviewOpen} onClose={()=>{
+        setAgreementPreviewOpen(false)
+        requestAnimationFrame(()=>agreementPreviewTriggerRef.current?.focus({preventScroll:true}))
+      }}/>
+    </Suspense>}
     {guideWelcomeOpen&&<WorkerGuideWelcome
       onBegin={()=>openWorkerGuide('all')}
       onSkip={()=>{rememberGuideOffer();setGuideWelcomeOpen(false)}}/>}
