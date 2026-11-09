@@ -25,22 +25,44 @@ const safeRect=(rect,vw,vh)=>({
 })
 export function WorkerGuideWelcome({onBegin,onSkip}){
  const modal=useRef(null)
+ const [disableAutomaticOffers,setDisableAutomaticOffers]=useState(false)
+ const [preferenceError,setPreferenceError]=useState('')
+ const choose=action=>{
+  if(action(disableAutomaticOffers)===false)
+   setPreferenceError('تنظیم نمایش خودکار ذخیره نشد. برای ادامه می‌توانید تیک این گزینه را بردارید.')
+ }
  useLayoutEffect(()=>{
   openModal(modal.current)
   return()=>closeModal(modal.current)
  },[])
  return <dialog className="swtb-guide-welcome" ref={modal} dir="rtl"
    aria-labelledby="swtb-guide-welcome-title" onKeyDown={trapModalTab}
-   onCancel={e=>{e.preventDefault();onSkip()}}>
+   onCancel={e=>{e.preventDefault();choose(onSkip)}}>
    <div className="swtb-guide-welcome__eyebrow">راهنمای آغاز کار</div>
    <h2 id="swtb-guide-welcome-title" tabIndex={-1}>به پنل دانشجوکار خوش آمدید</h2>
-   <p>اینجا می‌توانید وظایف، برنامه حضور، گزارش‌های کار و مشخصات خود را مدیریت کنید.</p>
-   <p>با یک راهنمای تصویری کوتاه، بخش‌های اصلی سامانه را بشناسید. هر وقت خواستید نیز می‌توانید از دکمه «راهنمای سامانه» یا «راهنمای این بخش» دوباره استفاده کنید.</p>
+   <p>برای شروع همکاری، این سه قدم کافی است:</p>
+   <ol className="swtb-guide-welcome__quickstart">
+     <li><strong>ورود را بررسی کنید.</strong> یک‌بار خارج شوید و با ایمیل و رمز شخصی دوباره وارد شوید.</li>
+     <li><strong>برنامه حضور را تنظیم کنید.</strong> روزها و ساعت‌های قابل همکاری خود را با توجه به کلاس‌ها مشخص کنید؛ هر روز را جداگانه ذخیره و پس از تازه‌سازی بررسی کنید.</li>
+     <li><strong>کارها را دنبال کنید.</strong> «کارهای من» را ببینید. فقط بعد از انجام فعالیت واقعی گزارش بفرستید؛ ساعت کارکرد پس از تأیید مدیر محاسبه می‌شود.</li>
+   </ol>
+   <p className="swtb-guide-welcome__note">برنامه حضور صرفاً زمان‌های قابل همکاری شماست؛ ثبت حضور واقعی یا ساعت تأییدشده نیست.</p>
+   <p>برای آشنایی بیشتر، راهنمای تصویری مرحله‌ای را باز کنید. بعداً هم «راهنمای سامانه» و «راهنمای این بخش» در دسترس هستند.</p>
+   <label className="swtb-guide-welcome__preference">
+     <input type="checkbox" checked={disableAutomaticOffers}
+       onChange={event=>{setDisableAutomaticOffers(event.target.checked);setPreferenceError('')}}/>
+     <span>دیگر به‌صورت خودکار نمایش نده</span>
+   </label>
+   <p className="swtb-guide-welcome__preference-note">
+     بدون انتخاب این گزینه، راهنما در نشست بعدی مرورگر دوباره پیشنهاد می‌شود؛
+     «راهنمای سامانه» همیشه دستی در دسترس است.
+   </p>
+   {preferenceError&&<p role="alert" className="swtb-guide-welcome__preference-error">{preferenceError}</p>}
    <div className="swtb-guide-welcome__actions">
      <button type="button" className="swtb-guide-button swtb-guide-button--primary"
-       onClick={onBegin}>شروع راهنمای سامانه</button>
+       onClick={()=>choose(onBegin)}>شروع راهنمای سامانه</button>
      <button type="button" className="swtb-guide-button"
-       onClick={onSkip}>فعلاً نه</button>
+       onClick={()=>choose(onSkip)}>فعلاً نه</button>
    </div>
  </dialog>
 }

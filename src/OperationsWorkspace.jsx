@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
-import {workerGuideStorageKey} from './lib/workerGuide.mjs'
+import {workerGuideStorageKey,workerGuideSessionStorageKey,shouldAutoOfferWorkerGuide,
+ WORKER_GUIDE_OFFERED_SESSION,suppressWorkerGuideAutoOffers} from './lib/workerGuide.mjs'
 import { trapModalTab } from './lib/dialogFocusTrap.mjs'
 import { selectWorkerTaskFocus, summarizeWorkerTaskFocus } from './lib/workerTaskFocus.mjs'
 import {projectWorkerReportActivity,summarizeWorkerReportActivity} from './lib/workerReportActivity.mjs'
@@ -2376,7 +2377,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const [peerVisibility,setPeerVisibility]=useState({workerId:profile.worker_id,enabled:false})
   const showCoworkers=peerVisibility.workerId===profile.worker_id&&peerVisibility.enabled
   const [selectedTaskId,setSelectedTaskId]=useState(null)
-  const [guideWelcomeOpen,setGuideWelcomeOpen]=useState(false)
+  const [guideWelcomeWorkerId,setGuideWelcomeWorkerId]=useState(null)
   const [guideScope,setGuideScope]=useState(null)
   const guideOfferedFor=useRef(null)
   const guideReturnSection=useRef('tasks')
@@ -2466,24 +2467,33 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   },[inspectedTask?.id])
   const sectionNames={tasks:'کارهای من',availability:'زمان حضور',workPool:'فرصت‌های کاری',
     history:'سوابق گزارش‌ها',profile:'حساب من'}
-  // Offer once per authenticated worker/version only after an authorized read.
+  // Offer only after an authorized worker read. A temporary dismissal is
+  // limited to this browser tab session; permanent suppression is opt-in.
+  // Honor legacy "seen" keys so existing workers are not unexpectedly nagged.
   useEffect(()=>{
     if(guideOfferedFor.current===profile.worker_id||loading||readFailed||
       workSnapshot.workerId!==profile.worker_id||settingsOpen)return
+    if(typeof HTMLDialogElement==='undefined'||
+      typeof HTMLDialogElement.prototype.showModal!=='function')return
     guideOfferedFor.current=profile.worker_id
     const key=workerGuideStorageKey(profile.worker_id)
-    try{if(key&&window.localStorage.getItem(key)==='seen')return}catch{}
-    if(typeof HTMLDialogElement!=='undefined'&&typeof HTMLDialogElement.prototype.showModal==='function')
-      setGuideWelcomeOpen(true)
+    const sessionKey=workerGuideSessionStorageKey(profile.worker_id)
+    let saved=null,offered=null
+    try{if(key)saved=window.localStorage.getItem(key)}catch{}
+    try{if(sessionKey)offered=window.sessionStorage.getItem(sessionKey)}catch{}
+    if(!shouldAutoOfferWorkerGuide(profile.worker_id,saved,offered))return
+    try{if(sessionKey)window.sessionStorage.setItem(sessionKey,WORKER_GUIDE_OFFERED_SESSION)}catch{}
+    setGuideWelcomeWorkerId(profile.worker_id)
   },[profile.worker_id,workSnapshot.workerId,loading,readFailed,settingsOpen])
-  const rememberGuideOffer=()=>{
-    const key=workerGuideStorageKey(profile.worker_id)
-    try{if(key)window.localStorage.setItem(key,'seen')}catch{}
+  const applyGuideAutoPreference=disable=>{
+    if(!disable)return true
+    try{return suppressWorkerGuideAutoOffers(profile.worker_id,window.localStorage)}
+    catch{return false}
   }
   const openWorkerGuide=scope=>{
+    // Manually opening the guide must NEVER implicitly disable future offers.
     // The V4 presence view is unified; there is no legacy availability subview to reset.
-    rememberGuideOffer()
-    setGuideWelcomeOpen(false)
+    setGuideWelcomeWorkerId(null)
     setSelectedTaskId(null)
     guideReturnSection.current=section
     if(settingsOpen)onToggleSettings?.()
@@ -2712,9 +2722,17 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         ...(nextView?{taskView:nextView}:{})})}
       approvedMinutesTotal={data.approved_minutes_total} refreshRevision={refreshRevision}/>}
     </div>
-    {guideWelcomeOpen&&<WorkerGuideWelcome
-      onBegin={()=>openWorkerGuide('all')}
-      onSkip={()=>{rememberGuideOffer();setGuideWelcomeOpen(false)}}/>}
+    {guideWelcomeWorkerId===profile.worker_id&&<WorkerGuideWelcome
+      onBegin={disable=>{
+        if(!applyGuideAutoPreference(disable))return false
+        openWorkerGuide('all')
+        return true
+      }}
+      onSkip={disable=>{
+        if(!applyGuideAutoPreference(disable))return false
+        setGuideWelcomeWorkerId(null)
+        return true
+      }}/>}
     {guideScope&&<WorkerGuideSpotlight key={guideScope} scope={guideScope}
       currentSection={section}
       onNavigate={next=>updateNavigation({section:next})}

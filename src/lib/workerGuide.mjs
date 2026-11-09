@@ -45,4 +45,26 @@ export function workerGuideStorageKey(workerId){
  if(typeof workerId!=='string'||!workerId)return null
  return 'swtb-worker-guide:v'+WORKER_GUIDE_VERSION+':'+workerId
 }
+// Browser-local presentation preferences only. Neither key nor value has
+// security/authorization meaning; never send them to any backend RPC.
+export const WORKER_GUIDE_SUPPRESSED = 'suppressed'
+export const WORKER_GUIDE_OFFERED_SESSION = 'offered'
+export function workerGuideSessionStorageKey(workerId){
+ const key=workerGuideStorageKey(workerId)
+ return key?key+':session-offer':null
+}
+export function shouldAutoOfferWorkerGuide(workerId,permanentValue,sessionValue){
+ return Boolean(workerGuideStorageKey(workerId))&&
+  permanentValue!=='seen'&& // Respect old implicit "seen" choices; no surprise popup.
+  permanentValue!==WORKER_GUIDE_SUPPRESSED&&
+  sessionValue!==WORKER_GUIDE_OFFERED_SESSION
+}
+export function suppressWorkerGuideAutoOffers(workerId,storage){
+ const key=workerGuideStorageKey(workerId)
+ if(!key||!storage)return false
+ try{
+  storage.setItem(key,WORKER_GUIDE_SUPPRESSED)
+  return storage.getItem(key)===WORKER_GUIDE_SUPPRESSED
+ }catch{return false}
+}
 export function isWorkerGuideSection(section){return GUIDE_SECTIONS.includes(section)}
