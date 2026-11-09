@@ -56,28 +56,44 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
   inFlight.current=true
   setBusyId(item.id);setNotice('')
   try{
-   const receipt=await claimWorkOpportunity({opportunityId:item.id,requestId})
-   if(receipt?.ok!==true||typeof receipt?.task_id!=='string')
-    throw Error('claim_not_confirmed')
-   // Never leak a late receipt into a different authenticated worker view.
+   let receipt
+   try{
+    receipt=await claimWorkOpportunity({opportunityId:item.id,requestId})
+    if(receipt?.ok!==true||typeof receipt?.task_id!=='string')
+     throw Error('claim_not_confirmed')
+   }catch{
+    // ONLY a missing/invalid claim receipt is ambiguous. A later UI
+    // navigation or read failure must not invalidate a confirmed receipt.
+    if(keys.current.workerId===workerId){
+     setUncertainId(item.id)
+     setRetryReady(false)
+     setNotice('نتیجه انتخاب مشخص نیست. ابتدا وضعیت را از سرور بازخوانی کنید؛ تا آن زمان تلاش مجدد غیرفعال است.')
+    }
+    return
+   }
    if(keys.current.workerId!==workerId)return
    keys.current.requests.delete(item.id)
    setUncertainId('')
    setRetryReady(false)
-   await load()
+   const freshOffers=await load()
    if(keys.current.workerId!==workerId)return
-   setNotice(receipt.replayed===true
+   setNotice(freshOffers===null
+    ?'انتخاب کار در سرور تأیید شد، اما فهرست فرصت‌ها به‌روزرسانی نشد. نتیجه را در «کارهای من» بررسی کنید.'
+    :receipt.replayed===true
      ?'انتخاب قبلی تأیید شد؛ وظیفه تکراری ساخته نشده است.'
      :'انتخاب کار ثبت شد. ثبت ساعت و تأیید نهایی، مراحل جداگانه‌اند.')
-   onClaimed?.(receipt.task_id)
-  }catch{
-   // A lost HTTP response might follow a committed claim.
-   if(keys.current.workerId===workerId){
-    setUncertainId(item.id)
-    setRetryReady(false)
-    setNotice('نتیجه انتخاب مشخص نیست. ابتدا وضعیت را از سرور بازخوانی کنید؛ تا آن زمان تلاش مجدد غیرفعال است.')
+   try{
+    await onClaimed?.(receipt.task_id)
+   }catch{
+    // The server already accepted this claim; a broken parent navigation
+    // must NEVER re-enable an uncertain-claim retry or issue a new UUID.
+    if(keys.current.workerId===workerId)
+     setNotice('انتخاب کار در سرور تأیید شد، اما انتقال به «کارهای من» انجام نشد. این بخش را دستی باز کنید.')
    }
-  }finally{inFlight.current=false;setBusyId('')}
+  }finally{
+   inFlight.current=false
+   if(keys.current.workerId===workerId)setBusyId('')
+  }
  }
  const refresh=async()=>{
   const items=await load()
