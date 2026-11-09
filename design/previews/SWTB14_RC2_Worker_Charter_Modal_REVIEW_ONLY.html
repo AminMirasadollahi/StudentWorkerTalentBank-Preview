@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>پیش‌نمایش چارچوب همکاری دانشجوکاران | RC2</title>
+<style>
+:root{font-family:Tahoma,"Vazirmatn",Arial,sans-serif;color:#193c4e;background:#edf4f6;font-synthesis:none}
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;line-height:1.85}
+button{font:inherit;cursor:pointer}
+aside{background:#10344b;color:white;padding:2rem 1.2rem;position:fixed;inset:0 auto 0 0;width:17.5rem;display:flex;flex-direction:column;gap:1rem}
+aside h2{font-size:1.02rem;margin:.2rem 0}
+aside p{color:#b9d8e0;font-size:.81rem;margin:0}
+aside .nav{margin-top:auto;border-top:1px solid #ffffff33;padding-top:1rem}
+.actions{display:flex;gap:.45rem}
+.action,.action-static{border:1px solid #ffffff56;border-radius:9px;min-height:2.55rem;color:white;background:#ffffff15;padding:.35rem .55rem;font-size:.8rem;flex:1}
+.action:hover{background:#ffffff25}
+.action-static{display:flex;align-items:center;justify-content:center;opacity:.8}
+main{max-width:69rem;margin:4rem auto;padding:2rem 20rem 2rem 2rem}
+main h1{font-size:1.6rem}
+main p{max-width:47rem;color:#506777}
+.open-main{border:0;background:#186c70;color:#fff;border-radius:12px;padding:.7rem 1rem;margin-top:1rem}
+.muted{color:#55717c;font-size:.85rem}
+dialog{position:fixed;inset:0;width:min(975px,calc(100vw - 1.5rem));height:min(91dvh,940px);max-height:91dvh;max-width:none;margin:auto;overflow:hidden;background:#f6f9fa;border:1px solid #b6d0d8;border-radius:17px;padding:0;color:#173e52;box-shadow:0 25px 65px #071c2c50}
+dialog::backdrop{background:#081d3199}
+.dialog-header{background:white;border-bottom:1px solid #dbe7ec;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:1rem 1.3rem}
+.dialog-header h2{margin:0;font-size:1.14rem}
+.dialog-header small{color:#567681}
+.close{background:#f2f6f8;color:#173e52;border:1px solid #ccdade;border-radius:9px;white-space:nowrap;padding:.3rem .8rem}
+.scroller{height:calc(100% - 89px);overflow:auto;padding:1.05rem;overscroll-behavior:contain}
+.intro{background:white;padding:1.2rem;border:1px solid #dce8e9;border-radius:14px}
+.intro h1{margin:0;font-size:1.3rem}
+.kicker{color:#27746d;font-size:.75rem;font-weight:700}
+.study{margin:.7rem 0;border-inline-start:3px solid #347a82;border-radius:9px;background:#ecf6f6;color:#345b67;padding:.7rem;font-size:.87rem}
+.intro>p{font-size:.88rem;margin:.55rem 0}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem;margin-top:.8rem}
+.card{--tone:#26716f;--soft:#f1f8f7;--edge:#dce9e7;border:1px solid var(--edge);border-inline-start:4px solid var(--tone);background:linear-gradient(180deg,var(--soft) 0,white 63px);border-radius:13px;padding:1rem 1rem 1.15rem;min-width:0}
+.card[data-kind=learning]{--tone:#24786e;--soft:#eff8f5;--edge:#cfe5dd}
+.card[data-kind=choice]{--tone:#40689b;--soft:#f0f5fb;--edge:#d5e3f1}
+.card[data-kind=presence]{--tone:#6a5b9d;--soft:#f5f2fa;--edge:#e3dcf0}
+.card[data-kind=library-routine]{--tone:#8c692d;--soft:#fbf7ec;--edge:#eadfc4}
+.card[data-kind=continuity]{--tone:#226f81;--soft:#edf7f9;--edge:#cde5ea}
+.card[data-kind=privacy]{--tone:#56744f;--soft:#f3f8f0;--edge:#dce8d4}
+.card[data-kind=finance]{--tone:#82577a;--soft:#faf2f8;--edge:#e8d6e3}
+.card-head{display:flex;align-items:center;gap:.65rem}
+.card-icon{height:2.55rem;width:2.55rem;border-radius:10px;border:1px solid var(--edge);background:var(--soft);display:grid;place-items:center;font-size:1.3rem;flex:0 0 auto}
+.card h3{font-size:.92rem;color:#173c54;margin:0;line-height:1.6}
+.card p{font-size:.85rem;color:#344f5f;line-height:1.95;margin:.6rem 0 0}
+.card[data-kind=finance] p+p{border-top:1px solid var(--edge);padding-top:.55rem}
+.timeline{margin-top:.8rem;border-top:1px solid var(--edge);padding-top:.6rem}
+.timeline h3{font-size:.88rem;margin:.2rem 0 .5rem}
+.timeline ol{list-style:none;display:grid;gap:.4rem;margin:0;padding:0}
+.timeline li{background:#f7fbfc;border:1px solid #d8e8ea;border-radius:8px;padding:.6rem;display:grid;grid-template-columns:8rem 1fr;gap:.2rem .5rem;font-size:.81rem}
+.timeline strong{color:#206c78}
+.timeline li p{grid-column:1/-1;font-size:.81rem;margin:0}
+footer{padding:1rem;border:1px solid #dce8e9;background:white;border-radius:13px;margin-top:1rem}
+footer label{display:flex;gap:.6rem;align-items:flex-start;font-size:.87rem}
+footer p{font-size:.8rem}
+footer button{margin-top:.7rem;padding:.5rem .8rem;border:1px solid #cbdedb;border-radius:8px;background:#dce8e6;color:#596e72;cursor:not-allowed}
+:focus-visible{outline:3px solid #0c8c86;outline-offset:3px}
+@media(max-width:1000px){aside{position:static;width:auto} main{margin:1rem auto;padding:1.5rem}}
+@media(max-width:720px){.cards{grid-template-columns:1fr}.scroller{padding:.5rem}.timeline li{grid-template-columns:1fr}.dialog-header{padding:.7rem;align-items:center}dialog{width:calc(100vw - .6rem);height:calc(100dvh - .7rem);max-height:calc(100dvh - .7rem)}}
+@media(prefers-contrast:more){.card{background:white;border-width:2px;border-inline-start-width:5px}}
+</style>
+</head>
+<body>
+<aside><div><h2>پنل دانشجوکار</h2><p>دانشکده علوم انسانی شهید رجایی بابل</p></div><div class="nav">
+<div class="actions"><span class="action-static">؟ راهنمای سامانه</span>
+<button type="button" class="action" id="openSidebar">▤ چارچوب همکاری</button></div><p>نمونه بصری مستقل؛ متصل به سامانه واقعی نیست.</p>
+</div></aside>
+<main><h1>پیش‌نمایش بصری پنجره چارچوب همکاری</h1>
+<p>هفت بخش با آیکون و رنگ‌های تأکیدی ملایم، در قالب پنجره‌ای قابل پیمایش. هیچ پذیرش یا تغییری در حساب‌های واقعی ثبت نمی‌شود.</p>
+<button class="open-main" type="button" id="openMain">نمایش پنجره چارچوب همکاری</button></main>
+<dialog id="charter" aria-labelledby="modalTitle">
+<header class="dialog-header"><div><h2 id="modalTitle">چارچوب همکاری دانشجوکاران</h2>
+<small>پیش‌نمایش ویرایش دوم (RC2) · حدود ۷ تا ۹ دقیقه · ثبت موافقت غیرفعال</small></div>
+<button type="button" class="close" id="closeModal">بستن ×</button></header>
+<div class="scroller"><section class="intro"><span class="kicker">نسخه پیشنهادی ۱.۰ · هنوز تصویب نشده</span>
+<h1>چارچوب همکاری دانشجوکاران</h1><p>دانشکده علوم انسانی شهید رجایی بابل</p>
+<div class="study">📖 آشنایی با این چارچوب، بخشی از حق شما برای اطلاع از حقوق، مسئولیت‌ها و ضوابط همکاری است. مطالعه کامل آن پیش از تأیید ضروری است؛ لطفاً همه هفت بخش و مراحل پیگیری را با دقت مرور کنید. زمان تقریبی مطالعه: ۷ تا ۹ دقیقه.</div>
+<p>همکاری دانشجوکاران فرصتی برای یادگیری، تجربه حرفه‌ای و مشارکت در امور کتابخانه، روابط عمومی، پژوهش و سایر فعالیت‌های مجاز دانشکده است. محیط همکاری باید محترمانه، روشن و قابل‌پیش‌بینی باشد. حق انتخاب و توجه به شرایط تحصیلی و شخصی دانشجو، با مسئولیت‌پذیری در قبال کارِ پذیرفته‌شده همراه است.</p><p>برای آنکه حقوق و مسئولیت‌های دانشجوکاران و شیوه هماهنگی با واحدهای دانشکده از ابتدا روشن باشد، هفت اصل زیر تنظیم شده است. این اصول، نحوه انتخاب فعالیت، برنامه حضور، حفظ محرمانگی، استمرار همکاری و پیگیری حق‌الزحمه را توضیح می‌دهند و به حفظ محیطی منظم، منصفانه و حمایتگر کمک می‌کنند.</p>
+</section><section class="cards" aria-label="هفت اصل چارچوب همکاری"><article class="card" data-kind="learning" aria-labelledby="s0">
+ <div class="card-head"><div class="card-icon" aria-hidden="true">🎓</div><h3 id="s0">1. یادگیری و کسب تجربه</h3></div>
+ <p>از انجام وظایف و کار با سامانه برای تقویت کار گروهی، نظم، ارتباط مؤثر، مدیریت زمان و گزارش‌نویسی استفاده کنید. فعالیت‌ها واقعی‌اند؛ بنابراین گزارش و ساعت ثبت‌شده باید دقیق و قابل رسیدگی باشند. پرسیدن سؤال، درخواست کمک و اعلام محدودیت بخشی طبیعی از فرایند یادگیری است.</p>
+ 
+ 
+ </article>
+<article class="card" data-kind="choice" aria-labelledby="s1">
+ <div class="card-head"><div class="card-icon" aria-hidden="true">🧭</div><h3 id="s1">2. انتخاب فعالیت و پایبندی به تعهدات</h3></div>
+ <p>شما می‌توانید پیش از پذیرش درباره فعالیت پیشنهادی گفت‌وگو کنید یا کاری نامتناسب با وقت، علاقه، سلامت یا شرایط تحصیلی‌تان را نپذیرید. اما وقتی یک کار یا نوبت مشخص با شرح و زمان روشن را آگاهانه پذیرفتید، دیگران بر انجام آن برنامه‌ریزی می‌کنند. اگر انجام کار مقدور نیست، در نخستین فرصت اطلاع دهید تا با توافق مسئول، موعد، جانشین یا وظیفه اصلاح شود. صرف ثبت بازه آزاد هفتگی یا واگذاری بدون احراز پذیرش آگاهانه، به‌تنهایی تعهد قطعیِ تخلف‌پذیر ایجاد نمی‌کند.</p>
+ 
+ 
+ </article>
+<article class="card" data-kind="presence" aria-labelledby="s2">
+ <div class="card-head"><div class="card-icon" aria-hidden="true">🗓️</div><h3 id="s2">3. برنامه حضور، استثناها و ساعات کارکرد</h3></div>
+ <p>روزها و ساعت‌هایی را که واقعاً امکان همکاری دارید در برنامه ثابت هفتگی ثبت کنید. تغییرِ قابل‌پیش‌بینی یا عدم حضور را ترجیحاً دست‌کم ۴۸ ساعت پیش از زمان مربوطه اعلام کنید. بیماری، امتحان یا اتفاق ناگهانی ممکن است اعلام زودتر را ناممکن کند؛ این موارد با توضیح متناسب و خصوصی بررسی می‌شوند، نه با برچسب‌زنی. ثبت استثنا یا عدم حضورِ موجه خودبه‌خود تخلف نیست.</p><p>سه مفهوم از هم جدا هستند: برنامه حضور (اعلام امکان همکاری)، گزارش کار (فعالیت واقعاً انجام‌شده)، و ساعات تأییدشده (زمانی که مسئول پس از بررسی پذیرفته است). حضور یا عضویت در گروه به‌تنهایی ساعت قابل‌احتساب ایجاد نمی‌کند.</p>
+ 
+ 
+ </article>
+<article class="card" data-kind="library-routine" aria-labelledby="s3">
+ <div class="card-head"><div class="card-icon" aria-hidden="true">📚</div><h3 id="s3">4. ظرفیت فعالیت‌های روتین کتابخانه</h3></div>
+ <p>برای کار روتین هم‌زمان کتابخانه حداکثر دو دانشجوکار می‌توانند ساعت مربوط به همان خدمت را گزارش کنند. همکاری شخص سوم برای وظیفه مستقل و مشخص، با هماهنگی مسئول و مطابق ضوابط امکان‌پذیر است. هیچ کاری یا ساعتی صرفاً برای پرکردن برنامه یا افزایش کارکرد ثبت نمی‌شود.</p>
+ 
+ 
+ </article>
+<article class="card" data-kind="continuity" aria-labelledby="s4">
+ <div class="card-head"><div class="card-icon" aria-hidden="true">🤝</div><h3 id="s4">5. هماهنگی، استمرار همکاری و تغییر وضعیت</h3></div>
+ <p>پنل و گروه کاری برای هماهنگی فعالیت‌های جاری‌اند؛ برای همین، لازم است پیام‌های مهم و مشخصی که مستقیماً درباره همکاری شما فرستاده می‌شوند در فرصت متعارف پاسخ داده شوند. کاهش توان همکاری یا تصمیم محترمانه برای توقف آن را می‌توانید بدون نگرانی اعلام کنید؛ هدف این است که واحدها برای افراد، کارها و نوبت‌ها برنامه قابل‌اتکا داشته باشند.</p><p>مراحل و بازه‌های پیشنهادی مشخص زیر بخشی از چارچوب قابل مطالعه دانشجو است؛ هیچ تصمیم محدودکننده‌ای صرفاً با شمارش خودکار پیام‌ها، استثناها یا روزهای بدون کار اتخاذ نمی‌شود.: </p>
+ <section class="timeline" aria-labelledby="timelineTitle"><h3 id="timelineTitle">مراحل زمان‌بندی پیگیری استمرار همکاری</h3><ol><li><strong>روز ۰</strong><span>درخواست رسمیِ تأیید امکان ادامه همکاری، با تحویل قابل‌احراز به شخص</span><p>درخواست خصوصی و ثبت تاریخ. این درخواست فقط هنگام نیاز واقعی به برنامه‌ریزی و زمانی که دانشجو در دوره همکاری فعال است آغاز می‌شود.</p></li><li><strong>پایان روز سوم تقویمی</strong><span>همان درخواست، بدون پاسخ و بدون عذر موجه</span><p>یک یادآوری حمایتی خصوصی و فرصت توضیح یا اعلام توقف داوطلبانه؛ بدون محدودیت حساب.</p></li><li><strong>پایان روز هفتم تقویمی</strong><span>همان درخواست و یادآوری، بدون پاسخ پس از دو نوبت تماس مستند</span><p>امکان تعلیق موقت با تصمیم مسئول مجاز و ثبت دلیل؛ مهلت بررسی و تماس دوباره ۱۴ روز تقویمی. این مرحله حکم خودکار نیست.</p></li><li><strong>پایان ۱۴ روز تقویمی از شروع تعلیق (تقریباً روز ۲۱ از درخواست اولیه)</strong><span>تعلیق برقرار است و امکان/تمایل به ادامه یا برنامه اصلاحی پس از تماس‌های مستند روشن نشده</span><p>امکان غیرفعال‌سازی پنل با تصمیم و ابلاغ خصوصی. خروج دستی از گروه کاری تنها پس از اطلاع‌رسانی قبلی، در حالت عادی دست‌کم ۴۸ ساعت، و بررسی مسئولیت‌های باز.</p></li><li><strong>۳۰ روز تقویمی پس از غیرفعال‌سازی</strong><span>حساب غیرفعال شده و درخواست بازگشت یا توافقی برای ادامه وجود ندارد</span><p>امکان ثبت پایان اداری همکاری توسط مقام مجاز؛ برای آغاز همکاریِ دوباره پس از پایان قطعی، نیاز به درخواست و بررسی و تأیید صلاحیت مجدد است.</p></li></ol><p class="muted">این زمان‌ها مبنای بررسی فردی‌اند؛ تصمیم محدودکننده خودکار نیست.</p></section>
+ <p>مسیر جداگانه برای تعهدِ پذیرفته‌شده و انجام‌نشده: پس از اولین تعهد مشخص که بدون اطلاع یا دلیل موجه انجام نشده، مسئول با پیام خصوصی ظرف حداکثر ۲ روز تقویمی موضوع را پیگیری می‌کند و ۳ روز تقویمی فرصت پاسخ می‌دهد. اگر دو تعهد پذیرفته‌شده در یک بازه شناور ۳۰ روز تقویمی به همین شکل انجام نشوند، پس از فرصت توضیح، امکان تعلیق ۱۴روزه مطابق فرایند بالاست. اگر پس از بازگشت از تعلیق، طی ۶۰ روز تقویمی چنین موردی دوباره تکرار و بدون توجیه بماند، امکان غیرفعال‌سازی با اخطار و ۳ روز فرصت پاسخ وجود دارد؛ سپس قاعده ۳۰روزه پایان همکاری اعمال می‌شود.</p><p>زمان‌بندی و انصاف: همه «روزها» در جدول، تقویمی و بر اساس تاریخ و ساعت رسمی ایران هستند و از زمان ثبت و تحویل مستند پیام/تصمیم مربوط آغاز می‌شوند. روز بدون وظیفه، نبود کارِ واگذارشده، مرخصی یا غیبت موجه، تغییر به‌موقع برنامه، شرایط ویژه تحصیل/سلامت و صرف کم‌بودن ساعات، «تعهد انجام‌نشده» نیستند. دانشجو می‌تواند عذر یا شرایط شخصی را محرمانه برای مسئول توضیح دهد. از زمان ابلاغ تصمیم محدودکننده، ۷ روز تقویمی فرصت طرح درخواست بازبینی دارد؛ مسئول ذی‌صلاح نتیجه را حداکثر تا ۷ روز تقویمی پس از دریافت درخواست، با رعایت مقررات رسمی اعلام می‌کند. موارد فوریت جدی امنیتی/ایمنی با اقدام حفاظتی موقت و بازبینی سریع توسط مقام مجاز، جدا از فرایند عادی‌اند.</p><p>در تعلیق یا غیرفعال‌سازی، کارهای باز باید بررسی و در صورت نیاز بازواگذار شوند، تجهیزات و دسترسی‌ها به شکل مجاز تعیین تکلیف شوند و سوابق کار واقعی و تأییدشده بدون حذف حفظ شوند. تعلیق، غیرفعال‌سازی و پایان اداری، سه مفهوم متفاوت‌اند؛ پایان اداری در سامانه فعلی هنوز وضعیت فنی مستقلی ندارد و ایجاد آن نیازمند تصمیم و طراحی جداگانه است.</p>
+ </article>
+<article class="card" data-kind="privacy" aria-labelledby="s5">
+ <div class="card-head"><div class="card-icon" aria-hidden="true">🛡️</div><h3 id="s5">6. ارتباطات، مراجعه حضوری و محرمانگی</h3></div>
+ <p>برای پرسش‌های معمول، ابتدا راهنمای پنل، فیلم آموزشی، توضیحات گروه و گفت‌وگو با همکاران یا نماینده دانشجوکاران را بررسی کنید؛ اگر حل نشد، با مسئول مربوطه هماهنگ کنید. در مسائل فوری، شخصی، محرمانه، امنیتی، آزار یا نیازمند تصمیم مسئول، مراجعه مستقیم مجاز است و لازم نیست موضوع ابتدا در گروه مطرح شود.</p><p>برای ورود به اتاق‌های اداری، از جمله اتاق کتابدار، در بزنید و پس از دریافت پاسخ وارد شوید؛ وقتی در بسته یا مسئول مشغول است، مگر در ضرورت، زمان مناسبی هماهنگ کنید. این قاعده برای حفظ تمرکز و احترام متقابل است، نه محدودکردن حق طرح پرسش، انتقاد یا درخواست کمک. از کتاب‌ها، تجهیزات و اطلاعات اشخاص مراقبت کنید و رمز و لینک‌های محرمانه را به دیگران ندهید.</p>
+ 
+ 
+ </article>
+<article class="card" data-kind="finance" aria-labelledby="s6">
+ <div class="card-head"><div class="card-icon" aria-hidden="true">⚖️</div><h3 id="s6">7. یادگیری، ثبت کارکرد و حق‌الزحمه</h3></div>
+ <p>هدف اصلی این همکاری، یادگیری، کسب تجربه و مشارکت مفید در امور دانشکده است. در کنار آن، پرداخت عادلانه حق‌الزحمه بابت ساعات کار مفید و تأییدشده، مسئولیت دانشگاه و مسئولان مربوطه است و باید به‌درستی پیگیری شود.</p><p>برای حفظ حقوق دانشجوکاران و مستندسازی منصفانه، فعالیتی که واقعاً انجام شده و مدت آن در سامانه ثبت می‌شود؛ مسئول مربوطه ساعات انجام کار را بررسی و تأیید می‌کند و حق‌الزحمه بر مبنای همین ساعات تأییدشده پرداخت می‌شود. تغییر وضعیت همکاری نباید باعث حذف کارکردهای قبلاً تأییدشده یا نادیده‌ماندن حق‌الزحمه مربوط به آن‌ها شود.</p>
+ 
+ 
+ </article></section>
+<footer><p>این نسخه هنوز نامزد تصویب است؛ هیچ موافقتی در این پیش‌نمایش ثبت نمی‌شود و هیچ محدودیتی در سامانه زنده اعمال نشده است.</p>
+<label><input type="checkbox" disabled> <span>چارچوب همکاری دانشجوکاران، نسخه ۱.۰ مصوب را مطالعه کرده‌ام، مفاد آن از جمله ضوابط استمرار همکاری و تغییر وضعیت را متوجه شده‌ام و با رعایت آن در مدت همکاری موافقم.</span></label>
+<button type="button" disabled>تأیید و شروع همکاری (غیرفعال در پیش‌نمایش)</button>
+</footer></div></dialog>
+<script>
+const dialog=document.getElementById('charter');
+const openers=[document.getElementById('openSidebar'),document.getElementById('openMain')];
+let lastOpener=null;
+for(const btn of openers)btn.addEventListener('click',()=>{
+lastOpener=btn;if(!dialog.open)dialog.showModal();
+});
+document.getElementById('closeModal').addEventListener('click',()=>dialog.close());
+dialog.addEventListener('close',()=>lastOpener?.focus());
+window.addEventListener('load',()=>{lastOpener=document.getElementById('openMain');dialog.showModal();});
+</script></body></html>
