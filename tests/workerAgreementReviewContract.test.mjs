@@ -60,9 +60,13 @@ test('public deployment never enables policy gating without an explicit build fl
  assert.doesNotMatch(app,/ops_accept_worker_policy|ops_require_current_worker_policy/)
 })
 
-test('SWTB14 RC1 review candidate shows all seven clauses and nonautomatic dated stages',()=>{
+test('SWTB14 RC2 review candidate preserves seven clauses, dated stages, student rights and fair payment',()=>{
  const v=workerAgreementApprovalCandidate
- assert.equal(v.version,'1.0-rc1')
+ assert.equal(v.version,'1.0-rc2')
+ assert.match(v.studyNote,/حق شما برای اطلاع از حقوق، مسئولیت‌ها/)
+ assert.match(v.studyNote,/زمان تقریبی مطالعه: ۷ تا ۹ دقیقه/)
+ assert.match(v.intro,/هفت اصل زیر تنظیم شده است/)
+ assert.match(v.readingEstimate,/۷ تا ۹ دقیقه/)
  assert.equal(v.status,'draft')
  assert.equal(v.sections.length,7)
  assert.equal(new Set(v.sections.map(x=>x.id)).size,7)
@@ -78,6 +82,11 @@ test('SWTB14 RC1 review candidate shows all seven clauses and nonautomatic dated
  assert.match(words,/ساعت/)
  assert.match(words,/محرمانه/)
  assert.match(words,/بدون حذف/)
+ const finance=v.sections.find(x=>x.id==='finance').paragraphs.join(' ')
+ assert.match(finance,/مسئولیت دانشگاه و مسئولان مربوطه است/)
+ assert.match(finance,/حق‌الزحمه بر مبنای همین ساعات تأییدشده پرداخت می‌شود/)
+ assert.doesNotMatch(finance,/هرگونه پرداخت تابع سهمیه‌ها|تضمینی برای پرداخت مبلغ مشخص/)
+ assert.match(v.sections.find(x=>x.id==='finance').title,/حق‌الزحمه/)
  assert.match(v.acceptance,/نسخه ۱\.۰ مصوب را مطالعه/)
  assert.match(v.notice,/هیچ موافقتی/)
 })
@@ -93,6 +102,17 @@ test('SWTB14 charter preview opens in native dialog, with no policy RPC and no f
  assert.match(modal,/WorkerAgreementReview policy=\{workerAgreementApprovalCandidate\}/)
  assert.match(modal,/بستن پیش‌نمایش/)
  assert.match(card,/policy\.timeline\.map/)
+ assert.match(card,/data-policy-section=\{item.id\}/)
+ assert.match(card,/policy.studyNote&&/)
+ assert.match(card,/policy.intro.split/)
+ const visuals=read('../src/components/worker-agreement-review.css')
+ for(const id of workerAgreementApprovalCandidate.sections.map(section=>section.id)){
+  assert.match(visuals,new RegExp('data-policy-section="'+id+'"'))
+ }
+ assert.match(visuals,/prefers-contrast:more/)
+ assert.match(visuals,/border-inline-start:4px solid/)
+ assert.match(visuals,/\.swtb-policy-study-note/)
+ assert.match(modal,/RC2/)
  assert.match(card,/type="checkbox" disabled/)
  assert.match(card,/className="report-btn report-btn--primary" disabled/)
  assert.match(css,/max-height:calc\(100dvh - 2\.2rem\)/)
