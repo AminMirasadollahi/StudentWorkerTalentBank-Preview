@@ -2377,7 +2377,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const [peerVisibility,setPeerVisibility]=useState({workerId:profile.worker_id,enabled:false})
   const showCoworkers=peerVisibility.workerId===profile.worker_id&&peerVisibility.enabled
   const [selectedTaskId,setSelectedTaskId]=useState(null)
-  const [guideWelcomeOpen,setGuideWelcomeOpen]=useState(false)
+  const [guideWelcomeWorkerId,setGuideWelcomeWorkerId]=useState(null)
   const [guideScope,setGuideScope]=useState(null)
   const guideOfferedFor=useRef(null)
   const guideReturnSection=useRef('tasks')
@@ -2483,7 +2483,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     try{if(sessionKey)offered=window.sessionStorage.getItem(sessionKey)}catch{}
     if(!shouldAutoOfferWorkerGuide(profile.worker_id,saved,offered))return
     try{if(sessionKey)window.sessionStorage.setItem(sessionKey,WORKER_GUIDE_OFFERED_SESSION)}catch{}
-    setGuideWelcomeOpen(true)
+    setGuideWelcomeWorkerId(profile.worker_id)
   },[profile.worker_id,workSnapshot.workerId,loading,readFailed,settingsOpen])
   const applyGuideAutoPreference=disable=>{
     if(!disable)return true
@@ -2493,7 +2493,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const openWorkerGuide=scope=>{
     // Manually opening the guide must NEVER implicitly disable future offers.
     // The V4 presence view is unified; there is no legacy availability subview to reset.
-    setGuideWelcomeOpen(false)
+    setGuideWelcomeWorkerId(null)
     setSelectedTaskId(null)
     guideReturnSection.current=section
     if(settingsOpen)onToggleSettings?.()
@@ -2722,7 +2722,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         ...(nextView?{taskView:nextView}:{})})}
       approvedMinutesTotal={data.approved_minutes_total} refreshRevision={refreshRevision}/>}
     </div>
-    {guideWelcomeOpen&&<WorkerGuideWelcome
+    {guideWelcomeWorkerId===profile.worker_id&&<WorkerGuideWelcome
       onBegin={disable=>{
         if(!applyGuideAutoPreference(disable))return false
         openWorkerGuide('all')
@@ -2730,7 +2730,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       }}
       onSkip={disable=>{
         if(!applyGuideAutoPreference(disable))return false
-        setGuideWelcomeOpen(false)
+        setGuideWelcomeWorkerId(null)
         return true
       }}/>}
     {guideScope&&<WorkerGuideSpotlight key={guideScope} scope={guideScope}
