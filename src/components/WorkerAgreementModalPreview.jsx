@@ -45,14 +45,14 @@ export default function WorkerAgreementModalPreview({open,onClose}){
    <div className="swtb-policy-modal-head">
     <div>
      <h2 id="swtb-policy-modal-heading">چارچوب همکاری دانشجوکاران</h2>
-     <p>{isReadingEdition?'نسخه ۱.۰ برای مطالعه · تأیید و ثبت پذیرش رسمی هنوز فعال نشده است':`نسخه ${workerAgreementApprovalCandidate.version} · برای مطالعه و بازبینی`}</p>
+     <p>{isReadingEdition?`${workerAgreementApprovalCandidate.institution} · نسخه ۱.۰ برای مطالعه`:`نسخه ${workerAgreementApprovalCandidate.version} · برای مطالعه و بازبینی`}</p>
     </div>
     <button type="button" className="swtb-policy-modal-close" onClick={close}
      aria-label="بستن پیش‌نمایش چارچوب همکاری">بستن ×</button>
    </div>
    <div className="swtb-policy-modal-body" role="region" tabIndex={0}
      aria-label="متن کامل چارچوب همکاری؛ با کلیدهای جهت‌دار قابل پیمایش است">
-    <WorkerAgreementReview policy={workerAgreementApprovalCandidate}/>
+    <WorkerAgreementReview policy={workerAgreementApprovalCandidate} embedded/>
    </div>
  </dialog>
 }
