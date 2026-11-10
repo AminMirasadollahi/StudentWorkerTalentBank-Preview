@@ -1,0 +1,49 @@
+name: SWTB15 RC6 native Chrome charter rehearsal (isolated, NO DEPLOY)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/OperationsWorkspace.jsx'
+      - 'src/operations-workspace.css'
+      - 'src/components/WorkerAgreement*'
+      - 'src/components/worker-agreement-*'
+      - 'src/lib/workerAgreement*'
+      - 'src/charterPreviewEntry.jsx'
+      - 'src/charter-preview-shell.css'
+      - 'charter-preview.html'
+      - 'design/previews/SWTB14_RC6*'
+      - 'tests/browser/run-swtb15-charter-smoke.mjs'
+      - '.github/workflows/swtb15-charter-visual.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-worker-charter:
+    if: github.head_ref == 'feat/swtb15-rc6-readonly-student-charter-2026-11-10'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install public preview dependencies (no release)
+        run: npm install --no-audit --no-fund
+      - name: Install disposable Playwright runner (not an app dependency)
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
+      - name: Verify native Chrome is available
+        run: google-chrome --version
+      - name: Run real worker-charter modal in native Chrome with all external traffic blocked
+        run: node tests/browser/run-swtb15-charter-smoke.mjs
+      - name: Attach synthetic visual review screenshots (no student data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swtb15-rc6-worker-charter-isolated
+          path: test-results/swtb15-charter-readonly/*.png
+          retention-days: 4
+          if-no-files-found: ignore
+      - name: Confirm zero production deploy
+        run: echo "SWTB15 isolated native Chrome acceptance only; no Pages/Supabase/Auth or real users."
