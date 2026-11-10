@@ -19,7 +19,7 @@ test('SWTB15 reading polish cannot rewrite draft status, sections, quota or rece
  })
  assert.match(review,/data-policy-status="draft"/)
  assert.match(review,/const compactSeven=isCurrentReading/)
- assert.match(modal,/تأیید و ثبت پذیرش رسمی هنوز فعال نشده است/)
+ assert.match(modal,/نسخه ۱.۰ برای مطالعه/)
  assert.match(review,/ثبت موافقت معتبر/)
  assert.match(review,/مطالعه این متن در سامانه به‌عنوان تأیید یا پذیرش ثبت نمی‌شود/)
  assert.doesNotMatch(review+modal,/ops_accept_my_worker_agreement|acceptMyWorkerAgreement|localStorage|sessionStorage/)
