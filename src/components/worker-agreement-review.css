@@ -1,0 +1,207 @@
+/* SWTB13 — review-only agreement page; no new font, image or network dependency. */
+.swtb-policy-review{
+ direction:rtl; max-width:72rem; margin-inline:auto; color:#193e52;
+}
+.swtb-policy-head{
+ background:#fff; border:1px solid #e0e9ed; border-radius:16px;
+ padding:1.2rem 1.35rem; margin-bottom:1rem;
+}
+.swtb-policy-kicker{
+ display:inline-flex; align-items:center; border-radius:20px;
+ border:1px solid #b8d7d5; color:#1f6763; font-size:.8rem;
+ font-weight:750; padding:.18rem .7rem; margin-bottom:.55rem;
+}
+.swtb-policy-head h1{
+ font-size:1.28rem; line-height:1.6; margin:.1rem 0 .15rem;
+}
+.swtb-policy-institution{font-size:.84rem;color:#56717c;font-weight:600;margin:.1rem 0 .7rem}
+.swtb-policy-head>p:not(.swtb-policy-institution):not(.swtb-policy-caution){
+ margin:.35rem 0 0; line-height:1.85; font-size:.92rem;
+}
+.swtb-policy-head .swtb-policy-caution{
+ border-inline-start:3px solid #5f9a9b; color:#315f68;
+ margin:.9rem 0 0; padding:.55rem .85rem;
+ background:#f4f9f9; border-radius:7px; font-size:.83rem; line-height:1.75;
+}
+.swtb-policy-sections{
+ padding:0; margin:0; list-style:none;
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.78rem;
+ align-items:start; /* prevent short cards stretching to adjacent cards */
+}
+.swtb-policy-card{
+ min-width:0; align-self:start; height:auto;
+ padding:.95rem 1rem 1.05rem;
+ background:#fff;border:1px solid #dce7eb;border-radius:13px;
+}
+.swtb-policy-card-heading{display:flex;align-items:center;gap:.78rem}
+.swtb-policy-icon-box,.swtb-policy-concept-icon{
+ flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+ width:3.15rem;height:3.15rem;border-radius:12px;
+ color:#28746f;background:#eaf5f2;
+}
+.swtb-policy-icon{width:1.86rem;height:1.86rem;display:block;stroke-width:1.7}
+.swtb-policy-card h2{font-size:.96rem;line-height:1.65;margin:0;color:#173f54}
+.swtb-policy-index{color:#3d827e;font-variant-numeric:tabular-nums}
+.swtb-policy-card p{font-size:.85rem;line-height:1.9;margin:.52rem 0 0;color:#385867}
+.swtb-policy-concepts{
+ background:#fff;border:1px solid #dce7eb;border-radius:13px;
+ padding:1rem 1.1rem;margin:1rem 0 0;
+}
+.swtb-policy-concepts h2{margin:0 0 .8rem;font-size:1rem}
+.swtb-policy-concepts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}
+.swtb-policy-concept{
+ display:flex;gap:.6rem;position:relative;min-width:0;
+ background:#f6f9fa;border-radius:10px;padding:.65rem .7rem;
+}
+.swtb-policy-concept-icon{width:2rem;height:2rem;border-radius:8px;background:#e5f3f0}
+.swtb-policy-concept strong{font-size:.87rem}
+.swtb-policy-concept p{font-size:.79rem;line-height:1.7;color:#4b6673;margin:.15rem 0 0}
+.swtb-policy-concept-arrow{display:none}
+.swtb-policy-footer{
+ background:#fff;border:1px solid #dce7eb;border-radius:13px;
+ padding:1.05rem 1.2rem;margin-top:.85rem;
+ display:flex;flex-direction:column;align-items:flex-start;gap:.65rem;
+}
+.swtb-policy-footer>p{font-size:.82rem;color:#496674;margin:0;line-height:1.8}
+.swtb-policy-accept-disabled{display:flex;align-items:flex-start;gap:.5rem;font-size:.86rem;line-height:1.8;color:#3b5664}
+.swtb-policy-accept-disabled input{margin-top:.38rem;flex:0 0 auto;accent-color:#26736d}
+.swtb-policy-footer .swtb-policy-muted{font-size:.78rem;color:#677b86}
+@media(max-width:1040px){
+ .swtb-policy-sections{grid-template-columns:1fr}
+ .swtb-policy-concepts-grid{grid-template-columns:1fr}
+}
+@media(max-width:590px){
+ .swtb-policy-head{padding:1rem}
+ .swtb-policy-card{padding:.85rem}
+ .swtb-policy-footer{padding:.9rem}
+ .swtb-policy-head h1{font-size:1.13rem}
+}
+
+
+/* SWTB14 RC2: restrained semantic accents, never rainbow paragraph text.
+ * All body copy remains dark on a very light surface for legibility. */
+.swtb-policy-study-note{
+ display:flex;align-items:flex-start;gap:.55rem;line-height:1.9;
+ margin:.75rem 0 .8rem!important;padding:.7rem .9rem;
+ background:#eef6f7;border:1px solid #d6e7ea;border-inline-start:3px solid #407d83;
+ border-radius:10px;color:#335c68;font-size:.85rem!important;
+}
+.swtb-policy-study-note .swtb-policy-icon{flex:0 0 1.25rem;width:1.25rem;
+ height:1.25rem;margin-top:.3rem;color:#2e7379}
+.swtb-policy-intro-paragraph{margin-top:.55rem!important}
+.swtb-policy-card{
+ --swtb-tone:#296e71;--swtb-soft:#eff7f6;--swtb-edge:#d6e9e5;
+ border-color:var(--swtb-edge);
+ border-inline-start:4px solid var(--swtb-tone);
+ background:linear-gradient(180deg,var(--swtb-soft) 0,white 58px);
+}
+.swtb-policy-card[data-policy-section="learning"]{
+ --swtb-tone:#24786e;--swtb-soft:#eff8f5;--swtb-edge:#cfe5dd;
+}
+.swtb-policy-card[data-policy-section="choice"]{
+ --swtb-tone:#40689b;--swtb-soft:#f0f5fb;--swtb-edge:#d5e3f1;
+}
+.swtb-policy-card[data-policy-section="presence"]{
+ --swtb-tone:#6a5b9d;--swtb-soft:#f5f2fa;--swtb-edge:#e3dcf0;
+}
+.swtb-policy-card[data-policy-section="library-routine"]{
+ --swtb-tone:#8c692d;--swtb-soft:#fbf7ec;--swtb-edge:#eadfc4;
+}
+.swtb-policy-card[data-policy-section="continuity"]{
+ --swtb-tone:#226f81;--swtb-soft:#edf7f9;--swtb-edge:#cde5ea;
+}
+.swtb-policy-card[data-policy-section="privacy"]{
+ --swtb-tone:#56744f;--swtb-soft:#f3f8f0;--swtb-edge:#dce8d4;
+}
+.swtb-policy-card[data-policy-section="finance"]{
+ --swtb-tone:#82577a;--swtb-soft:#faf2f8;--swtb-edge:#e8d6e3;
+}
+.swtb-policy-card .swtb-policy-icon-box{
+ background:var(--swtb-soft);color:var(--swtb-tone);
+ border:1px solid var(--swtb-edge);
+}
+.swtb-policy-card .swtb-policy-index{color:var(--swtb-tone)}
+.swtb-policy-card p{color:#344f5f}
+.swtb-policy-card[data-policy-section="finance"] p+p{
+ border-top:1px solid var(--swtb-edge);padding-top:.6rem;margin-top:.7rem
+}
+@media(prefers-contrast:more){
+ .swtb-policy-card{background:white;border-width:2px;border-inline-start-width:5px}
+ .swtb-policy-study-note{background:white;color:#173f54}
+}
+
+
+/* RC3: clause five is a full-width decision table; each other card sizes itself
+ * to its own content, irrespective of its grid neighbor. */
+.swtb-policy-sections > .swtb-policy-card[data-policy-section="continuity"][data-policy-has-timeline="true"],
+.swtb-policy-sections > .swtb-policy-card[data-policy-section="finance"][data-policy-has-quota="true"]{
+ grid-column:1 / -1;
+}
+.swtb-policy-card[data-policy-section="continuity"] > p{
+ max-width:76ch;
+}
+.swtb-policy-continuity-details{
+ margin-top:.75rem;border:1px solid var(--swtb-edge);border-radius:10px;
+ background:#fff;overflow:hidden
+}
+.swtb-policy-continuity-details summary{
+ cursor:pointer;font-weight:700;color:#245c70;font-size:.85rem;
+ line-height:1.7;padding:.7rem .85rem;list-style-position:inside
+}
+.swtb-policy-continuity-details summary:focus-visible{
+ outline:3px solid #118987;outline-offset:-3px
+}
+.swtb-policy-continuity-details[open] summary{
+ border-bottom:1px solid var(--swtb-edge);background:#f4fafb
+}
+.swtb-policy-continuity-details > div{padding:.15rem .85rem .8rem}
+.swtb-policy-continuity-details > div p{margin-top:.65rem}
+.swtb-policy-timeline-scroll:focus-visible{
+ outline:3px solid #118987;outline-offset:2px
+}
+
+
+/* RC6: the finance example has a genuine visible ratio (not only prose).
+ * No calculation fetches financial or personal data: figures are static
+ * review-only illustrations from the owner-approved draft example. */
+.swtb-policy-quota-example{border-top:1px solid var(--swtb-edge);
+ margin-top:1rem;padding-top:.8rem}
+.swtb-policy-quota-example h3{font-size:.94rem;color:#204b5e;
+ margin:0 0 .45rem}
+.swtb-policy-quota-example>p{max-width:85ch}
+.swtb-policy-quota-math{display:flex;align-items:center;justify-content:center;
+ flex-wrap:wrap;gap:.55rem .85rem;padding:1.1rem .75rem;margin:.85rem 0;
+ border:1px solid #d1e4e3;border-radius:12px;background:#f2f9f8;
+ direction:rtl;color:#1f5661}
+.swtb-policy-quota-ratio{display:flex;align-items:center;gap:.5rem}
+.swtb-policy-quota-ratio small{max-width:5rem;line-height:1.65;font-size:.7rem;
+ color:#486972}
+.swtb-policy-quota-fraction{display:grid;min-width:3.9rem;text-align:center;
+ font-size:1.28rem;font-weight:800;line-height:1.35;font-variant-numeric:tabular-nums}
+.swtb-policy-quota-fraction b:first-child{border-bottom:2px solid #427b80;
+ padding-bottom:.12rem}
+.swtb-policy-quota-fraction b:last-child{padding-top:.12rem}
+.swtb-policy-quota-operator{font-size:1.5rem;font-weight:700;color:#567985}
+.swtb-policy-quota-value,.swtb-policy-quota-total{display:flex;flex-direction:column;
+ align-items:center;gap:.1rem;font-weight:800;font-size:1.25rem;
+ font-variant-numeric:tabular-nums}
+.swtb-policy-quota-value small,.swtb-policy-quota-total small{
+ font-size:.72rem;font-weight:600;line-height:1.55}
+.swtb-policy-quota-total{color:#176d5e;border-radius:10px;
+ border:1px solid #b7dacc;background:#e7f5ee;padding:.45rem .7rem}
+.swtb-policy-quota-comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:.6rem;margin:.65rem 0}
+.swtb-policy-quota-comparison>div{display:flex;flex-direction:column;gap:.2rem;
+ padding:.65rem .75rem;border:1px solid #d9e8e8;border-radius:10px;background:#fff}
+.swtb-policy-quota-comparison>div small{font-size:.78rem;color:#496974}
+.swtb-policy-quota-comparison>div strong{font-size:1.05rem;color:#224c61}
+.swtb-policy-quota-comparison>div:last-child strong{color:#176d5e}
+@media(max-width:560px){
+ .swtb-policy-quota-comparison{grid-template-columns:1fr}
+ .swtb-policy-quota-math{gap:.45rem .6rem}
+ .swtb-policy-quota-fraction{font-size:1.1rem;min-width:3rem}
+ .swtb-policy-quota-value,.swtb-policy-quota-total{font-size:1.08rem}
+}
+@media(prefers-contrast:more){
+ .swtb-policy-quota-math,.swtb-policy-quota-total{background:white;border-width:2px}
+}
