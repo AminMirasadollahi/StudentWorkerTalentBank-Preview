@@ -13,6 +13,8 @@ const document=()=>({
  intro:'فقط محتوای ساختگی؛ هیچ ابلاغ حقیقی وجود ندارد.',
  acceptance:'من همین نسخه مصوب آزمایشی را خواندم و می‌پذیرم.',
  institution:'واحد آزمایشی',readingEstimate:'۴ دقیقه',
+ approval:{reference:'SYNTHETIC-ONLY-01',authority:'مرجع ساختگی آزمایش',
+  approved_on:'2026-11-10T07:00:00Z'},
  sections:['learning','choice','presence','library','continuity','privacy','finance']
   .map((id,i)=>({id,title:'اصل آزمایشی '+(i+1),
    paragraphs:['متن غیرواقعی آزمایش بند '+(i+1)]})),
