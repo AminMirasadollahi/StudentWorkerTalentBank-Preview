@@ -50,7 +50,9 @@ function officialDocument(doc,versionLabel){
   text(q.preamble,'quota_preamble');text(q.note,'quota_note')
  }
  for(const k of ['institution','studyNote','notice']) if(doc[k]!==undefined)text(doc[k],k,false)
- if(doc.readingEstimate!==undefined&&(!Number.isFinite(doc.readingEstimate)||doc.readingEstimate<0))
+ if(doc.readingEstimate!==undefined &&
+  !(nonempty(doc.readingEstimate,100) ||
+    (typeof doc.readingEstimate==='number'&&Number.isFinite(doc.readingEstimate)&&doc.readingEstimate>=0)))
   invalid('reading_estimate')
  if(doc.showTimeConcepts!==undefined&&typeof doc.showTimeConcepts!=='boolean')
   invalid('show_time_concepts')
