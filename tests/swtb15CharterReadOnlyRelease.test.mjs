@@ -65,7 +65,7 @@ test('SWTB15 native dialog and charter are non-submitting, safe to close/reopen'
  assert.match(modal,/showModal/)
  assert.match(modal,/onKeyDown=\{trapModalTab\}/)
  assert.match(modal,/role="region" tabIndex=\{0\}/)
- assert.match(modal,/WorkerAgreementReview policy=\{workerAgreementApprovalCandidate\}/)
+ assert.match(modal,/WorkerAgreementReview policy=\{workerAgreementApprovalCandidate\} embedded/)
  assert.match(modal,/if\(dialogRef.current\?\.open\)return/)
  assert.doesNotMatch(card,/type="checkbox"|تأیید و شروع همکاری/)
  assert.match(card,/مطالعه این متن در سامانه به‌عنوان تأیید یا پذیرش ثبت نمی‌شود/)

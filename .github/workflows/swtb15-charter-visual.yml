@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   isolated-worker-charter:
-    if: github.head_ref == 'feat/swtb15-rc6-readonly-student-charter-2026-11-10' || github.head_ref == 'fix/swtb15-charter-masonry-buttons-visual-copy-2026-11-10'
+    if: github.head_ref == 'feat/swtb15-rc6-readonly-student-charter-2026-11-10' || github.head_ref == 'fix/swtb15-charter-masonry-buttons-visual-copy-2026-11-10' || github.head_ref == 'fix/swtb15-charter-single-header-reading-entry-2026-11-10'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
