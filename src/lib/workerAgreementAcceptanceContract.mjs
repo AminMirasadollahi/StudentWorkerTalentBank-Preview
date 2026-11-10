@@ -32,16 +32,19 @@ function officialDocument(doc,versionLabel){
   Number.isNaN(Date.parse(doc.approval.approved_on)))invalid('approval_authority')
  if(!Array.isArray(doc.sections)||doc.sections.length!==7)invalid('seven_sections')
  const ids=new Set()
+ const expectedIds=['learning','choice','presence','library-routine',
+  'continuity','privacy','finance']
  const sections=doc.sections.map((s,index)=>{
   if(!plain(s)||!own(s,['id','title','paragraphs','icon','detailParagraphs']))invalid('section_fields_'+index)
   const id=text(s.id,'section_id',true),heading=text(s.title,'section_title')
-  if(ids.has(id))invalid('duplicate_section_id')
+  if(ids.has(id)||id!==expectedIds[index])invalid('missing_or_unexpected_section_order')
   ids.add(id)
   const body=paragraphs(s.paragraphs,'section_paragraphs_'+id)
   if(s.detailParagraphs!==undefined)paragraphs(s.detailParagraphs,'detail_paragraphs_'+id)
   if(s.icon!==undefined && !nonempty(s.icon,30))invalid('section_icon_'+id)
   return {...s,id,title:heading,paragraphs:body}
  })
+ if(doc.quotaExample===undefined)invalid('missing_quota_example')
  if(doc.quotaExample!==undefined){
   const q=doc.quotaExample
   const qkeys=['quota','totalApproved','individualApproved','proportionalPercent',
@@ -59,8 +62,8 @@ function officialDocument(doc,versionLabel){
   !(nonempty(doc.readingEstimate,100) ||
     (typeof doc.readingEstimate==='number'&&Number.isFinite(doc.readingEstimate)&&doc.readingEstimate>=0)))
   invalid('reading_estimate')
- if(doc.showTimeConcepts!==undefined&&typeof doc.showTimeConcepts!=='boolean')
-  invalid('show_time_concepts')
+ if(doc.showTimeConcepts!==undefined&&doc.showTimeConcepts!==false)
+  invalid('unsupported_local_time_concepts')
  // Legacy RC6 source text still calls itself unapproved. Never sign that
  // text under a new server version without the owner explicitly replacing it.
  if(/هنوز نامزد تصویب|هنوز فاقد ثبت پذیرش|تأیید معتبر آن فقط پس از تصویب/.test(
