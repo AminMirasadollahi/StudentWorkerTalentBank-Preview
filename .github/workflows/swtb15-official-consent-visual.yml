@@ -29,6 +29,8 @@ jobs:
           node-version: '22'
       - name: Install existing public dependencies
         run: npm install --no-audit --no-fund
+      - name: Install synthetic jsdom test dependency (not a production change)
+        run: npm install --no-save --no-package-lock --no-audit --no-fund jsdom@26.1.0
       - name: Run all Node contract tests with per-test timeouts (NO DEPLOY)
         shell: bash
         run: |
