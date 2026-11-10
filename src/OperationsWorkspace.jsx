@@ -37,6 +37,8 @@ import {managerReviewItems} from './lib/managerReviewRows.mjs'
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
 const WorkPoolManagerPanel = lazy(()=>import('./components/WorkPoolManagerPanel'))
 const WorkPoolWorkerPanel = lazy(()=>import('./components/WorkPoolWorkerPanel'))
+// SWTB15 separate from mandatory acceptance: informational, nonblocking RC6.
+const WorkerAgreementModalPreview = lazy(()=>import('./components/WorkerAgreementModalPreview.jsx'))
 import * as unifiedPeerApi from './lib/operationsV2'
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
  requestProfileChange,reviewProfileChange,getUnitHourTotals,
@@ -59,6 +61,9 @@ const termMembershipUIEnabled=import.meta.env?.VITE_SWTB21_TERM_MEMBERSHIP_UI!==
 // zero offers and zero claims. Enable only the manager-authorized, worker-self
 // surfaces; keep emergency build-time UI kill switch without altering DB policy.
 const workPoolUIEnabled=import.meta.env?.VITE_SWTB21_WORK_POOL_UI!=='false'
+// Read-only charter visible to worker by default; emergency build-time OFF switch.
+// Does NOT grant or deny writes, record consent, or change any worker state.
+const workerCharterInfoEnabled=import.meta.env?.VITE_SWTB15_READONLY_CHARTER_UI!=='false'
 // SWTB22-D3 is a presentation-only, independently reversible manager release.
 // Legacy manager route and all TaskAssignmentEditor server guards remain unchanged.
 const focusTaskUIEnabled=import.meta.env?.VITE_SWTB22_TASKS_FOCUS_UI==='true'
@@ -2371,6 +2376,9 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const [localNavigation,setLocalNavigation]=useState({section:'tasks',taskRange:'today'})
   const [submissionReceipt,setSubmissionReceipt]=useState(null)
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
+  const [charterInfoOpen,setCharterInfoOpen]=useState(false)
+  const charterInfoTriggerRef=useRef(null)
+  useEffect(()=>setCharterInfoOpen(false),[profile.worker_id])
   // Default OFF for every authenticated principal. Remembering this checkbox
   // within the same session must never leak across an account switch.
   const [peerVisibility,setPeerVisibility]=useState({workerId:profile.worker_id,enabled:false})
@@ -2528,11 +2536,25 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         ['availability','زمان حضور'],['history','سوابق گزارش‌ها'],['profile','حساب من'],
       ]}/>
       <div className="ow-b3-sidebar__footer">
-        <button type="button" className="swtb-guide-launch" data-swtb-guide="help-global"
-          title="راهنمای تصویری سامانه" aria-label="راهنمای سامانه"
-          onClick={()=>openWorkerGuide('all')}>
-          <span aria-hidden="true">؟</span>{!sidebarCollapsed&&' راهنمای سامانه'}
-        </button>
+        <div className="swtb-policy-sidebar-actions">
+          <button type="button" className="swtb-guide-launch" data-swtb-guide="help-global"
+            title="راهنمای تصویری سامانه" aria-label="راهنمای سامانه"
+            onClick={()=>{setCharterInfoOpen(false);openWorkerGuide('all')}}>
+            <span aria-hidden="true">؟</span>{!sidebarCollapsed&&' راهنمای سامانه'}
+          </button>
+          {workerCharterInfoEnabled&&<button type="button"
+            ref={charterInfoTriggerRef}
+            title="مطالعه پیش‌نویس چارچوب همکاری؛ هنوز مصوب یا لازم‌الاجرا نیست"
+            aria-label="مطالعه پیش‌نویس چارچوب همکاری دانشجوکاران"
+            aria-haspopup="dialog"
+            onClick={()=>{
+              setGuideScope(null)
+              setGuideWelcomeOpen(false)
+              setCharterInfoOpen(true)
+            }}>
+            <span aria-hidden="true">▤</span>{!sidebarCollapsed&&' چارچوب همکاری'}
+          </button>}
+        </div>
         <div className="ow-b3-worker" title={visibleWorkerName}>
           <span className="ow-b3-worker__avatar" aria-hidden="true">{visibleWorkerName?.trim()?.[0]||'د'}</span>
           {!sidebarCollapsed&&<div><strong>{visibleWorkerName}</strong>
@@ -2712,6 +2734,13 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         ...(nextView?{taskView:nextView}:{})})}
       approvedMinutesTotal={data.approved_minutes_total} refreshRevision={refreshRevision}/>}
     </div>
+    {workerCharterInfoEnabled&&charterInfoOpen&&<Suspense
+      fallback={<p role="status">در حال بارگذاری متن چارچوب همکاری…</p>}>
+      <WorkerAgreementModalPreview open={charterInfoOpen} onClose={()=>{
+        setCharterInfoOpen(false)
+        requestAnimationFrame(()=>charterInfoTriggerRef.current?.focus({preventScroll:true}))
+      }}/>
+    </Suspense>}
     {guideWelcomeOpen&&<WorkerGuideWelcome
       onBegin={()=>openWorkerGuide('all')}
       onSkip={()=>{rememberGuideOffer();setGuideWelcomeOpen(false)}}/>}
