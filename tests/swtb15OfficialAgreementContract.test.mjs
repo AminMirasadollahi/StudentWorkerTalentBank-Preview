@@ -80,7 +80,7 @@ test('Ratio example cannot misrepresent retained approved work time',()=>{
 })
 
 test('Invalid digest, UUID, status, accepted date or roles fail closed',()=>{
- let p=payload();p.digest='b'.repeat(64)
+ let p=payload();p.digest='g'.repeat(64)
  rejects(p,/identity_or_digest/)
  p=payload();p.version_id='not-a-uuid';rejects(p,/identity_or_digest/)
  p=payload();p.status='weird';rejects(p,/unknown_status/)
