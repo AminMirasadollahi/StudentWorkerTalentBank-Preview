@@ -124,15 +124,10 @@ export default function WorkerAgreementReview({policy=workerAgreementDraft}){
    </section>}
    <footer className="swtb-policy-footer">
      <p>{policy.notice}</p>
-     <label className="swtb-policy-accept-disabled">
-       <input type="checkbox" disabled aria-describedby="swtb-policy-future-gate-note"/>
-       <span>{policyInline(policy.acknowledgement||policy.acceptance)}</span>
-     </label>
-     <button type="button" className="report-btn report-btn--primary" disabled>
-       تأیید و شروع همکاری
-     </button>
-     <p id="swtb-policy-future-gate-note" className="swtb-policy-muted">
-       نمونه نمایشی است. دکمه تأیید تنها پس از انتشار نسخه رسمی و فعال‌سازی ثبت امن پذیرش در سرور قابل استفاده خواهد بود.
+     <p className="swtb-policy-muted" role="note">
+       این متن در مرحله فعلی صرفاً برای آشنایی شما با اصول پیشنهادی همکاری منتشر شده است.
+       مطالعه این متن در سامانه به‌عنوان تأیید یا پذیرش ثبت نمی‌شود و استفاده از پنل را محدود نمی‌کند.
+       اگر نسخه‌ای به تصویب رسمی برسد، شیوه اطلاع‌رسانی و پذیرش معتبر آن جداگانه اعلام خواهد شد.
      </p>
    </footer>
  </section>
