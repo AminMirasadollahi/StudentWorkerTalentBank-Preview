@@ -2537,22 +2537,37 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       ]}/>
       <div className="ow-b3-sidebar__footer">
         <div className="swtb-policy-sidebar-actions">
-          <button type="button" className="swtb-guide-launch" data-swtb-guide="help-global"
+          <button type="button" className="swtb-guide-launch swtb-policy-sidebar-action"
+            data-swtb-guide="help-global"
             title="راهنمای تصویری سامانه" aria-label="راهنمای سامانه"
             onClick={()=>{setCharterInfoOpen(false);openWorkerGuide('all')}}>
-            <span aria-hidden="true">؟</span>{!sidebarCollapsed&&' راهنمای سامانه'}
+            <svg className="swtb-policy-action-icon" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
+              strokeLinejoin="round" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="9"/>
+              <path d="M9.4 9a2.8 2.8 0 0 1 5.3 1c0 1.9-2.7 2.4-2.7 4"/>
+              <path d="M12 17.5h.01"/>
+            </svg>
+            {!sidebarCollapsed&&<span className="swtb-policy-action-label">راهنمای سامانه</span>}
           </button>
           {workerCharterInfoEnabled&&<button type="button"
+            className="swtb-policy-sidebar-action"
             ref={charterInfoTriggerRef}
-            title="مطالعه پیش‌نویس چارچوب همکاری؛ هنوز مصوب یا لازم‌الاجرا نیست"
-            aria-label="مطالعه پیش‌نویس چارچوب همکاری دانشجوکاران"
+            title="مطالعه چارچوب همکاری دانشجوکاران؛ ثبت موافقت رسمی هنوز فعال نیست"
+            aria-label="مطالعه چارچوب همکاری دانشجوکاران"
             aria-haspopup="dialog"
             onClick={()=>{
               setGuideScope(null)
               setGuideWelcomeOpen(false)
               setCharterInfoOpen(true)
             }}>
-            <span aria-hidden="true">▤</span>{!sidebarCollapsed&&' چارچوب همکاری'}
+            <svg className="swtb-policy-action-icon" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
+              strokeLinejoin="round" aria-hidden="true" focusable="false">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <path d="M14 2v6h6M8 13h8M8 17h8"/>
+            </svg>
+            {!sidebarCollapsed&&<span className="swtb-policy-action-label">چارچوب همکاری</span>}
           </button>}
         </div>
         <div className="ow-b3-worker" title={visibleWorkerName}>
