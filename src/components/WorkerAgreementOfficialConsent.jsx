@@ -29,6 +29,9 @@ function ServerAgreementDocument({snapshot}){
    <strong>نسخه مصوب و منتشرشده {snapshot.versionLabel}</strong>
    <span>شناسه سند از سرور: <bdi dir="ltr">{snapshot.versionId}</bdi></span>
    <span>تاریخ انتشار: {readableTime(snapshot.publishedAt)}</span>
+   <span>مرجع تصویب: {doc.approval.authority}</span>
+   <span>شماره تصویب: <bdi dir="ltr">{doc.approval.reference}</bdi></span>
+   <span>تاریخ تصویب: {readableTime(doc.approval.approved_on)}</span>
   </div>
   <h3 id="swtb-agreement-server-title">{doc.title}</h3>
   {doc.institution&&<p>{doc.institution}</p>}
