@@ -33,6 +33,7 @@ test('only a knowingly accepted specific task creates a commitment, not weekly a
 
 test('flexible hours on the assigned date never claim flexible dates',()=>{
  const clause=draft.sections.find(s=>s.id==='presence').paragraphs[2]
+ assert.match(clause,/«فرصت‌های کاری»/)
  assert.match(clause,/نوبت‌های زمان‌دار/)
  assert.match(clause,/روز و ساعت مشخص/)
  assert.match(clause,/روز انجام از قبل تعیین می‌شود/)
