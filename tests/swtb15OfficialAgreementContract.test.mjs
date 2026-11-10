@@ -15,7 +15,7 @@ const document=()=>({
  institution:'واحد آزمایشی',readingEstimate:'۴ دقیقه',
  approval:{reference:'SYNTHETIC-ONLY-01',authority:'مرجع ساختگی آزمایش',
   approved_on:'2026-11-10T07:00:00Z'},
- sections:['learning','choice','presence','library','continuity','privacy','finance']
+ sections:['learning','choice','presence','library-routine','continuity','privacy','finance']
   .map((id,i)=>({id,title:'اصل آزمایشی '+(i+1),
    paragraphs:['متن غیرواقعی آزمایش بند '+(i+1)]})),
  quotaExample:{quota:400,totalApproved:500,individualApproved:50,
@@ -80,7 +80,7 @@ test('Ratio example cannot misrepresent retained approved work time',()=>{
 })
 
 test('Invalid digest, UUID, status, accepted date or roles fail closed',()=>{
- let p=payload();p.digest='b'*64
+ let p=payload();p.digest='b'.repeat(64)
  rejects(p,/identity_or_digest/)
  p=payload();p.version_id='not-a-uuid';rejects(p,/identity_or_digest/)
  p=payload();p.status='weird';rejects(p,/unknown_status/)
