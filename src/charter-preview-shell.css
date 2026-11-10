@@ -1,0 +1,17 @@
+/* Only the local in-app design preview. No changes to production shell CSS. */
+.swtb-charter-local-shell{min-height:100dvh}
+.swtb-charter-local-shell .ow-b3-layout{min-height:100dvh}
+.swtb-charter-local-nav{display:grid;gap:.32rem;padding:.5rem .7rem}
+.swtb-charter-local-nav span{display:block;border-radius:8px;
+ padding:.55rem .65rem;color:#d6e9ed;font-size:.81rem}
+.swtb-charter-local-nav span:first-child{background:#175e67;color:#fff}
+.swtb-charter-local-guide{display:grid;place-items:center;flex:1;
+ min-height:2.4rem;font-size:.72rem;border-radius:8px;
+ border:1px solid #ffffff38;background:#ffffff0d;color:#d9e7e9;padding:.3rem}
+.swtb-charter-local-safe{font-size:.72rem;color:#bfd5da;line-height:1.8;margin:.7rem 0 0}
+.swtb-charter-local-flag{font-size:.73rem;background:#e8f3f3;
+ border:1px solid #cfe3e2;border-radius:30px;color:#38686b;padding:.3rem .65rem}
+.swtb-charter-local-info{margin-top:1rem;max-width:48rem}
+.swtb-charter-local-info h1{font-size:1.25rem;color:#153e5c;margin:0 0 .6rem}
+.swtb-charter-local-info p{font-size:.88rem;color:#476574}
+.swtb-charter-local-info button{margin:.55rem 0}
