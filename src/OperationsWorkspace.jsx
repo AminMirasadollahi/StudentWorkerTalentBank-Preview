@@ -39,6 +39,8 @@ const WorkPoolManagerPanel = lazy(()=>import('./components/WorkPoolManagerPanel'
 const WorkPoolWorkerPanel = lazy(()=>import('./components/WorkPoolWorkerPanel'))
 // SWTB15 separate from mandatory acceptance: informational, nonblocking RC6.
 const WorkerAgreementModalPreview = lazy(()=>import('./components/WorkerAgreementModalPreview.jsx'))
+// Future owner-approved official consent is a separate lazy module.
+const WorkerAgreementOfficialConsent = lazy(()=>import('./components/WorkerAgreementOfficialConsent.jsx'))
 import * as unifiedPeerApi from './lib/operationsV2'
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
  requestProfileChange,reviewProfileChange,getUnitHourTotals,
@@ -64,6 +66,9 @@ const workPoolUIEnabled=import.meta.env?.VITE_SWTB21_WORK_POOL_UI!=='false'
 // Read-only charter visible to worker by default; emergency build-time OFF switch.
 // Does NOT grant or deny writes, record consent, or change any worker state.
 const workerCharterInfoEnabled=import.meta.env?.VITE_SWTB15_READONLY_CHARTER_UI!=='false'
+// Intentionally OFF: backend PR37–40 and approved official text are NOT live.
+// Never enable this at the same time as an uninstalled/future RPC.
+const workerAgreementOfficialUIEnabled=import.meta.env?.VITE_SWTB15_OFFICIAL_CONSENT_UI==='true'
 // SWTB22-D3 is a presentation-only, independently reversible manager release.
 // Legacy manager route and all TaskAssignmentEditor server guards remain unchanged.
 const focusTaskUIEnabled=import.meta.env?.VITE_SWTB22_TASKS_FOCUS_UI==='true'
@@ -2555,6 +2560,10 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
             <span aria-hidden="true">▤</span>{!sidebarCollapsed&&' چارچوب همکاری'}
           </button>}
         </div>
+        {workerAgreementOfficialUIEnabled&&<Suspense
+          fallback={<p role="status">در حال آماده‌سازی وضعیت چارچوب رسمی…</p>}>
+          <WorkerAgreementOfficialConsent key={profile.worker_id} workerId={profile.worker_id}/>
+        </Suspense>}
         <div className="ow-b3-worker" title={visibleWorkerName}>
           <span className="ow-b3-worker__avatar" aria-hidden="true">{visibleWorkerName?.trim()?.[0]||'د'}</span>
           {!sidebarCollapsed&&<div><strong>{visibleWorkerName}</strong>
