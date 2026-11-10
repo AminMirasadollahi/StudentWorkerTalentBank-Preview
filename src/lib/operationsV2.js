@@ -154,7 +154,9 @@ export const claimDeskWorkOffer=({offerId,requestId})=>
 // SWTB15: reserved for the NOT-YET-INSTALLED private PR37–40 agreement ledger.
 // Never treat the locally bundled RC6 preview as a published server version.
 // The browser sends only the exact UUID/digest it just displayed, never a
-// worker_id or a client-computed digest. No automatic retries on acceptance.
+// worker_id or a client-computed digest. This wrapper performs NO independent
+// re-submission; SDK-level POST transport retries can occur, so the immutable
+// server (worker_id,version_id) UNIQUE receipt is essential for idempotence.
 export const getMyWorkerAgreement=()=>rpc('ops_get_my_worker_agreement')
 export const acceptMyWorkerAgreement=({versionId,digest})=>
  rpc('ops_accept_my_worker_agreement',{
