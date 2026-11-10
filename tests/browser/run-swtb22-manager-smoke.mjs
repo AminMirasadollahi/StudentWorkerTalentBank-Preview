@@ -324,6 +324,9 @@ try{
  await page.locator('.swtb22-term-advanced-filter>summary').click()
  await page.locator('[aria-label="فیلتر واحد بودجه"]').selectOption('library')
  await page.waitForFunction(()=>globalThis.__qaBudgetReads.at(-1)?.unit==='library')
+ // A fetch invocation does not prove React has committed its filtered result.
+ // Wait for the read-only pool projection before asserting the visible count.
+ await page.waitForFunction(()=>document.querySelectorAll('.ow-term-pool').length===1)
  assert.equal(await page.locator('.swtb22-term-audit').count(),0,
   'shared group consumption must not be compared with one-unit consumption')
  assert.equal(await page.locator('.ow-term-pool').count(),1)

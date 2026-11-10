@@ -15,6 +15,8 @@ const v2=[
  'export const getMyWorkV2=async()=>globalThis.__qaWorkerData;',
  'export const getMyWorkerProfileV2=async()=>({worker_id:"SWTB_CHROMIUM_SYNTHETIC_WORKER",name:"دانشجوکار ساختگی",major:"رشته ساختگی",entry_year:"1405",unit:"library"});',
  'export const getMyProfileChangeRequests=async()=>globalThis.__qaProfileRequests;',
+ 'export const getWorkerStateHistory=async()=>({ok:true,scope:"synthetic",events:[]});',
+ 'export const setWorkerState=async()=>{globalThis.__qaWriteAttempts++;throw Error("BROWSER_WORKER_STATE_MUTATION_FORBIDDEN")};',
  'export const requestProfileChange=async()=>{globalThis.__qaWriteAttempts++;throw Error("BROWSER_SMOKE_WRITE_FORBIDDEN")};',
  ...['getAdminWorkV2','reviewProfileChange','assignGroupTask'].map(name=>
   `export const ${name}=async()=>{throw Error("BROWSER_SMOKE_API_DENIED")};`),

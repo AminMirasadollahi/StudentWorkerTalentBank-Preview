@@ -1,0 +1,144 @@
+<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>پیش‌نمایش چارچوب همکاری RC6 | فقط بازبینی</title>
+<style>
+:root{font-family:Tahoma,Arial,sans-serif;color:#1b4053;background:#eef4f5}
+*{box-sizing:border-box}body{margin:0;min-height:100dvh;line-height:1.88}
+button{font:inherit;cursor:pointer}
+aside{position:fixed;inset:0 0 0 auto;width:225px;background:#10344a;color:#eaf5f6;padding:1.2rem;display:flex;flex-direction:column;gap:1rem}
+aside strong{font-size:1rem}aside small{font-size:.73rem;color:#b7d4d9}
+aside button{margin-top:auto;background:#195e6a;border:1px solid #62aeb4;color:white;padding:.65rem .5rem;border-radius:10px}
+main{max-width:900px;margin:4rem auto;padding:2rem 250px 2rem 1rem}
+main h1{font-size:1.35rem}main p{color:#50707f}
+.open{background:#1d7379;color:white;border:0;border-radius:9px;padding:.55rem .9rem}
+dialog{position:fixed;inset:0;margin:auto;width:min(980px,calc(100vw - 1rem));height:min(92dvh,950px);
+border:1px solid #bed4d9;border-radius:18px;background:#f5f9fa;color:#153d50;padding:0;box-shadow:0 30px 72px #05223661;overflow:hidden}
+dialog[open]{display:flex;flex-direction:column}dialog::backdrop{background:#09263b97}
+.top{flex:0 0 auto;background:white;border-bottom:1px solid #dce8ea;padding:.85rem 1rem;
+display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.top h2{font-size:1.08rem;margin:0}.top p{color:#577583;font-size:.75rem;margin:.15rem 0 0}
+.close{border:1px solid #cfdee1;background:#f4f8f9;border-radius:9px;padding:.4rem .75rem;white-space:nowrap}
+.scroll{flex:1 1 auto;min-height:0;overflow:auto;padding:1rem;overscroll-behavior:contain}
+.intro{background:#fff;border:1px solid #dde9eb;border-radius:14px;padding:1.1rem}
+.intro h1{font-size:1.15rem;margin:.3rem 0}.intro p{font-size:.85rem;margin:.5rem 0}
+.study{background:#edf6f7;color:#355b68;border-inline-start:3px solid #2b7b80;border-radius:8px;padding:.7rem;font-size:.82rem}
+.notice{color:#56717c;font-size:.79rem}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:.8rem;margin:1rem 0}
+.card{--tone:#397d79;--soft:#f1f8f5;--edge:#d5e8e3;background:linear-gradient(180deg,var(--soft),#fff 65px);
+border:1px solid var(--edge);border-inline-start:4px solid var(--tone);border-radius:13px;
+padding:.85rem 1rem;align-self:start;height:auto;min-width:0}
+.card[data-section=learning]{--tone:#26796e;--soft:#eff8f5;--edge:#cce7dc}
+.card[data-section=choice]{--tone:#436c9e;--soft:#f0f5fb;--edge:#d5e3f1}
+.card[data-section=presence]{--tone:#6b5d9f;--soft:#f4f2fa;--edge:#e1d9f0}
+.card[data-section=library-routine]{--tone:#8a6b35;--soft:#faf7ec;--edge:#eadfc4}
+.card[data-section=continuity]{--tone:#257083;--soft:#edf7f9;--edge:#cde5ea}
+.card[data-section=privacy]{--tone:#587d55;--soft:#f3f8f0;--edge:#dce8d4}
+.card[data-section=finance]{--tone:#855b7a;--soft:#faf3f8;--edge:#e9d7e3;grid-column:1/-1}
+.cardhead{display:flex;align-items:center;gap:.7rem}.cardhead h3{font-size:.96rem;margin:0}
+.icon{display:grid;place-items:center;border-radius:11px;width:3.1rem;height:3.1rem;
+flex:0 0 auto;color:var(--tone);background:var(--soft);border:1px solid var(--edge)}
+.icon svg{height:1.9rem;width:1.9rem}
+.card p{font-size:.85rem;line-height:1.95;margin:.55rem 0 0;color:#345263}
+.quota{margin-top:.8rem;border-top:1px solid var(--edge);padding-top:.8rem}
+.quota h4{font-size:.91rem;margin:0}
+.equation{display:flex;align-items:center;justify-content:center;gap:.7rem 1rem;flex-wrap:wrap;
+background:#edf8f5;border:1px solid #cfe3dc;padding:1rem;margin:.7rem 0;border-radius:10px}
+.fraction{display:flex;align-items:center;gap:.5rem}.fraction>div{display:flex;flex-direction:column;text-align:center;font-size:1.3rem}
+.fraction b:first-child{border-bottom:2px solid #287b78}.fraction small{max-width:75px;line-height:1.5;color:#4b6972;font-size:.7rem}
+.op{font-weight:800;font-size:1.5rem}.value,.result{display:flex;flex-direction:column;text-align:center;line-height:1.4;font-weight:800;font-size:1.2rem}
+.value small,.result small{font-size:.68rem;font-weight:600}.result{color:#186d5e;background:#e6f5ed;border:1px solid #b9dbca;padding:.5rem;border-radius:9px}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.compare>div{display:flex;flex-direction:column;gap:.2rem;background:white;border:1px solid #dde8e8;border-radius:9px;padding:.5rem .8rem}
+.compare small{color:#58727a;font-size:.75rem}.compare b{color:#24566a}
+footer{background:white;border:1px solid #dae8ea;border-radius:12px;padding:1rem}
+footer p,footer label{font-size:.83rem}footer label{display:flex;align-items:start;gap:.5rem;margin:.5rem 0}
+footer button{padding:.5rem .8rem;border:1px solid #d2dcdf;border-radius:8px;cursor:not-allowed}
+:focus-visible{outline:3px solid #139b91;outline-offset:3px}
+@media(max-width:880px){aside{position:static;width:auto}main{padding:1rem;margin:2rem auto}}
+@media(max-width:700px){.cards{grid-template-columns:1fr}.scroll{padding:.45rem}
+.card[data-section=finance]{grid-column:auto}.compare{grid-template-columns:1fr}
+dialog{height:calc(100dvh - .7rem);max-height:calc(100dvh - .7rem)}}
+@media(prefers-contrast:more){.card,.equation{background:white;border-width:2px}}
+</style></head><body><aside><strong>پنل دانشجوکار</strong><small>پیش‌نمایش مستقل · بدون حساب واقعی</small>
+<button type="button" id="openSidebar">چارچوب همکاری</button></aside>
+<main><h1>نمونه بصری چارچوب همکاری دانشجوکاران</h1><p>این صفحه صرفاً برای بازبینی چیدمان و مثال محاسبه سهمیه است و هیچ داده واقعی را تغییر نمی‌دهد.</p>
+<button class="open" type="button" id="openMain">نمایش چارچوب همکاری</button></main>
+<dialog id="policy" aria-labelledby="dialogTitle">
+<div class="top"><div><h2 id="dialogTitle">چارچوب همکاری دانشجوکاران</h2>
+<p>پیش‌نمایش RC6 · بدون ثبت موافقت یا محدودیت حساب</p></div>
+<button type="button" class="close" id="closePolicy">بستن ×</button></div>
+<div class="scroll"><section class="intro"><small>نسخه نامزد تصویب ۱.۰</small><h1>چارچوب همکاری دانشجوکاران</h1>
+<p>دانشکده علوم انسانی شهید رجایی بابل</p><p class="study"><strong>آشنایی با حقوق و شیوه همکاری، حق شماست.</strong> لطفاً این متن کوتاه را یک‌بار با دقت بخوانید؛ مطالعه آن حدود <strong>۴ تا ۵ دقیقه</strong> زمان می‌برد. تأیید مطالعه پس از تصویب رسمی نسخه، برای ادامه کار در سامانه لازم خواهد بود.</p>
+<p>هدف ما این است که در کنار هم <strong>تجربه کسب کنیم، یاد بگیریم و به بهترشدن دانشکده کمک کنیم</strong>. هفت نکته زیر، زمینه همکاری روشن و منصفانه را فراهم می‌کنند.</p>
+<p class="notice">این متن هنوز نامزد تصویب است؛ تأیید معتبر آن فقط پس از تصویب و انتشار رسمی و ثبت پذیرش در سامانه امکان‌پذیر خواهد بود.</p></section>
+<div class="cards"><article class="card" data-section="learning">
+<header class="cardhead"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10 12 5 22 10 12 15Z"/><path d="M6 12v5c3.8 3 8.2 3 12 0v-5"/><path d="M22 10v6"/></svg></span><h3>۱. یادگیری و مشارکت</h3></header>
+<p>این تجربه برای رشد شما هم هست. اگر پیشنهاد، پرسش یا انتقادی درباره فعالیت‌ها دارید، خوشحال می‌شویم مطرح کنید؛ <strong>نظر محترمانه شما ارزشمند است</strong> و نباید به‌خودی‌خود بر فرصت همکاری‌تان اثر منفی بگذارد.</p>
+</article>
+<article class="card" data-section="choice">
+<header class="cardhead"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.2 17l3-3"/><path d="M20 12.5 14.8 17l-3-3"/><path d="M2 12l5-5 5 3 5-3 5 5"/><path d="M9 10l3 4 3-4"/></svg></span><h3>۲. انتخاب فعالیت و همکاری میان واحدها</h3></header>
+<p>انتخاب اولیه <strong>کتابخانه، روابط عمومی یا پژوهش</strong> در فرم، فقط نشانه علاقه شماست؛ با هماهنگی <strong>مسئول واحد مربوطه</strong> می‌توانید در هر سه حوزه فعالیت کنید.</p>
+<p>پیش از پذیرفتن هر کار، آزادید درباره آن گفت‌وگو کنید یا کاری نامتناسب با وقت، تحصیل یا سلامتتان ــ از جمله کار فیزیکی سنگین ــ را نپذیرید.</p>
+<p>وقتی <strong>کار یا نوبت مشخصی را آگاهانه پذیرفتید</strong>، روی همراهی شما برنامه‌ریزی می‌شود؛ اگر شرایط تغییر کرد، کافی است زود اطلاع دهید تا با هم راه‌حلی پیدا کنیم.</p>
+</article>
+<article class="card" data-section="presence">
+<header class="cardhead"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v15H4z"/><path d="M8 3v6"/><path d="M16 3v6"/><path d="M4 11h16"/><path d="M8 15h3"/><path d="M8 18h5"/></svg></span><h3>۳. برنامه هفتگی، انتخاب کار و ثبت ساعات</h3></header>
+<p><strong>برنامه هفتگی</strong> نشان می‌دهد معمولاً چه زمان‌هایی امکان همکاری دارید؛ قرار نیست همه این ساعت‌ها در دانشکده حاضر باشید یا برایتان کارکرد حساب شود.</p>
+<p><strong>مسئول واحد مربوطه</strong> تلاش می‌کند کارها را تا حد امکان <strong>۴۸ ساعت پیش از موعد</strong> هماهنگ کند.</p>
+<p>شما هم می‌توانید از <strong>«مخزن فرصت‌های همکاری»</strong> کارهای مناسب را خودتان انتخاب کنید: برای کارهای زمان‌دار، همان روز و ساعت تعیین‌شده ملاک است؛ برای کارهای انعطاف‌پذیر، زمان مناسب را طبق شرایط فعالیت انتخاب می‌کنید.</p>
+<p>وقتی <strong>کاری را پذیرفته و زمانش را هماهنگ کرده‌ایم</strong>، روی حضور شما حساب می‌کنیم. اگر مانعی پیش آمد، لطفاً زودتر خبر دهید؛ امتحان، بیماری و شرایط پیش‌بینی‌نشده را با انعطاف در نظر می‌گیریم.</p>
+<p><strong>گزارش فعالیت</strong> فقط مربوط به کار واقعاً انجام‌شده و مدت آن است؛ ساعات با بررسی <strong>مسئول واحد مربوطه</strong> تأیید می‌شوند و به همان حوزه فعالیت تعلق دارند.</p>
+<p><strong>نکته درباره فعالیت‌های روتین کتابخانه:</strong> برای <strong>یک کار روتین یکسان در کتابخانه و در بازه‌ای هم‌زمان</strong>، حداکثر <strong>دو نفر</strong> ساعت همان کار را ثبت می‌کنند؛ کار مستقل نفر دیگر با هماهنگی امکان‌پذیر است و این محدودیت به کارهای پژوهش و روابط عمومی تعمیم ندارد.</p>
+</article>
+<article class="card" data-section="library-routine">
+<header class="cardhead"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c-3-1-6-1-9 1v16c3-2 6-2 9-1 3-1 6-1 9 1V4c-3-2-6-2-9-1z"/><path d="M12 3v16"/></svg></span><h3>۴. فضای کتابخانه و نگهداری امکانات</h3></header>
+<p>کتابخانه فضای مشترک استقرار و هماهنگی دانشجوکاران هر سه حوزه است، هرچند همه فعالیت‌ها کتابخانه‌ای نیستند.</p>
+<p>پس از تأیید صلاحیت، می‌توانید <strong>طبق روال اعلام‌شده در گروه</strong> از کتابخانه برای مطالعه یا کارهای شخصی نیز استفاده کنید، حتی روزهایی که وظیفه مشخصی ندارید؛ <strong>حضور یا مطالعه شخصی ساعت کارکرد نیست</strong>.</p>
+<p>در صورت نیاز، کلید را طبق روال دریافت کنید و پس از استفاده <strong>به محل تعیین‌شده بازگردانید یا با هماهنگی به دانشجوکار بعدی بسپارید</strong>.</p>
+<p>خواهشمندیم در نگهداری وسایل، رعایت ایمنی و هماهنگی‌های حضور نیز با مسئولان دانشکده همکاری کنید.</p>
+</article>
+<article class="card" data-section="continuity">
+<header class="cardhead"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v12H9l-5 4z"/><path d="M8 9h8"/><path d="M8 13h6"/></svg></span><h3>۵. هماهنگی و ادامه همکاری</h3></header>
+<p>طبیعی است که در طول ترم، وقت آزاد، اولویت‌ها یا تمایل شما نسبت به همکاری دانشجویی تغییر کند. اگر چنین شد، لطفاً با <strong>مسئول واحد مربوطه</strong> در میان بگذارید تا برنامه‌ها و مسئولیت‌های پذیرفته‌شده به‌موقع تنظیم شوند.</p>
+<p>در صورت کاهش امکان همکاری، می‌توانیم با <strong>گفت‌وگو و توجه به شرایط شما</strong> درباره کمترکردن فعالیت‌ها، توقف موقت یا پایان همکاری تصمیم بگیریم.</p>
+<p>وضعیت پنل یا عضویت در گروه کاری هم ممکن است متناسب با شرایط تغییر کند؛ موضوع با اطلاع شما پیگیری می‌شود، نه صرفاً بر اساس روزهای بدون کار.</p>
+</article>
+<article class="card" data-section="privacy">
+<header class="cardhead"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg></span><h3>۶. پرسش‌ها، نماینده و ارتباط با مسئول</h3></header>
+<p>ممکن است هنگام فعالیت پرسش‌هایی درباره موضوعات مختلف برایتان پیش بیاید. پیشنهاد می‌کنیم ابتدا <strong>راهنمای سامانه</strong> را ببینید، در <strong>گروه</strong> بپرسید یا از <strong>همکاران و نماینده دانشجوکاران</strong> کمک بگیرید؛ نماینده، پل ارتباطی شما با مسئول واحد مربوطه است.</p>
+<p>اگر موضوع فوری بود یا از این راه‌ها به نتیجه نرسیدید، می‌توانید <strong>مستقیم با مسئول واحد مربوطه</strong> در ارتباط باشید.</p>
+<p>برای مراجعه حضوری به اتاق مسئول بهتر است از قبل هماهنگ کنید تا فرصت مناسبی فراهم باشد.</p>
+<p>در کنار این ارتباط دوستانه، متعهدیم که به حریم شخصی افراد، محرمانگی اطلاعات و گفت‌وگوهای داخلی احترام بگذاریم.</p>
+</article>
+<article class="card" data-section="finance">
+<header class="cardhead"><span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M8 7 4 15h8z"/><path d="M20 15h-8l4-8z"/><path d="M8 21h8"/></svg></span><h3>۷. حق‌الزحمه و سهمیه هر نیمسال</h3></header>
+<p>هدف اصلی، <strong>یادگیری و تجربه‌اندوزی</strong> است؛ در کنار آن، <strong>پرداخت عادلانه حق‌الزحمه کار مفید و پیگیری آن، مسئولیت دانشگاه و مسئولان مربوطه است</strong>.</p>
+<p>کار واقعی شما در سامانه ثبت و پس از بررسی تأیید می‌شود.</p>
+<p><strong>سهمیه هر واحد یا مجموعه واحدهای مرتبط در هر نیمسال اطلاع‌رسانی می‌شود.</strong> اگر مجموع ساعات تأییدشده از سهمیه مربوط بیشتر باشد، <strong>سهم مبنای پرداخت هر نفر متناسب با سهم او از مجموع کارکرد همان مجموعه</strong> محاسبه می‌شود؛ ساعات واقعی و تأییدشده در سوابق <strong>بدون کاهش</strong> باقی می‌مانند.</p>
+<section class="quota" aria-labelledby="quota-title">
+<h4 id="quota-title">نمونه محاسبه سهمیه نیمسال</h4>
+<p>فرض کنیم سهمیه یک نیمسال <strong>۴۰۰ ساعت</strong>، مجموع کارکرد تأییدشده <strong>۵۰۰ ساعت</strong> و کارکرد تأییدشده شما <strong>۵۰ ساعت</strong> باشد.</p>
+<div class="equation" role="img" aria-label="۵۰ تقسیم بر ۵۰۰، ضرب در ۴۰۰، مساوی با ۴۰ ساعت">
+ <div class="fraction"><div><b>۵۰</b><b>۵۰۰</b></div><small>۱۰٪ از کل کارکرد</small></div>
+ <span class="op" aria-hidden="true">×</span><span class="value" aria-hidden="true">۴۰۰<small>ساعت سهمیه</small></span>
+ <span class="op" aria-hidden="true">=</span><span class="result" aria-hidden="true">۴۰<small>ساعت مبنای پرداخت</small></span>
+</div><div class="compare"><div><small>کارکرد واقعی تأییدشده</small><b>۵۰ ساعت</b></div><div><small>سهم مبنای پرداخت</small><b>۴۰ ساعت</b></div></div>
+<p><strong>ساعات کارکرد واقعی و تأییدشده شما: ۵۰ ساعت</strong>  
+<strong>سهم مبنای پرداخت از سهمیه این نیمسال: ۴۰ ساعت</strong>
+
+این <strong>۴۰ ساعت سهم مبنای محاسبه پرداخت</strong> است؛ <strong>۵۰ ساعت کار واقعی همچنان در سوابق شما باقی می‌ماند</strong>. اگر مجموع کارکرد از سهمیه فراتر نرود، نسبت‌گیری کاهنده انجام نمی‌شود.</p></section></article></div>
+<footer><p>این نسخه هنوز تصویب نشده و تأییدی در این پیش‌نمایش ثبت نمی‌شود.</p>
+<label><input type="checkbox" disabled><span>چارچوب همکاری دانشجوکاران را خوانده‌ام، با حقوق و شیوه همکاری آشنا شده‌ام و با رعایت مفاد <strong>نسخه مصوب نمایش‌داده‌شده</strong> موافقم.</span></label>
+<button type="button" disabled>تأیید و ادامه (غیرفعال در پیش‌نمایش)</button></footer>
+</div></dialog>
+<script>
+const d=document.getElementById('policy');
+let last=null;
+for(const id of ['openMain','openSidebar']){document.getElementById(id).addEventListener('click',e=>{
+ last=e.currentTarget;if(!d.open)d.showModal();
+});}
+document.getElementById('closePolicy').addEventListener('click',()=>d.close());
+d.addEventListener('close',()=>last?.focus());
+window.addEventListener('load',()=>{last=document.getElementById('openMain');d.showModal();});
+</script>
+</body></html>
