@@ -1,4 +1,4 @@
-/* SWTB15 — native Chrome, isolated RC6 informational charter preview.
+/* SWTB15 — native Chrome, isolated RC7 informational charter preview.
  * No OpsApp, Auth, Supabase client, live RPC, real identities or deploy. */
 import assert from 'node:assert/strict'
 import {mkdir} from 'node:fs/promises'
@@ -63,7 +63,12 @@ try{
   'embedded view must not repeat page title, badge, institution or draft notice')
  assert.equal(await dialog.locator('.swtb-policy-lead').count(),1,
   'only one concise purpose introduction is allowed')
- assert.match(await dialog.locator('.swtb-policy-lead').innerText(),/هدف ما این است/)
+ assert.match(await dialog.locator('.swtb-policy-lead').innerText(),/همکاری دانشجوکاری در دانشکده/)
+ assert.equal(await dialog.locator('.swtb-policy-lead .swtb-policy-intro-paragraph').count(),3,
+  'owner-approved introduction must have three readable paragraphs')
+ assert.match(await dialog.innerText(),/حدود ۵ تا ۶ دقیقه/)
+ assert.match(await dialog.innerText(),/روز انجام از قبل تعیین می‌شود/)
+ assert.match(await dialog.innerText(),/پس از تأیید مراجع ذی‌صلاح اطلاع‌رسانی می‌شود/)
  assert.equal(await dialog.locator('.swtb-policy-footer [role="note"]').count(),1)
  assert.equal(await dialog.locator('li.swtb-policy-card').count(),7)
  assert.equal(await dialog.locator('[data-policy-section="finance"]').count(),1)
@@ -95,7 +100,7 @@ try{
  log('independent_height_columns_and_full_width_finance')
 
  log('single_heading_concise_purpose_no_repeated_notices')
- await page.screenshot({path:resolve(output,'01-rc6-initial-1440.png')})
+ await page.screenshot({path:resolve(output,'01-rc7-initial-1440.png')})
  log('initial_modal_readable_7_clauses_and_no_consent')
 
  const shellButton=page.locator('.swtb-policy-sidebar-actions button').last()
@@ -138,7 +143,7 @@ try{
  await expectModal()
  await page.setViewportSize({width:1366,height:720})
  await fit('1366x720 laptop')
- await page.screenshot({path:resolve(output,'02-rc6-short-laptop-1366.png')})
+ await page.screenshot({path:resolve(output,'02-rc7-short-laptop-1366.png')})
  await page.setViewportSize({width:800,height:600})
  await fit('800x600 compact')
  const mobile=await dialog.evaluate(node=>
@@ -148,7 +153,7 @@ try{
   'compact 800px view must show sections in real numerical order: '+mobile)
  log('compact_numeric_order_1_to_7')
 
- await page.screenshot({path:resolve(output,'03-rc6-compact-800.png')})
+ await page.screenshot({path:resolve(output,'03-rc7-compact-800.png')})
  await dialog.getByRole('button',{name:'بستن پیش‌نمایش چارچوب همکاری'}).click()
  await page.waitForFunction(()=>!document.querySelector('dialog.swtb-policy-modal'))
  log('short_laptop_compact_viewport')
@@ -221,7 +226,7 @@ try{
  await triggers.last().click()
  await expectModal()
  assert.equal(await page.locator('dialog.swtb-policy-modal li.swtb-policy-card').count(),7)
- await page.screenshot({path:resolve(output,'04-rc6-real-worker-shell-fake-data.png')})
+ await page.screenshot({path:resolve(output,'04-rc7-real-worker-shell-fake-data.png')})
  await page.keyboard.press('Escape')
  await page.waitForFunction(()=>!document.querySelector('dialog.swtb-policy-modal'))
  assert.equal(await page.evaluate(()=>globalThis.__qaWriteAttempts),0)
