@@ -49,7 +49,7 @@ test('SWTB15 worker UI shows a reading-only link and cannot gate login, task/rep
  const baseCss=read('../src/operations-workspace.css')
  assert.match(app,/VITE_SWTB15_READONLY_CHARTER_UI!=='false'/)
  assert.match(app,/const WorkerAgreementModalPreview = lazy/)
- assert.match(app,/aria-label="مطالعه پیش‌نویس چارچوب همکاری دانشجوکاران"/)
+ assert.match(app,/aria-label="مطالعه چارچوب همکاری دانشجوکاران"/)
  assert.match(app,/workerCharterInfoEnabled&&charterInfoOpen&&<Suspense/)
  assert.match(app,/useEffect\(\(\)=>setCharterInfoOpen\(false\),\[profile.worker_id\]\)/)
  assert.match(app,/charterInfoTriggerRef.current\?\.focus/)

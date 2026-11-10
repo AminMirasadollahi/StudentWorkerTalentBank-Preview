@@ -205,3 +205,30 @@
 @media(prefers-contrast:more){
  .swtb-policy-quota-math,.swtb-policy-quota-total{background:white;border-width:2px}
 }
+
+/* SWTB15 — independent natural-height card stacks (RC6 only).
+ * Desktop visual pairing remains 1|2, 3|4, 5|6, then finance 7 full width.
+ * Unlike a row-based CSS grid, one taller card never reserves blank space
+ * beneath the shorter neighboring card. Cards and finance text are unchanged.
+ * Single-column layouts restore numeric reading order for mobile/zoom. */
+.swtb-policy-seven-layout{
+ display:flex;flex-direction:column;gap:.8rem;min-width:0;
+}
+.swtb-policy-masonry{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:.8rem;align-items:start;min-width:0;
+}
+.swtb-policy-stack{
+ display:flex;flex-direction:column;gap:.8rem;
+ min-width:0;list-style:none;margin:0;padding:0;
+}
+.swtb-policy-stack>.swtb-policy-card{width:100%;box-sizing:border-box;min-width:0}
+.swtb-policy-finance-list{margin:0;padding:0;list-style:none;min-width:0}
+.swtb-policy-finance-list>.swtb-policy-card{width:100%;box-sizing:border-box}
+@media(max-width:1040px){
+ .swtb-policy-masonry{display:flex;flex-direction:column;gap:.8rem}
+ .swtb-policy-stack{display:contents}
+ .swtb-policy-masonry>.swtb-policy-stack>.swtb-policy-card{
+  width:100%;min-width:0;flex:none;
+ }
+}
