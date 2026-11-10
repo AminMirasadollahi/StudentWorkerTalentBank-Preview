@@ -58,8 +58,9 @@ try{
  assert.equal(await dialog.locator('li.swtb-policy-card').count(),7)
  assert.equal(await dialog.locator('[data-policy-section="finance"]').count(),1)
  assert.ok((await dialog.locator('.swtb-policy-quota-math').getAttribute('aria-label')).includes('50'))
- assert.equal(await dialog.locator('input[type="checkbox"]').isDisabled(),true)
- assert.equal(await dialog.getByRole('button',{name:'تأیید و شروع همکاری'}).isDisabled(),true)
+ assert.equal(await dialog.locator('input[type="checkbox"]').count(),0)
+ assert.equal(await dialog.getByRole('button',{name:'تأیید و شروع همکاری'}).count(),0)
+ assert.match(await dialog.innerText(),/مطالعه این متن در سامانه به‌عنوان تأیید یا پذیرش ثبت نمی‌شود/)
  await page.screenshot({path:resolve(output,'01-rc6-initial-1440.png')})
  log('initial_modal_readable_7_clauses_and_no_consent')
 
