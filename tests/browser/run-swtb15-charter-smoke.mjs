@@ -78,8 +78,18 @@ try{
  assert.equal(await dialog.locator('li.swtb-policy-card').count(),7)
  for(let i=0;i<12;i++){
   await page.keyboard.press('Tab')
-  assert.equal(await page.evaluate(()=>!!document.activeElement?.closest('dialog.swtb-policy-modal')),
-   true,'Tab '+(i+1)+' escaped native modal')
+  const focus=await page.evaluate(()=>{
+   const d=document.querySelector('dialog.swtb-policy-modal')
+   const a=document.activeElement
+   return {
+    dialogExists:!!d,dialogOpen:d?.open,topLayer:d?.matches(':modal'),
+    activeTag:a?.tagName,activeClass:typeof a?.className==='string'?a.className:'',
+    activeText:a?.textContent?.trim().slice(0,80),
+    inside:!!a?.closest('dialog.swtb-policy-modal')
+   }
+  })
+  process.stdout.write('SWTB15_CHROME_TAB_'+(i+1)+'='+JSON.stringify(focus)+'\n')
+  assert.ok(focus.inside,'Tab '+(i+1)+' escaped native modal: '+JSON.stringify(focus))
  }
  await page.keyboard.press('Escape')
  await page.waitForFunction(()=>!document.querySelector('dialog.swtb-policy-modal'))
