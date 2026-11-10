@@ -40,6 +40,9 @@ const isolates={
   }
   if((from.endsWith('/src/components/TermBudgetPanel.jsx')||from.endsWith('/src/components/BudgetPoolEditor.jsx')||from.endsWith('/src/components/TermStatusDialog.jsx'))&&source==='../lib/operationsV2')
     return '\0swtb7-fake-v2'
+  // This candidate UI must NEVER load the actual production Ops client in QA.
+  if(from.endsWith('/src/components/WorkerAgreementOfficialConsent.jsx')
+   &&source==='../lib/operationsV2')return '\0swtb7-fake-v2'
   if(from.endsWith('/src/components/TaskAssignmentEditor.jsx')){
    if(source==='../lib/operationsV2')return '\0swtb7-fake-v2'
    if(source==='../lib/operations')return '\0swtb7-fake-legacy'
