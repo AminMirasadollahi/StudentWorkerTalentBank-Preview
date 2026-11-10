@@ -31,7 +31,7 @@ function policyInline(raw){
 }
 const faNumber=value=>new Intl.NumberFormat('fa-IR',{maximumFractionDigits:2}).format(value)
 
-export default function WorkerAgreementReview({policy=workerAgreementDraft}){
+export default function WorkerAgreementReview({policy=workerAgreementDraft,embedded=false}){
  // RC6 remains draft internally until institutionally approved and stored.
  // Display version is a reading edition, never a recorded legal consent.
  const isCurrentReading=policy.version==='1.0-rc6'&&policy.status==='draft'
@@ -106,8 +106,15 @@ export default function WorkerAgreementReview({policy=workerAgreementDraft}){
      </li>
 
  return <section className="swtb-policy-review" dir="rtl"
-   aria-labelledby="swtb-policy-title" data-policy-status="draft">
-   <header className="swtb-policy-head">
+   aria-labelledby={embedded?undefined:'swtb-policy-title'}
+   aria-label={embedded?'مفاد هفت‌گانه چارچوب همکاری':undefined}
+   data-policy-status="draft">
+   {embedded
+    ?<div className="swtb-policy-lead">
+      {policy.intro.split(/\n\s*\n/).map((paragraph,i)=>
+        <p key={i} className="swtb-policy-intro-paragraph">{policyInline(paragraph)}</p>)}
+     </div>
+    :<header className="swtb-policy-head">
      <span className="swtb-policy-kicker">چارچوب همکاری · نسخه {displayVersion} برای مطالعه</span>
      <h1 id="swtb-policy-title">{policy.title}</h1>
      {policy.studyNote&&<p className="swtb-policy-study-note">
@@ -118,7 +125,7 @@ export default function WorkerAgreementReview({policy=workerAgreementDraft}){
      <p className="swtb-policy-caution" role="status">
        {displayNotice||'متن برای مطالعه در دسترس است؛ ثبت پذیرش رسمی هنوز فعال نشده است.'}
      </p>
-   </header>
+   </header>}
    {compactSeven
      ?<div className="swtb-policy-seven-layout" aria-label="هفت اصل چارچوب همکاری">
        <div className="swtb-policy-masonry">
@@ -146,11 +153,10 @@ export default function WorkerAgreementReview({policy=workerAgreementDraft}){
      </div>
    </section>}
    <footer className="swtb-policy-footer">
-     <p>{displayNotice}</p>
+     {!embedded&&<p>{displayNotice}</p>}
      <p className="swtb-policy-muted" role="note">
-       این متن برای آشنایی شما با اصول همکاری دانشجوکاران در دسترس است.
        مطالعه این متن در سامانه به‌عنوان تأیید یا پذیرش ثبت نمی‌شود و استفاده از پنل را محدود نمی‌کند.
-       اگر نسخه‌ای به تصویب رسمی برسد، شیوه اطلاع‌رسانی و پذیرش معتبر آن جداگانه اعلام خواهد شد.
+       پس از تصویب نسخه رسمی، روش ثبت موافقت در سامانه جداگانه اعلام خواهد شد.
      </p>
    </footer>
  </section>
