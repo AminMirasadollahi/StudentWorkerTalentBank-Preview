@@ -60,6 +60,8 @@ globalThis.__qaAgreementStatus??={
  document:{
   status:'approved',version:'1.0.0',title:'چارچوب همکاری آزمایشی — فاقد اعتبار واقعی',
   institution:'دانشکده نمونه آزمایشی',
+  approval:{reference:'SYNTHETIC-ONLY-01',authority:'مرجع کاملاً ساختگی QA',
+   approved_on:'2026-11-10T07:00:00Z'},
   intro:'این فقط داده ساختگی در محیط آزمون است.\n\nهیچ پذیرش واقعی ثبت نمی‌شود.',
   acceptance:'متن نسخه نمونه را مطالعه کرده‌ام و پذیرش این نسخه ساختگی را در محیط آزمایش تأیید می‌کنم.',
   sections:['learning','choice','presence','library-routine','continuity','privacy','finance']
