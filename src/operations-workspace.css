@@ -3726,9 +3726,10 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 }
 .ow-b3-sidebar__footer .swtb-policy-sidebar-actions .swtb-policy-sidebar-action{
  box-sizing:border-box;display:flex;align-items:center;justify-content:center;
- flex:initial;gap:.34rem;min-width:0;width:100%;min-height:3.12rem;
- padding:.45rem .32rem;line-height:1.5;text-align:center;
- font:inherit;font-size:.72rem;font-weight:700;
+ flex:initial;flex-direction:column;gap:.15rem;
+ min-width:0;width:100%;height:3.6rem;min-height:3.6rem;
+ padding:.38rem .2rem;margin:0;line-height:1.35;text-align:center;
+ font:inherit;font-size:.7rem;font-weight:700;
  border:1px solid #ffffff42;border-radius:9px;
  background:#ffffff13;color:#f0fbfc;cursor:pointer;
  transition:background .15s ease,border-color .15s ease;
@@ -3743,13 +3744,13 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
  display:block;flex:0 0 1.06rem;width:1.06rem;height:1.06rem;
 }
 .ow-b3-sidebar__footer .swtb-policy-action-label{
- min-width:0;overflow-wrap:normal;line-height:1.5;text-align:center;
+ min-width:0;overflow-wrap:normal;line-height:1.35;text-align:center;
 }
 .ow-b3-is-collapsed .ow-b3-sidebar__footer .swtb-policy-sidebar-actions{
  grid-template-columns:1fr 1fr;gap:.25rem;
 }
 .ow-b3-is-collapsed .ow-b3-sidebar__footer .swtb-policy-sidebar-action{
- min-height:2.6rem;padding:.42rem .2rem;
+ min-height:2.55rem;height:2.55rem;padding:.35rem .15rem;margin:0;
 }
 @media(max-width:600px){
  .ow-b3-sidebar__footer .swtb-policy-sidebar-actions{
