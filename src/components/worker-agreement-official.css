@@ -1,0 +1,89 @@
+/* SWTB15 candidate official consent surface — never loaded unless explicit flag. */
+.swtb-agreement-official-entry{margin:.45rem 0;color:inherit}
+.swtb-agreement-official-entry>p{font-size:.74rem;line-height:1.65;margin:.4rem 0;color:inherit}
+.swtb-agreement-official-entry .swtb-agreement-official-launch{
+  display:block;width:100%;border:1px solid #59aaa1;border-radius:9px;
+  padding:.52rem .65rem;background:#124c53;color:#fff;
+  font:inherit;line-height:1.7;font-size:.78rem;text-align:center;cursor:pointer
+}
+.swtb-agreement-official-launch:disabled{opacity:.6;cursor:wait}
+.swtb-agreement-official-launch:focus-visible,
+.swtb-agreement-official-modal button:focus-visible,
+.swtb-agreement-official-modal input:focus-visible{
+  outline:3px solid #30b9a9;outline-offset:3px
+}
+.swtb-agreement-official-modal{
+  box-sizing:border-box;position:fixed;inset:0;
+  width:min(900px,calc(100vw - 24px));max-width:900px;
+  height:min(91dvh,900px);max-height:calc(100dvh - 20px);
+  min-height:0;margin:auto;padding:0;overflow:hidden;
+  border-radius:13px;border:1px solid #b4cfce;background:#fff;
+  color:#133743;box-shadow:0 24px 85px #0005;
+  font:inherit;line-height:1.9
+}
+.swtb-agreement-official-modal::backdrop{background:#091f33ba}
+.swtb-agreement-official-modal[open]{display:flex;flex-direction:column}
+.swtb-agreement-official-header,.swtb-agreement-official-controls{
+  flex:0 0 auto;padding:12px 18px;background:#f4faf9;
+}
+.swtb-agreement-official-header{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  border-bottom:1px solid #dbe9e7
+}
+.swtb-agreement-official-header h2{font:inherit;font-size:1.1rem;font-weight:800;margin:0}
+.swtb-agreement-official-header p{font-size:.8rem;margin:.15rem 0}
+.swtb-agreement-official-header button,.swtb-agreement-official-controls button{
+  border:1px solid #9bbab6;border-radius:7px;padding:.38rem .9rem;
+  font:inherit;color:#103949;background:#fff;cursor:pointer
+}
+.swtb-agreement-official-controls button:not([disabled]){
+  background:#08756b;border-color:#08756b;color:#fff;font-weight:700
+}
+.swtb-agreement-official-controls button:disabled{opacity:.5;cursor:not-allowed}
+.swtb-agreement-official-scroll{
+  flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;
+  padding:18px 22px;scrollbar-gutter:stable
+}
+.swtb-agreement-official-scroll:focus-visible{outline:2px solid #08756b;outline-offset:-3px}
+.swtb-agreement-server-document h3{font-size:1.28rem;line-height:1.5;margin:.6rem 0}
+.swtb-agreement-server-document h4{font-size:.96rem;margin:0 0 .45rem}
+.swtb-agreement-server-document p{margin:.5rem 0;line-height:1.95}
+.swtb-agreement-version-meta{
+  display:flex;flex-wrap:wrap;gap:.3rem .9rem;
+  padding:.65rem .8rem;border-radius:8px;background:#eaf5f2;font-size:.78rem
+}
+.swtb-agreement-version-meta bdi,.swtb-agreement-digest bdi{
+  direction:ltr;unicode-bidi:isolate;overflow-wrap:anywhere
+}
+.swtb-agreement-official-sections{padding:0 1.4rem 0 0;margin:1.2rem 0}
+.swtb-agreement-official-sections>li{
+  border:1px solid #d9e9e7;border-radius:9px;padding:.75rem 1rem;
+  margin:.75rem 0;background:#fff
+}
+.swtb-agreement-official-example,.swtb-agreement-note,.swtb-agreement-change{
+  border-right:3px solid #199e91;background:#f1f9f7;
+  border-radius:6px;padding:.6rem .75rem
+}
+.swtb-agreement-official-formula{
+  font-weight:800;font-variant-numeric:tabular-nums;text-align:center;
+  overflow-wrap:anywhere
+}
+.swtb-agreement-official-controls{
+  border-top:1px solid #dbe9e7;max-height:38vh;overflow-y:auto;font-size:.82rem
+}
+.swtb-agreement-official-controls label{
+  display:flex;align-items:flex-start;gap:.55rem;line-height:1.9;
+  font-weight:600;margin:.25rem 0 .6rem
+}
+.swtb-agreement-official-controls input[type="checkbox"]{
+  width:19px;height:19px;flex:0 0 19px;margin-top:.35rem
+}
+.swtb-agreement-official-controls p{margin:.35rem 0}
+.swtb-agreement-official-note{padding:.4rem .6rem;border-radius:6px;background:#e0f6f2}
+.swtb-agreement-digest{margin:.8rem 0;font-size:.78rem}
+@media(max-width:680px){
+ .swtb-agreement-official-modal{width:calc(100vw - 12px);height:calc(100dvh - 12px);max-height:none}
+ .swtb-agreement-official-header,.swtb-agreement-official-controls{padding:9px 11px}
+ .swtb-agreement-official-scroll{padding:11px}
+ .swtb-agreement-official-header h2{font-size:.9rem}
+}
