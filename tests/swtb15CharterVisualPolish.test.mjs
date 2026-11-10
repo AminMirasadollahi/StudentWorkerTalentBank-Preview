@@ -4,12 +4,13 @@ import {readFileSync} from 'node:fs'
 import {workerAgreementApprovalCandidate as candidate} from '../src/lib/workerAgreementApprovalCandidate.mjs'
 const load=path=>readFileSync(new URL(path,import.meta.url),'utf8')
 
-test('SWTB15 reading polish cannot rewrite draft status, sections, quota or receipt',()=>{
+test('SWTB16 RC7 editorial polish preserves draft, sections, quota and no receipt',()=>{
  const review=load('../src/components/WorkerAgreementReview.jsx')
  const modal=load('../src/components/WorkerAgreementModalPreview.jsx')
  const application=load('../src/OperationsWorkspace.jsx')
  assert.equal(candidate.status,'draft')
- assert.equal(candidate.version,'1.0-rc6')
+ assert.equal(candidate.version,'1.0-rc7')
+ assert.equal(candidate.intro.split(/\n\s*\n/).length,3)
  assert.equal(candidate.sections.length,7)
  assert.equal(candidate.sections.reduce((a,s)=>a+s.paragraphs.length,0),24)
  assert.deepEqual(candidate.quotaExample, {

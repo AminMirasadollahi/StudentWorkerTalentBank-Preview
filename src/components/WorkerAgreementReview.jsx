@@ -32,9 +32,9 @@ function policyInline(raw){
 const faNumber=value=>new Intl.NumberFormat('fa-IR',{maximumFractionDigits:2}).format(value)
 
 export default function WorkerAgreementReview({policy=workerAgreementDraft,embedded=false}){
- // RC6 remains draft internally until institutionally approved and stored.
+ // RC7 remains draft internally until institutionally approved and stored.
  // Display version is a reading edition, never a recorded legal consent.
- const isCurrentReading=policy.version==='1.0-rc6'&&policy.status==='draft'
+ const isCurrentReading=policy.version==='1.0-rc7'&&policy.status==='draft'
  const displayVersion=isCurrentReading?'۱.۰':policy.version
  const displayNotice=isCurrentReading
   ?'این نسخه برای آشنایی با چارچوب همکاری در دسترس است. تصویب نهایی و ثبت موافقت معتبر، پس از تکمیل مراحل رسمی از طریق سامانه اعلام خواهد شد.'

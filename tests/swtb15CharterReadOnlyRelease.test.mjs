@@ -7,15 +7,16 @@ const read=relative=>readFileSync(new URL(relative,import.meta.url),'utf8')
 const norm=value=>String(value).replace(/\*\*/g,'').replace(/<\/?strong>/g,'')
  .replace(/[\u200c\u200f\u200e]/g,'').replace(/\s+/g,' ').normalize('NFKC').trim()
 
-test('SWTB15 student-reading copy is exactly draft RC6, not enforceable v1.0',()=>{
- assert.equal(policy.version,'1.0-rc6')
+test('SWTB16 student-reading copy is exactly draft RC7, not enforceable v1.0',()=>{
+ assert.equal(policy.version,'1.0-rc7')
  assert.equal(policy.status,'draft')
  assert.equal(policy.sections.length,7)
  assert.equal(new Set(policy.sections.map(x=>x.id)).size,7)
  assert.equal(policy.sections.reduce((n,s)=>n+s.paragraphs.length,0),24)
  assert.equal(policy.timeline,undefined)
  assert.match(policy.notice,/تصویب|منتشر/)
- assert.match(policy.studyNote,/۴ تا ۵ دقیقه/)
+ assert.match(policy.studyNote,/۵ تا ۶ دقیقه/)
+ assert.equal(policy.intro.split(/\n\s*\n/).length,3)
  const all=policy.sections.flatMap(s=>s.paragraphs).join(' ')
  assert.doesNotMatch(all,/روز سوم تقویمی|تعلیق ۱۴روزه|روزهای ۰، ۳، ۷/)
 })
@@ -29,17 +30,17 @@ test('SWTB15 math example must NOT decrease recorded approved hours',()=>{
  assert.match(q.note,/۵۰ ساعت کار واقعی همچنان در سوابق شما باقی می‌ماند/)
 })
 
-test('SWTB15 current seven-card offline review mirrors every student-facing RC6 paragraph',()=>{
+test('SWTB15 historical RC6 offline snapshot stays independently intact (not RC7 source)',()=>{
  const html=read('../design/previews/SWTB14_RC6_Worker_Charter_Proportion_REVIEW_ONLY.html')
  assert.match(html,/<html lang="fa" dir="rtl">/)
- for(const section of policy.sections){
-  const block=html.match(new RegExp('<article class="card" data-section="'+section.id+'">([\\s\\S]*?)<\\/article>'))
-  assert.ok(block,'missing HTML card '+section.id)
-  const normalized=norm(block[1])
-  for(const para of section.paragraphs)
-   assert.ok(normalized.includes(norm(para)),'RC6 paragraph drift in '+section.id)
- }
+ for(const id of ['learning','choice','presence','library-routine',
+  'continuity','privacy','finance'])
+  assert.ok(html.includes('class="card" data-section="'+id+'"'),
+   'historical RC6 snapshot lost '+id)
  assert.equal((html.match(/class="card" data-section=/g)||[]).length,7)
+ // RC6 is intentionally archived without silently rewriting its text to RC7.
+ assert.match(html,/برای کارهای انعطاف‌پذیر/)
+ assert.doesNotMatch(html,/روز انجام از قبل تعیین می‌شود/)
  assert.match(html,/type="checkbox" disabled/)
  assert.doesNotMatch(html,/fetch\(|XMLHttpRequest|supabase|\.rpc\(|<script\s+src=|<link\s+href=/i)
 })

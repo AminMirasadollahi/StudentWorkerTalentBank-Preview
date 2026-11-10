@@ -241,10 +241,10 @@
  margin:0 0 .85rem;padding:.7rem 1rem;
 }
 .swtb-policy-lead .swtb-policy-intro-paragraph{
- margin:0!important;font-size:.88rem;line-height:1.9;color:#294a5a;
+ margin:0!important;font-size:.92rem;line-height:1.9;color:#294a5a;
 }
 .swtb-policy-lead .swtb-policy-intro-paragraph+.swtb-policy-intro-paragraph{
- margin-top:.35rem!important;
+ margin-top:.58rem!important;
 }
 @media(max-width:590px){
  .swtb-policy-lead{padding:.7rem .8rem}
