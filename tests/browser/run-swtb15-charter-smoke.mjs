@@ -55,6 +55,16 @@ try{
  const dialog=page.locator('dialog.swtb-policy-modal')
  assert.match(await dialog.innerText(),/نسخه ۱.۰/)
  assert.doesNotMatch(await dialog.innerText(),/پیش‌نمایش محتوایی/)
+ assert.equal(await dialog.getByRole('heading',
+  {name:'چارچوب همکاری دانشجوکاران',exact:true}).count(),1,
+  'the modal must display the charter title exactly once')
+ assert.equal(await dialog.locator('.swtb-policy-head,.swtb-policy-kicker,'
+  +'.swtb-policy-study-note,.swtb-policy-institution,.swtb-policy-caution').count(),0,
+  'embedded view must not repeat page title, badge, institution or draft notice')
+ assert.equal(await dialog.locator('.swtb-policy-lead').count(),1,
+  'only one concise purpose introduction is allowed')
+ assert.match(await dialog.locator('.swtb-policy-lead').innerText(),/هدف ما این است/)
+ assert.equal(await dialog.locator('.swtb-policy-footer [role="note"]').count(),1)
  assert.equal(await dialog.locator('li.swtb-policy-card').count(),7)
  assert.equal(await dialog.locator('[data-policy-section="finance"]').count(),1)
  assert.ok((await dialog.locator('.swtb-policy-quota-math').getAttribute('aria-label')).includes('50'))
@@ -84,6 +94,7 @@ try{
   'financial example remains wide and legible')
  log('independent_height_columns_and_full_width_finance')
 
+ log('single_heading_concise_purpose_no_repeated_notices')
  await page.screenshot({path:resolve(output,'01-rc6-initial-1440.png')})
  log('initial_modal_readable_7_clauses_and_no_consent')
 
