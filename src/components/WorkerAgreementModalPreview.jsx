@@ -8,6 +8,7 @@ import './worker-agreement-modal.css'
 
 export default function WorkerAgreementModalPreview({open,onClose}){
  const dialogRef=useRef(null)
+ const isReadingEdition=workerAgreementApprovalCandidate.version==='1.0-rc6'&&workerAgreementApprovalCandidate.status==='draft'
  useEffect(()=>{
   const dialog=dialogRef.current
   if(!open||!dialog)return
@@ -44,7 +45,7 @@ export default function WorkerAgreementModalPreview({open,onClose}){
    <div className="swtb-policy-modal-head">
     <div>
      <h2 id="swtb-policy-modal-heading">چارچوب همکاری دانشجوکاران</h2>
-     <p>پیش‌نمایش محتوایی نسخه {workerAgreementApprovalCandidate.version} · هنوز فاقد ثبت پذیرش یا محدودیت عملیاتی</p>
+     <p>{isReadingEdition?'نسخه ۱.۰ برای مطالعه · تأیید و ثبت پذیرش رسمی هنوز فعال نشده است':`نسخه ${workerAgreementApprovalCandidate.version} · برای مطالعه و بازبینی`}</p>
     </div>
     <button type="button" className="swtb-policy-modal-close" onClick={close}
      aria-label="بستن پیش‌نمایش چارچوب همکاری">بستن ×</button>
