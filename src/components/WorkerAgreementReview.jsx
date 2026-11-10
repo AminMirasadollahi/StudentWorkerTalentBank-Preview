@@ -32,22 +32,15 @@ function policyInline(raw){
 const faNumber=value=>new Intl.NumberFormat('fa-IR',{maximumFractionDigits:2}).format(value)
 
 export default function WorkerAgreementReview({policy=workerAgreementDraft}){
- return <section className="swtb-policy-review" dir="rtl"
-   aria-labelledby="swtb-policy-title" data-policy-status="draft">
-   <header className="swtb-policy-head">
-     <span className="swtb-policy-kicker">پیش‌نمایش محتوایی · نسخه {policy.version}</span>
-     <h1 id="swtb-policy-title">{policy.title}</h1>
-     {policy.studyNote&&<p className="swtb-policy-study-note">
-       <AgreementIcon name="document"/><span>{policyInline(policy.studyNote)}</span>
-     </p>}
-     <p className="swtb-policy-institution">{policy.institution}</p>
-     {policy.intro.split(/\n\s*\n/).map((paragraph,i)=><p key={i} className="swtb-policy-intro-paragraph">{policyInline(paragraph)}</p>)}
-     <p className="swtb-policy-caution" role="status">
-       {policy.notice||'این صفحه فقط برای بازبینی متن و طراحی است؛ هنوز چارچوب رسمی منتشر نشده و هیچ موافقتی ثبت نمی‌شود.'}
-     </p>
-   </header>
-   <ol className="swtb-policy-sections" aria-label="هفت اصل چارچوب همکاری">
-     {policy.sections.map((item,index)=><li key={item.id} className="swtb-policy-card" data-policy-section={item.id}
+ // RC6 remains draft internally until institutionally approved and stored.
+ // Display version is a reading edition, never a recorded legal consent.
+ const isCurrentReading=policy.version==='1.0-rc6'&&policy.status==='draft'
+ const displayVersion=isCurrentReading?'۱.۰':policy.version
+ const displayNotice=isCurrentReading
+  ?'این نسخه برای آشنایی با چارچوب همکاری در دسترس است. تصویب نهایی و ثبت موافقت معتبر، پس از تکمیل مراحل رسمی از طریق سامانه اعلام خواهد شد.'
+  :policy.notice
+ const compactSeven=isCurrentReading&&policy.sections.length===7&&policy.sections[6].id==='finance'&&!Array.isArray(policy.timeline)
+ const renderCard=(item,index)=> <li key={item.id} className="swtb-policy-card" style={{order:index}} data-policy-section={item.id}
          data-policy-has-timeline={item.id==='continuity'&&Array.isArray(policy.timeline)?'true':'false'}
          data-policy-has-quota={item.id==='finance'&&Boolean(policy.quotaExample)?'true':'false'}>
        <div className="swtb-policy-card-heading">
@@ -110,8 +103,38 @@ export default function WorkerAgreementReview({policy=workerAgreementDraft}){
          <summary>شرایط تعهدهای انجام‌نشده، حق توضیح و درخواست بازبینی — متن کامل</summary>
          <div>{item.detailParagraphs.map((p,i)=><p key={'detail-'+i}>{p}</p>)}</div>
        </details>}
-     </li>)}
-   </ol>
+     </li>
+
+ return <section className="swtb-policy-review" dir="rtl"
+   aria-labelledby="swtb-policy-title" data-policy-status="draft">
+   <header className="swtb-policy-head">
+     <span className="swtb-policy-kicker">چارچوب همکاری · نسخه {displayVersion} برای مطالعه</span>
+     <h1 id="swtb-policy-title">{policy.title}</h1>
+     {policy.studyNote&&<p className="swtb-policy-study-note">
+       <AgreementIcon name="document"/><span>{policyInline(policy.studyNote)}</span>
+     </p>}
+     <p className="swtb-policy-institution">{policy.institution}</p>
+     {policy.intro.split(/\n\s*\n/).map((paragraph,i)=><p key={i} className="swtb-policy-intro-paragraph">{policyInline(paragraph)}</p>)}
+     <p className="swtb-policy-caution" role="status">
+       {displayNotice||'متن برای مطالعه در دسترس است؛ ثبت پذیرش رسمی هنوز فعال نشده است.'}
+     </p>
+   </header>
+   {compactSeven
+     ?<div className="swtb-policy-seven-layout" aria-label="هفت اصل چارچوب همکاری">
+       <div className="swtb-policy-masonry">
+         {[0,1].map(column=><ol className="swtb-policy-stack" key={column}
+           aria-label={column===0?'اصول یک، سه و پنج':'اصول دو، چهار و شش'}>
+           {policy.sections.slice(0,6).filter((_,index)=>index%2===column)
+             .map((item,index)=>renderCard(item,column+2*index))}
+         </ol>)}
+       </div>
+       <ol className="swtb-policy-finance-list" aria-label="اصل هفتم">
+         {renderCard(policy.sections[6],6)}
+       </ol>
+     </div>
+     :<ol className="swtb-policy-sections" aria-label="هفت اصل چارچوب همکاری">
+       {policy.sections.map(renderCard)}
+     </ol>}
    {policy.showTimeConcepts!==false&&<section className="swtb-policy-concepts" aria-labelledby="swtb-policy-concepts-heading">
      <h2 id="swtb-policy-concepts-heading">سه مفهوم که نباید با هم اشتباه شوند</h2>
      <div className="swtb-policy-concepts-grid">
@@ -123,9 +146,9 @@ export default function WorkerAgreementReview({policy=workerAgreementDraft}){
      </div>
    </section>}
    <footer className="swtb-policy-footer">
-     <p>{policy.notice}</p>
+     <p>{displayNotice}</p>
      <p className="swtb-policy-muted" role="note">
-       این متن در مرحله فعلی صرفاً برای آشنایی شما با اصول پیشنهادی همکاری منتشر شده است.
+       این متن برای آشنایی شما با اصول همکاری دانشجوکاران در دسترس است.
        مطالعه این متن در سامانه به‌عنوان تأیید یا پذیرش ثبت نمی‌شود و استفاده از پنل را محدود نمی‌کند.
        اگر نسخه‌ای به تصویب رسمی برسد، شیوه اطلاع‌رسانی و پذیرش معتبر آن جداگانه اعلام خواهد شد.
      </p>
