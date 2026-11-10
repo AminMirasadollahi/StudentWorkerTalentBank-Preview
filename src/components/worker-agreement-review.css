@@ -232,3 +232,20 @@
   width:100%;min-width:0;flex:none;
  }
 }
+
+/* SWTB15 — the real modal already has the document heading, institution and
+ * reading edition. Inside its scroll region, only one concise purpose lead
+ * precedes seven independent cards. Keep standalone review headings intact. */
+.swtb-policy-lead{
+ background:#fff;border:1px solid #dde9ec;border-radius:12px;
+ margin:0 0 .85rem;padding:.7rem 1rem;
+}
+.swtb-policy-lead .swtb-policy-intro-paragraph{
+ margin:0!important;font-size:.88rem;line-height:1.9;color:#294a5a;
+}
+.swtb-policy-lead .swtb-policy-intro-paragraph+.swtb-policy-intro-paragraph{
+ margin-top:.35rem!important;
+}
+@media(max-width:590px){
+ .swtb-policy-lead{padding:.7rem .8rem}
+}
