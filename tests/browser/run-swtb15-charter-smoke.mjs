@@ -36,7 +36,10 @@ try{
  await server.listen()
  browser=await chromium.launch({headless:true,channel:'chrome',args:['--no-sandbox']})
  page=await browser.newPage({viewport:{width:1440,height:900},locale:'fa-IR'})
- page.on('pageerror',error=>browserErrors.push(error.message))
+ page.on('pageerror',error=>{
+  browserErrors.push(error.message)
+  process.stderr.write('SWTB15_CHROME_PAGEERROR='+error.message+'\n')
+ })
  page.on('request',request=>{
   if(!['GET','HEAD','OPTIONS'].includes(request.method()))writeAttempts.push(request.url())
  })
@@ -117,7 +120,10 @@ try{
  server=await createServer({configFile:resolve('tests/browser/vite.smoke.config.mjs')})
  await server.listen()
  page=await browser.newPage({viewport:{width:1440,height:900},locale:'fa-IR'})
- page.on('pageerror',error=>browserErrors.push(error.message))
+ page.on('pageerror',error=>{
+  browserErrors.push(error.message)
+  process.stderr.write('SWTB15_CHROME_PAGEERROR='+error.message+'\n')
+ })
  page.on('request',request=>{
   if(!['GET','HEAD','OPTIONS'].includes(request.method()))writeAttempts.push(request.url())
  })
@@ -127,9 +133,22 @@ try{
   externalAttempts.push(u.origin)
   return route.abort('blockedbyclient')
  })
- await page.goto('http://127.0.0.1:4177/tests/browser/worker-smoke.html',
+ const workerResponse=await page.goto('http://127.0.0.1:4177/tests/browser/worker-smoke.html',
   {waitUntil:'domcontentloaded'})
- await page.locator('.ow-worker-report-trigger').first().waitFor({state:'visible',timeout:15000})
+ process.stdout.write('SWTB15_WORKER_FIXTURE_HTTP='+workerResponse.status()+'\n')
+ try{
+  await page.locator('.ow-b3-sidebar').waitFor({state:'visible',timeout:12000})
+ }catch(error){
+  const fixture=await page.evaluate(()=>({
+   title:document.title,rootLength:document.getElementById('root')?.innerHTML?.length||0,
+   bodyText:document.body.innerText.slice(0,1300),
+   hasSidebar:!!document.querySelector('.ow-b3-sidebar'),
+   hasViteOverlay:!!document.querySelector('vite-error-overlay'),
+  }))
+  process.stderr.write('SWTB15_WORKER_FIXTURE_DIAGNOSTIC='+JSON.stringify(fixture)+'\n')
+  throw error
+ }
+ process.stdout.write('SWTB15_WORKER_FIXTURE_SIDEBAR_RENDERED\n')
  const welcome=page.locator('dialog.swtb-guide-welcome')
  if(await welcome.count() && await welcome.isVisible())
   await welcome.getByRole('button',{name:'فعلاً نه'}).click()
