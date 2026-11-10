@@ -37,8 +37,10 @@ import {managerReviewItems} from './lib/managerReviewRows.mjs'
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
 const WorkPoolManagerPanel = lazy(()=>import('./components/WorkPoolManagerPanel'))
 const WorkPoolWorkerPanel = lazy(()=>import('./components/WorkPoolWorkerPanel'))
-// SWTB15 separate from mandatory acceptance: informational, nonblocking RC6.
+// SWTB16 read-only RC7 is distinct from separately approved, versioned server consent.
 const WorkerAgreementModalPreview = lazy(()=>import('./components/WorkerAgreementModalPreview.jsx'))
+// Optional official consent; the server is always authoritative.
+const WorkerAgreementOfficialConsent = lazy(()=>import('./components/WorkerAgreementOfficialConsent.jsx'))
 import * as unifiedPeerApi from './lib/operationsV2'
 import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeRequests,
  requestProfileChange,reviewProfileChange,getUnitHourTotals,
@@ -64,6 +66,8 @@ const workPoolUIEnabled=import.meta.env?.VITE_SWTB21_WORK_POOL_UI!=='false'
 // Read-only charter visible to worker by default; emergency build-time OFF switch.
 // Does NOT grant or deny writes, record consent, or change any worker state.
 const workerCharterInfoEnabled=import.meta.env?.VITE_SWTB15_READONLY_CHARTER_UI!=='false'
+// OFF until published official snapshot, backend receipt/gates, QA and explicit release authorization.
+const workerAgreementOfficialUIEnabled=import.meta.env?.VITE_SWTB15_OFFICIAL_CONSENT_UI==='true'
 // SWTB22-D3 is a presentation-only, independently reversible manager release.
 // Legacy manager route and all TaskAssignmentEditor server guards remain unchanged.
 const focusTaskUIEnabled=import.meta.env?.VITE_SWTB22_TASKS_FOCUS_UI==='true'
@@ -2570,6 +2574,10 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
             {!sidebarCollapsed&&<span className="swtb-policy-action-label">چارچوب همکاری</span>}
           </button>}
         </div>
+        {workerAgreementOfficialUIEnabled&&<Suspense
+          fallback={<p role="status">در حال آماده‌سازی وضعیت چارچوب رسمی…</p>}>
+          <WorkerAgreementOfficialConsent key={profile.worker_id} workerId={profile.worker_id}/>
+        </Suspense>}
         <div className="ow-b3-worker" title={visibleWorkerName}>
           <span className="ow-b3-worker__avatar" aria-hidden="true">{visibleWorkerName?.trim()?.[0]||'د'}</span>
           {!sidebarCollapsed&&<div><strong>{visibleWorkerName}</strong>

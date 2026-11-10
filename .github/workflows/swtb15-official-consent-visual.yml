@@ -1,0 +1,63 @@
+name: SWTB16 RC7 official worker consent integration (fake API, NO DEPLOY)
+
+on:
+  pull_request:
+    branches: [main, 'fix/swtb16-charter-rc7-content-ux-2026-11-10']
+    paths:
+      - 'src/components/WorkerAgreementOfficialConsent.jsx'
+      - 'src/components/worker-agreement-official.css'
+      - 'src/lib/workerAgreementAcceptanceContract.mjs'
+      - 'src/lib/operationsV2.js'
+      - 'src/OperationsWorkspace.jsx'
+      - 'tests/browser/vite.smoke.config.mjs'
+      - 'tests/browser/worker-smoke.jsx'
+      - 'tests/browser/run-swtb15-official-consent-smoke.mjs'
+      - '.github/workflows/swtb15-official-consent-visual.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fake-only:
+    if: github.head_ref == 'feat/swtb16-rc7-server-versioned-consent-integration-2026-11-10'
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install existing public dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install synthetic jsdom test dependency (not a production change)
+        run: npm install --no-save --no-package-lock --no-audit --no-fund jsdom@26.1.0
+      - name: Run all Node contract tests with per-test timeouts (NO DEPLOY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test_file in tests/*.test.mjs; do
+            echo "::group::SWTB16_CONSENT_NODE_FILE=$test_file"
+            timeout --signal=TERM --kill-after=5s 65s node --test "$test_file"
+            echo "::endgroup::"
+          done
+          echo "SWTB16_CONSENT_ALL_NODE_PASS"
+      - name: Build exact Vite production entrypoint (NOT deployed)
+        run: npm run build
+      - name: Install throwaway browser runner
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
+      - name: Check native browser
+        run: google-chrome --version
+      - name: Synthetic-only actual worker UI + exact version consent
+        env:
+          VITE_SWTB15_OFFICIAL_CONSENT_UI: 'true'
+        run: node tests/browser/run-swtb15-official-consent-smoke.mjs
+      - name: Attach only synthetic screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swtb15-official-consent-synthetic
+          path: test-results/swtb15-official-synthetic/*.png
+          retention-days: 3
+          if-no-files-found: ignore
+      - name: Deny production publication and real backend operations
+        run: echo "Only mocked contract; zero real credentials, RPC or Pages deploy"

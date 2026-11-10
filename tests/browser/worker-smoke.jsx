@@ -48,6 +48,31 @@ globalThis.__qaProfileRequests=[
   review_note:'درخواست نمونه به‌دلیل وجود مغایرت آزمایشی رد شده است؛ جهت بررسی بعدی از مسیر تعریف‌شده اقدام کنید'},
 ]
 globalThis.__qaWriteAttempts=0
+// Future official-consent E2E tests use only fake, explicitly labelled data.
+// No actual policy version is installed or published by this test fixture.
+globalThis.__qaAgreementReads=0
+globalThis.__qaAgreementAcceptCalls=[]
+globalThis.__qaAgreementStatus??={
+ status:'published',version_id:'00000000-0000-4000-8000-000000000001',
+ version_label:'1.0.0',digest:'a'.repeat(64),
+ required:true,accepted:false,accepted_at:null,
+ published_at:'2026-11-10T08:00:00Z',change_summary:'نسخه ساختگی برای آزمون مرورگر',
+ document:{
+  status:'approved',version:'1.0.0',title:'چارچوب همکاری آزمایشی — فاقد اعتبار واقعی',
+  institution:'دانشکده نمونه آزمایشی',
+  approval:{reference:'SYNTHETIC-ONLY-01',authority:'مرجع کاملاً ساختگی QA',
+   approved_on:'2026-11-10T07:00:00Z'},
+  intro:'این فقط داده ساختگی در محیط آزمون است.\n\nهیچ پذیرش واقعی ثبت نمی‌شود.',
+  acceptance:'متن نسخه نمونه را مطالعه کرده‌ام و پذیرش این نسخه ساختگی را در محیط آزمایش تأیید می‌کنم.',
+  sections:['learning','choice','presence','library-routine','continuity','privacy','finance']
+   .map((id,i)=>({id,title:'اصل ساختگی '+(i+1),
+    paragraphs:['متن ساختگی کاملِ بند '+(i+1)+'؛ هیچ الزام اداری واقعی وجود ندارد.']})),
+  quotaExample:{quota:400,totalApproved:500,individualApproved:50,
+   proportionalPercent:10,payAllocation:40,
+   preamble:'مثال محاسبه فرضی و غیرواقعی.',note:'۵۰ ساعت واقعی فرضی ثبت‌شده تغییر نمی‌کند.'},
+  notice:'فقط در داده‌های آزمایشی فرض شده این نسخه تصویب شده باشد.'
+ }
+}
 
 function App(){
  const [nav,setNav]=useState({section:'tasks',taskRange:'today'})
