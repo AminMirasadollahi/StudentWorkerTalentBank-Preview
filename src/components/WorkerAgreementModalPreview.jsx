@@ -1,6 +1,7 @@
 /* SWTB14 — REVIEW-ONLY modal. Must NOT issue policy acceptance, lock worker
  * operations, or claim to be the canonical server-published agreement. */
 import {useEffect,useRef} from 'react'
+import {trapModalTab} from '../lib/dialogFocusTrap.mjs'
 import WorkerAgreementReview from './WorkerAgreementReview.jsx'
 import {workerAgreementApprovalCandidate} from '../lib/workerAgreementApprovalCandidate.mjs'
 import './worker-agreement-modal.css'
@@ -38,7 +39,7 @@ export default function WorkerAgreementModalPreview({open,onClose}){
   onClose?.() // older non-modal fallback
  }
  return <dialog ref={dialogRef} className="swtb-policy-modal"
-   onClose={handleNativeClose}
+   onClose={handleNativeClose} onKeyDown={trapModalTab}
    aria-labelledby="swtb-policy-modal-heading" dir="rtl">
    <div className="swtb-policy-modal-head">
     <div>
@@ -48,7 +49,8 @@ export default function WorkerAgreementModalPreview({open,onClose}){
     <button type="button" className="swtb-policy-modal-close" onClick={close}
      aria-label="بستن پیش‌نمایش چارچوب همکاری">بستن ×</button>
    </div>
-   <div className="swtb-policy-modal-body">
+   <div className="swtb-policy-modal-body" role="region" tabIndex={0}
+     aria-label="متن کامل چارچوب همکاری؛ با کلیدهای جهت‌دار قابل پیمایش است">
     <WorkerAgreementReview policy={workerAgreementApprovalCandidate}/>
    </div>
  </dialog>
