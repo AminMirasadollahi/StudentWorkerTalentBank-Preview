@@ -42,7 +42,7 @@ test('SWTB15 historical RC6 offline snapshot stays independently intact (not RC7
  assert.match(html,/برای کارهای انعطاف‌پذیر/)
  assert.doesNotMatch(html,/روز انجام از قبل تعیین می‌شود/)
  assert.match(html,/type="checkbox" disabled/)
- assert.doesNotMatch(html,/fetch\\(|XMLHttpRequest|supabase|\\.rpc\\(|<script\\s+src=|<link\\s+href=/i)
+ assert.doesNotMatch(html,/fetch\(|XMLHttpRequest|supabase|\.rpc\(|<script\s+src=|<link\s+href=/i)
 })
 
 test('SWTB15 worker UI shows a reading-only link and cannot gate login, task/report writes',()=>{
