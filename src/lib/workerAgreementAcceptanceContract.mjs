@@ -20,11 +20,16 @@ function paragraphs(arr,label){
 function officialDocument(doc,versionLabel){
  if(!plain(doc))invalid('document')
  const keys=['status','version','title','institution','studyNote','readingEstimate',
-  'intro','sections','quotaExample','showTimeConcepts','acceptance','notice']
+  'intro','sections','quotaExample','showTimeConcepts','acceptance','notice','approval']
  if(!own(doc,keys))invalid('unknown_root_content')
  if(doc.status!=='approved'||doc.version!==versionLabel)invalid('not_approved_matching_version')
  const title=text(doc.title,'title'),intro=text(doc.intro,'intro')
  const acceptance=text(doc.acceptance,'acceptance')
+ // No browser-mediated legal acknowledgement without a cited human approval.
+ if(!plain(doc.approval)||!own(doc.approval,['reference','authority','approved_on'])||
+  !nonempty(doc.approval.reference,160)||!nonempty(doc.approval.authority,160)||
+  !nonempty(doc.approval.approved_on,100)||
+  Number.isNaN(Date.parse(doc.approval.approved_on)))invalid('approval_authority')
  if(!Array.isArray(doc.sections)||doc.sections.length!==7)invalid('seven_sections')
  const ids=new Set()
  const sections=doc.sections.map((s,index)=>{
