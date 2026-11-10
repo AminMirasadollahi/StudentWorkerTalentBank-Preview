@@ -108,6 +108,50 @@ try{
  await page.waitForFunction(()=>!document.querySelector('dialog.swtb-policy-modal'))
  log('short_laptop_compact_viewport')
 
+ // Now exercise the ACTUAL WorkerOperations sidebar using the pre-existing
+ // synthetic fake API Vite fixture, never the real application login.
+ await page.close()
+ page=undefined
+ await server.close()
+ server=undefined
+ server=await createServer({configFile:resolve('tests/browser/vite.smoke.config.mjs')})
+ await server.listen()
+ page=await browser.newPage({viewport:{width:1440,height:900},locale:'fa-IR'})
+ page.on('pageerror',error=>browserErrors.push(error.message))
+ page.on('request',request=>{
+  if(!['GET','HEAD','OPTIONS'].includes(request.method()))writeAttempts.push(request.url())
+ })
+ await page.route('**/*',route=>{
+  const u=new URL(route.request().url())
+  if(['127.0.0.1','localhost'].includes(u.hostname))return route.continue()
+  externalAttempts.push(u.origin)
+  return route.abort('blockedbyclient')
+ })
+ await page.goto('http://127.0.0.1:4177/tests/browser/worker-smoke.html',
+  {waitUntil:'domcontentloaded'})
+ await page.locator('.ow-worker-report-trigger').first().waitFor({state:'visible',timeout:15000})
+ const welcome=page.locator('dialog.swtb-guide-welcome')
+ if(await welcome.count() && await welcome.isVisible())
+  await welcome.getByRole('button',{name:'فعلاً نه'}).click()
+ const triggers=page.locator('.ow-b3-sidebar .swtb-policy-sidebar-actions button')
+ assert.equal(await triggers.count(),2,'genuine worker sidebar must display help and charter')
+ const uiLayout=await triggers.first().evaluate(node=>{
+  const group=node.parentElement
+  const buttons=Array.from(group.querySelectorAll('button'))
+  return {display:getComputedStyle(group).display,
+   widths:buttons.map(button=>button.getBoundingClientRect().width)}
+ })
+ assert.equal(uiLayout.display,'flex','charter sidebar layout CSS must already be loaded')
+ assert.ok(uiLayout.widths.every(w=>w>=50),'sidebar triggers must both remain readable')
+ await triggers.last().click()
+ await expectModal()
+ assert.equal(await page.locator('dialog.swtb-policy-modal li.swtb-policy-card').count(),7)
+ await page.screenshot({path:resolve(output,'04-rc6-real-worker-shell-fake-data.png')})
+ await page.keyboard.press('Escape')
+ await page.waitForFunction(()=>!document.querySelector('dialog.swtb-policy-modal'))
+ assert.equal(await page.evaluate(()=>globalThis.__qaWriteAttempts),0)
+ log('actual_worker_sidebar_dialog_and_no_fake_rpc_writes')
+
  assert.deepEqual(browserErrors,[],'browser runtime errors')
  assert.deepEqual(writeAttempts,[],'unexpected POST/PUT/PATCH/DELETE')
  assert.deepEqual(externalAttempts,[],'external network request was attempted')
