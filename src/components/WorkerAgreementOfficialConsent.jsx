@@ -69,7 +69,7 @@ export default function WorkerAgreementOfficialConsent({workerId}){
  const [posting,setPosting]=useState(false)
  const [note,setNote]=useState('')
  const dialogRef=useRef(null),triggerRef=useRef(null)
- const alive=useRef(true),autoshown=useRef(false),postingRef=useRef(false)
+ const alive=useRef(true),postingRef=useRef(false)
  useEffect(()=>{
   alive.current=true
   let cancelled=false
@@ -77,10 +77,7 @@ export default function WorkerAgreementOfficialConsent({workerId}){
    const agreement=parseWorkerAgreementStatus(raw)
    if(cancelled)return
    setStatus({phase:'ready',agreement,error:''})
-   if(agreement.kind==='published'&&agreement.required&&!agreement.accepted
-     &&!autoshown.current){
-    autoshown.current=true;setChecked(false);setOpen(true)
-   }
+   // No forced opening during first-login tour: the student chooses when to read.
   }).catch(()=>{
    if(!cancelled)setStatus({phase:'error',agreement:null,
     error:'وضعیت نسخه مصوب از سرور دریافت نشد. هیچ تأییدی ثبت نشده است.'})
@@ -164,12 +161,11 @@ export default function WorkerAgreementOfficialConsent({workerId}){
    if(alive.current)setPosting(false)
   }
  }
- return <div className="swtb-agreement-official-entry" data-swtb-official-gate="draft-off">
+ return <div className="swtb-agreement-official-entry" data-swtb-official-gate="client-only-not-enforcement">
   <button ref={triggerRef} type="button"
    className="swtb-agreement-official-launch"
    disabled={status.phase==='loading'}
-   onClick={()=>{if(agreement?.kind==='published'){setOpen(true);setChecked(false);setNote('')}
-    else void reload({show:true})}}
+   onClick={()=>void reload({show:true})}
    aria-haspopup="dialog">
    {status.phase==='loading'?'در حال بررسی وضعیت چارچوب رسمی…':
     status.phase==='error'?'بررسی مجدد وضعیت چارچوب رسمی':
@@ -185,7 +181,9 @@ export default function WorkerAgreementOfficialConsent({workerId}){
     dir="rtl" aria-labelledby="swtb-agreement-official-heading"
     onKeyDown={trapModalTab}
     onCancel={event=>{if(postingRef.current)event.preventDefault()}}
-    onClose={()=>{if(!postingRef.current){setOpen(false);setChecked(false)}}}>
+    onClose={()=>{if(!postingRef.current){setOpen(false);setChecked(false)
+     requestAnimationFrame(()=>triggerRef.current?.focus({preventScroll:true}))
+    }}}>
     <header className="swtb-agreement-official-header">
      <div>
       <h2 id="swtb-agreement-official-heading">مطالعه و تأیید نسخه رسمی چارچوب همکاری</h2>
