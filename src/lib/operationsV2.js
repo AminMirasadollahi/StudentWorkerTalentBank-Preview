@@ -150,3 +150,13 @@ export const setDeskWorkOfferState=({offerId,state,reason})=>
  })
 export const claimDeskWorkOffer=({offerId,requestId})=>
  rpc('ops_claim_desk_work_offer',{p_offer_id:offerId,p_request_id:requestId})
+
+// SWTB15: reserved for the NOT-YET-INSTALLED private PR37–40 agreement ledger.
+// Never treat the locally bundled RC6 preview as a published server version.
+// The browser sends only the exact UUID/digest it just displayed, never a
+// worker_id or a client-computed digest. No automatic retries on acceptance.
+export const getMyWorkerAgreement=()=>rpc('ops_get_my_worker_agreement')
+export const acceptMyWorkerAgreement=({versionId,digest})=>
+ rpc('ops_accept_my_worker_agreement',{
+  p_version_id:versionId,p_displayed_digest:digest,
+ })
