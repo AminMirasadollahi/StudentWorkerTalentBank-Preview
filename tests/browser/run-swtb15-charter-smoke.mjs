@@ -191,8 +191,14 @@ try{
   return {display:getComputedStyle(group).display,
    widths:buttons.map(button=>button.getBoundingClientRect().width),
    heights:buttons.map(button=>button.getBoundingClientRect().height),
-   icons:buttons.map(button=>button.querySelector('svg')?.getBoundingClientRect().width)}
+   icons:buttons.map(button=>button.querySelector('svg')?.getBoundingClientRect().width),
+   computed:buttons.map(button=>{
+    const c=getComputedStyle(button)
+    return {height:c.height,minHeight:c.minHeight,margin:c.margin,
+      padding:c.padding,alignSelf:c.alignSelf,font:c.fontSize,display:c.display}
+   })}
  })
+ process.stdout.write('SWTB15_BUTTON_GEOMETRY='+JSON.stringify(uiLayout)+'\n')
  assert.equal(uiLayout.display,'grid','matching sidebar layout CSS must already be loaded')
  assert.ok(uiLayout.widths.every(w=>w>=50),'sidebar triggers must both remain readable')
  assert.ok(Math.abs(uiLayout.widths[0]-uiLayout.widths[1])<=2,
