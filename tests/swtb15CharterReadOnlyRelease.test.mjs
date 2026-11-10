@@ -63,6 +63,8 @@ test('SWTB15 native dialog and charter are non-submitting, safe to close/reopen'
  const modalCss=read('../src/components/worker-agreement-modal.css')
  assert.match(modal,/<dialog ref=\{dialogRef\}/)
  assert.match(modal,/showModal/)
+ assert.match(modal,/onKeyDown=\{trapModalTab\}/)
+ assert.match(modal,/role="region" tabIndex=\{0\}/)
  assert.match(modal,/WorkerAgreementReview policy=\{workerAgreementApprovalCandidate\}/)
  assert.match(modal,/if\(dialogRef.current\?\.open\)return/)
  assert.match(card,/type="checkbox" disabled/)
