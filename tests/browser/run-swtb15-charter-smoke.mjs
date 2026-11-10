@@ -53,14 +53,37 @@ try{
  await expectModal()
  await fit('1440x900 initial')
  const dialog=page.locator('dialog.swtb-policy-modal')
- assert.match(await dialog.innerText(),/1\.0-rc6/)
- assert.match(await dialog.innerText(),/پیش‌نمایش/)
+ assert.match(await dialog.innerText(),/نسخه ۱.۰/)
+ assert.doesNotMatch(await dialog.innerText(),/پیش‌نمایش محتوایی/)
  assert.equal(await dialog.locator('li.swtb-policy-card').count(),7)
  assert.equal(await dialog.locator('[data-policy-section="finance"]').count(),1)
  assert.ok((await dialog.locator('.swtb-policy-quota-math').getAttribute('aria-label')).includes('50'))
  assert.equal(await dialog.locator('input[type="checkbox"]').count(),0)
  assert.equal(await dialog.getByRole('button',{name:'تأیید و شروع همکاری'}).count(),0)
  assert.match(await dialog.innerText(),/مطالعه این متن در سامانه به‌عنوان تأیید یا پذیرش ثبت نمی‌شود/)
+ // Natural-height desktop pairings: no empty strip below a short card.
+ const desktop=await dialog.evaluate(node=>{
+  const ids=['learning','choice','presence','library-routine',
+   'continuity','privacy','finance']
+  const rectangles=Object.fromEntries(ids.map(id=>{
+   const r=node.querySelector('[data-policy-section="'+id+'"]').getBoundingClientRect()
+   return [id,{x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom}]
+  }))
+  return {columns:getComputedStyle(node.querySelector('.swtb-policy-masonry')).display,
+   rectangles}
+ })
+ assert.equal(desktop.columns,'grid')
+ assert.ok(desktop.rectangles.learning.x>desktop.rectangles.choice.x,
+  'RTL first column should appear on the right')
+ for(const [before,after] of [['learning','presence'],['presence','continuity'],
+   ['choice','library-routine'],['library-routine','privacy']]){
+  const gap=desktop.rectangles[after].y-desktop.rectangles[before].bottom
+  assert.ok(gap>=5&&gap<=24,before+' -> '+after+' unwanted blank gap '+gap)
+ }
+ assert.ok(desktop.rectangles.finance.width>desktop.rectangles.learning.width*1.65,
+  'financial example remains wide and legible')
+ log('independent_height_columns_and_full_width_finance')
+
  await page.screenshot({path:resolve(output,'01-rc6-initial-1440.png')})
  log('initial_modal_readable_7_clauses_and_no_consent')
 
@@ -107,6 +130,13 @@ try{
  await page.screenshot({path:resolve(output,'02-rc6-short-laptop-1366.png')})
  await page.setViewportSize({width:800,height:600})
  await fit('800x600 compact')
+ const mobile=await dialog.evaluate(node=>
+  ['learning','choice','presence','library-routine','continuity','privacy','finance']
+   .map(id=>node.querySelector('[data-policy-section="'+id+'"]').getBoundingClientRect().y))
+ assert.ok(mobile.every((y,i)=>i===0||y>mobile[i-1]),
+  'compact 800px view must show sections in real numerical order: '+mobile)
+ log('compact_numeric_order_1_to_7')
+
  await page.screenshot({path:resolve(output,'03-rc6-compact-800.png')})
  await dialog.getByRole('button',{name:'بستن پیش‌نمایش چارچوب همکاری'}).click()
  await page.waitForFunction(()=>!document.querySelector('dialog.swtb-policy-modal'))
@@ -159,10 +189,18 @@ try{
   const group=node.parentElement
   const buttons=Array.from(group.querySelectorAll('button'))
   return {display:getComputedStyle(group).display,
-   widths:buttons.map(button=>button.getBoundingClientRect().width)}
+   widths:buttons.map(button=>button.getBoundingClientRect().width),
+   heights:buttons.map(button=>button.getBoundingClientRect().height),
+   icons:buttons.map(button=>button.querySelector('svg')?.getBoundingClientRect().width)}
  })
- assert.equal(uiLayout.display,'flex','charter sidebar layout CSS must already be loaded')
+ assert.equal(uiLayout.display,'grid','matching sidebar layout CSS must already be loaded')
  assert.ok(uiLayout.widths.every(w=>w>=50),'sidebar triggers must both remain readable')
+ assert.ok(Math.abs(uiLayout.widths[0]-uiLayout.widths[1])<=2,
+  'both sidebar buttons must have matching widths')
+ assert.ok(Math.abs(uiLayout.heights[0]-uiLayout.heights[1])<=2,
+  'both sidebar buttons must have matching heights')
+ assert.ok(uiLayout.icons.every(w=>w>13&&w<25),
+  'guide and charter must use equivalent vector icons')
  await triggers.last().click()
  await expectModal()
  assert.equal(await page.locator('dialog.swtb-policy-modal li.swtb-policy-card').count(),7)
