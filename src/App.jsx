@@ -5,6 +5,7 @@ import InfoIcon from './components/InfoIcon'
 import { availabilitySlots, entryYears, majors, skills, units, weekDays } from './data'
 import { getOpenCampaign, submitStudentWorkerApplication } from './lib/supabase'
 import { normalizeCandidateEmail, isValidCandidateEmail } from './lib/candidateEmail'
+import { digitsOnly, isValidEntryYearOther, toAsciiDigits } from './lib/digits.mjs'
 
 const STORAGE_KEY = 'student-worker-form-v2'
 const TOTAL_STEPS = 18
@@ -37,7 +38,16 @@ const initialForm = {
 function readDraft() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
-    return { ...initialForm, ...saved }
+    const merged = { ...initialForm, ...saved }
+    // Older browser drafts may contain Persian/Arabic numerals, even after
+    // newer onChange handlers are fixed. Normalize locally without submission.
+    return {
+      ...merged,
+      studentNumber: digitsOnly(merged.studentNumber),
+      phone: digitsOnly(merged.phone, 11),
+      socialPhone: digitsOnly(merged.socialPhone, 11),
+      entryYearOther: digitsOnly(merged.entryYearOther, 4),
+    }
   } catch {
     return initialForm
   }
@@ -173,13 +183,19 @@ export default function App() {
     setSubmissionError('')
   }
 
+  const confirmDraftReset = () => {
+    if (window.confirm('تمام پاسخ‌های ذخیره‌شده این فرم پاک شوند؟ این کار قابل بازگشت نیست.')) {
+      resetDraft()
+    }
+  }
+
   const submitApplication = async () => {
     if (submissionStatus === 'submitting' || submissionStatus === 'success') return
 
-    const studentNumber = form.studentNumber.trim()
+    const studentNumber = digitsOnly(form.studentNumber)
     const major = (form.major === 'سایر' ? form.majorOther : form.major).trim()
     const rawEntryYear = form.entryYear === 'سایر' ? form.entryYearOther : form.entryYear
-    const entryYear = Number(rawEntryYear)
+    const entryYear = Number(toAsciiDigits(rawEntryYear))
     const portfolioUrl = form.portfolioUrl.trim()
     const email = normalizeCandidateEmail(form.email)
 
@@ -378,10 +394,10 @@ export default function App() {
           dir="ltr"
           className="text-input ltr"
           value={form.studentNumber}
-          onChange={event => set('studentNumber', event.target.value.replace(/\D/g, ''))}
+          onChange={event => set('studentNumber', digitsOnly(event.target.value))}
           placeholder="401234567"
         />
-        <small>با اعداد انگلیسی وارد کنید.</small>
+        <small>ارقام فارسی و انگلیسی هر دو پذیرفته می‌شوند.</small>
       </label>
     </StepShell>,
 
@@ -408,7 +424,7 @@ export default function App() {
             dir="ltr"
             className="text-input ltr"
             value={form.phone}
-            onChange={event => set('phone', event.target.value.replace(/\D/g, '').slice(0, 11))}
+            onChange={event => set('phone', digitsOnly(event.target.value, 11))}
             placeholder="09123456789"
             autoComplete="tel"
           />
@@ -436,7 +452,7 @@ export default function App() {
             dir="ltr"
             className="text-input ltr"
             value={form.socialPhone}
-            onChange={event => set('socialPhone', event.target.value.replace(/\D/g, '').slice(0, 11))}
+            onChange={event => set('socialPhone', digitsOnly(event.target.value, 11))}
             placeholder="اگر با شماره تماس فرق دارد"
           />
           <small>اگر خالی بگذارید، همان شماره تماس را برای ارتباط در گروه یا پیام‌رسان در نظر می‌گیریم.</small>
@@ -491,7 +507,7 @@ export default function App() {
       description="سال ورودتان به دانشگاه را انتخاب کنید."
       onBack={back}
       onNext={next}
-      nextDisabled={!form.entryYear || (form.entryYear === 'سایر' && form.entryYearOther.trim().length < 2)}
+      nextDisabled={!form.entryYear || (form.entryYear === 'سایر' && !isValidEntryYearOther(form.entryYearOther))}
     >
       <label className="input-shell">
         <span className="input-shell__label">سال ورود</span>
@@ -516,7 +532,7 @@ export default function App() {
             inputMode="numeric"
             className="text-input"
             value={form.entryYearOther}
-            onChange={event => set('entryYearOther', event.target.value.slice(0, 10))}
+            onChange={event => set('entryYearOther', digitsOnly(event.target.value, 4))}
             placeholder="مثلاً ۱۳۹۷"
           />
         </label>
@@ -900,7 +916,7 @@ export default function App() {
         <p>{form.benefitExpectation}</p>
       </div>
 
-      <button type="button" className="link-button danger-link" onClick={resetDraft}>
+      <button type="button" className="link-button danger-link" onClick={confirmDraftReset}>
         پاک کردن پاسخ‌ها و شروع دوباره
       </button>
     </StepShell>,
