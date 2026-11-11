@@ -18,6 +18,7 @@ import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
 import ManagerWorkspaceNav from './components/ManagerWorkspaceNav'
 import ManagerCandidatesWorkspace from './components/ManagerCandidatesWorkspace'
+import {candidateOnboardingLabel,candidateAuthSignInLabel} from './lib/managerCandidateView.mjs'
 import WorkerSecureLinkReissue from './components/WorkerSecureLinkReissue'
 import {currentManagerDestination,nextManagerNavigation} from './lib/managerWorkspaceNav.mjs'
 import {
@@ -455,7 +456,7 @@ function CandidateCard({
           <small dir="ltr">{candidate.phone}</small>
         </div>
         <span className={`ops-status ${hasWorker ? 'ops-status--active' : ''}`}>
-          {hasWorker ? (candidate.worker_state==='active'?'دانشجوکار فعال':'حساب دانشجوکار ایجادشده') : 'داوطلب'}
+          {hasWorker ? (candidate.worker_state==='active'?'همکاری فعال':'حساب دانشجوکار ایجادشده') : 'داوطلب'}
         </span>
       </div>
       <ControlsTag className="ops-candidate-controls">
@@ -542,7 +543,10 @@ function CandidateCard({
       )}
       {hasWorker && <>
         <p className="ops-worker-state">ایمیل حساب: <span dir="ltr">{candidate.email || '—'}</span></p>
-        <p className="ops-worker-state">واحد فعال: {unitLabels[candidate.worker_unit]} · وضعیت: {candidate.worker_state}</p>
+        <p className="ops-worker-state">واحد همکاری: {unitLabels[candidate.worker_unit] || 'نامشخص'} · وضعیت اداری: {candidate.worker_state === 'active' ? 'فعال' : candidate.worker_state === 'paused' ? 'تعلیق‌شده' : candidate.worker_state === 'inactive' ? 'غیرفعال' : 'نامشخص'}</p>
+        <p className="ops-worker-state">راه‌اندازی حساب: {candidateOnboardingLabel(candidate)}</p>
+        <p className="ops-worker-state">آخرین ورود در سرویس احراز هویت: {candidateAuthSignInLabel(candidate)}</p>
+        <p className="ops-muted">این اطلاعات به‌تنهایی دریافت یا بازشدن ایمیل دعوت و ورود به محیط کاری دانشجوکار را ثابت نمی‌کنند.</p>
         <WorkerSecureLinkReissue
           key={candidate.worker_id}
           workerId={candidate.worker_id}
@@ -731,7 +735,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
       <section className="ops-kpis" aria-label="وضعیت دانشجوکارها">
         <article><span>کل داوطلبان</span><strong>{numbers.format(rows.length)}</strong></article>
         <article><span>آماده فعال‌سازی</span><strong>{numbers.format(readyCount)}</strong></article>
-        <article><span>دانشجوکار فعال‌شده</span><strong>{numbers.format(activeCount)}</strong></article>
+        <article><span>حساب‌های ایجادشده</span><strong>{numbers.format(activeCount)}</strong></article>
       </section>
       <section className="report-panel">
         <div className="report-panel-heading">
@@ -742,7 +746,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
               <option value="all">همه</option>
               <option value="pending">در انتظار فعال‌سازی</option>
               <option value="ready">تأییدهای تکمیل‌شده</option>
-              <option value="active">فعال‌شده‌ها</option>
+              <option value="active">حساب ایجادشده</option>
             </select>
           </label>
         </div>

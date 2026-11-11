@@ -14,7 +14,9 @@ const fixtures=[
   entry_year:1403,primary_unit:'research',interview_status:'approved',clearance_status:'cleared'},
  {id:'FAKE_C',full_name:'ندا نمونه',major:'علوم',phone:'09123456782',
   entry_year:1402,primary_unit:'library',worker_id:'WORKER_FAKE_C',
-  worker_state:'inactive',interview_status:'approved',clearance_status:'cleared'},
+  worker_state:'inactive',worker_onboarding_state:'password_required',
+  worker_auth_account_found:true,worker_last_auth_sign_in_at:null,
+  interview_status:'approved',clearance_status:'cleared'},
 ]
 test('candidate label distinguishes authorized worker state and readiness',()=>{
  assert.equal(candidateStage(fixtures[0]),'در انتظار بررسی')
@@ -22,7 +24,7 @@ test('candidate label distinguishes authorized worker state and readiness',()=>{
  assert.equal(candidateIsReady(fixtures[1]),true)
  assert.equal(candidateStage(fixtures[2]),'حساب ایجادشده')
  assert.equal(candidateIsReady(fixtures[2]),false)
- assert.equal(candidateStage({...fixtures[2],worker_state:'active'}),'حساب فعال')
+ assert.equal(candidateStage({...fixtures[2],worker_state:'active'}),'همکاری فعال')
 })
 test('search normalizes Persian/Arabic spelling and digits without extra server reads',()=>{
  assert.equal(normalizeCandidateQuery('  كيارش يونس ۱۴۰۴  '),'کیارش یونس 1404')
@@ -83,6 +85,7 @@ test('candidate workspace is list-first; inspector only renders on explicit sele
  const ui=await mount()
  try{
   assert.equal(ui.host.querySelectorAll('.swtb22-candidate-row').length,3)
+  assert.match(ui.host.textContent,/راه‌اندازی: در انتظار تکمیل تعیین رمز/)
   assert.equal(ui.host.querySelector('[data-testid="fake-selected-candidate"]'),null)
   assert.match(ui.host.textContent,/پرونده‌ای انتخاب نشده/)
   const row=ui.host.querySelectorAll('.swtb22-candidate-row')[1]

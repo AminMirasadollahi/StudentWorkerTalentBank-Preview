@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useRef} from 'react'
-import {candidateStage,selectManagerCandidates} from '../lib/managerCandidateView.mjs'
+import {candidateStage,candidateOnboardingLabel,selectManagerCandidates} from '../lib/managerCandidateView.mjs'
 
 // One navigable directory and one purpose-built candidate inspector.
 // No writes, authorization or onboarding decisions live in this component.
@@ -64,6 +64,7 @@ export default function ManagerCandidatesWorkspace({
          <span className="swtb22-candidate-row-main">
           <strong>{row.full_name}</strong>
           <small>{row.major||'رشته نامشخص'}{row.entry_year?' · ورودی '+row.entry_year:''}</small>
+          {row.worker_id && row.worker_onboarding_state && <small>راه‌اندازی: {candidateOnboardingLabel(row)}</small>}
          </span>
          <span className={'swtb22-candidate-stage'+(row.worker_id?' is-worker':'')}>
           {candidateStage(row)}
