@@ -9,18 +9,20 @@ function gitBlobSha(path){
   return createHash('sha1').update(`blob ${b.length}\0`).update(b).digest('hex')
 }
 
-// Locked public baseline: fail if any review edit touches applicant intake,
-// base Ops Auth/API, the original QA-only placeholder, or deployment workflow.
-// The separately reviewed audited manager lifecycle is now intentionally wired.
+// Locked public baseline: all changes to applicant intake require a focused,
+// separately reviewed change and an exact pinned Git blob hash. SWTB17 P0
+// deliberately updated App + a standalone digits helper, with independent
+// regression tests. Base Ops Auth/API, QA and Pages remain byte-identical.
 const critical=Object.freeze({
-  'src/App.jsx':'c3c34f11e7a992015b1ea281828a39386ffce3e9',
+  'src/App.jsx':'6b63bdda19f60bd06c48ef9e22374b077aa9f6df',
+  'src/lib/digits.mjs':'350abb3c22a6ea8116e71b5822e13c202f9246b7',
   'src/report.css':'88330e1f6469d1763430353a23863f2dd61cf8bb',
   'src/lib/operations.js':'d192d0b5a4dcaee820ddffb6b822625018c35990',
   'src/components/WorkerLifecycleReadOnlyPreview.jsx':'c9125b5627bb509248a300cc023b83b779092946',
   'vite.config.js':'971c9b048f726bc27199078d41b5a45a263a8595',
   '.github/workflows/pages.yml':'88452575162ef82aea7351c5b915b8c60d8936b8',
 })
-test('production applicant intake, base API/auth, QA-only placeholder and deployment pipeline are byte-identical',()=>{
+test('reviewed SWTB17 intake and protected API/auth/QA/deploy assets are byte-identical',()=>{
   for(const [path,sha] of Object.entries(critical))
     assert.equal(gitBlobSha(path),sha,`BLOCK RELEASE: modified protected public asset ${path}`)
 })
