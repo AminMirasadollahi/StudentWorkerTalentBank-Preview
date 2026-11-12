@@ -18,7 +18,7 @@ import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
 import ManagerWorkspaceNav from './components/ManagerWorkspaceNav'
 import ManagerCandidatesWorkspace from './components/ManagerCandidatesWorkspace'
-import {candidateOnboardingLabel,candidateAuthSignInLabel} from './lib/managerCandidateView.mjs'
+import {candidateOnboardingLabel,candidateAuthSignInLabel,candidateDisplayName,candidateDisplayMajor} from './lib/managerCandidateView.mjs'
 import WorkerSecureLinkReissue from './components/WorkerSecureLinkReissue'
 import {currentManagerDestination,nextManagerNavigation} from './lib/managerWorkspaceNav.mjs'
 import {
@@ -451,8 +451,10 @@ function CandidateCard({
     <article className="ops-candidate">
       <div className="ops-candidate__head">
         <div>
-          <strong>{candidate.full_name}</strong>
-          <small>{candidate.major} · ورودی {candidate.entry_year} · {unitLabels[candidate.primary_unit]}</small>
+          <strong>{candidateDisplayName(candidate)}</strong>
+          <small>{candidateDisplayMajor(candidate)} · ورودی {candidate.entry_year} · {unitLabels[candidate.primary_unit]}</small>
+          {candidate.worker_id && candidateDisplayName(candidate)!==candidate.full_name && <small>نام هنگام ثبت‌نام: {candidate.full_name}</small>}
+          {candidate.worker_id && candidateDisplayMajor(candidate)!==candidate.major && <small>رشته هنگام ثبت‌نام: {candidate.major}</small>}
           <small dir="ltr">{candidate.phone}</small>
         </div>
         <span className={`ops-status ${hasWorker ? 'ops-status--active' : ''}`}>
