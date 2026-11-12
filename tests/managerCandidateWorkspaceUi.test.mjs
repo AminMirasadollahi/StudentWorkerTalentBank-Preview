@@ -124,3 +124,24 @@ test('pending loading never incorrectly claims zero candidates and busy disables
   assert.ok([...ui.host.querySelectorAll('.swtb22-candidate-row')].every(x=>x.disabled))
  }finally{await ui.cleanup()}
 })
+
+test('directory and selected inspector show effective approved name and major; historic search still works',async()=>{
+ const identity={...fixtures[2],full_name:'نام اولیه ساختگی',major:'رشته اولیه ساختگی',
+  worker_effective_full_name:'نام جدید تأییدشده ساختگی',
+  worker_effective_major:'رشته جدید تأییدشده ساختگی'}
+ const ui=await mount({rows:[identity]})
+ try{
+  const directory=ui.host.querySelector('.swtb22-candidate-row')
+  assert.match(directory.textContent,/نام جدید تأییدشده ساختگی/)
+  assert.match(directory.textContent,/رشته جدید تأییدشده ساختگی/)
+  assert.doesNotMatch(directory.textContent,/نام اولیه ساختگی/)
+  await act(async()=>directory.click())
+  assert.match(ui.host.querySelector('.swtb22-candidate-inspector-head').textContent,/نام جدید تأییدشده ساختگی/)
+  await ui.render({search:'نام اولیه'})
+  assert.equal(ui.host.querySelectorAll('.swtb22-candidate-row').length,1)
+  await ui.render({search:'نام جدید'})
+  assert.equal(ui.host.querySelectorAll('.swtb22-candidate-row').length,1)
+  await ui.render({search:'رشته اولیه'})
+  assert.equal(ui.host.querySelectorAll('.swtb22-candidate-row').length,1)
+ }finally{await ui.cleanup()}
+})
