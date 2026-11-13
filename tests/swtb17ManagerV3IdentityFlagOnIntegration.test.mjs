@@ -27,6 +27,7 @@ const reset=()=>{
  globalThis.__identity17RPCs=[]
  globalThis.__identity17ManagerDenied=false
  globalThis.__identity17CandidateDenied=false
+ globalThis.__identity17ManagerResponder=null
 }
 const mock={
  name:'swtb17-manager-identity-offline-only',enforce:'pre',
@@ -47,6 +48,7 @@ const mock={
    ' resetPasswordForEmail:async()=>({error:null})},',
    ' rpc:async name=>{globalThis.__identity17RPCs.push(name);',
    ' if(name!=="ops_get_operations_v3")throw Error("UNEXPECTED_RPC");',
+   ' if(globalThis.__identity17ManagerResponder)return globalThis.__identity17ManagerResponder();',
    ' return globalThis.__identity17ManagerDenied?',
    '  {data:null,error:Error("MANAGER_READ_DENIED")}:',
    '  {data:globalThis.__identity17WorkerSnapshot,error:null};},',
@@ -96,7 +98,8 @@ after(async()=>{
  else process.env.VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK=previousFallbackFlag
  for(const k of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT',
   '__identity17Rows','__identity17WorkerSnapshot','__identity17RPCs',
-  '__identity17ManagerDenied','__identity17CandidateDenied'])delete globalThis[k]
+  '__identity17ManagerDenied','__identity17CandidateDenied',
+  '__identity17ManagerResponder'])delete globalThis[k]
 })
 async function mountCandidates(){
  const host=document.createElement('div');document.body.append(host)
@@ -171,4 +174,40 @@ test('flag ON: candidate RPC denial skips manager data and fails closed',async()
   assert.equal(ui.host.querySelectorAll('.swtb22-candidate-row').length,0)
   assert.match(ui.host.textContent,/پرونده‌های قبلی نمایش داده نمی‌شوند/)
  }finally{await ui.cleanup()}
+})
+
+test('stale successful manager reply cannot repopulate candidates after a newer denial',async()=>{
+ reset()
+ const ui=await mountCandidates()
+ let finishOld=null
+ try{
+  assert.equal(ui.host.querySelectorAll('.swtb22-candidate-row').length,1)
+  globalThis.__identity17ManagerResponder=()=>new Promise(resolve=>{finishOld=resolve})
+  await act(async()=>{
+   const refresh=[...ui.host.querySelectorAll('button')].find(b=>b.textContent==='به‌روزرسانی')
+   assert.ok(refresh)
+   refresh.click()
+   await Promise.resolve();await Promise.resolve()
+  })
+  assert.equal(typeof finishOld,'function','older manager read is still pending')
+  globalThis.__identity17ManagerResponder=null
+  globalThis.__identity17ManagerDenied=true
+  const route=id=>ui.host.querySelector('[data-swtb22-route="'+id+'"]')
+  await act(async()=>{route('tasks').click();await Promise.resolve()})
+  await act(async()=>{route('applicants').click();await Promise.resolve()})
+  assert.equal(ui.host.querySelectorAll('.swtb22-candidate-row').length,0)
+  assert.match(ui.host.textContent,/پرونده‌های قبلی نمایش داده نمی‌شوند/)
+  await act(async()=>{
+   finishOld({data:globalThis.__identity17WorkerSnapshot,error:null})
+   await Promise.resolve();await Promise.resolve()
+  })
+  assert.equal(ui.host.querySelectorAll('.swtb22-candidate-row').length,0,
+   'older success must never override the newer authorization denial')
+  assert.match(ui.host.textContent,/پرونده‌های قبلی نمایش داده نمی‌شوند/)
+ }finally{
+  if(finishOld)finishOld({data:globalThis.__identity17WorkerSnapshot,error:null})
+  globalThis.__identity17ManagerResponder=null
+  globalThis.__identity17ManagerDenied=false
+  await ui.cleanup()
+ }
 })
