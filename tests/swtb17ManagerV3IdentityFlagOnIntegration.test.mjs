@@ -32,14 +32,14 @@ const mock={
  name:'swtb17-manager-identity-offline-only',enforce:'pre',
  resolveId(source,importer){
   if(importer?.endsWith('/src/OpsApp.jsx')&&source==='./lib/operations')
-   return '\\0swtb17-mock-auth'
+   return '\0swtb17-mock-auth'
   if(importer?.endsWith('/src/OpsApp.jsx')&&source==='./OperationsWorkspace')
-   return '\\0swtb17-mock-work'
+   return '\0swtb17-mock-work'
   if(importer?.endsWith('/src/OpsApp.jsx')&&source==='./ReportApp')
-   return '\\0swtb17-mock-report'
+   return '\0swtb17-mock-report'
  },
  load(id){
-  if(id==='\\0swtb17-mock-auth')return [
+  if(id==='\0swtb17-mock-auth')return [
    'export const opsClient={auth:{',
    ' onAuthStateChange(){return {data:{subscription:{unsubscribe(){}}}}},',
    ' getSession:async()=>({data:{session:null},error:null}),',
@@ -60,16 +60,16 @@ const mock={
    'export const setCandidateEmail=async()=>{throw Error("NO_WRITE")};',
    'export const signInOperations=async()=>({});',
    'export const signOutOperations=async()=>{};',
-  ].join('\\n')
-  if(id==='\\0swtb17-mock-work')return [
+  ].join('\n')
+  if(id==='\0swtb17-mock-work')return [
    'import React from "react";',
    'export function AdminOperations(){return React.createElement("div",null,"FAKE_WORK")}',
    'export function WorkerOperations(){return React.createElement("div",null,"FAKE_WORKER")}',
-  ].join('\\n')
-  if(id==='\\0swtb17-mock-report')return [
+  ].join('\n')
+  if(id==='\0swtb17-mock-report')return [
    'import React from "react";',
    'export default function ReportApp(){return React.createElement("div",null,"FAKE_REPORT")}',
-  ].join('\\n')
+  ].join('\n')
  }
 }
 before(async()=>{
