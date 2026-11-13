@@ -628,9 +628,12 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
       return true
     } catch (e) {
       if(readId!==candidateReadSequence.current)return false
-      // Never leave the previous candidate list visible after a denied read.
+      // A denied read invalidates both privileged rows and the previous
+      // inspector selection; a later authorized refresh must require a new
+      // explicit candidate selection, even if the same row is returned.
       setRows([])
       setCandidateDrafts({})
+      setSelectedCandidateId('')
       setError(getMessage(e))
       return false
     } finally {
