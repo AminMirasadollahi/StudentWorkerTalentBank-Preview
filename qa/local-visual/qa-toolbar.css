@@ -1,0 +1,6 @@
+#swtb17-qa-toolbar{position:sticky;top:0;z-index:99999;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 18px;background:#17324f;color:#fff;box-shadow:0 3px 12px #0002;font:12px/1.8 system-ui,sans-serif}
+#swtb17-qa-toolbar strong{font-size:15px}
+#swtb17-qa-toolbar span{display:block;color:#d4e6f4}
+#swtb17-qa-stat{color:#deedfd}
+#swtb17-qa-report{padding:8px 12px;background:#fff;border:0;border-radius:8px;color:#17324f;cursor:pointer}
+#swtb17-qa-report:focus-visible{outline:3px solid #9ad4ff}
