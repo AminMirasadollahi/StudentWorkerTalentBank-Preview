@@ -25,6 +25,7 @@ document.getElementById('swtb17-qa-report').addEventListener('click',()=>{
   build:'SWTB17_PR85_LOCAL_REACT_VISUAL_QA_V1',
   reviewCommit:import.meta.env.VITE_SWTB17_QA_SHA||'UNKNOWN',
   flag:'ENABLED_IN_QA_ONLY',
+  redesignedManagerShell:'ENABLED_IN_QA_ONLY',
   readOnlyNetworkGuard:true,
   authSession:'IN_MEMORY_QA_BUILD',
   exportedAtUtc:new Date().toISOString(),
