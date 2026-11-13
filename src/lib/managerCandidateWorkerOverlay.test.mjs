@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {needsManagerWorkerIdentitySnapshot,projectCandidatesFromManagerWorkers as join} from './managerCandidateWorkerOverlay.mjs';
+import {needsManagerWorkerIdentitySnapshot,projectCandidatesFromManagerWorkers as join,fetchCandidatesWithAuthorizedWorkerIdentity as fetchJoined} from './managerCandidateWorkerOverlay.mjs';
 const base={id:'a1',worker_id:'w1',full_name:'OLD_N',major:'OLD_M'};
 const worker={id:'w1',application_id:'a1',name:'APPROVED_N',major:'APPROVED_M'};
 const snapshot={workers:[worker],tasks:[{task:'SECRET_TASK'}],time_entries:[{note:'SECRET_NOTE'}]};
@@ -22,3 +22,29 @@ test('malformed candidate list => STOP',()=>assert.throws(()=>join({},snapshot),
 test('malformed worker id => STOP',()=>assert.throws(()=>join([{...base,worker_id:123}],snapshot),/WORKER_ID_INVALID/));
 test('leading and trailing whitespace normalized only in displayed approved fields',()=>{const r=join([base],{workers:[{...worker,name:'  APPROVED_N  ',major:' APPROVED_M  '}]})[0];assert.equal(r.worker_effective_full_name,'APPROVED_N');assert.equal(r.worker_effective_major,'APPROVED_M');});
 test('response excludes unrelated sensitive manager data',()=>{const r=join([base],snapshot);assert.ok(!JSON.stringify(r).includes('SECRET_TASK'));assert.ok(!JSON.stringify(r).includes('SECRET_NOTE'));});
+test('feature default OFF: never fetch manager aggregate',async()=>{
+  let calls=0;const got=await fetchJoined({fetchCandidates:async()=>[base],fetchManagerSnapshot:async()=>{calls++;return snapshot}});
+  assert.equal(calls,0);assert.equal(got[0],base);
+});
+test('feature ON with legacy fields: fetch manager once and project',async()=>{
+  let calls=0;const got=await fetchJoined({enableFallback:true,fetchCandidates:async()=>[base],fetchManagerSnapshot:async()=>{calls++;return snapshot}});
+  assert.equal(calls,1);assert.equal(got[0].worker_effective_full_name,'APPROVED_N');
+});
+test('feature ON with unlinked application: no extra fetch',async()=>{
+  let calls=0;await fetchJoined({enableFallback:true,fetchCandidates:async()=>[{id:'a',worker_id:null}],fetchManagerSnapshot:async()=>{calls++;return snapshot}});
+  assert.equal(calls,0);
+});
+test('feature ON with backend effective fields: no extra fetch',async()=>{
+  let calls=0;await fetchJoined({enableFallback:true,fetchCandidates:async()=>[{...base,worker_effective_full_name:'A',worker_effective_major:'B'}],fetchManagerSnapshot:async()=>{calls++;return snapshot}});
+  assert.equal(calls,0);
+});
+test('manager snapshot access denial fails closed',async()=>{
+  await assert.rejects(fetchJoined({enableFallback:true,fetchCandidates:async()=>[base],fetchManagerSnapshot:async()=>{throw new Error('manager_denied')}}),/manager_denied/);
+});
+test('candidate RPC denial fails closed and skips manager read',async()=>{
+  let calls=0;await assert.rejects(fetchJoined({enableFallback:true,fetchCandidates:async()=>{throw new Error('candidate_denied')},fetchManagerSnapshot:async()=>{calls++;return snapshot}}),/candidate_denied/);
+  assert.equal(calls,0);
+});
+test('malformed candidate RPC response fails closed',async()=>{
+  await assert.rejects(fetchJoined({enableFallback:true,fetchCandidates:async()=>({error:'bad'}),fetchManagerSnapshot:async()=>snapshot}),/LIST_INVALID/);
+});
