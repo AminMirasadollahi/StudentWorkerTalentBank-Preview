@@ -573,6 +573,10 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   const [manualWorkRevision,setManualWorkRevision] = useState(0)
   const [manualReportRevision,setManualReportRevision] = useState(0)
   const [candidateDrafts,setCandidateDrafts] = useState({})
+  // A slower, earlier manager RPC must never revive records after a newer
+  // authorization failure or overwrite a more recent verified snapshot.
+  const candidateReadSequence=useRef(0)
+  useEffect(()=>()=>{candidateReadSequence.current+=1},[])
   const filter = navigation.candidateFilter
   const search = navigation.candidateSearch||''
   const selectedCandidateId = navigation.candidateId||''
@@ -596,6 +600,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   const setAdminSection = value => setNavigation(previous => ({ ...previous, section: value }))
 
   const refresh = async () => {
+    const readId=++candidateReadSequence.current
     setLoading(true)
     setError('')
     try {
@@ -614,14 +619,18 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
         },
         enableFallback:import.meta.env.VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK==='true',
       })
+      if(readId!==candidateReadSequence.current)return false
       setRows(results)
+      return true
     } catch (e) {
+      if(readId!==candidateReadSequence.current)return false
       // Never leave the previous candidate list visible after a denied read.
       setRows([])
       setCandidateDrafts({})
       setError(getMessage(e))
+      return false
     } finally {
-      setLoading(false)
+      if(readId===candidateReadSequence.current)setLoading(false)
     }
   }
 
