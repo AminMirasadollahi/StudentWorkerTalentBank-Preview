@@ -25,22 +25,30 @@ const safeRect=(rect,vw,vh)=>({
 })
 export function WorkerGuideWelcome({onBegin,onSkip}){
  const modal=useRef(null)
+ const [dontShowAgain,setDontShowAgain]=useState(false)
  useLayoutEffect(()=>{
   openModal(modal.current)
   return()=>closeModal(modal.current)
  },[])
  return <dialog className="swtb-guide-welcome" ref={modal} dir="rtl"
    aria-labelledby="swtb-guide-welcome-title" onKeyDown={trapModalTab}
-   onCancel={e=>{e.preventDefault();onSkip()}}>
+   onCancel={e=>{e.preventDefault();onSkip(dontShowAgain)}}>
    <div className="swtb-guide-welcome__eyebrow">راهنمای آغاز کار</div>
    <h2 id="swtb-guide-welcome-title" tabIndex={-1}>به پنل دانشجوکار خوش آمدید</h2>
    <p>اینجا می‌توانید وظایف، برنامه حضور، گزارش‌های کار و مشخصات خود را مدیریت کنید.</p>
    <p>با یک راهنمای تصویری کوتاه، بخش‌های اصلی سامانه را بشناسید. هر وقت خواستید نیز می‌توانید از دکمه «راهنمای سامانه» یا «راهنمای این بخش» دوباره استفاده کنید.</p>
+   <label className="swtb-guide-welcome__option">
+     <input type="checkbox" checked={dontShowAgain}
+       onChange={event=>setDontShowAgain(event.target.checked)}/>
+     <span>دیگر به‌صورت خودکار نشان نده
+       <small>این انتخاب فقط در همین مرورگر ذخیره می‌شود؛ راهنمای سامانه همیشه در دسترس است. در حالت خصوصی یا پس از پاک‌کردن داده مرورگر ممکن است دوباره نمایش داده شود.</small>
+     </span>
+   </label>
    <div className="swtb-guide-welcome__actions">
      <button type="button" className="swtb-guide-button swtb-guide-button--primary"
        onClick={onBegin}>شروع راهنمای سامانه</button>
      <button type="button" className="swtb-guide-button"
-       onClick={onSkip}>فعلاً نه</button>
+       onClick={()=>onSkip(dontShowAgain)}>فعلاً نه</button>
    </div>
  </dialog>
 }
