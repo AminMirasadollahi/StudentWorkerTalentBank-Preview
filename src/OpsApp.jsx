@@ -20,7 +20,6 @@ import ManagerWorkspaceNav from './components/ManagerWorkspaceNav'
 import ManagerCandidatesWorkspace from './components/ManagerCandidatesWorkspace'
 import {candidateOnboardingLabel,candidateAuthSignInLabel,candidateDisplayName,candidateDisplayMajor} from './lib/managerCandidateView.mjs'
 import {fetchCandidatesWithAuthorizedWorkerIdentity} from './lib/managerCandidateWorkerOverlay.mjs'
-import {getAdminWorkV2} from './lib/operationsV2'
 import WorkerSecureLinkReissue from './components/WorkerSecureLinkReissue'
 import {currentManagerDestination,nextManagerNavigation} from './lib/managerWorkspaceNav.mjs'
 import {
@@ -605,7 +604,14 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
       // no protected public operations API file or database function changes.
       const results = await fetchCandidatesWithAuthorizedWorkerIdentity({
         fetchCandidates:getOperationsCandidates,
-        fetchManagerSnapshot:getAdminWorkV2,
+        // Use the already-injected manager session client. Never import a
+        // second unmocked operations module into role-sensitive UI tests.
+        fetchManagerSnapshot:async()=>{
+          const {data,error}=await opsClient.rpc('ops_get_operations_v3')
+          if(error)throw error
+          if(data?.error)throw new Error('manager_snapshot_denied')
+          return data
+        },
         enableFallback:import.meta.env.VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK==='true',
       })
       setRows(results)
