@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { classifyOperationsIdentity } from './workerAccess.mjs'
+import {fetchCandidatesWithAuthorizedWorkerIdentity} from './managerCandidateWorkerOverlay.mjs'
 
 // Separate identity/session from the public, intentionally sessionless intake client.
 // Only the publishable key enters the browser. Never use the service-role key here.
@@ -40,8 +41,17 @@ export async function currentOperationsIdentity() {
   return classifyOperationsIdentity({ user: data.user, isAdmin: false, profile })
 }
 
+// Experimental PR85 identity fallback: OFF by default. When explicitly
+// enabled, joins two independently manager-guarded RPC responses by both
+// worker_id AND application_id, failing closed on any mismatch or denied read.
+// The second (larger) RPC is never requested when the new single-RPC fields
+// already exist or when this feature is disabled.
 export async function getOperationsCandidates() {
-  return assertResult(await opsClient.rpc('ops_list_candidates'))
+  return fetchCandidatesWithAuthorizedWorkerIdentity({
+    fetchCandidates:async()=>assertResult(await opsClient.rpc('ops_list_candidates')),
+    fetchManagerSnapshot:async()=>assertResult(await opsClient.rpc('ops_get_operations_v3')),
+    enableFallback:import.meta.env.VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK==='true',
+  })
 }
 
 export async function setCandidateScreening(id, interview, clearance) {
