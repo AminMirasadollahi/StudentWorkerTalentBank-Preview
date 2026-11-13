@@ -502,10 +502,6 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
             {editingDay===id&&editingSlot!==null&&
               <form className="ow-slot-editor" onSubmit={submitWeek}
                 aria-label={`ثبت نوبت ${editingSlot+1} ${name}`}>
-                <div className="ow-slot-editor__heading">
-                  <strong>نوبت {n(editingSlot+1)} · {name}</strong>
-                  <small>ساعت و دقیقه را انتخاب کنید (قالب ۲۴ساعته)</small>
-                </div>
                 <WeeklyClockSelect label="شروع" disabled={busy}
                   value={draftWindows[editingSlot]?.start||''}
                   onChange={value=>editWindow(setDraftWindows,editingSlot,'start',value)}/>
