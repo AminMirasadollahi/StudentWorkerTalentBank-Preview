@@ -31,6 +31,7 @@ jobs:
       - name: Compile QA-only actual PR85 React UI with read-only and memory-only Auth
         env:
           VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK: 'true'
+          VITE_SWTB22_MANAGER_SHELL_UI: 'true'
           VITE_SWTB17_QA_SHA: '${{ github.sha }}'
         run: npx vite build --config qa/local-visual/vite.config.mjs
       - name: Verify no credentials, exact guard marker and distinct QA entry
