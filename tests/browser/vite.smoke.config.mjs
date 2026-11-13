@@ -16,6 +16,8 @@ const v2=[
  'export const getMyWorkerProfileV2=async()=>({worker_id:"SWTB_CHROMIUM_SYNTHETIC_WORKER",name:"دانشجوکار ساختگی",major:"رشته ساختگی",entry_year:"1405",unit:"library"});',
  'export const getMyProfileChangeRequests=async()=>globalThis.__qaProfileRequests;',
  'export const getWorkerStateHistory=async()=>({ok:true,scope:"synthetic",events:[]});',
+ 'export const getMyWorkerAgreement=async()=>{globalThis.__qaAgreementReads=(globalThis.__qaAgreementReads||0)+1;return globalThis.__qaAgreementStatus??{status:"unpublished",required:false,accepted:false}};',
+ 'export const acceptMyWorkerAgreement=async({versionId,digest})=>{const state=globalThis.__qaAgreementStatus;(globalThis.__qaAgreementAcceptCalls??=[]).push({versionId,digest});if(!state||state.status!=="published"||state.version_id!==versionId||state.digest!==digest)throw Error("worker_agreement_version_stale");if(globalThis.__qaAgreementMode==="reject")throw Error("worker_agreement_role_denied");state.accepted=true;state.accepted_at="2026-11-10T08:01:00Z";const out={ok:true,version_id:versionId,digest,receipt_id:"00000000-0000-4000-8000-000000000002",accepted_at:state.accepted_at};if(globalThis.__qaAgreementMode==="commit_then_throw"){globalThis.__qaAgreementMode="";throw Error("SYNTHETIC_UNCERTAIN_NETWORK")}return out};',
  'export const setWorkerState=async()=>{globalThis.__qaWriteAttempts++;throw Error("BROWSER_WORKER_STATE_MUTATION_FORBIDDEN")};',
  'export const requestProfileChange=async()=>{globalThis.__qaWriteAttempts++;throw Error("BROWSER_SMOKE_WRITE_FORBIDDEN")};',
  ...['getAdminWorkV2','reviewProfileChange','assignGroupTask'].map(name=>
@@ -38,6 +40,9 @@ const isolates={
   }
   if((from.endsWith('/src/components/TermBudgetPanel.jsx')||from.endsWith('/src/components/BudgetPoolEditor.jsx')||from.endsWith('/src/components/TermStatusDialog.jsx'))&&source==='../lib/operationsV2')
     return '\0swtb7-fake-v2'
+  // This candidate UI must NEVER load the actual production Ops client in QA.
+  if(from.endsWith('/src/components/WorkerAgreementOfficialConsent.jsx')
+   &&source==='../lib/operationsV2')return '\0swtb7-fake-v2'
   if(from.endsWith('/src/components/TaskAssignmentEditor.jsx')){
    if(source==='../lib/operationsV2')return '\0swtb7-fake-v2'
    if(source==='../lib/operations')return '\0swtb7-fake-legacy'
