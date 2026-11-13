@@ -245,3 +245,34 @@ test('pending manager revalidation hides prior candidate directory and inspector
   await ui.cleanup()
  }
 })
+
+test('denied candidate refresh clears selection; later recovery requires an explicit new click',async()=>{
+ reset()
+ const ui=await mountCandidates()
+ try{
+  const row=ui.host.querySelector('.swtb22-candidate-row')
+  assert.ok(row)
+  await act(async()=>row.click())
+  assert.ok(ui.host.querySelector('.ops-candidate'),
+   'initially selected inspector is visible to the verified fake manager')
+  globalThis.__identity17ManagerDenied=true
+  const refresh=()=>[...ui.host.querySelectorAll('button')]
+   .find(b=>b.textContent==='به‌روزرسانی')
+  await act(async()=>{refresh().click();await Promise.resolve()})
+  assert.equal(ui.host.querySelectorAll('.swtb22-candidate-row').length,0)
+  assert.equal(ui.host.querySelector('.ops-candidate'),null)
+  globalThis.__identity17ManagerDenied=false
+  await act(async()=>{refresh().click();await Promise.resolve()})
+  assert.equal(ui.host.querySelectorAll('.swtb22-candidate-row').length,1,
+   'fresh successful authorized read recovers the directory')
+  assert.equal(ui.host.querySelector('.ops-candidate'),null,
+   'previous selected inspector must NOT reopen automatically after access rejection')
+  assert.match(ui.host.textContent,/پرونده‌ای انتخاب نشده است/)
+  await act(async()=>ui.host.querySelector('.swtb22-candidate-row').click())
+  assert.ok(ui.host.querySelector('.ops-candidate'),
+   'authorized user can open the freshly chosen row explicitly')
+ }finally{
+  globalThis.__identity17ManagerDenied=false
+  await ui.cleanup()
+ }
+})
