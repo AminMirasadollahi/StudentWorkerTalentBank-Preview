@@ -15,7 +15,7 @@ const mock={
   return [
    'export const getWorkerDeskWorkPool=async()=>{',
    ' globalThis.__deskReads++;',
-   ' if(globalThis.__deskReadDenied)throw Error("NO_WORKER_ACCESS");',
+   ' if(globalThis.__deskReadDenied||globalThis.__deskReadDeniedAfterClaim&&globalThis.__deskBooked)throw Error("NO_WORKER_ACCESS");',
    ' return {ok:true,scope:"worker_desk_offers",offers:[{',
    ' id:"offer-1",date:"2026-11-25",start_minute:480,end_minute:540,',
    ' deadline:"2026-11-23",title:"نوبت میز کتابخانه",',
@@ -29,7 +29,9 @@ const mock={
    '};',
    'export const claimDeskWorkOffer=async({offerId,requestId})=>{',
    ' globalThis.__deskClaims.push({offerId,requestId});',
-   ' if(globalThis.__deskClaimFails)throw Error("UNKNOWN_NETWORK_RESULT");',
+   ' if(globalThis.__deskClaimFails){',
+   ' if(globalThis.__deskCommitOnLostReply)globalThis.__deskBooked=true;',
+   ' throw Error("UNKNOWN_NETWORK_RESULT");}',
    ' globalThis.__deskBooked=true;',
    ' return {ok:true,task_id:"task-a",shift_id:"shift-a",replayed:false};',
    '};',
@@ -53,7 +55,8 @@ before(async()=>{
 after(async()=>{
  await server?.close();dom?.window.close()
  for(const v of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT',
-  '__deskReads','__deskReadDenied','__deskBooked','__deskClaims','__deskClaimFails'])
+  '__deskReads','__deskReadDenied','__deskBooked','__deskClaims','__deskClaimFails',
+  '__deskReadDeniedAfterClaim','__deskCommitOnLostReply'])
   delete globalThis[v]
 })
 async function flush(){await act(async()=>{await Promise.resolve();await Promise.resolve()})}
@@ -63,6 +66,8 @@ async function mount(props={}){
  globalThis.__deskBooked=false
  globalThis.__deskClaims=[]
  globalThis.__deskClaimFails=false
+ globalThis.__deskReadDeniedAfterClaim=false
+ globalThis.__deskCommitOnLostReply=false
  const host=document.createElement('div');document.body.append(host)
  const root=createRoot(host)
  const render=async next=>{
@@ -120,6 +125,67 @@ test('ambiguous HTTP result cannot be blindly retried; same UUID retained after 
   assert.equal(globalThis.__deskClaims[0].requestId,
    globalThis.__deskClaims[1].requestId)
   assert.match(host.textContent,/قبلاً توسط شما رزرو شده/)
+ }finally{await cleanup()}
+})
+test('confirmed desk reservation survives failed post-commit read and remains navigable',async()=>{
+ const receipts=[]
+ const {host,cleanup}=await mount({onClaimed:id=>receipts.push(id)})
+ try{
+  globalThis.__deskReadDeniedAfterClaim=true
+  await act(async()=>button(host,'انتخاب این نوبت').click())
+  await flush()
+  assert.equal(globalThis.__deskClaims.length,1)
+  assert.deepEqual(receipts,['task-a'])
+  assert.match(host.textContent,/رزرو نوبت در سرور تأیید شد/)
+  assert.match(host.textContent,/دریافت فهرست تازه موفق نبود/)
+  assert.match(host.textContent,/داده‌های قبلی پنهان شدند/)
+  assert.doesNotMatch(host.textContent,/نتیجه رزرو مشخص نیست/)
+  assert.ok(!button(host,'تلاش مجدد با همان شناسه'))
+ }finally{await cleanup()}
+})
+test('navigation rejection after confirmed desk reservation never invites a second claim',async()=>{
+ const receipts=[]
+ const {host,cleanup}=await mount({onClaimed:async id=>{
+  receipts.push(id);throw Error('SYNTHETIC_DESK_NAV_FAILURE')
+ }})
+ try{
+  await act(async()=>button(host,'انتخاب این نوبت').click())
+  await flush()
+  assert.deepEqual(receipts,['task-a'])
+  assert.equal(globalThis.__deskClaims.length,1)
+  assert.match(host.textContent,/رزرو نوبت در سرور تأیید شد/)
+  assert.match(host.textContent,/انتقال به «کارهای من» انجام نشد/)
+  assert.doesNotMatch(host.textContent,/نتیجه رزرو مشخص نیست/)
+  assert.ok(!button(host,'تلاش مجدد با همان شناسه'))
+ }finally{await cleanup()}
+})
+test('lost desk HTTP reply after server commit is reconciled by read-back without rebooking',async()=>{
+ const {host,cleanup}=await mount()
+ try{
+  globalThis.__deskClaimFails=true
+  globalThis.__deskCommitOnLostReply=true
+  await act(async()=>button(host,'انتخاب این نوبت').click())
+  await flush()
+  assert.equal(globalThis.__deskClaims.length,1)
+  assert.equal(button(host,'تلاش مجدد با همان شناسه').disabled,true)
+  await act(async()=>button(host,'بررسی نتیجه از سرور').click())
+  await flush()
+  assert.match(host.textContent,/رزرو قبلی شما از سرور تأیید شد/)
+  assert.equal(globalThis.__deskClaims.length,1)
+  assert.ok(!button(host,'تلاش مجدد با همان شناسه'))
+ }finally{await cleanup()}
+})
+test('switching worker identity clears unresolved desk receipt and preserves isolation',async()=>{
+ const {host,render,cleanup}=await mount()
+ try{
+  globalThis.__deskClaimFails=true
+  await act(async()=>button(host,'انتخاب این نوبت').click())
+  await flush()
+  assert.match(host.textContent,/نتیجه رزرو مشخص نیست/)
+  globalThis.__deskClaimFails=false
+  await render({workerId:'FAKE-OTHER-WORKER'})
+  assert.doesNotMatch(host.textContent,/نتیجه رزرو مشخص نیست/)
+  assert.equal(globalThis.__deskClaims.length,1)
  }finally{await cleanup()}
 })
 test('authorization refresh failure clears all previously displayed desk offers',async()=>{
