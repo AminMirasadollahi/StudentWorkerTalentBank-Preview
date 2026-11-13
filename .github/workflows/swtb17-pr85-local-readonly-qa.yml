@@ -1,0 +1,105 @@
+name: SWTB17 PR85 Local Read-only React QA (NO DEPLOY)
+
+on:
+  push:
+    branches:
+      - review/swtb17-profile-effective-identity-ui-2026-11-12
+    paths:
+      - 'qa/local-visual/**'
+      - '.github/workflows/swtb17-pr85-local-readonly-qa.yml'
+      - 'src/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build_local_readonly:
+    name: Offline guard tests + local React build, never deploy
+    if: github.ref == 'refs/heads/review/swtb17-profile-effective-identity-ui-2026-11-12'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies on GitHub runner only
+        run: npm install --no-audit --no-fund
+      - name: Run exact QA network allowlist tests
+        run: node --test qa/local-visual/readonly-guard.test.mjs
+      - name: Compile QA-only actual PR85 React UI with read-only and memory-only Auth
+        env:
+          VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK: 'true'
+          VITE_SWTB17_QA_SHA: '${{ github.sha }}'
+        run: npx vite build --config qa/local-visual/vite.config.mjs
+      - name: Verify no credentials, exact guard marker and distinct QA entry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s qa/local-visual/dist/index.html
+          test -f qa/local-visual/dist/.vite/manifest.json
+          grep -Rql 'SWTB17_QA_READ_ONLY_BLOCKED' qa/local-visual/dist/assets
+          ! grep -Rql 'service_role' qa/local-visual/dist/assets
+          ! grep -Eiq 'operations-qa|lifecycle-qa|/src/qa/' qa/local-visual/dist/index.html
+          echo "SWTB17_PR85_QA_BUILD_SOURCE_ONLY_PASS"
+      - name: Package SHA256-verified files for owner Windows without npm/Git
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,pathlib,shutil,re,os
+          source=pathlib.Path('qa/local-visual')
+          dist=source/'dist'
+          dst=source/'artifact'
+          if dst.exists():shutil.rmtree(dst)
+          dst.mkdir()
+          shutil.copytree(dist,dst/'dist')
+          for name in ('Start-SWTB17-PR85-Local-QA.cmd','Start-SWTB17-PR85-Local-QA.ps1','README_FA.txt'):
+              shutil.copy2(source/name,dst/name)
+          info={'build':'SWTB17_PR85_LOCAL_REACT_QA_V1',
+                'sourceCommit':os.environ['GITHUB_SHA'],
+                'qaFlagEnabled':True,
+                'readOnlyFetchAllowlist':True,
+                'authPersistSession':False,
+                'neverPublishFromThisArtifact':True}
+          (dst/'dist'/'QA_BUILD_INFO.json').write_text(json.dumps(info,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          lines=[]
+          for f in sorted((dst/'dist').rglob('*')):
+              if not f.is_file():continue
+              rel=f.relative_to(dst).as_posix()
+              assert re.fullmatch(r'dist/[A-Za-z0-9._/-]+',rel),rel
+              assert '..' not in rel.split('/'),rel
+              lines.append(f'{hashlib.sha256(f.read_bytes()).hexdigest().upper()}  {rel}')
+          assert len(lines)>2 and any(x.endswith('dist/index.html') for x in lines)
+          (dst/'SHA256SUMS.txt').write_text('\n'.join(lines)+'\n',encoding='ascii')
+          print('SWTB17_QA_PACKAGE_FILE_COUNT',len(lines))
+          print('SWTB17_QA_PACKAGE_COMMIT',os.environ['GITHUB_SHA'])
+          PY
+      - name: Upload isolated read-only local QA artifact ONLY (no Pages)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SWTB17_PR85_READONLY_REACT_LOCAL_QA
+          path: qa/local-visual/artifact/
+          if-no-files-found: error
+          retention-days: 5
+
+  windows_integrity:
+    name: Native Windows PowerShell 5.1 package integrity self-test, no browser
+    needs: build_local_readonly
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: SWTB17_PR85_READONLY_REACT_LOCAL_QA
+          path: qa-package
+      - name: Windows PowerShell 5.1 script + asset integrity smoke
+        shell: pwsh
+        run: |
+          $output = & "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File ".\qa-package\Start-SWTB17-PR85-Local-QA.ps1" -SelfTest
+          $status = $LASTEXITCODE
+          $joined = $output -join [Environment]::NewLine
+          Write-Host $joined
+          if ($status -ne 0 -or $joined -notmatch 'SWTB17_PR85_LOCAL_ASSET_INTEGRITY=PASS') {
+            throw 'SWTB17_PR85_NATIVE_WINDOWS_INTEGRITY_STOP'
+          }
