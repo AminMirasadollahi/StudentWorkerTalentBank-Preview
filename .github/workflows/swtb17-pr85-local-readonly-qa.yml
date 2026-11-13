@@ -54,6 +54,10 @@ jobs:
           if dst.exists():shutil.rmtree(dst)
           dst.mkdir()
           shutil.copytree(dist,dst/'dist')
+          # Vite .vite/manifest.json is build metadata only, not runtime data.
+          # Exclude it before checksums: upload-artifact v4 excludes hidden paths.
+          hidden_manifest=dst/'dist'/'.vite'
+          if hidden_manifest.exists():shutil.rmtree(hidden_manifest)
           for name in ('Start-SWTB17-PR85-Local-QA.cmd','Start-SWTB17-PR85-Local-QA.ps1','README_FA.txt'):
               shutil.copy2(source/name,dst/name)
           info={'build':'SWTB17_PR85_LOCAL_REACT_QA_V1',
