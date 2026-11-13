@@ -601,6 +601,10 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
 
   const refresh = async () => {
     const readId=++candidateReadSequence.current
+    // Never display a prior authorized snapshot while a new manager
+    // permission/data read is pending. A rejected read stays blank;
+    // only its own latest successful response may repopulate the list.
+    setRows([])
     setLoading(true)
     setError('')
     try {
