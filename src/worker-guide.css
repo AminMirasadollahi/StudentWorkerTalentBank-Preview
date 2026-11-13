@@ -23,6 +23,17 @@
  outline:2px solid #168783;outline-offset:3px;border-radius:.2rem;
 }
 .swtb-guide-welcome p {font-size:.91rem;line-height:1.85;color:#475f6f;margin:.5rem 0}
+.swtb-guide-welcome__option {
+ display:flex;gap:.65rem;align-items:flex-start;cursor:pointer;
+ padding:.6rem .75rem;margin:.8rem 0 .15rem;border:1px solid #d8e6e8;
+ border-radius:.55rem;background:#f7fbfb;font-size:.85rem;line-height:1.6;
+}
+.swtb-guide-welcome__option input {
+ flex:none;width:1.05rem;height:1.05rem;margin:.22rem 0 0;
+ accent-color:#137c79;cursor:pointer;
+}
+.swtb-guide-welcome__option input:focus-visible {outline:3px solid #38a4a1;outline-offset:3px}
+.swtb-guide-welcome__option small {display:block;color:#59717b;font-size:.76rem;line-height:1.7;margin-top:.13rem}
 .swtb-guide-welcome__actions {display:flex;flex-wrap:wrap;gap:.55rem;margin-top:1.15rem}
 .swtb-guide-button {
  min-height:2.35rem;border:1px solid #cddfe2;background:#fff;border-radius:.55rem;
