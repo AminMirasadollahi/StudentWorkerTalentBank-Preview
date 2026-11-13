@@ -211,3 +211,37 @@ test('stale successful manager reply cannot repopulate candidates after a newer 
   await ui.cleanup()
  }
 })
+
+test('pending manager revalidation hides prior candidate directory and inspector until a fresh success',async()=>{
+ reset()
+ const ui=await mountCandidates()
+ let resolvePending=null
+ try{
+  assert.equal(ui.host.querySelectorAll('.swtb22-candidate-row').length,1)
+  await act(async()=>ui.host.querySelector('.swtb22-candidate-row').click())
+  assert.ok(ui.host.querySelector('.ops-candidate'),'the previous inspector was visible')
+  globalThis.__identity17ManagerResponder=()=>new Promise(resolve=>{resolvePending=resolve})
+  await act(async()=>{
+   const refresh=[...ui.host.querySelectorAll('button')].find(b=>b.textContent==='به‌روزرسانی')
+   assert.ok(refresh)
+   refresh.click()
+   await Promise.resolve();await Promise.resolve()
+  })
+  assert.equal(typeof resolvePending,'function','manager authorization is pending')
+  assert.equal(ui.host.querySelectorAll('.swtb22-candidate-row').length,0,
+   'previous candidate identities must be concealed during revalidation')
+  assert.equal(ui.host.querySelector('.ops-candidate'),null,
+   'prior detailed candidate record must be concealed during revalidation')
+  assert.match(ui.host.textContent,/در حال دریافت پرونده‌ها/)
+  await act(async()=>{
+   resolvePending({data:globalThis.__identity17WorkerSnapshot,error:null})
+   await Promise.resolve();await Promise.resolve()
+  })
+  assert.equal(ui.host.querySelectorAll('.swtb22-candidate-row').length,1,
+   'only the completed fresh authorized read can show candidates again')
+ }finally{
+  if(resolvePending)resolvePending({data:globalThis.__identity17WorkerSnapshot,error:null})
+  globalThis.__identity17ManagerResponder=null
+  await ui.cleanup()
+ }
+})
