@@ -2758,7 +2758,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     </Suspense>}
     {guideWelcomeOpen&&<WorkerGuideWelcome
       onBegin={()=>openWorkerGuide('all')}
-      onSkip={()=>{rememberGuideOffer();setGuideWelcomeOpen(false)}}/>}
+      onSkip={dontShowAgain=>{if(dontShowAgain)rememberGuideOffer();setGuideWelcomeOpen(false)}}/>}
     {guideScope&&<WorkerGuideSpotlight key={guideScope} scope={guideScope}
       currentSection={section}
       onNavigate={next=>updateNavigation({section:next})}
