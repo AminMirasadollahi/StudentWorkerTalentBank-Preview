@@ -19,6 +19,8 @@ import ReportApp from './ReportApp'
 import ManagerWorkspaceNav from './components/ManagerWorkspaceNav'
 import ManagerCandidatesWorkspace from './components/ManagerCandidatesWorkspace'
 import {candidateOnboardingLabel,candidateAuthSignInLabel,candidateDisplayName,candidateDisplayMajor} from './lib/managerCandidateView.mjs'
+import {fetchCandidatesWithAuthorizedWorkerIdentity} from './lib/managerCandidateWorkerOverlay.mjs'
+import {getAdminWorkV2} from './lib/operationsV2'
 import WorkerSecureLinkReissue from './components/WorkerSecureLinkReissue'
 import {currentManagerDestination,nextManagerNavigation} from './lib/managerWorkspaceNav.mjs'
 import {
@@ -598,8 +600,15 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
     setLoading(true)
     setError('')
     try {
-      const results = await getOperationsCandidates()
-      setRows(Array.isArray(results) ? results : [])
+      // Optional fallback only when approved identity fields are absent from
+      // ops_list_candidates. This path uses an EXISTING manager-guarded RPC;
+      // no protected public operations API file or database function changes.
+      const results = await fetchCandidatesWithAuthorizedWorkerIdentity({
+        fetchCandidates:getOperationsCandidates,
+        fetchManagerSnapshot:getAdminWorkV2,
+        enableFallback:import.meta.env.VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK==='true',
+      })
+      setRows(results)
     } catch (e) {
       // Never leave the previous candidate list visible after a denied read.
       setRows([])
