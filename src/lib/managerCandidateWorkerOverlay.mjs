@@ -50,3 +50,17 @@ export function projectCandidatesFromManagerWorkers(candidates, managerSnapshot)
     return {...row,worker_effective_full_name:name,worker_effective_major:major};
   });
 }
+
+// Async orchestration remains injection-based for reproducible tests. The actual
+// RPC client and opt-in feature flag live in operations.js, never here.
+export async function fetchCandidatesWithAuthorizedWorkerIdentity({
+  fetchCandidates,fetchManagerSnapshot,enableFallback=false,
+}) {
+  if (typeof fetchCandidates !== 'function' || typeof fetchManagerSnapshot !== 'function')
+    throw new TypeError('SWTB17_MANAGER_IDENTITY_PROVIDERS_MISSING');
+  const candidates=await fetchCandidates();
+  if (!Array.isArray(candidates)) throw new TypeError('SWTB17_CANDIDATE_LIST_INVALID');
+  if (!enableFallback || !needsManagerWorkerIdentitySnapshot(candidates)) return candidates;
+  const managerSnapshot=await fetchManagerSnapshot();
+  return projectCandidatesFromManagerWorkers(candidates,managerSnapshot);
+}
