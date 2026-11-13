@@ -44,6 +44,10 @@ jobs:
           ! grep -Rql 'service_role' qa/local-visual/dist/assets
           ! grep -Eiq 'operations-qa|lifecycle-qa|/src/qa/' qa/local-visual/dist/index.html
           echo "SWTB17_PR85_QA_BUILD_SOURCE_ONLY_PASS"
+      - name: Install Chrome automation for synthetic-only QA smoke
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
+      - name: Verify actual compiled React manager view with mocked RPCs (NO NETWORK)
+        run: node qa/local-visual/browser-smoke.mjs
       - name: Package SHA256-verified files for owner Windows without npm/Git
         shell: bash
         run: |
