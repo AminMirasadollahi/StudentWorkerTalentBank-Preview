@@ -18,7 +18,8 @@ import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
 import ManagerWorkspaceNav from './components/ManagerWorkspaceNav'
 import ManagerCandidatesWorkspace from './components/ManagerCandidatesWorkspace'
-import {candidateOnboardingLabel,candidateAuthSignInLabel} from './lib/managerCandidateView.mjs'
+import {candidateOnboardingLabel,candidateAuthSignInLabel,candidateDisplayName,candidateDisplayMajor} from './lib/managerCandidateView.mjs'
+import {fetchCandidatesWithAuthorizedWorkerIdentity} from './lib/managerCandidateWorkerOverlay.mjs'
 import WorkerSecureLinkReissue from './components/WorkerSecureLinkReissue'
 import {currentManagerDestination,nextManagerNavigation} from './lib/managerWorkspaceNav.mjs'
 import {
@@ -451,8 +452,10 @@ function CandidateCard({
     <article className="ops-candidate">
       <div className="ops-candidate__head">
         <div>
-          <strong>{candidate.full_name}</strong>
-          <small>{candidate.major} · ورودی {candidate.entry_year} · {unitLabels[candidate.primary_unit]}</small>
+          <strong>{candidateDisplayName(candidate)}</strong>
+          <small>{candidateDisplayMajor(candidate)} · ورودی {candidate.entry_year} · {unitLabels[candidate.primary_unit]}</small>
+          {candidate.worker_id && candidateDisplayName(candidate)!==candidate.full_name && <small>نام هنگام ثبت‌نام: {candidate.full_name}</small>}
+          {candidate.worker_id && candidateDisplayMajor(candidate)!==candidate.major && <small>رشته هنگام ثبت‌نام: {candidate.major}</small>}
           <small dir="ltr">{candidate.phone}</small>
         </div>
         <span className={`ops-status ${hasWorker ? 'ops-status--active' : ''}`}>
@@ -570,6 +573,10 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   const [manualWorkRevision,setManualWorkRevision] = useState(0)
   const [manualReportRevision,setManualReportRevision] = useState(0)
   const [candidateDrafts,setCandidateDrafts] = useState({})
+  // A slower, earlier manager RPC must never revive records after a newer
+  // authorization failure or overwrite a more recent verified snapshot.
+  const candidateReadSequence=useRef(0)
+  useEffect(()=>()=>{candidateReadSequence.current+=1},[])
   const filter = navigation.candidateFilter
   const search = navigation.candidateSearch||''
   const selectedCandidateId = navigation.candidateId||''
@@ -593,18 +600,44 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   const setAdminSection = value => setNavigation(previous => ({ ...previous, section: value }))
 
   const refresh = async () => {
+    const readId=++candidateReadSequence.current
+    // Never display a prior authorized snapshot while a new manager
+    // permission/data read is pending. A rejected read stays blank;
+    // only its own latest successful response may repopulate the list.
+    setRows([])
     setLoading(true)
     setError('')
     try {
-      const results = await getOperationsCandidates()
-      setRows(Array.isArray(results) ? results : [])
+      // Optional fallback only when approved identity fields are absent from
+      // ops_list_candidates. This path uses an EXISTING manager-guarded RPC;
+      // no protected public operations API file or database function changes.
+      const results = await fetchCandidatesWithAuthorizedWorkerIdentity({
+        fetchCandidates:getOperationsCandidates,
+        // Use the already-injected manager session client. Never import a
+        // second unmocked operations module into role-sensitive UI tests.
+        fetchManagerSnapshot:async()=>{
+          const {data,error}=await opsClient.rpc('ops_get_operations_v3')
+          if(error)throw error
+          if(data?.error)throw new Error('manager_snapshot_denied')
+          return data
+        },
+        enableFallback:import.meta.env.VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK==='true',
+      })
+      if(readId!==candidateReadSequence.current)return false
+      setRows(results)
+      return true
     } catch (e) {
-      // Never leave the previous candidate list visible after a denied read.
+      if(readId!==candidateReadSequence.current)return false
+      // A denied read invalidates both privileged rows and the previous
+      // inspector selection; a later authorized refresh must require a new
+      // explicit candidate selection, even if the same row is returned.
       setRows([])
       setCandidateDrafts({})
+      setSelectedCandidateId('')
       setError(getMessage(e))
+      return false
     } finally {
-      setLoading(false)
+      if(readId===candidateReadSequence.current)setLoading(false)
     }
   }
 

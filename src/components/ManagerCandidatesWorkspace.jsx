@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useRef} from 'react'
-import {candidateStage,candidateOnboardingLabel,selectManagerCandidates} from '../lib/managerCandidateView.mjs'
+import {candidateStage,candidateOnboardingLabel,candidateDisplayName,candidateDisplayMajor,selectManagerCandidates} from '../lib/managerCandidateView.mjs'
 
 // One navigable directory and one purpose-built candidate inspector.
 // No writes, authorization or onboarding decisions live in this component.
@@ -62,8 +62,8 @@ export default function ManagerCandidatesWorkspace({
          aria-controls="swtb22-candidate-inspector"
          disabled={busy} onClick={()=>onSelect(row.id)}>
          <span className="swtb22-candidate-row-main">
-          <strong>{row.full_name}</strong>
-          <small>{row.major||'رشته نامشخص'}{row.entry_year?' · ورودی '+row.entry_year:''}</small>
+          <strong>{candidateDisplayName(row)}</strong>
+          <small>{candidateDisplayMajor(row)||'رشته نامشخص'}{row.entry_year?' · ورودی '+row.entry_year:''}</small>
           {row.worker_id && row.worker_onboarding_state && <small>راه‌اندازی: {candidateOnboardingLabel(row)}</small>}
          </span>
          <span className={'swtb22-candidate-stage'+(row.worker_id?' is-worker':'')}>
@@ -80,7 +80,7 @@ export default function ManagerCandidatesWorkspace({
      {selected
       ?<>
         <div className="swtb22-candidate-inspector-head">
-         <h3 tabIndex={-1} ref={inspectorHeading}>بررسی پرونده: {selected.full_name}</h3>
+         <h3 tabIndex={-1} ref={inspectorHeading}>بررسی پرونده: {candidateDisplayName(selected)}</h3>
          <button type="button" className="report-btn report-btn--light" disabled={busy}
           onClick={()=>onSelect('')}>بستن جزئیات</button>
         </div>

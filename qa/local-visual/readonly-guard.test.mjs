@@ -1,0 +1,32 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {classifyReadOnlyRequest,PROJECT_ORIGIN} from './readonly-guard.mjs';
+const check=(uri,method='GET')=>classifyReadOnlyRequest(uri,{method},'http://127.0.0.1:8000');
+test('local GET asset permitted',()=>assert.equal(check('/assets/main.js').allowed,true));
+test('local POST prohibited',()=>assert.equal(check('/index.html','POST').allowed,false));
+test('foreign HTTPS origin prohibited',()=>assert.equal(check('https://evil.example/collect').allowed,false));
+test('foreign lookalike subdomain prohibited',()=>assert.equal(check('https://pmwxryavkrjcdobwkryw.supabase.co.evil.example/').allowed,false));
+test('manager role RPC permitted (POST only)',()=>assert.equal(check(PROJECT_ORIGIN+'/rest/v1/rpc/ops_is_admin','POST').allowed,true));
+test('candidate RPC permitted',()=>assert.equal(check(PROJECT_ORIGIN+'/rest/v1/rpc/ops_list_candidates','POST').allowed,true));
+test('manager v3 RPC permitted',()=>assert.equal(check(PROJECT_ORIGIN+'/rest/v1/rpc/ops_get_operations_v3','POST').allowed,true));
+test('manager RPC GET prohibited',()=>assert.equal(check(PROJECT_ORIGIN+'/rest/v1/rpc/ops_get_operations_v3').allowed,false));
+test('write RPC set_screening prohibited',()=>assert.equal(check(PROJECT_ORIGIN+'/rest/v1/rpc/ops_set_screening','POST').allowed,false));
+test('write RPC assign_task prohibited',()=>assert.equal(check(PROJECT_ORIGIN+'/rest/v1/rpc/ops_assign_task','POST').allowed,false));
+test('edge function invocation prohibited',()=>assert.equal(check(PROJECT_ORIGIN+'/functions/v1/ops-provision-worker','POST').allowed,false));
+test('direct REST table READ prohibited',()=>assert.equal(check(PROJECT_ORIGIN+'/rest/v1/student_workers').allowed,false));
+test('RPC query arguments prohibited',()=>assert.equal(check(PROJECT_ORIGIN+'/rest/v1/rpc/ops_list_candidates?unsafe=1','POST').allowed,false));
+test('password sign-in permitted',()=>assert.equal(check(PROJECT_ORIGIN+'/auth/v1/token?grant_type=password','POST').allowed,true));
+test('refresh token rotation permitted',()=>assert.equal(check(PROJECT_ORIGIN+'/auth/v1/token?grant_type=refresh_token','POST').allowed,true));
+test('auth user read permitted',()=>assert.equal(check(PROJECT_ORIGIN+'/auth/v1/user').allowed,true));
+test('auth logout permitted',()=>assert.equal(check(PROJECT_ORIGIN+'/auth/v1/logout?scope=global','POST').allowed,true));
+test('signup and recovery prohibited',()=>{
+ assert.equal(check(PROJECT_ORIGIN+'/auth/v1/signup','POST').allowed,false);
+ assert.equal(check(PROJECT_ORIGIN+'/auth/v1/recover','POST').allowed,false);
+});
+test('unknown token grant prohibited',()=>assert.equal(check(PROJECT_ORIGIN+'/auth/v1/token?grant_type=otp','POST').allowed,false));
+test('extra grant parameters prohibited',()=>assert.equal(check(PROJECT_ORIGIN+'/auth/v1/token?grant_type=password&x=1','POST').allowed,false));
+test('request method override cannot bypass POST deny',()=>{
+ const input={url:PROJECT_ORIGIN+'/rest/v1/rpc/ops_set_screening',method:'POST'};
+ assert.equal(classifyReadOnlyRequest(input,{},'http://127.0.0.1:8000').allowed,false);
+});
+test('invalid input fails closed',()=>assert.equal(check(null,'POST').allowed,false));

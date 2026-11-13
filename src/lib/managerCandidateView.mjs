@@ -18,6 +18,18 @@ export const candidateStage=row=>{
  return 'در انتظار بررسی'
 }
 
+// Identity display is sourced only from the already manager-authorized RPC.
+// The application name/major are historical. Never treat an unapproved worker
+// request, unlinked applicant or unavailable newer RPC fields as an override.
+const safeCurrentField=(row,effectiveKey,legacyKey)=>{
+ const original=typeof row?.[legacyKey]==='string'?row[legacyKey]:''
+ if(!row?.worker_id)return original
+ const effective=row?.[effectiveKey]
+ return typeof effective==='string'&&effective.trim()?effective.trim():original
+}
+export const candidateDisplayName=row=>safeCurrentField(row,'worker_effective_full_name','full_name')
+export const candidateDisplayMajor=row=>safeCurrentField(row,'worker_effective_major','major')
+
 // Both helpers are *presentation only*: the manager RPC is the authority.
 // Absent optional fields from an older deployed backend are UNKNOWN, never
 // a false claim that no password was set, an email was not delivered, or
@@ -51,7 +63,7 @@ export const selectManagerCandidates=(rows,filter='all',search='')=>{
   if(filter==='ready'&&!candidateIsReady(row))return false
   if(q){
    const searchable=[
-    row.full_name,row.major,row.phone,row.entry_year,
+    candidateDisplayName(row),row.full_name,candidateDisplayMajor(row),row.major,row.phone,row.entry_year,
     row.primary_unit,
    ].map(normalizeCandidateQuery).join(' ')
    if(!searchable.includes(q))return false
