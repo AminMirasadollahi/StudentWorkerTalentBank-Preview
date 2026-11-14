@@ -104,10 +104,14 @@ test('manager sees the independent queue and can reject without changing work re
  const ui=await mount(ManagerPresenceReviewQueue,{
   workers:[{id:'FAKE-WORKER',name:'دانشجوکار ساختگی'}],
   tasks:[{id:'TASK-FAKE',worker_id:'FAKE-WORKER',planned_date:'2030-01-01'}],
+  data:{exceptions:[],weekly_slots:[{worker_id:'FAKE-WORKER',weekday_iso:2,
+    valid_from:'2020-01-01',valid_until:null,start_minute:480,end_minute:780}]},
  })
  try{
   assert.match(ui.host.textContent,/دانشجوکار ساختگی/)
   assert.match(ui.host.textContent,/Synthetic change of attendance/)
+  assert.match(ui.host.textContent,/ساعات مؤثر کنونی: 08:00 تا 13:00/)
+  assert.match(ui.host.textContent,/درخواست عدم حضور|عدم حضور در این روز/)
   assert.match(ui.host.textContent,/۱ کار ثبت‌شده|1 کار ثبت‌شده/)
   const reject=Array.from(ui.host.querySelectorAll('button')).find(b=>/رد درخواست/.test(b.textContent))
   assert.ok(reject)
