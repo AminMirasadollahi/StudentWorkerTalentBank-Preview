@@ -1350,7 +1350,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       <TermMembershipPanel workers={workers} refreshRevision={refreshRevision}
        focusedReview={focusedReview}/>
     </Suspense>}
-    {view==='inbox'&&presenceApprovalUIEnabled&&<ManagerPresenceReviewQueue
+    {view==='inbox'&&presenceApprovalUIEnabled&&!loading&&!readFailed&&<ManagerPresenceReviewQueue
       workers={workers} tasks={data.tasks||[]} revision={refreshRevision}
       onEffectiveChange={refresh}/>}
     {view==='inbox'&&<section className="report-panel">
