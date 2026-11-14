@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from 'react'
+import {projectDayPresence} from '../lib/presenceDayProjection.mjs'
 import {
   listPresenceChanges,cancelPresenceChange,reviewPresenceChange,
 } from '../lib/presenceChangesApi.js'
@@ -19,6 +20,18 @@ const label=item=>item.action==='set_exception'
   ?(item.kind==='unavailable'?'درخواست عدم حضور':'درخواست تغییر ساعت حضور')
   :(PRESENCE_ACTION_TEXT[item.action]||'درخواست تغییر برنامه')
 const stateLabel=status=>PRESENCE_STATUS_TEXT[status]||'وضعیت نامشخص'
+const clock=n=>Number.isInteger(Number(n))&&Number(n)>=0&&Number(n)<=1440
+  ?String(Math.floor(Number(n)/60)).padStart(2,'0')+':'+String(Number(n)%60).padStart(2,'0')
+  :'نامعتبر'
+const windowsText=windows=>Array.isArray(windows)&&windows.length
+  ?windows.map(w=>clock(w.start??w.start_minute)+' تا '+clock(w.end??w.end_minute)).join('، ')
+  :'بدون بازه حضور'
+const desiredText=item=>item.action==='inherit_weekly'?'برداشتن استثنا و پیروی از برنامه ثابت هفتگی'
+  :item.kind==='unavailable'?'عدم حضور در این روز'
+  :'ساعات جایگزین: '+windowsText(item.intervals)
+const effectiveText=actual=>actual.kind==='unknown'?'برنامه فعلی نامشخص است'
+  :actual.kind==='unavailable'?'عدم حضور قبلاً ثبت شده است'
+  :'ساعات مؤثر کنونی: '+windowsText(actual.windows)
 
 export function WorkerPresenceRequests({workerId,revision=0,onEffectiveChange}) {
  const [items,setItems]=useState([])
@@ -88,7 +101,7 @@ export function WorkerPresenceRequests({workerId,revision=0,onEffectiveChange}) 
  </section>
 }
 
-export function ManagerPresenceReviewQueue({workers=[],tasks=[],revision=0,onEffectiveChange}) {
+export function ManagerPresenceReviewQueue({workers=[],tasks=[],data=null,revision=0,onEffectiveChange}) {
  const [items,setItems]=useState([])
  const [loading,setLoading]=useState(true)
  const [error,setError]=useState('')
@@ -159,12 +172,15 @@ export function ManagerPresenceReviewQueue({workers=[],tasks=[],revision=0,onEff
      const worker=workers.find(w=>w.id===item.worker_id)
      const oldDate=item.local_date<todayTehran()
      const plannedTasks=tasks.filter(t=>t.worker_id===item.worker_id&&t.planned_date===item.local_date)
+     const effective=projectDayPresence(data||{},item.worker_id,item.local_date)
      return <article className="ow-item" key={item.id}>
        <div className="ow-item-header">
          <strong>{worker?.name||'دانشجوکار مجاز'} · {formatDate(item.local_date)}</strong>
          <span className="ow-status">در انتظار تأیید</span>
        </div>
        <p>{label(item)}</p>
+       <p><strong>برنامه مؤثر فعلی: </strong>{effectiveText(effective)}</p>
+       <p><strong>تغییر درخواستی: </strong>{desiredText(item)}</p>
        <p className="ow-muted">ثبت درخواست: {item.requested_at||'ثبت شده در سرور'}</p>
        <p><strong>دلیل دانشجوکار: </strong>{item.reason||'ثبت نشده'}</p>
        {item.worker_note&&<p><strong>یادداشت برنامه: </strong>{item.worker_note}</p>}
