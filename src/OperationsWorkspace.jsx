@@ -759,7 +759,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
              onChange={e=>setPresenceReason(e.target.value)}
              placeholder="دلیل تغییر یا عدم حضور"/>
           <small className="ow-muted">در بازه ۴۸ ساعت مانده به شروع روز تا پایان همان روز، درخواست در انتظار تأیید مدیر باقی می‌ماند.</small>
-        </label>
+        </label>}
         {!exceptionValidation.ok&&<p role="alert" className="ow-warning">{exceptionValidation.error}</p>}
         {exceptionPreview?.code==='conflict'&&<p role="status" className="ow-warning">
           ظرفیت این روز با {minutes(exceptionPreview.allocatedMinutes)} کار موجود تداخل دارد.
