@@ -18,7 +18,7 @@ const plugin={
    'export const listPresenceChanges=async (workerId,pendingOnly)=>{',
    ' const q=globalThis.__swtb18qa;',
    ' if(q.failRead)throw Error("SYNTHETIC_READ_DENIED");',
-   ' return {ok:true,scope:q.scope,items:q.items.filter(x=>(!workerId||x.worker_id===workerId)&&(!pendingOnly||x.status==="pending"))};',
+   ' return {ok:true,scope:q.scope,items:q.items.filter(x=>(q.ignoreWorkerFilter||!workerId||x.worker_id===workerId)&&(!pendingOnly||x.status==="pending"))};',
    '};',
    'export const cancelPresenceChange=async id=>{',
    ' const q=globalThis.__swtb18qa;q.cancelCalls.push(id);',
@@ -91,6 +91,8 @@ test('worker pending request is shown separately from effective schedule; cancel
 })
 test('cross-worker response fails closed and request details are not rendered',async()=>{
  fake('my_worker',[{...pending,worker_id:'ANOTHER-WORKER',reason:'NEVER_RENDER_PRIVATE_REASON'}])
+ // Simulate a BUGGY server response containing an out-of-scope row.
+ globalThis.__swtb18qa.ignoreWorkerFilter=true
  const ui=await mount(WorkerPresenceRequests,{workerId:'FAKE-WORKER'})
  try{
   assert.match(ui.host.textContent,/محدوده اطلاعات درخواست‌های حضور معتبر نیست/)
