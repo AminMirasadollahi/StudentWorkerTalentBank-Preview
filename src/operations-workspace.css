@@ -3760,3 +3760,18 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 @media(prefers-reduced-motion:reduce){
  .ow-b3-sidebar__footer .swtb-policy-sidebar-action{transition:none}
 }
+
+
+/* SWTB18 presence approvals. Component is feature-gated OFF in production. */
+.swtb18-presence-requests,.swtb18-presence-review {
+  margin-block-start:1rem;
+}
+.swtb18-presence-requests .ow-item,.swtb18-presence-review .ow-item {
+  display:grid;gap:.6rem;margin-block:.5rem;
+}
+.swtb18-presence-review .ow-presence-review-actions {
+  display:flex;flex-wrap:wrap;gap:.65rem;margin-block-start:.4rem;
+}
+.swtb18-presence-review .report-field input[type="checkbox"] {
+  margin-inline-end:.35rem;
+}
