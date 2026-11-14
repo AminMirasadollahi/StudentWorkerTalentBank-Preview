@@ -189,6 +189,13 @@ function readableError(e) {
     overlapping_or_invalid_slots:'زمان‌های حضور هم‌پوشانی دارند یا نامعتبرند.',
     invalid_availability:'تنظیمات زمان حضور معتبر نیست.',
     invalid_exception:'تاریخ یا بازه تغییر حضور معتبر نیست.',
+    presence_change_requires_manager_review:'این تغییر نزدیک به زمان حضور باید از مسیر درخواست و تأیید مدیر ثبت شود.',
+    weekly_change_requires_advance_notice_or_day_request:'برای تغییر برنامه نزدیک به موعد، روز موردنظر را در تقویم انتخاب و درخواست تغییر ثبت کنید.',
+    presence_change_reason_required:'برای تغییر در بازه حساس، دلیل روشن و دست‌کم ۱۰ کاراکتری وارد کنید.',
+    presence_request_already_pending:'برای همین تاریخ، درخواست دیگری در انتظار تصمیم مدیر است.',
+    presence_request_payload_conflict:'این شناسه درخواست قبلاً با محتوای متفاوت ثبت شده است؛ وضعیت را بازخوانی کنید.',
+    invalid_presence_request:'محتوای درخواست یا تاریخ انتخاب‌شده معتبر نیست.',
+    worker_password_setup_required:'تعیین رمز و فعال‌سازی حساب دانشجوکار هنوز تکمیل نشده است.',
   }
   for (const [code,msg] of Object.entries(dict)) if(raw.includes(code)) return msg
   if(/fetch|network/i.test(raw))return 'ارتباط برقرار نشد؛ پاسخ‌ها حفظ شده‌اند. دوباره تلاش کنید.'
@@ -426,6 +433,11 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
         catch{setNotice('تغییر روی سرور ثبت شد، ولی تازه‌سازی تقویم ناموفق بود؛ بازخوانی کنید.')}
       }
     }catch(e){
+      // A deterministic PostgreSQL rejection is NOT an uncertain network
+      // commit. Explain the actual cause instead of inviting blind retry.
+      if(['23514','22023','42501','23505','P0001'].includes(String(e?.code||''))){
+        setError(readableError(e));return
+      }
       // A lost HTTP reply can follow a committed server request.
       // Query the authenticated scope; do NOT generate a new UUID blindly.
       try{
@@ -1351,7 +1363,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
        focusedReview={focusedReview}/>
     </Suspense>}
     {view==='inbox'&&presenceApprovalUIEnabled&&!loading&&!readFailed&&<ManagerPresenceReviewQueue
-      workers={workers} tasks={data.tasks||[]} revision={refreshRevision}
+      workers={workers} tasks={data.tasks||[]} data={data} revision={refreshRevision}
       onEffectiveChange={refresh}/>}
     {view==='inbox'&&<section className="report-panel">
       <div className="ow-presence-section-title ow-manager-inbox-heading">
