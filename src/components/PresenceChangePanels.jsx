@@ -20,9 +20,11 @@ const label=item=>item.action==='set_exception'
   ?(item.kind==='unavailable'?'درخواست عدم حضور':'درخواست تغییر ساعت حضور')
   :(PRESENCE_ACTION_TEXT[item.action]||'درخواست تغییر برنامه')
 const stateLabel=status=>PRESENCE_STATUS_TEXT[status]||'وضعیت نامشخص'
-const clock=n=>Number.isInteger(Number(n))&&Number(n)>=0&&Number(n)<=1440
-  ?String(Math.floor(Number(n)/60)).padStart(2,'0')+':'+String(Number(n)%60).padStart(2,'0')
-  :'نامعتبر'
+const clock=n=>typeof n==='string'&&/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$|^24:00$/.test(n)
+  ?n
+  :Number.isInteger(Number(n))&&Number(n)>=0&&Number(n)<=1440
+    ?String(Math.floor(Number(n)/60)).padStart(2,'0')+':'+String(Number(n)%60).padStart(2,'0')
+    :'نامعتبر'
 const windowsText=windows=>Array.isArray(windows)&&windows.length
   ?windows.map(w=>clock(w.start??w.start_minute)+' تا '+clock(w.end??w.end_minute)).join('، ')
   :'بدون بازه حضور'
