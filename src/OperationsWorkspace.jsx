@@ -2,6 +2,9 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState }
 import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
 import {workerGuideStorageKey} from './lib/workerGuide.mjs'
 import { trapModalTab } from './lib/dialogFocusTrap.mjs'
+import {canonicalPresencePayload,createPresenceAttemptLedger,interpretPresenceReceipt,workerPresenceItems,managerPresenceItems} from './lib/presenceChanges.mjs'
+import {requestPresenceChange,listPresenceChanges} from './lib/presenceChangesApi.js'
+import {WorkerPresenceRequests,ManagerPresenceReviewQueue} from './components/PresenceChangePanels.jsx'
 import { selectWorkerTaskFocus, summarizeWorkerTaskFocus } from './lib/workerTaskFocus.mjs'
 import {projectWorkerReportActivity,summarizeWorkerReportActivity} from './lib/workerReportActivity.mjs'
 import {filterPerformanceByWorkDate} from './lib/workerPerformance.mjs'
@@ -75,6 +78,8 @@ const focusDecisionsUIEnabled=import.meta.env?.VITE_SWTB22_REVIEW_FOCUS_UI==='tr
 const focusHistoryUIEnabled=import.meta.env?.VITE_SWTB22_HISTORY_FOCUS_UI==='true'
 // D6B affects only manager term-budget presentation; source defaults OFF.
 const focusTermBudgetUIEnabled=import.meta.env?.VITE_SWTB22_TERM_FOCUS_UI==='true'
+// OFF until paired backend, UI acceptance and explicit owner release.
+const presenceApprovalUIEnabled=import.meta.env?.VITE_SWTB18_PRESENCE_APPROVAL_UI==='true'
 
 /** Complete, current-scope server aggregate, independent of bounded task/history rows.
  * Fail closed to an explicit unavailable message instead of displaying false zero totals. */
@@ -184,6 +189,13 @@ function readableError(e) {
     overlapping_or_invalid_slots:'زمان‌های حضور هم‌پوشانی دارند یا نامعتبرند.',
     invalid_availability:'تنظیمات زمان حضور معتبر نیست.',
     invalid_exception:'تاریخ یا بازه تغییر حضور معتبر نیست.',
+    presence_change_requires_manager_review:'این تغییر نزدیک به زمان حضور باید از مسیر درخواست و تأیید مدیر ثبت شود.',
+    weekly_change_requires_advance_notice_or_day_request:'برای تغییر برنامه نزدیک به موعد، روز موردنظر را در تقویم انتخاب و درخواست تغییر ثبت کنید.',
+    presence_change_reason_required:'برای تغییر در بازه حساس، دلیل روشن و دست‌کم ۱۰ کاراکتری وارد کنید.',
+    presence_request_already_pending:'برای همین تاریخ، درخواست دیگری در انتظار تصمیم مدیر است.',
+    presence_request_payload_conflict:'این شناسه درخواست قبلاً با محتوای متفاوت ثبت شده است؛ وضعیت را بازخوانی کنید.',
+    invalid_presence_request:'محتوای درخواست یا تاریخ انتخاب‌شده معتبر نیست.',
+    worker_password_setup_required:'تعیین رمز و فعال‌سازی حساب دانشجوکار هنوز تکمیل نشده است.',
   }
   for (const [code,msg] of Object.entries(dict)) if(raw.includes(code)) return msg
   if(/fetch|network/i.test(raw))return 'ارتباط برقرار نشد؛ پاسخ‌ها حفظ شده‌اند. دوباره تلاش کنید.'
@@ -248,6 +260,10 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
   const [exceptionWindows,setExceptionWindows]=useState([])
   const [exceptionSlot,setExceptionSlot]=useState(null)
   const [note,setNote]=useState('')
+  const [presenceReason,setPresenceReason]=useState('')
+  const [presenceRequestRevision,setPresenceRequestRevision]=useState(0)
+  const presenceAttemptLedger=useRef(null)
+  if(!presenceAttemptLedger.current)presenceAttemptLedger.current=createPresenceAttemptLedger()
   const [busy,setBusy]=useState(false)
   const [error,setError]=useState('')
   const [notice,setNotice]=useState('')
@@ -309,13 +325,16 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
   const selectedWeekDate=editingDay===null?'':firstMatchingWeekday(effective,editingDay)
   const weekPreview=editingDay===null||!weeklyValidation.ok?null:
     assessAvailabilityOverride(calendarData,workerId,selectedWeekDate,weeklyValidation.intervals)
+  const existingDayException=selectedDate?(calendarData.exceptions||[]).find(
+    ex=>ex.worker_id===workerId&&ex.local_date===selectedDate):null
   const exceptionPreview=!selectedDate||!exceptionValidation.ok?null:
     assessAvailabilityOverride(calendarData,workerId,selectedDate,exceptionValidation.intervals,
       {unavailable:exceptionKind==='unavailable'})
 
   useEffect(()=>{
     setEditingDay(null);setEditingSlot(null);setDraftWindows([]);setSelectedDate('');setExceptionSlot(null)
-    setError('');setNotice('');setSaveState('')
+    setError('');setNotice('');setSaveState('');setPresenceReason('')
+    presenceAttemptLedger.current.reset()
   },[workerId])
   useEffect(()=>{
     setEditingDay(null);setEditingSlot(null);setDraftWindows([]);setSaveState('')
@@ -358,6 +377,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
     setExceptionKind(kind)
     setExceptionWindows(windows.length?windows:[suggestNextWindow([])])
     setNote(exception?.note||'')
+    setPresenceReason('')
     setError('');setNotice('');setSaveState('')
   }
   // The manager can arrive from a particular day/person in the group calendar.
@@ -388,12 +408,70 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
       'برنامه ثابت این روز حذف می‌شود. نبود برنامه به معنی عدم حضور قطعی نیست. ادامه می‌دهید؟'))return
     void save(()=>setWeeklyDay(workerId,editingDay,weeklyValidation.intervals,effective),'weekly')
   }
+  const submitPresenceRequest=async action=>{
+    if(busy||!workerId||!selectedDate||selectedDate<today())return
+    const payload=canonicalPresencePayload({
+      workerId,date:selectedDate,action,
+      kind:action==='inherit_weekly'?null:exceptionKind,
+      intervals:action==='inherit_weekly'?[]:exceptionValidation.intervals,
+      note:action==='inherit_weekly'?null:note,reason:presenceReason,
+    })
+    setBusy(true);setError('');setNotice('');setSaveState('')
+    let requestId
+    try{
+      requestId=presenceAttemptLedger.current.get(payload)
+      const reply=await requestPresenceChange({requestId,...payload})
+      const receipt=interpretPresenceReceipt(reply)
+      if(receipt.id!==requestId)
+        throw new Error('شناسه رسید با درخواست ارسال‌شده یکسان نیست.')
+      presenceAttemptLedger.current.acknowledge(payload)
+      setSaveState(receipt.message)
+      setPresenceRequestRevision(x=>x+1)
+      setSelectedDate('')
+      if(receipt.effective){
+        try{await onSaved?.()}
+        catch{setNotice('تغییر روی سرور ثبت شد، ولی تازه‌سازی تقویم ناموفق بود؛ بازخوانی کنید.')}
+      }
+    }catch(e){
+      // A deterministic PostgreSQL rejection is NOT an uncertain network
+      // commit. Explain the actual cause instead of inviting blind retry.
+      if(['23514','22023','42501','23505','P0001'].includes(String(e?.code||''))){
+        setError(readableError(e));return
+      }
+      // A lost HTTP reply can follow a committed server request.
+      // Query the authenticated scope; do NOT generate a new UUID blindly.
+      try{
+        if(!requestId)throw e
+        const response=await listPresenceChanges(workerId)
+        const rows=response.scope==='my_worker'
+          ?workerPresenceItems(response,workerId):managerPresenceItems(response)
+        const recorded=rows.find(item=>item.id===requestId&&item.worker_id===workerId)
+        if(!recorded)throw e
+        presenceAttemptLedger.current.acknowledge(payload)
+        setSaveState('ثبت درخواست از سرور تأیید شد: '+(
+          recorded.status==='pending'?'در انتظار تأیید مدیر':recorded.status))
+        setPresenceRequestRevision(x=>x+1)
+        setSelectedDate('')
+        if(recorded.status==='applied'||recorded.status==='approved'){
+          try{await onSaved?.()}catch{}
+        }
+      }catch{
+        setError('نتیجه ارسال قطعی نیست؛ شناسه درخواست حفظ شده است. بدون تغییر متن می‌توانید همان درخواست را پیگیری یا دوباره ارسال کنید. '+(e.message||''))
+      }
+    }finally{setBusy(false)}
+  }
   const submitDate=event=>{
     event.preventDefault()
     if(!workerId||!selectedDate||selectedDate<today()||!exceptionValidation.ok||busy)return
     if(exceptionKind==='replacement_intervals'&&!exceptionWindows.length)return
+    if(presenceApprovalUIEnabled){void submitPresenceRequest('set_exception');return}
     void save(()=>setDateException(workerId,selectedDate,exceptionKind,
       exceptionValidation.intervals,note),'exception')
+  }
+  const restoreWeekly=()=>{
+    if(!presenceApprovalUIEnabled||!existingDayException||busy||selectedDate<today())return
+    if(!window.confirm('این استثنا حذف و برنامه ثابت هفتگی مبنا شود؟ در بازه نزدیک، ابتدا تأیید مدیر لازم است.'))return
+    void submitPresenceRequest('inherit_weekly')
   }
   const setMonth=direction=>{
     setMonthAnchor(previous=>direction==='previous'
@@ -684,9 +762,16 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
         </div>
         {exceptionKind==='replacement_intervals'&&
           renderWindows(exceptionWindows,setExceptionWindows,'استثنا')}
-        <label className="report-field"><span>توضیح (اختیاری)</span>
+        <label className="report-field"><span>توضیح برنامه (اختیاری)</span>
           <input maxLength={300} value={note} onChange={e=>setNote(e.target.value)}/>
         </label>
+        {presenceApprovalUIEnabled&&<label className="report-field">
+          <span>دلیل تغییر (در بازه نزدیک به تاریخ حضور، الزامی)</span>
+          <input maxLength={300} value={presenceReason}
+             onChange={e=>setPresenceReason(e.target.value)}
+             placeholder="دلیل تغییر یا عدم حضور"/>
+          <small className="ow-muted">در بازه ۴۸ ساعت مانده به شروع روز تا پایان همان روز، درخواست در انتظار تأیید مدیر باقی می‌ماند.</small>
+        </label>}
         {!exceptionValidation.ok&&<p role="alert" className="ow-warning">{exceptionValidation.error}</p>}
         {exceptionPreview?.code==='conflict'&&<p role="status" className="ow-warning">
           ظرفیت این روز با {minutes(exceptionPreview.allocatedMinutes)} کار موجود تداخل دارد.
@@ -695,13 +780,22 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
         <button className="report-btn report-btn--primary" type="submit"
           disabled={busy||selectedDate<today()||!exceptionValidation.ok
             ||(exceptionKind==='replacement_intervals'&&!exceptionWindows.length)}>
-          ذخیره استثنای این تاریخ
+          {presenceApprovalUIEnabled?'ثبت تغییر / ارسال برای تأیید':'ذخیره استثنای این تاریخ'}
         </button>
+        {presenceApprovalUIEnabled&&existingDayException&&
+          <button type="button" className="report-btn report-btn--light"
+            disabled={busy||selectedDate<today()} onClick={restoreWeekly}>
+            حذف استثنا و بازگشت به برنامه هفتگی
+          </button>}
           </>}
       </form>}
       </dialog>
       <small className="ow-muted">برای مشاهده یا ویرایش برنامهٔ یک روز، آن روز را در تقویم انتخاب کنید.</small>
     </section>
+    {presenceApprovalUIEnabled&&workerId&&<WorkerPresenceRequests
+      key={workerId} workerId={workerId}
+      revision={presenceRequestRevision+peerRefreshRevision}
+      onEffectiveChange={onSaved}/>}
     <div className="ow-presence-feedback">
       <Message error={error} notice={notice}/>
       {saveState&&<p role="status" className="ow-muted">{saveState}</p>}
@@ -1268,6 +1362,9 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       <TermMembershipPanel workers={workers} refreshRevision={refreshRevision}
        focusedReview={focusedReview}/>
     </Suspense>}
+    {view==='inbox'&&presenceApprovalUIEnabled&&!loading&&!readFailed&&<ManagerPresenceReviewQueue
+      workers={workers} tasks={data.tasks||[]} data={data} revision={refreshRevision}
+      onEffectiveChange={refresh}/>}
     {view==='inbox'&&<section className="report-panel">
       <div className="ow-presence-section-title ow-manager-inbox-heading">
         <h2>کارتابل رسیدگی</h2>
