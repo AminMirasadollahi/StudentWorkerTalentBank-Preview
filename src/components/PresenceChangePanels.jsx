@@ -31,7 +31,9 @@ export function WorkerPresenceRequests({workerId,revision=0,onEffectiveChange}) 
    setLoading(true);setError('')
    try{
      const response=await listPresenceChanges(workerId)
-     const rows=workerPresenceItems(response,workerId)
+     const rows=response.scope==='manager'
+       ?managerPresenceItems(response).filter(x=>x.worker_id===workerId)
+       :workerPresenceItems(response,workerId)
      if(v===version.current)setItems(rows)
      return rows
    }catch(e){
@@ -43,7 +45,9 @@ export function WorkerPresenceRequests({workerId,revision=0,onEffectiveChange}) 
    const v=++version.current
    setItems([]);setLoading(true);setError('')
    void listPresenceChanges(workerId).then(response=>{
-     const rows=workerPresenceItems(response,workerId)
+     const rows=response.scope==='manager'
+       ?managerPresenceItems(response).filter(x=>x.worker_id===workerId)
+       :workerPresenceItems(response,workerId)
      if(v===version.current)setItems(rows)
    }).catch(e=>{
      if(v===version.current){setItems([]);setError(e.message||'خواندن درخواست‌ها ناموفق بود.')}
