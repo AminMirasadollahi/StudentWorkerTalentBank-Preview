@@ -286,8 +286,9 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
   const [settingsOpen,setSettingsOpen] = useState(false)
   const [manualRefreshRevision,setManualRefreshRevision] = useState(0)
 
-  const changePassword = async event => {
+  const changePassword = async (event,confirmExisting=false) => {
     event.preventDefault()
+    const recoveryMode=recoveryOffered||confirmExisting
     setMessage('')
     setPasswordError('')
     if (!validWorkerPasswordPair(password, confirmation)) {
@@ -297,7 +298,7 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
     setSaving(true)
     try {
       if (!passwordEstablished) {
-        const body=recoveryOffered?{password,mode:'confirm_existing_password'}:{password}
+        const body=recoveryMode?{password,mode:'confirm_existing_password'}:{password}
         const { data, error } = await opsClient.functions.invoke(
           'ops-complete-worker-onboarding',
           { body },
@@ -338,7 +339,7 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
     }
     setSaving(false)
     setRecoveryOffered(false)
-    setMessage(recoveryOffered?'تکمیل فعال‌سازی حساب تأیید شد.':'رمز اختصاصی حساب شما ثبت شد.')
+    setMessage(recoveryMode?'تکمیل فعال‌سازی حساب تأیید شد.':'رمز اختصاصی حساب شما ثبت شد.')
     setPasswordEstablished(true)
     setSettingsOpen(false)
     setPassword('')
@@ -381,6 +382,15 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
                 ? recoveryOffered?'تکمیل با همین رمز (بدون تغییر رمز)':'ثبت رمز اختصاصی'
                 : 'تغییر رمز'}
           </button>
+          {!passwordEstablished&&<div className="ops-worker-recovery-existing">
+            <p className="ow-muted">اگر قبلاً رمز اختصاصی خود را ثبت کرده‌اید ولی فعال‌سازی کامل نشده،
+              گزینه زیر فقط همان رمز را بررسی می‌کند و رمز جدیدی نمی‌سازد.</p>
+            <button className="ops-recovery-toggle" type="button"
+              disabled={saving||!password||!confirmation}
+              onClick={event=>{void changePassword(event,true)}}>
+              قبلاً رمز را ثبت کرده‌ام؛ تکمیل حساب بدون تغییر رمز
+            </button>
+          </div>}
         </form>
       </section>
   )
