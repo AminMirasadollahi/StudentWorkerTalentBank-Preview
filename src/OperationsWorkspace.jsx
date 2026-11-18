@@ -1299,7 +1299,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const pending=(data.time_entries||[]).filter(e=>e.review_state==='submitted')
   const pendingProfileChanges=(data.profile_requests||[]).filter(r=>r.review_state==='pending')
   const focusedReview=hideSectionTabs&&focusDecisionsUIEnabled
-  const inboxReviewItems=focusedReview?managerReviewItems({
+  const inboxReviewItems=(focusedReview||presenceApprovalUIEnabled)?managerReviewItems({
     timeEntries:pending,profileChanges:pendingProfileChanges,
     workers,tasks:allTasks,formatDate:pretty,
     formatUnit:unit=>unitLabels[unit]||'واحد نامشخص',
@@ -1372,8 +1372,15 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     </Suspense>}
     {view==='inbox'&&presenceApprovalUIEnabled&&!loading&&!readFailed&&<ManagerPresenceReviewQueue
       workers={workers} tasks={data.tasks||[]} data={data} revision={refreshRevision}
+      otherItems={inboxReviewItems}
+      renderOtherReview={item=>item.kind==='profile'
+        ?<ProfileChangeReview key={item.key} request={item.request}
+          worker={item.worker} onDone={refresh}/>
+        :<ApprovalCard key={item.key} entry={item.entry} task={item.task}
+          worker={item.worker} focused onDone={refresh}/>}
+      onCreateTask={()=>{setView('tasks');if(focusedTasks&&!loading&&active.length>0)setTaskEditorOpen(true)}}
       onEffectiveChange={refresh}/>}
-    {view==='inbox'&&<section className="report-panel">
+    {view==='inbox'&&!presenceApprovalUIEnabled&&<section className="report-panel">
       <div className="ow-presence-section-title ow-manager-inbox-heading">
         <h2>کارتابل رسیدگی</h2>
         <small>{n(pending.length)} گزارش · {n(pendingProfileChanges.length)} درخواست اصلاح</small>
