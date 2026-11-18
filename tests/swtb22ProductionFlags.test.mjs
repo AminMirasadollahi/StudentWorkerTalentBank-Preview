@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs'
 // Reversible, nonsecret production presentation release.
 // The protected GitHub Pages workflow remains pinned byte-for-byte by
 // releaseBoundary.test.mjs and is intentionally not edited.
-test('SWTB22 production Vite file enables exactly the seven reviewed manager UI features plus guarded email invite and owner-approved manager identity fallback',()=>{
+test('production Vite contains only explicitly reviewed SWTB22, identity, email and deployed SWTB18 presence flags',()=>{
  const raw=readFileSync(new URL('../.env.production',import.meta.url),'utf8')
  const rows=raw.split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#'))
  const values=Object.fromEntries(rows.map(row=>{
@@ -27,8 +27,11 @@ test('SWTB22 production Vite file enables exactly the seven reviewed manager UI 
   // SWTB18: exact public PR85 release flag; this is a manager-only,
   // existing-RPC display fallback, not authorization or new backend access.
   VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK:'true',
+  // Owner-approved, installed SQL migration 20261118070059 and public PR87.
+  // Detailed source/RPC contract is separately locked by the SWTB18 test.
+  VITE_SWTB18_PRESENCE_APPROVAL_UI:'true',
  })
- assert.equal(rows.length,9,'no other variables or credentials may be included')
+ assert.equal(rows.length,10,'no other variables or credentials may be included')
 })
 test('all source feature switches remain explicitly overridable to false',()=>{
  const app=readFileSync(new URL('../src/OpsApp.jsx',import.meta.url),'utf8')
@@ -43,4 +46,5 @@ test('all source feature switches remain explicitly overridable to false',()=>{
  assert.match(tasks,/VITE_SWTB22_TERM_FOCUS_UI\s*===\s*'true'/)
  assert.match(app,/VITE_OPS_EMAIL_INVITES_AVAILABLE\s*===\s*'true'/)
  assert.match(app,/VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK\s*===\s*'true'/)
+ assert.match(tasks,/VITE_SWTB18_PRESENCE_APPROVAL_UI\s*===\s*'true'/)
 })

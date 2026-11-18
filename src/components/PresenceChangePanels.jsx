@@ -1,5 +1,7 @@
 import {useEffect,useRef,useState} from 'react'
 import {projectDayPresence} from '../lib/presenceDayProjection.mjs'
+import FocusedReviewQueue from './FocusedReviewQueue.jsx'
+import {managerReviewItems} from '../lib/managerReviewRows.mjs'
 import {
   listPresenceChanges,cancelPresenceChange,reviewPresenceChange,
 } from '../lib/presenceChangesApi.js'
@@ -103,13 +105,15 @@ export function WorkerPresenceRequests({workerId,revision=0,onEffectiveChange}) 
  </section>
 }
 
-export function ManagerPresenceReviewQueue({workers=[],tasks=[],data=null,revision=0,onEffectiveChange}) {
+export function ManagerPresenceReviewQueue({workers=[],tasks=[],data=null,otherItems=[],
+ renderOtherReview=()=>null,onCreateTask,revision=0,onEffectiveChange}) {
  const [items,setItems]=useState([])
  const [loading,setLoading]=useState(true)
  const [error,setError]=useState('')
  const [busyId,setBusyId]=useState('')
  const [notes,setNotes]=useState({})
  const [retrospective,setRetrospective]=useState({})
+ const [kindFilter,setKindFilter]=useState('all')
  const seq=useRef(0)
  const reload=async()=>{
    const v=++seq.current
@@ -160,52 +164,91 @@ export function ManagerPresenceReviewQueue({workers=[],tasks=[],data=null,revisi
      setError('نتیجه تصمیم یا بازخوانی قطعی نیست. پیش از اقدام مجدد وضعیت را بررسی کنید. '+(e.message||''))
    }finally{setBusyId('')}
  }
- return <section className="report-panel swtb18-presence-review" aria-label="کارتابل درخواست‌های تغییر حضور">
-   <div className="report-panel-heading">
-     <h3>درخواست‌های تغییر برنامه حضور</h3>
+ const presenceProjection=managerReviewItems({
+  presenceChanges:items,workers,tasks,formatDate:formatDate,mode:'presence',
+ })
+ // A presence RPC failure must not block independently authorized time or
+ // profile reviews. Never present the partial list as the complete count.
+ const allItems=error?otherItems:[...otherItems,...presenceProjection]
+ const visibleItems=kindFilter==='all'?allItems:allItems.filter(item=>item.kind===kindFilter)
+ const renderPresenceRequest=record=>{
+   const item=record.request
+   const worker=workers.find(w=>w.id===item.worker_id)
+   const oldDate=item.local_date<todayTehran()
+   const plannedTasks=tasks.filter(t=>t.worker_id===item.worker_id&&t.planned_date===item.local_date)
+   const effective=projectDayPresence(data||{},item.worker_id,item.local_date)
+   return <article className="ow-item swtb19-presence-review-detail" key={item.id}>
+     <div className="ow-item-header">
+       <strong>{worker?.name||'دانشجوکار مجاز'} · {formatDate(item.local_date)}</strong>
+       <span className="ow-status">در انتظار تأیید</span>
+     </div>
+     <p>{label(item)}</p>
+     <p><strong>برنامه مؤثر فعلی: </strong>{effectiveText(effective)}</p>
+     <p><strong>تغییر درخواستی: </strong>{desiredText(item)}</p>
+     <p className="ow-muted">ثبت درخواست: {item.requested_at||'ثبت شده در سرور'}</p>
+     <p><strong>دلیل دانشجوکار: </strong>{item.reason||'ثبت نشده'}</p>
+     {item.worker_note&&<p><strong>یادداشت برنامه: </strong>{item.worker_note}</p>}
+     {plannedTasks.length>0&&<p className="ow-warning" role="status">
+       در این تاریخ {plannedTasks.length} کار ثبت‌شده وجود دارد؛ تأیید تغییر حضور آن‌ها را لغو نمی‌کند.
+     </p>}
+     {oldDate&&<label className="report-field">
+       <span><input type="checkbox" checked={Boolean(retrospective[item.id])}
+         disabled={!!busyId} onChange={e=>setRetrospective(x=>({...x,[item.id]:e.target.checked}))}/>
+         {' '}تأیید گذشته‌نگر پس از پایان روز را صریحاً می‌پذیرم</span>
+     </label>}
+     <label className="report-field">
+       <span>توضیح تصمیم مدیر{oldDate?' (برای تأیید، اجباری)':''}</span>
+       <input type="text" maxLength={500} disabled={!!busyId}
+         value={notes[item.id]||''} onChange={e=>setNotes(x=>({...x,[item.id]:e.target.value}))}/>
+     </label>
+     <div className="ow-presence-review-actions">
+       <button type="button" className="report-btn report-btn--primary"
+         disabled={!!busyId} onClick={()=>{void review(item,'approve')}}>تأیید تغییر</button>
+       <button type="button" className="report-btn report-btn--light"
+         disabled={!!busyId} onClick={()=>{void review(item,'reject')}}>رد درخواست</button>
+     </div>
+   </article>
+ }
+ return <section className="report-panel swtb18-presence-review swtb19-unified-inbox"
+   aria-label="کارتابل رسیدگی یکپارچه">
+   <div className="ow-presence-section-title ow-manager-inbox-heading">
+     <h2>کارتابل رسیدگی</h2>
+     <small>{loading?'در حال دریافت درخواست‌های حضور…':
+       error?'شمار کل قابل تأیید نیست':
+       new Intl.NumberFormat('fa-IR').format(allItems.length)+' درخواست · '+
+       new Intl.NumberFormat('fa-IR').format(presenceProjection.length)+' حضور · '+
+       new Intl.NumberFormat('fa-IR').format(otherItems.filter(x=>x.kind==='time').length)+' گزارش · '+
+       new Intl.NumberFormat('fa-IR').format(otherItems.filter(x=>x.kind==='profile').length)+' اصلاح مشخصات'}
+     </small>
      <button type="button" className="report-btn report-btn--light"
        disabled={loading||!!busyId} onClick={()=>{void reload().catch(()=>{})}}>بازخوانی صف</button>
+     {onCreateTask&&<button type="button" className="report-btn report-btn--light"
+       onClick={onCreateTask}>+ واگذاری کار جدید</button>}
    </div>
-   <p className="ow-muted">این صف مستقل از بررسی گزارش ساعت است. تأیید برنامه، کار انجام‌شده یا مبلغ قابل پرداخت را تأیید نمی‌کند.</p>
-   {loading&&<p role="status">در حال دریافت صف مدیر…</p>}
-   {error&&<p role="alert" className="ow-warning">{error}</p>}
-   {!loading&&!error&&items.length===0&&<p className="ow-muted">درخواست حضور منتظر تأیید وجود ندارد.</p>}
-   {!loading&&items.map(item=>{
-     const worker=workers.find(w=>w.id===item.worker_id)
-     const oldDate=item.local_date<todayTehran()
-     const plannedTasks=tasks.filter(t=>t.worker_id===item.worker_id&&t.planned_date===item.local_date)
-     const effective=projectDayPresence(data||{},item.worker_id,item.local_date)
-     return <article className="ow-item" key={item.id}>
-       <div className="ow-item-header">
-         <strong>{worker?.name||'دانشجوکار مجاز'} · {formatDate(item.local_date)}</strong>
-         <span className="ow-status">در انتظار تأیید</span>
-       </div>
-       <p>{label(item)}</p>
-       <p><strong>برنامه مؤثر فعلی: </strong>{effectiveText(effective)}</p>
-       <p><strong>تغییر درخواستی: </strong>{desiredText(item)}</p>
-       <p className="ow-muted">ثبت درخواست: {item.requested_at||'ثبت شده در سرور'}</p>
-       <p><strong>دلیل دانشجوکار: </strong>{item.reason||'ثبت نشده'}</p>
-       {item.worker_note&&<p><strong>یادداشت برنامه: </strong>{item.worker_note}</p>}
-       {plannedTasks.length>0&&<p className="ow-warning" role="status">
-         در این تاریخ {plannedTasks.length} کار ثبت‌شده وجود دارد؛ تأیید تغییر حضور آن‌ها را لغو نمی‌کند.
-       </p>}
-       {oldDate&&<label className="report-field">
-         <span><input type="checkbox" checked={Boolean(retrospective[item.id])}
-           disabled={!!busyId} onChange={e=>setRetrospective(x=>({...x,[item.id]:e.target.checked}))}/>
-           {' '}تأیید گذشته‌نگر پس از پایان روز را صریحاً می‌پذیرم</span>
-       </label>}
-       <label className="report-field">
-         <span>توضیح تصمیم مدیر{oldDate?' (برای تأیید، اجباری)':''}</span>
-         <input type="text" maxLength={500} disabled={!!busyId}
-           value={notes[item.id]||''} onChange={e=>setNotes(x=>({...x,[item.id]:e.target.value}))}/>
-       </label>
-       <div className="ow-presence-review-actions">
-         <button type="button" className="report-btn report-btn--primary"
-           disabled={!!busyId} onClick={()=>{void review(item,'approve')}}>تأیید تغییر</button>
-         <button type="button" className="report-btn report-btn--light"
-           disabled={!!busyId} onClick={()=>{void review(item,'reject')}}>رد درخواست</button>
-       </div>
-     </article>
-   })}
+   <p className="ow-muted">گزارش ساعت، اصلاح مشخصات و درخواست تغییر حضور در یک فهرست بررسی می‌شوند.
+     انتخاب درخواست هیچ تصمیمی ثبت نمی‌کند؛ تأیید حضور نیز به معنی تأیید ساعت کار نیست.</p>
+   {loading&&<p role="status">در حال دریافت کامل کارتابل مدیر…</p>}
+   {error&&<div role="alert" className="ow-warning">
+      دریافت درخواست‌های حضور ناموفق بود؛ شمار کل کارتابل ناقص است.
+      گزارش‌های ساعت و اصلاح مشخصاتِ مجاز همچنان قابل رسیدگی‌اند.
+      فهرست حضور تا بازخوانی موفق نمایش داده نمی‌شود. {error}
+   </div>}
+   {!loading&&<>
+     <label className="report-field swtb19-review-kind-filter">
+       <span>نوع درخواست</span>
+       <select value={kindFilter} aria-label="فیلتر نوع درخواست کارتابل"
+         onChange={e=>setKindFilter(e.target.value)}>
+         <option value="all">همه درخواست‌ها</option>
+         <option value="time">گزارش ساعت و زمان اضافه</option>
+         <option value="profile">اصلاح مشخصات</option>
+         <option value="presence">تغییر برنامه حضور</option>
+       </select>
+     </label>
+     <FocusedReviewQueue items={visibleItems} label="درخواست‌های نیازمند تصمیم مدیر"
+       emptyText={error?'درخواست‌های حضور هنوز بارگذاری نشده‌اند؛ در فهرست‌های قابل دسترس موردی مطابق فیلتر نیست.':
+         allItems.length===0?'هیچ درخواستی منتظر رسیدگی نیست.':'درخواستی مطابق فیلتر انتخاب‌شده وجود ندارد.'}
+       renderReview={item=>item.kind==='presence'
+         ?renderPresenceRequest(item):renderOtherReview(item)}/>
+   </>}
  </section>
 }

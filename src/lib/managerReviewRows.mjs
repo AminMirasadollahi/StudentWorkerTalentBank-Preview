@@ -1,12 +1,12 @@
 // Pure read-only projection of ALREADY manager-authorized review rows.
 // Never treats a pending request as approved time, membership or access.
 export function managerReviewItems({
- timeEntries=[],profileChanges=[],workers=[],tasks=[],formatDate=v=>v||'—',
+ timeEntries=[],profileChanges=[],presenceChanges=[],workers=[],tasks=[],formatDate=v=>v||'—',
  formatUnit=v=>v||'نامشخص',mode='all',
 }={}){
  const byWorker=new Map(workers.map(w=>[w.id,w]))
  const byTask=new Map(tasks.map(t=>[t.id,t]))
- const profiles=mode==='time'?[]:profileChanges
+ const profiles=['time','presence'].includes(mode)?[]:profileChanges
   .filter(r=>r.review_state==='pending')
   .map(request=>{
    const worker=byWorker.get(request.worker_id)
@@ -18,7 +18,7 @@ export function managerReviewItems({
     badge:'اصلاح مشخصات',alert:false,
    }
   })
- const reports=mode==='profile'?[]:timeEntries
+ const reports=['profile','presence'].includes(mode)?[]:timeEntries
   .filter(entry=>entry.review_state==='submitted')
   .map(entry=>{
    const task=byTask.get(entry.task_id)
@@ -36,5 +36,18 @@ export function managerReviewItems({
     alert:missing||extra,
    }
   })
- return [...profiles,...reports]
+ const presences=['time','profile'].includes(mode)?[]:presenceChanges
+  .filter(request=>request.status==='pending')
+  .map(request=>{
+   const worker=byWorker.get(request.worker_id)
+   const kind=request.action==='inherit_weekly'?'بازگشت به برنامه ثابت':
+     request.kind==='unavailable'?'عدم حضور':'تغییر ساعت حضور'
+   return {
+    key:'presence:'+request.id,kind:'presence',request,worker,
+    title:(worker?.name||'دانشجوکار')+' · '+kind,
+    subtitle:'تاریخ درخواست: '+formatDate(request.local_date),
+    badge:'تغییر برنامه حضور',alert:false,
+   }
+  })
+ return [...profiles,...reports,...presences]
 }
