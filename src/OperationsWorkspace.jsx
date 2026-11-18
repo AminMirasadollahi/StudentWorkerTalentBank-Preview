@@ -28,6 +28,7 @@ import {projectUnifiedPeerDay,sharedPeerClockScale,packPeerDayIntervals,labelPee
 import {minutesToClock} from './lib/weeklyScheduleGrid.mjs'
 import {useUnifiedPeerCalendar} from './lib/useUnifiedPeerCalendar.js'
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
+import {presenceReviewTiming} from './lib/presenceReviewTiming.mjs'
 import TaskAssignmentEditor from './components/TaskAssignmentEditor'
 import TeamScheduleOverview from './components/TeamScheduleOverview'
 import TermBudgetPanel from './components/TermBudgetPanel'
@@ -325,6 +326,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
   const selectedWeekDate=editingDay===null?'':firstMatchingWeekday(effective,editingDay)
   const weekPreview=editingDay===null||!weeklyValidation.ok?null:
     assessAvailabilityOverride(calendarData,workerId,selectedWeekDate,weeklyValidation.intervals)
+  const selectedPresenceTiming=presenceReviewTiming(selectedDate)
   const existingDayException=selectedDate?(calendarData.exceptions||[]).find(
     ex=>ex.worker_id===workerId&&ex.local_date===selectedDate):null
   const exceptionPreview=!selectedDate||!exceptionValidation.ok?null:
@@ -470,7 +472,8 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
   }
   const restoreWeekly=()=>{
     if(!presenceApprovalUIEnabled||!existingDayException||busy||selectedDate<today())return
-    if(!window.confirm('این استثنا حذف و برنامه ثابت هفتگی مبنا شود؟ در بازه نزدیک، ابتدا تأیید مدیر لازم است.'))return
+    if(!window.confirm('این استثنا حذف و برنامه ثابت هفتگی مبنا شود؟ '+
+      (selectedPresenceTiming.requiresReview?'در بازه نزدیک، ابتدا تأیید مدیر لازم است.':'تغییر مجاز پیش از بازه نزدیک بلافاصله اعمال می‌شود.')))return
     void submitPresenceRequest('inherit_weekly')
   }
   const setMonth=direction=>{
@@ -765,13 +768,18 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
         <label className="report-field"><span>توضیح برنامه (اختیاری)</span>
           <input maxLength={300} value={note} onChange={e=>setNote(e.target.value)}/>
         </label>
-        {presenceApprovalUIEnabled&&<label className="report-field">
+        {presenceApprovalUIEnabled&&selectedPresenceTiming.requiresReview&&<label className="report-field">
           <span>دلیل تغییر (در بازه نزدیک به تاریخ حضور، الزامی)</span>
-          <input maxLength={300} value={presenceReason}
+          <input maxLength={300} minLength={10} required value={presenceReason}
              onChange={e=>setPresenceReason(e.target.value)}
              placeholder="دلیل تغییر یا عدم حضور"/>
-          <small className="ow-muted">در بازه ۴۸ ساعت مانده به شروع روز تا پایان همان روز، درخواست در انتظار تأیید مدیر باقی می‌ماند.</small>
+          <small className="ow-muted">در بازه ۴۸ ساعت پیش از شروع روز تا پایان همان روز، درخواست در انتظار تأیید مدیر باقی می‌ماند. نتیجه قطعی را سرور تعیین می‌کند.</small>
         </label>}
+        {presenceApprovalUIEnabled&&selectedPresenceTiming.state==='direct'&&
+          <p className="ow-muted" role="status">
+            این تاریخ خارج از بازه حساس فعلی است؛ دلیل الزامی نیست.
+            تغییر معمولاً پس از ثبت اعمال می‌شود؛ پاسخ سرور تعیین‌کننده است.
+          </p>}
         {!exceptionValidation.ok&&<p role="alert" className="ow-warning">{exceptionValidation.error}</p>}
         {exceptionPreview?.code==='conflict'&&<p role="status" className="ow-warning">
           ظرفیت این روز با {minutes(exceptionPreview.allocatedMinutes)} کار موجود تداخل دارد.
@@ -780,7 +788,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
         <button className="report-btn report-btn--primary" type="submit"
           disabled={busy||selectedDate<today()||!exceptionValidation.ok
             ||(exceptionKind==='replacement_intervals'&&!exceptionWindows.length)}>
-          {presenceApprovalUIEnabled?'ثبت تغییر / ارسال برای تأیید':'ذخیره استثنای این تاریخ'}
+          {presenceApprovalUIEnabled?(selectedPresenceTiming.requiresReview?'ارسال درخواست برای تأیید':'ثبت تغییر برنامه'):'ذخیره استثنای این تاریخ'}
         </button>
         {presenceApprovalUIEnabled&&existingDayException&&
           <button type="button" className="report-btn report-btn--light"
