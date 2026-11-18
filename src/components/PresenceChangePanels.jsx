@@ -167,7 +167,9 @@ export function ManagerPresenceReviewQueue({workers=[],tasks=[],data=null,otherI
  const presenceProjection=managerReviewItems({
   presenceChanges:items,workers,tasks,formatDate:formatDate,mode:'presence',
  })
- const allItems=[...otherItems,...presenceProjection]
+ // A presence RPC failure must not block independently authorized time or
+ // profile reviews. Never present the partial list as the complete count.
+ const allItems=error?otherItems:[...otherItems,...presenceProjection]
  const visibleItems=kindFilter==='all'?allItems:allItems.filter(item=>item.kind===kindFilter)
  const renderPresenceRequest=record=>{
    const item=record.request
@@ -227,10 +229,11 @@ export function ManagerPresenceReviewQueue({workers=[],tasks=[],data=null,otherI
      انتخاب درخواست هیچ تصمیمی ثبت نمی‌کند؛ تأیید حضور نیز به معنی تأیید ساعت کار نیست.</p>
    {loading&&<p role="status">در حال دریافت کامل کارتابل مدیر…</p>}
    {error&&<div role="alert" className="ow-warning">
-      کارتابل کامل دریافت نشد؛ شمار صفر معتبر نیست و برای جلوگیری از نمایش فهرست ناقص،
-      درخواست‌ها تا بازخوانی موفق پنهان هستند. {error}
+      دریافت درخواست‌های حضور ناموفق بود؛ شمار کل کارتابل ناقص است.
+      گزارش‌های ساعت و اصلاح مشخصاتِ مجاز همچنان قابل رسیدگی‌اند.
+      فهرست حضور تا بازخوانی موفق نمایش داده نمی‌شود. {error}
    </div>}
-   {!loading&&!error&&<>
+   {!loading&&<>
      <label className="report-field swtb19-review-kind-filter">
        <span>نوع درخواست</span>
        <select value={kindFilter} aria-label="فیلتر نوع درخواست کارتابل"
@@ -242,7 +245,8 @@ export function ManagerPresenceReviewQueue({workers=[],tasks=[],data=null,otherI
        </select>
      </label>
      <FocusedReviewQueue items={visibleItems} label="درخواست‌های نیازمند تصمیم مدیر"
-       emptyText={allItems.length===0?'هیچ درخواستی منتظر رسیدگی نیست.':'درخواستی مطابق فیلتر انتخاب‌شده وجود ندارد.'}
+       emptyText={error?'درخواست‌های حضور هنوز بارگذاری نشده‌اند؛ در فهرست‌های قابل دسترس موردی مطابق فیلتر نیست.':
+         allItems.length===0?'هیچ درخواستی منتظر رسیدگی نیست.':'درخواستی مطابق فیلتر انتخاب‌شده وجود ندارد.'}
        renderReview={item=>item.kind==='presence'
          ?renderPresenceRequest(item):renderOtherReview(item)}/>
    </>}
