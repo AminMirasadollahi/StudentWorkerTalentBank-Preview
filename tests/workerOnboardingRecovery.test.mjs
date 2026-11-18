@@ -48,7 +48,8 @@ test('uncertain first onboarding result reconciles server state before any passw
  const source=readFileSync(new URL('../src/OpsApp.jsx',import.meta.url),'utf8')
  const worker=source.slice(source.indexOf('function WorkerView('),source.indexOf('const accountSettingsPanel=',source.indexOf('function WorkerView(')))
  assert.ok(worker.length>2000,'worker action source available')
- assert.match(worker,/const body=recoveryOffered\?\{password,mode:'confirm_existing_password'\}:\{password\}/)
+ assert.match(worker,/const recoveryMode=recoveryOffered\|\|confirmExisting/)
+ assert.match(worker,/const body=recoveryMode\?\{password,mode:'confirm_existing_password'\}:\{password\}/)
  assert.match(worker,/const current=await currentOperationsIdentity\(\)/)
  assert.match(worker,/current\.profile\?\.worker_id===profile\.worker_id/)
  assert.match(worker,/current\.profile\?\.onboarding_state==='ready'/)
@@ -56,6 +57,8 @@ test('uncertain first onboarding result reconciles server state before any passw
  assert.match(worker,/setRecoveryOffered\(false\)/)
  assert.match(source,/تکمیل با همین رمز \(بدون تغییر رمز\)/)
  assert.match(source,/رمز دوباره تغییر نمی‌کند/)
+ assert.match(source,/قبلاً رمز را ثبت کرده‌ام؛ تکمیل حساب بدون تغییر رمز/)
+ assert.match(source,/void changePassword\(event,true\)/)
 })
 test('recovery guidance does not instruct password rotation after ambiguous Auth+DB commit',()=>{
  const message=workerPasswordChangeErrorCopy({initialSetup:true})
