@@ -3,11 +3,19 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 const base=new URL('../',import.meta.url)
 const read=path=>readFileSync(new URL(path,base),'utf8')
-test('presence request UI is explicitly OFF in production and no new Vite token is published',()=>{
+test('SWTB18 flag requires recorded SQL migration and explicit React gate',()=>{
  const prod=read('.env.production')
  const app=read('src/OperationsWorkspace.jsx')
- assert.doesNotMatch(prod,/^VITE_SWTB18_PRESENCE_APPROVAL_UI\s*=\s*true/m)
+ const enable=/^VITE_SWTB18_PRESENCE_APPROVAL_UI\s*=\s*true\s*$/m.test(prod)
  assert.match(app,/presenceApprovalUIEnabled\s*=\s*import\.meta\.env\?\.VITE_SWTB18_PRESENCE_APPROVAL_UI\s*===\s*'true'/)
+ if(enable){
+   // This marker is the owner-authorized, actually installed production SQL
+   // migration; removing it requires disabling the flag first.
+   assert.match(prod,/SWTB18 PR52\+PR87: coordinated server migration 20261118070059/)
+   assert.match(app,/if\(presenceApprovalUIEnabled\)\{void submitPresenceRequest\('set_exception'\);return\}/)
+   assert.match(app,/presenceApprovalUIEnabled&&workerId&&<WorkerPresenceRequests/)
+ }
+ assert.equal((prod.match(/^VITE_SWTB18_PRESENCE_APPROVAL_UI\s*=/gm)||[]).length,1)
 })
 test('no direct presence client table mutation or hidden fallback to legacy write when enabled',()=>{
  const api=read('src/lib/presenceChangesApi.js')
