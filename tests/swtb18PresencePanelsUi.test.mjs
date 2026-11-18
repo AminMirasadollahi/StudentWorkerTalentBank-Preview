@@ -99,7 +99,7 @@ test('cross-worker response fails closed and request details are not rendered',a
   assert.doesNotMatch(ui.host.textContent,/NEVER_RENDER_PRIVATE_REASON/)
  }finally{await ui.unmount()}
 })
-test('manager sees the independent queue and can reject without changing work reports',async()=>{
+test('manager selects presence from the unified queue and can reject without touching work reports',async()=>{
  fake('manager')
  const ui=await mount(ManagerPresenceReviewQueue,{
   workers:[{id:'FAKE-WORKER',name:'دانشجوکار ساختگی'}],
@@ -109,6 +109,10 @@ test('manager sees the independent queue and can reject without changing work re
  })
  try{
   assert.match(ui.host.textContent,/دانشجوکار ساختگی/)
+  assert.equal(ui.host.querySelectorAll('.swtb22-review-row').length,1)
+  assert.equal(ui.host.querySelectorAll('.swtb19-presence-review-detail').length,0,
+   'no decision form opens before explicit choice')
+  await act(async()=>ui.host.querySelector('.swtb22-review-row').click())
   assert.match(ui.host.textContent,/Synthetic change of attendance/)
   assert.match(ui.host.textContent,/ساعات مؤثر کنونی: 08:00 تا 13:00/)
   assert.match(ui.host.textContent,/درخواست عدم حضور|عدم حضور در این روز/)
@@ -128,5 +132,53 @@ test('manager-only response scope is required; worker payload is not treated as 
   assert.match(ui.host.textContent,/صف تأیید مدیر قابل دریافت نیست/)
   assert.doesNotMatch(ui.host.textContent,/Synthetic change of attendance/)
   assert.equal(globalThis.__swtb18qa.reviewCalls.length,0)
+ }finally{await ui.unmount()}
+})
+
+test('manager sees a single canonical list for time, profile and presence with type filter',async()=>{
+ fake('manager')
+ const otherItems=[
+  {key:'time:SYNTHETIC',kind:'time',title:'گزارش ساختگی ساعت',subtitle:'کتابخانه',badge:'زمان اضافه'},
+  {key:'profile:SYNTHETIC',kind:'profile',title:'اصلاح مشخصات ساختگی',subtitle:'دانشجوکار',badge:'اصلاح مشخصات'},
+ ]
+ const ui=await mount(ManagerPresenceReviewQueue,{
+  workers:[{id:'FAKE-WORKER',name:'دانشجوکار ساختگی'}],
+  tasks:[],otherItems,
+  renderOtherReview:item=>createElement('p',null,'جزئیات '+item.kind),
+ })
+ try{
+  assert.equal(ui.host.querySelectorAll('.swtb19-unified-inbox').length,1)
+  assert.equal(ui.host.querySelectorAll('.swtb22-review-row').length,3)
+  assert.match(ui.host.textContent,/۳ درخواست/)
+  assert.equal(ui.host.querySelectorAll('.swtb19-presence-review-detail').length,0)
+  const select=ui.host.querySelector('[aria-label="فیلتر نوع درخواست کارتابل"]')
+  assert.ok(select)
+  await act(async()=>{
+   select.value='presence'
+   select.dispatchEvent(new window.Event('change',{bubbles:true}))
+  })
+  assert.equal(ui.host.querySelectorAll('.swtb22-review-row').length,1)
+  await act(async()=>ui.host.querySelector('.swtb22-review-row').click())
+  assert.match(ui.host.textContent,/Synthetic change of attendance/)
+  assert.deepEqual(globalThis.__swtb18qa.reviewCalls,[])
+  await act(async()=>{
+   select.value='time'
+   select.dispatchEvent(new window.Event('change',{bubbles:true}))
+  })
+  assert.equal(ui.host.querySelectorAll('.swtb22-review-row').length,1)
+  assert.match(ui.host.querySelector('.swtb22-review-row').textContent,/گزارش ساختگی ساعت/)
+  assert.equal(ui.host.querySelectorAll('.swtb19-presence-review-detail').length,0)
+ }finally{await ui.unmount()}
+})
+test('a failed manager presence read hides partial inbox instead of falsely declaring zero',async()=>{
+ fake('manager')
+ globalThis.__swtb18qa.failRead=true
+ const ui=await mount(ManagerPresenceReviewQueue,{
+  otherItems:[{key:'time:X',kind:'time',title:'PARTIAL_PRIVATE_ROW',subtitle:'',badge:'گزارش'}],
+ })
+ try{
+  assert.match(ui.host.textContent,/کارتابل کامل دریافت نشد/)
+  assert.doesNotMatch(ui.host.textContent,/PARTIAL_PRIVATE_ROW/)
+  assert.equal(ui.host.querySelectorAll('.swtb22-review-row').length,0)
  }finally{await ui.unmount()}
 })
