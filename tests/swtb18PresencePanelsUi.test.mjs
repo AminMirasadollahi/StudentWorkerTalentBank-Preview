@@ -170,15 +170,19 @@ test('manager sees a single canonical list for time, profile and presence with t
   assert.equal(ui.host.querySelectorAll('.swtb19-presence-review-detail').length,0)
  }finally{await ui.unmount()}
 })
-test('a failed manager presence read hides partial inbox instead of falsely declaring zero',async()=>{
+test('failed presence read leaves authorized time review available with incomplete-total warning',async()=>{
  fake('manager')
  globalThis.__swtb18qa.failRead=true
  const ui=await mount(ManagerPresenceReviewQueue,{
   otherItems:[{key:'time:X',kind:'time',title:'PARTIAL_PRIVATE_ROW',subtitle:'',badge:'گزارش'}],
  })
  try{
-  assert.match(ui.host.textContent,/کارتابل کامل دریافت نشد/)
-  assert.doesNotMatch(ui.host.textContent,/PARTIAL_PRIVATE_ROW/)
-  assert.equal(ui.host.querySelectorAll('.swtb22-review-row').length,0)
+  assert.match(ui.host.textContent,/دریافت درخواست‌های حضور ناموفق بود/)
+  assert.match(ui.host.textContent,/شمار کل کارتابل ناقص است/)
+  assert.equal(ui.host.querySelectorAll('.swtb22-review-row').length,1,
+   'independently scoped time reviews remain usable')
+  assert.match(ui.host.querySelector('.swtb22-review-row').textContent,/PARTIAL_PRIVATE_ROW/)
+  assert.doesNotMatch(ui.host.textContent,/Synthetic change of attendance/)
+  assert.equal(globalThis.__swtb18qa.reviewCalls.length,0)
  }finally{await ui.unmount()}
 })
