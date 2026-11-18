@@ -57,3 +57,24 @@ test('a legacy report with no linked task never masquerades as a normal report',
  assert.equal(items[0].badge,'کار نامشخص')
  assert.equal(items[0].alert,true)
 })
+
+test('pending presence is counted exactly once alongside time and profile, but never treated as approved credit',()=>{
+ const presenceChanges=[
+  {id:'FAKE-P1',worker_id:'FAKE-A',local_date:'2026-11-21',
+   action:'set_exception',kind:'unavailable',status:'pending',reason:'synthetic'},
+  {id:'FAKE-P2',worker_id:'FAKE-A',local_date:'2026-11-20',
+   action:'inherit_weekly',status:'approved',reason:'synthetic'},
+ ]
+ const opts={timeEntries:pending,profileChanges:changes,presenceChanges,workers,tasks}
+ const all=managerReviewItems(opts)
+ assert.equal(all.length,5)
+ const item=all.find(x=>x.kind==='presence')
+ assert.equal(item?.key,'presence:FAKE-P1')
+ assert.match(item?.title||'',/عدم حضور/)
+ assert.equal(item?.request?.status,'pending')
+ assert.equal(managerReviewItems({...opts,mode:'time'}).length,3)
+ assert.equal(managerReviewItems({...opts,mode:'profile'}).length,1)
+ assert.equal(managerReviewItems({...opts,mode:'presence'}).length,1)
+ assert.equal(all.some(x=>x.key==='presence:FAKE-P2'),false)
+ assert.equal(JSON.stringify(presenceChanges).includes('"status":"approved"'),true)
+})
