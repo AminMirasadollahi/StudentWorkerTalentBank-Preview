@@ -448,23 +448,22 @@
  outline:2px solid var(--report-teal);outline-offset:-2px;background:#e0f4f0;
 }
 .ow-slot-editor {
- width:100%;min-width:0;box-sizing:border-box;display:grid;
- grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;
- align-items:end;gap:.45rem;padding:.6rem .7rem;margin:.3rem 0 .5rem;
+ width:100%;min-width:0;box-sizing:border-box;display:flex;
+ align-items:center;flex-wrap:wrap;gap:.35rem .4rem;
+ padding:.38rem .5rem;margin:.22rem 0 .38rem;
  border:1px solid var(--report-teal);background:#f7fcfb;border-radius:.52rem;
 }
-.ow-slot-editor__heading {
- grid-column:1/-1;display:flex;gap:.3rem .8rem;align-items:baseline;flex-wrap:wrap;
- text-align:right;color:var(--report-navy);
+/* Each time endpoint now keeps its visible label beside its native
+   hour/minute selectors. Wrapping depends on the actual half-panel width. */
+.ow-slot-clock {
+ display:flex;flex:1 1 9.1rem;min-width:9.1rem;
+ align-items:center;gap:.25rem;text-align:right;
 }
-.ow-slot-editor__heading strong {font-size:.78rem;}
-.ow-slot-editor__heading small {font-size:.68rem;color:var(--report-muted);}
-.ow-slot-clock {display:grid;gap:.18rem;min-width:0;text-align:right;}
-.ow-slot-clock__caption {font-size:.72rem;font-weight:700;color:var(--report-navy);}
-.ow-slot-clock__controls {display:flex;align-items:center;gap:.18rem;min-width:0;}
+.ow-slot-clock__caption {flex:0 0 auto;font-size:.7rem;font-weight:700;color:var(--report-navy);}
+.ow-slot-clock__controls {display:flex;flex:1 1 0;align-items:center;gap:.14rem;min-width:0;}
 .ow-slot-clock__controls select {
- flex:1 1 0;width:0;min-width:0;max-width:5.5rem;box-sizing:border-box;
- height:2.25rem;padding:.28rem .2rem;font:inherit;font-size:.77rem;
+ flex:1 1 0;width:0;min-width:2.55rem;max-width:none;box-sizing:border-box;
+ height:2.05rem;padding:.18rem .1rem;font:inherit;font-size:.74rem;
  font-variant-numeric:tabular-nums;color:var(--report-navy);
  border:1px solid var(--report-border);border-radius:.35rem;background:white;
  cursor:pointer;direction:ltr;
@@ -473,22 +472,21 @@
 .ow-slot-actions button:focus-visible {outline:2px solid var(--report-teal);outline-offset:2px;}
 .ow-slot-clock__controls select:disabled {opacity:.65;cursor:not-allowed;}
 .ow-slot-clock__separator {font-weight:700;color:var(--report-navy);}
-.ow-slot-actions {display:flex;align-items:center;justify-content:flex-end;gap:.3rem;flex-wrap:wrap;}
+.ow-slot-actions {
+ display:flex;flex:0 0 auto;align-items:center;justify-content:flex-start;
+ gap:.2rem;flex-wrap:nowrap;min-width:0;
+}
 .ow-slot-actions button {
  border:1px solid var(--report-border);background:white;color:var(--report-navy);
- padding:.3rem .55rem;min-height:2.25rem;border-radius:.4rem;cursor:pointer;
- font:inherit;font-size:.74rem;white-space:nowrap;
+ padding:.25rem .37rem;min-height:2.05rem;border-radius:.4rem;cursor:pointer;
+ font:inherit;font-size:.7rem;white-space:nowrap;
 }
 .ow-slot-actions button[type=submit] {background:var(--report-teal);border-color:var(--report-teal);color:white;}
 .ow-slot-actions button:disabled {opacity:.45;cursor:not-allowed;}
-.ow-slot-editor>small {grid-column:1/-1;font-size:.67rem;text-align:right;overflow-wrap:anywhere;}
-@media(max-width:900px) {
- .ow-slot-editor {grid-template-columns:repeat(2,minmax(0,1fr));}
- .ow-slot-actions {grid-column:1/-1;justify-content:flex-start;}
-}
+.ow-slot-editor>small {flex:1 0 100%;font-size:.67rem;text-align:right;overflow-wrap:anywhere;}
 @media(max-width:420px) {
- .ow-slot-editor {grid-template-columns:minmax(0,1fr);}
- .ow-slot-actions {grid-column:1;}
+ .ow-slot-clock {flex:1 1 100%;min-width:0;}
+ .ow-slot-actions {flex:1 1 100%;flex-wrap:wrap;}
  .ow-slot-clock__controls select {max-width:7rem;}
 }
 .ow-slot-delete-confirm {display:flex; align-items:center; gap:.3rem; flex-wrap:wrap; padding:.25rem; font-size:.72rem; }
