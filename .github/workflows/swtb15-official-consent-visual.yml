@@ -1,0 +1,49 @@
+name: SWTB15 official worker consent UX (fake API, NO DEPLOY)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/WorkerAgreementOfficialConsent.jsx'
+      - 'src/components/worker-agreement-official.css'
+      - 'src/lib/workerAgreementAcceptanceContract.mjs'
+      - 'src/lib/operationsV2.js'
+      - 'src/OperationsWorkspace.jsx'
+      - 'tests/browser/vite.smoke.config.mjs'
+      - 'tests/browser/worker-smoke.jsx'
+      - 'tests/browser/run-swtb15-official-consent-smoke.mjs'
+      - '.github/workflows/swtb15-official-consent-visual.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fake-only:
+    if: github.head_ref == 'feat/swtb15-server-versioned-acceptance-ui-draft-2026-11-10'
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install existing public dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install throwaway browser runner
+        run: npm install --no-save --no-package-lock --no-audit --no-fund playwright@1.56.1
+      - name: Check native browser
+        run: google-chrome --version
+      - name: Synthetic-only actual worker UI + exact version consent
+        env:
+          VITE_SWTB15_OFFICIAL_CONSENT_UI: 'true'
+        run: node tests/browser/run-swtb15-official-consent-smoke.mjs
+      - name: Attach only synthetic screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swtb15-official-consent-synthetic
+          path: test-results/swtb15-official-synthetic/*.png
+          retention-days: 3
+          if-no-files-found: ignore
+      - name: Deny production publication and real backend operations
+        run: echo "Only mocked contract; zero real credentials, RPC or Pages deploy"
