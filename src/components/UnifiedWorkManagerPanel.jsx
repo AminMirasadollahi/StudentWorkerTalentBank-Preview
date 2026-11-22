@@ -1,4 +1,5 @@
-import {useCallback,useEffect,useMemo,useRef,useState} from 'react'
+import {lazy,Suspense,useCallback,useEffect,useMemo,useRef,useState} from 'react'
+const DeskWorkPoolManagerSection=lazy(()=>import('./DeskWorkPoolManagerSection'))
 import JalaliDatePicker from './JalaliDatePicker'
 import {getOperationsTermDashboard,getManagerUnifiedWorkPool,
  createUnifiedWorkPackage,setWorkOpportunityState} from '../lib/operationsV2'
@@ -23,6 +24,8 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
  const [view,setView]=useState({status:'loading',terms:[],templates:[],offers:[]})
  const [termSelection,setTermSelection]=useState('')
  const [open,setOpen]=useState(false)
+ const [deskMode,setDeskMode]=useState(false)
+ const [deskVisited,setDeskVisited]=useState(false)
  const [notice,setNotice]=useState('')
  const [uncertain,setUncertain]=useState(false)
  const [retryReady,setRetryReady]=useState(false)
@@ -148,6 +151,13 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
  }
  const offers=view.offers.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)))
  return <section className="swtb19-unified-work" aria-label="تعریف و انتشار کار">
+  <label className="swtb19-unified-work__kind">
+   <input type="checkbox" checked={deskMode} disabled={busy||hasUnresolved}
+    onChange={e=>{const next=e.target.checked;setDeskMode(next);
+     if(next)setDeskVisited(true)}}/>
+   <span>این فعالیت، نوبت حضور با ساعت مشخص در میز کتابخانه است.</span>
+  </label>
+  <div className="swtb19-unified-work__general" hidden={deskMode}>
   <div className="swtb19-unified-work__toolbar">
    <div><h3>کارهای قابل انتخاب</h3>
     <p>عنوان و شرح کار را بنویسید؛ تنظیمات تخصصی فقط در صورت نیاز نمایش داده می‌شوند.</p>
@@ -327,6 +337,13 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
      </div>}
     </article>
    })}
+  </div>}
+  </div>
+  {deskVisited&&<div hidden={!deskMode} className="swtb19-unified-work__desk">
+   <p className="ow-muted">این حالت ویژه نوبت میز کتابخانه است: تاریخ و ساعت شروع/پایان مشخص، با ظرفیت هم‌زمان حداکثر دو نفر. قواعد مستقل نوبت‌ها حفظ می‌شوند.</p>
+   <Suspense fallback={<p role="status">در حال آماده‌سازی نوبت ساعت‌دار…</p>}>
+    <DeskWorkPoolManagerSection refreshRevision={refreshRevision}/>
+   </Suspense>
   </div>}
  </section>
 }
