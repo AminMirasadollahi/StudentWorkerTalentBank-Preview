@@ -1,6 +1,8 @@
 import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react'
 // Hidden until D2A/D2B are safely installed; D1 remains untouched by default.
 const deskPoolUIEnabled=import.meta.env?.VITE_SWTB21_DESK_POOL_UI!=='false'
+const unifiedUIEnabled=import.meta.env?.VITE_SWTB19_UNIFIED_WORK_UI==='true'
+const UnifiedWorkWorkerPanel=lazy(()=>import('./UnifiedWorkWorkerPanel'))
 const DeskWorkPoolWorkerSection=lazy(()=>import('./DeskWorkPoolWorkerSection'))
 import {getWorkerWorkPool,claimWorkOpportunity} from '../lib/operationsV2'
 import WorkerInfoHint from './WorkerInfoHint.jsx'
@@ -10,6 +12,10 @@ const pretty=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{dateStyle:'medium',ti
 const dateName=x=>x?pretty.format(new Date(x+'T12:00:00Z')):'—'
 const units={library:'کتابخانه',research:'پژوهش',public_relations:'روابط عمومی'}
 export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaimed,onGuide}){
+ if(unifiedUIEnabled)return <Suspense fallback={<p role="status">در حال آماده‌سازی فرصت‌های کاری…</p>}>
+  <UnifiedWorkWorkerPanel workerId={workerId} refreshRevision={refreshRevision}
+   onClaimed={onClaimed} onGuide={onGuide}/>
+ </Suspense>
  const [view,setView]=useState({status:'loading',items:[]})
  const [busyId,setBusyId]=useState('')
  const [uncertainId,setUncertainId]=useState('')
