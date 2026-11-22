@@ -46,3 +46,11 @@
  .swtb19-unified-work__toolbar{display:grid}
  .swtb19-unified-work__actions{width:100%}
 }
+
+/* One surface: the internal desk subtype is disclosed only on request. */
+.swtb19-unified-work__kind{display:flex;gap:.6rem;align-items:center;
+ font-size:.88rem;font-weight:600;cursor:pointer;line-height:1.7}
+.swtb19-unified-work__kind input{width:auto;accent-color:#138780;flex:0 0 auto}
+.swtb19-unified-work__general{display:grid;gap:1rem;min-width:0}
+.swtb19-unified-work__desk{display:grid;gap:.7rem;min-width:0}
+.swtb19-unified-work__general[hidden],.swtb19-unified-work__desk[hidden]{display:none!important}
