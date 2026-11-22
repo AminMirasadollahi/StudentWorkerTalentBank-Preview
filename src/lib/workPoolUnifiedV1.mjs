@@ -17,7 +17,8 @@ export const isISODate=x=>/^\d{4}-\d{2}-\d{2}$/.test(String(x||''))&&
   new Date(x+'T12:00:00Z').toISOString().slice(0,10)===x
 export const durationFa=mins=>{
  const n=Number(mins)
- if(!Number.isInteger(n)||n<1)return '—'
+ if(!Number.isInteger(n)||n<0)return '—'
+ if(n===0)return '۰ دقیقه'
  const h=Math.floor(n/60),m=n%60
  const f=new Intl.NumberFormat('fa-IR')
  return [h?f.format(h)+' ساعت':'',m?f.format(m)+' دقیقه':''].filter(Boolean).join(' و ')
