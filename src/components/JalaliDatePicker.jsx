@@ -50,7 +50,7 @@ function todayTehran() {
  * Does not change SQL dates or require extra frontend dependencies.
  */
 export default function JalaliDatePicker({
-  value, onChange, min, max, disabled = false, ariaLabel = 'تاریخ شمسی',
+  value, onChange, min, max, allowedDates = null, disabled = false, ariaLabel = 'تاریخ شمسی',
 }) {
   const fieldId = useId()
   const containerRef = useRef(null)
@@ -78,8 +78,10 @@ export default function JalaliDatePicker({
   const currentJalali = jalaliParts(base)
   const todayValue = todayTehran()
 
+  const unavailableDay = iso => Boolean((min && iso < min) || (max && iso > max)
+    || (Array.isArray(allowedDates) && !allowedDates.includes(iso)))
   const selectDay = iso => {
-    if ((min && iso < min) || (max && iso > max)) return
+    if (unavailableDay(iso)) return
     onChange(iso)
     setOpened(false)
   }
@@ -134,7 +136,7 @@ export default function JalaliDatePicker({
             {days.map(iso => {
               const p = jalaliParts(iso)
               const inMonth = p.month === currentJalali.month && p.year === currentJalali.year
-              const outOfRange = (min && iso < min) || (max && iso > max)
+              const outOfRange = unavailableDay(iso)
               return (
                 <button
                   key={iso}
@@ -155,7 +157,7 @@ export default function JalaliDatePicker({
           </div>
           <div className="jd-footer">
             <button type="button" onClick={() => {
-              if ((!min || todayValue >= min) && (!max || todayValue <= max)) selectDay(todayValue)
+              if (!unavailableDay(todayValue)) selectDay(todayValue)
               else setAnchor(todayValue)
             }}>امروز</button>
             <button type="button" onClick={() => setOpened(false)}>بستن</button>
