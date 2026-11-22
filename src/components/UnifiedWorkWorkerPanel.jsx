@@ -12,8 +12,9 @@ const nf=new Intl.NumberFormat('fa-IR')
 const units={library:'کتابخانه',research:'پژوهش',public_relations:'روابط عمومی'}
 const faDate=x=>x?new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
  dateStyle:'medium',timeZone:'UTC'}).format(new Date(x+'T12:00:00Z')):'—'
-const pickDate=item=>item.date<addDays(todayTehran(),2)
- ?addDays(todayTehran(),2):item.date
+const pickDate=item=>Array.isArray(item.available_dates)&&item.available_dates.length
+ ?item.available_dates[0]
+ :(item.date<addDays(todayTehran(),2)?addDays(todayTehran(),2):item.date)
 
 export default function UnifiedWorkWorkerPanel({
  workerId,refreshRevision=0,onClaimed,onGuide,
