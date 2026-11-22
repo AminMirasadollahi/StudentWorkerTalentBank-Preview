@@ -1,0 +1,48 @@
+/* SWTB19 proposed interface — isolated, feature-gated, existing RTL shell. */
+.swtb19-unified-work{display:grid;gap:1rem;min-width:0;max-width:none}
+.swtb19-unified-work__toolbar{display:flex;gap:.8rem;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.swtb19-unified-work__toolbar h2,.swtb19-unified-work__toolbar h3{margin:0 0 .22rem}
+.swtb19-unified-work__toolbar p{font-size:.88rem;line-height:1.8;margin:0;color:#4b6877}
+.swtb19-unified-work__actions{display:flex;flex-wrap:wrap;align-items:center;gap:.55rem}
+.swtb19-unified-work__form{width:min(100%,58rem);display:grid;gap:1rem;
+ background:#fbfefe;border:1px solid #c8dfe2;border-radius:1rem;padding:clamp(.85rem,2vw,1.5rem)}
+.swtb19-unified-work__form h4{font-size:1.05rem;margin:0}
+.swtb19-unified-work__form .report-field{display:grid;gap:.38rem;min-width:0}
+.swtb19-unified-work__form .report-field>span{font-weight:650;font-size:.88rem}
+.swtb19-unified-work__form :is(input,select,textarea){width:100%;min-width:0}
+.swtb19-unified-work__form textarea{min-height:5.5rem;resize:vertical;line-height:1.75}
+.swtb19-unified-work__two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+.swtb19-unified-work__three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}
+.swtb19-unified-work__fieldset{border:1px solid #d8e5e8;border-radius:.8rem;
+ margin:0;padding:.7rem .9rem .9rem;min-width:0;display:grid;gap:.7rem}
+.swtb19-unified-work__fieldset>legend{padding:0 .45rem;font-weight:700}
+.swtb19-unified-work__fieldset p{font-size:.8rem;line-height:1.7;margin:0}
+.swtb19-unified-work__radios{display:flex;gap:.65rem 1.2rem;flex-wrap:wrap}
+.swtb19-unified-work__radios label{display:inline-flex;gap:.4rem;align-items:center;
+ font-size:.9rem;cursor:pointer}
+.swtb19-unified-work__radios input{width:auto;accent-color:#138780}
+.swtb19-unified-work__details{border-top:1px solid #dbe8ea;padding-top:.65rem;min-width:0}
+.swtb19-unified-work__details summary{font-size:.92rem;font-weight:700;cursor:pointer;
+ min-height:2.75rem;align-content:center;color:#176b6c}
+.swtb19-unified-work__details summary small{font-size:.74rem;font-weight:400;color:#5c7580}
+.swtb19-unified-work__details[open]{display:grid;gap:.8rem}
+.swtb19-unified-work__preview{background:#eef7f6;border-radius:.72rem;
+ border:1px solid #d4e7e3;padding:.75rem .9rem;display:grid;gap:.3rem;
+ color:#265e60;font-size:.82rem;line-height:1.75}
+.swtb19-unified-work__list{display:grid;gap:.75rem}
+.swtb19-unified-work__list h4{font-size:1rem;margin:.1rem 0}
+.swtb19-unified-work__facts{display:flex;gap:.45rem;flex-wrap:wrap}
+.swtb19-unified-work__facts span{background:#f2f8f9;color:#315966;
+ padding:.35rem .6rem;border-radius:.45rem;font-size:.82rem}
+.swtb19-unified-work--worker .ow-work-pool-item{display:grid;gap:.72rem;
+ padding:1rem;border:1px solid #dce7ea;border-radius:.9rem}
+.swtb19-unified-work__share{display:flex;min-height:2.5rem;align-items:center}
+.swtb19-unified-work .jd-popup{z-index:25}
+.swtb19-unified-work :is(button,input,textarea,select,summary):focus-visible{
+ outline:3px solid #158d99;outline-offset:2px}
+@media(max-width:700px){
+ .swtb19-unified-work__two,.swtb19-unified-work__three{grid-template-columns:minmax(0,1fr)}
+ .swtb19-unified-work__form{padding:.75rem}
+ .swtb19-unified-work__toolbar{display:grid}
+ .swtb19-unified-work__actions{width:100%}
+}
