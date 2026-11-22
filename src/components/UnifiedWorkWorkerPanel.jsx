@@ -177,6 +177,7 @@ export default function UnifiedWorkWorkerPanel({
        <span>روز انجام سهم شما</span>
        <JalaliDatePicker value={date} disabled={blocked}
         min={pickDate(item)} max={item.end_date}
+        allowedDates={item.available_dates}
         onChange={x=>{setDates(p=>({...p,[item.id]:x}));
          requests.current.items.delete(item.id)}}
         ariaLabel="انتخاب روز انجام سهم"/></div>}
