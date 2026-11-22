@@ -115,6 +115,11 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
     setUncertain(false);setRetryReady(true)
     setNotice('هنوز رسید ثبت قبلی پیدا نشد. فقط با همان شناسه قبلی می‌توانید دوباره تلاش کنید.')
    }
+  }else if(state){
+   // An uncertain pause/publish/close has no manager request UUID, so an
+   // authorized list read-back is the safe way to inspect the actual state.
+   setUncertain(false);setRetryReady(false)
+   setNotice('فهرست تازه از سرور دریافت شد؛ وضعیت فرصت را پیش از اقدام بعدی بررسی کنید.')
   }else{
    setNotice('بازخوانی موفق نبود؛ ثبت دوباره تا روشن شدن نتیجه غیرفعال است.')
   }
@@ -149,7 +154,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
    </div>
    <div className="swtb19-unified-work__actions">
     <button type="button" className="report-btn report-btn--light" disabled={busy}
-     onClick={()=>{setUncertain(false);setRetryReady(false);pending.current=null;setRevision(n=>n+1)}}>بازخوانی فهرست</button>
+     onClick={()=>{if(hasUnresolved)void verify();else setRevision(n=>n+1)}}>بازخوانی فهرست</button>
     <button type="button" className="report-btn report-btn--primary"
      disabled={disabled} onClick={()=>setOpen(v=>!v)}>{open?'بستن فرم':'تعریف کار جدید'}</button>
    </div>
