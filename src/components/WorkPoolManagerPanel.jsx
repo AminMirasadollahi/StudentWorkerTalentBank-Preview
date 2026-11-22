@@ -240,7 +240,9 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
  return <section className={'report-panel ow-work-pool'+(focusUIEnabled?' swtb22-work-pool':'')} aria-label="مدیریت مخزن وظایف">
   <div className="report-panel-heading">
    <div><h2>مخزن وظایف و فرصت‌های کاری</h2>
-    <p className="ow-muted">الگوهای کار مستقل از نوبت‌های تاریخ‌دارند. فقط فرصت منتشرشده می‌تواند توسط دانشجوکار واجد شرایط انتخاب شود.</p>
+    <p className="ow-muted">{unifiedUIEnabled
+     ?'کار جدید را در یک فرم تعریف کنید؛ تاریخ یا بازه و حجم کل مشخص می‌شود و تنظیمات بیشتر اختیاری‌اند.'
+     :'الگوهای کار مستقل از نوبت‌های تاریخ‌دارند. فقط فرصت منتشرشده می‌تواند توسط دانشجوکار واجد شرایط انتخاب شود.'}</p>
    </div>
    <button type="button" className="report-btn report-btn--light"
     onClick={()=>{setUncertain(false);setRevision(x=>x+1)}} disabled={busy!==''}>
