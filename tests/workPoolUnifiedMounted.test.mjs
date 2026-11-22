@@ -121,6 +121,11 @@ test('timed desk is optional and preserves the general draft when switching back
   await act(async()=>{toggle.click()})
   assert.equal(toggle.checked,true)
   assert.equal(m.host.querySelector('.swtb19-unified-work__general').hidden,true)
+  // React.lazy resolves on a subsequent microtask/Vite SSR module load;
+  // verify eventual committed render rather than asserting during fallback.
+  for(let retry=0;retry<30&&!m.host.textContent.includes('SWTB19_DESK_MANAGER_FAKE');retry++){
+   await act(async()=>{await new Promise(resolve=>setTimeout(resolve,25))})
+  }
   assert.match(m.host.textContent,/SWTB19_DESK_MANAGER_FAKE/)
   await act(async()=>{toggle.click()})
   assert.equal(toggle.checked,false)
