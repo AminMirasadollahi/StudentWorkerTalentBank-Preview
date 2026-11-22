@@ -93,4 +93,5 @@ export function shareOptions(offer){
 export function selectedDayAllowed(date,offer,now=todayTehran()){
  const end=offer?.end_date||offer?.date
  return isISODate(date)&&date>=addDays(now,2)&&date>=offer?.date&&date<=end
+  &&(!Array.isArray(offer?.available_dates)||offer.available_dates.includes(date))
 }
