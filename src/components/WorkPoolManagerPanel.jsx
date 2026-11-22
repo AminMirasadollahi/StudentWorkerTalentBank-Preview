@@ -121,6 +121,15 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
  const ordered=opportunities.slice().sort((a,b)=>
   (a.date||'').localeCompare(b.date||'')||String(a.id).localeCompare(String(b.id)))
  const formDisabled=busy!==''||uncertain||snapshot.status!=='ready'
+ // SWTB19: do not expose database-originated general/desk subtypes as
+ // required top-level navigation. The unified screen discloses timed desk
+ // only when the manager explicitly needs an hourly shift.
+ if(unifiedUIEnabled)return <section className="report-panel ow-work-pool swtb22-work-pool"
+  aria-label="تعریف و انتشار فعالیت">
+   <Suspense fallback={<p role="status">در حال آماده‌سازی تعریف کار…</p>}>
+    <UnifiedWorkManagerPanel refreshRevision={refreshRevision}/>
+   </Suspense>
+  </section>
  const editorSurface=(<div key="editor" className="ow-work-pool-compose" ref={editorRootRef}>
     {ordered.length===0&&<p className="ow-work-pool-workflow" aria-label="مراحل آماده‌سازی فرصت عمومی">
      <span>۱. تعریف الگو</span><span>۲. ساخت پیش‌نویس</span><span>۳. انتشار توسط مدیر</span>
