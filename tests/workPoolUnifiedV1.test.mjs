@@ -60,6 +60,7 @@ test('fixed share includes a shorter last share without exceeding remainder',()=
   max_share_minutes:120,share_step_minutes:1}
  assert.deepEqual(shareOptions(o),[30])
  assert.equal(durationFa(120),'۲ ساعت')
+ assert.equal(durationFa(0),'۰ دقیقه')
 })
 test('student chooses one valid day within range and at least two days ahead',()=>{
  const offer={date:'2026-11-27',end_date:'2026-12-03'}
