@@ -104,8 +104,10 @@ export default function UnifiedWorkWorkerPanel({
     ?'انتخاب قبلی تأیید شد؛ کار تکراری ساخته نشده است.'
     :'سهم کار به شما واگذار شد. ساعت واقعی باید بعداً گزارش و تأیید شود.')
    await read()
-   try{await onClaimed?.(receipt.task_id)}
-   catch{setNotice('انتخاب در سرور ثبت شد، اما جابه‌جایی صفحه انجام نشد؛ «کارهای من» را باز کنید.')}
+   if(requests.current.workerId===workerId){
+    try{await onClaimed?.(receipt.task_id)}
+    catch{setNotice('انتخاب در سرور ثبت شد، اما جابه‌جایی صفحه انجام نشد؛ «کارهای من» را باز کنید.')}
+   }
   }
   inFlight.current=false
   if(requests.current.workerId===workerId)setBusyId('')
