@@ -2,6 +2,8 @@ import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react'
 // Hidden until audited D2A+D2B database rollout.
 const deskPoolUIEnabled=import.meta.env?.VITE_SWTB21_DESK_POOL_UI!=='false'
 const focusUIEnabled=import.meta.env?.VITE_SWTB22_WORK_POOL_FOCUS_UI==='true'
+const unifiedUIEnabled=import.meta.env?.VITE_SWTB19_UNIFIED_WORK_UI==='true'
+const UnifiedWorkManagerPanel=lazy(()=>import('./UnifiedWorkManagerPanel'))
 const DeskWorkPoolManagerSection=lazy(()=>import('./DeskWorkPoolManagerSection'))
 import JalaliDatePicker from './JalaliDatePicker'
 import {plusIsoDays} from '../lib/persianMonthCalendar.mjs'
@@ -75,7 +77,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
     setSnapshot({status:'error',terms:[],items:null})
   }
  },[])
- useEffect(()=>{void reload()},[reload,revision,refreshRevision])
+ useEffect(()=>{if(!unifiedUIEnabled)void reload()},[reload,revision,refreshRevision])
  const run=async(id,action,success)=>{
   if(pending.current||uncertain)return
   pending.current=true;setBusy(id);setNotice('')
@@ -249,6 +251,9 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
    <button type="button" aria-pressed={kind==='desk'} onClick={()=>selectKind('desk')}>نوبت‌های زمان‌دار کتابخانه</button>
   </div>}
   <div className="swtb22-work-pool-kind-view" hidden={focusUIEnabled&&kind==='desk'}>
+  {unifiedUIEnabled?<Suspense fallback={<p role="status">در حال آماده‌سازی تعریف کار…</p>}>
+   <UnifiedWorkManagerPanel refreshRevision={refreshRevision}/>
+  </Suspense>:<>
   <p className="ow-compact-hint">{deskPoolUIEnabled?'فرصت‌های عمومی در این بخش و نوبت‌های زمان‌دار کتابخانه در بخش بعدی همین صفحه مدیریت می‌شوند.':'این بخش فقط برای کارهای عمومی است. نوبت‌های زمان‌دار کتابخانه، کار گروهی و درخواست‌های نیازمند تأیید مدیر همچنان از مسیرهای تخصصی خود انجام می‌شوند.'} انتخاب کار، ساعت تأییدشده ایجاد نمی‌کند.</p>
   {notice&&<p role={uncertain?'alert':'status'} className={uncertain?'report-alert report-alert--error':'ops-alert-success'}>{notice}</p>}
   {snapshot.status==='loading'&&<p role="status" className="ow-muted">در حال دریافت الگوها و فرصت‌ها…</p>}
@@ -261,6 +266,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
    </div>}
    {focusUIEnabled?(editorMode?<>{editorSurface}{listSurface}</>:<>{listSurface}{editorSurface}</>):<>{editorSurface}{listSurface}</>}
   </div>}
+  </>}
   </div>
   {deskPoolUIEnabled&&(!focusUIEnabled||deskVisited)&&<div className="swtb22-work-pool-kind-view" hidden={focusUIEnabled&&kind!=='desk'}>
    <Suspense fallback={<p role="status">در حال آماده‌سازی نوبت‌های کتابخانه…</p>}>
