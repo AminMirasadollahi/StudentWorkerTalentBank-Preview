@@ -13,9 +13,12 @@ const fake={
     &&source==='../lib/operationsV2')return '\0swtb19-worker-api'
   if(importer?.endsWith('/src/components/UnifiedWorkWorkerPanel.jsx')
     &&source==='./DeskWorkPoolWorkerSection')return '\0swtb19-desk-stub'
+  if(importer?.endsWith('/src/components/UnifiedWorkManagerPanel.jsx')
+    &&source==='./DeskWorkPoolManagerSection')return '\0swtb19-desk-manager-stub'
  },
  load(id){
   if(id==='\0swtb19-desk-stub')return 'export default function DeskStub(){return null}'
+  if(id==='\0swtb19-desk-manager-stub')return 'import React from "react";export default function DeskManagerStub(){return React.createElement("p",null,"SWTB19_DESK_MANAGER_FAKE")}'
   if(id==='\0swtb19-manager-api')return [
    'export const getOperationsTermDashboard=async()=>({ok:true,terms:[',
    '{id:"term",label:"نیمسال جاری",state:"active",start_date:"2026-09-23",end_date:"2027-02-09"}]});',
@@ -98,5 +101,31 @@ test('worker sees dated offer, commits one 120-minute share, never writes approv
   assert.equal(globalThis.__v1Claims[0].opportunityId,'offer')
   assert.equal(callback,1)
   assert.match(m.host.textContent,/قبلاً توسط شما انتخاب/)
+ }finally{await m.cleanup()}
+})
+
+test('timed desk is optional and preserves the general draft when switching back',async()=>{
+ globalThis.__v1Writes=0
+ const m=await mount(Manager)
+ try{
+  const create=[...m.host.querySelectorAll('button')].find(x=>x.textContent.includes('تعریف کار جدید'))
+  await act(async()=>{create.click()})
+  const title=m.host.querySelector('input[placeholder*="قفسه"]')
+  assert.ok(title)
+  await act(async()=>{
+   title.value='کار واقعی کتابخانه'
+   title.dispatchEvent(new window.Event('input',{bubbles:true}))
+  })
+  const toggle=m.host.querySelector('.swtb19-unified-work__kind input[type="checkbox"]')
+  assert.ok(toggle&&!toggle.checked)
+  await act(async()=>{toggle.click()})
+  assert.equal(toggle.checked,true)
+  assert.equal(m.host.querySelector('.swtb19-unified-work__general').hidden,true)
+  assert.match(m.host.textContent,/SWTB19_DESK_MANAGER_FAKE/)
+  await act(async()=>{toggle.click()})
+  assert.equal(toggle.checked,false)
+  assert.equal(m.host.querySelector('.swtb19-unified-work__general').hidden,false)
+  assert.ok(m.host.querySelector('input[placeholder*="قفسه"]'))
+  assert.equal(globalThis.__v1Writes,0)
  }finally{await m.cleanup()}
 })
