@@ -65,6 +65,8 @@ test('fixed share includes a shorter last share without exceeding remainder',()=
 test('student chooses one valid day within range and at least two days ahead',()=>{
  const offer={date:'2026-11-27',end_date:'2026-12-03'}
  assert.equal(selectedDayAllowed('2026-12-01',offer,'2026-11-22'),true)
+ assert.equal(selectedDayAllowed('2026-12-01',{...offer,available_dates:['2026-12-02']},'2026-11-22'),false)
+ assert.equal(selectedDayAllowed('2026-12-02',{...offer,available_dates:['2026-12-02']},'2026-11-22'),true)
  assert.equal(selectedDayAllowed('2026-11-26',offer,'2026-11-22'),false)
  assert.equal(selectedDayAllowed('2026-12-04',offer,'2026-11-22'),false)
 });
