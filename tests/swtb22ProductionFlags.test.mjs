@@ -30,13 +30,17 @@ test('production Vite contains only explicitly reviewed SWTB22, identity, email 
   // Owner-approved, installed SQL migration 20261118070059 and public PR87.
   // Detailed source/RPC contract is separately locked by the SWTB18 test.
   VITE_SWTB18_PRESENCE_APPROVAL_UI:'true',
+  // SWTB19: owner-approved backend migration 20261123060459, public
+  // manager/worker presentation; independently disabled by setting false.
+  VITE_SWTB19_UNIFIED_WORK_UI:'true',
  })
- assert.equal(rows.length,10,'no other variables or credentials may be included')
+ assert.equal(rows.length,11,'no other variables or credentials may be included')
 })
 test('all source feature switches remain explicitly overridable to false',()=>{
  const app=readFileSync(new URL('../src/OpsApp.jsx',import.meta.url),'utf8')
  const pool=readFileSync(new URL('../src/components/WorkPoolManagerPanel.jsx',import.meta.url),'utf8')
  const tasks=readFileSync(new URL('../src/OperationsWorkspace.jsx',import.meta.url),'utf8')
+ const worker=readFileSync(new URL('../src/components/WorkPoolWorkerPanel.jsx',import.meta.url),'utf8')
  assert.match(app,/VITE_SWTB22_MANAGER_SHELL_UI\s*===\s*'true'/)
  assert.match(pool,/VITE_SWTB22_WORK_POOL_FOCUS_UI\s*===\s*'true'/)
  assert.match(tasks,/VITE_SWTB22_TASKS_FOCUS_UI\s*===\s*'true'/)
@@ -47,4 +51,6 @@ test('all source feature switches remain explicitly overridable to false',()=>{
  assert.match(app,/VITE_OPS_EMAIL_INVITES_AVAILABLE\s*===\s*'true'/)
  assert.match(app,/VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK\s*===\s*'true'/)
  assert.match(tasks,/VITE_SWTB18_PRESENCE_APPROVAL_UI\s*===\s*'true'/)
+ assert.match(pool,/VITE_SWTB19_UNIFIED_WORK_UI\s*===\s*'true'/)
+ assert.match(worker,/VITE_SWTB19_UNIFIED_WORK_UI\s*===\s*'true'/)
 })

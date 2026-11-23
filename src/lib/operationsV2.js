@@ -150,3 +150,19 @@ export const setDeskWorkOfferState=({offerId,state,reason})=>
  })
 export const claimDeskWorkOffer=({offerId,requestId})=>
  rpc('ops_claim_desk_work_offer',{p_offer_id:offerId,p_request_id:requestId})
+
+
+// SWTB19 candidate: additive work-package/worker-share V1 RPCs.
+// Feature flag OFF until backend versioned migration and protected rollout.
+// Legacy D1/D2 APIs remain untouched.
+export const getManagerUnifiedWorkPool=({from,to})=>
+ rpc('ops_get_manager_work_pool_v1',{p_start_date:from,p_end_date:to})
+export const getWorkerUnifiedWorkPool=()=>
+ rpc('ops_get_worker_work_pool_v1')
+export const createUnifiedWorkPackage=({requestId,payload})=>
+ rpc('ops_create_work_package_v1',{p_request_id:requestId,p_payload:payload})
+export const claimUnifiedWorkShare=({opportunityId,requestId,date,minutes})=>
+ rpc('ops_claim_work_opportunity_v1',{
+  p_opportunity_id:opportunityId,p_request_id:requestId,
+  p_selected_work_date:date,p_minutes:Number(minutes),
+ })
