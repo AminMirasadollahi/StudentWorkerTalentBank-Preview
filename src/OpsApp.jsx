@@ -12,7 +12,7 @@ import {
 import { opsClient } from './lib/operations'
 import { normalizeCandidateEmail, isValidCandidateEmail } from './lib/candidateEmail'
 import { disabledWorkerCopy } from './lib/workerAccess.mjs'
-import { validWorkerPasswordPair, workerPasswordChangeErrorCopy } from './lib/workerOnboardingRecovery.mjs'
+import { validWorkerPasswordPair, workerPasswordChangeErrorCopy, confirmedInitialPasswordUpdateRejected } from './lib/workerOnboardingRecovery.mjs'
 import { watchOperationsResume } from './lib/operationsResume.mjs'
 import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
@@ -303,12 +303,20 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
           'ops-complete-worker-onboarding',
           { body },
         )
-        if (error || data?.ok !== true) throw error || new Error(data?.error || 'password_setup_failed')
+        if (error || data?.ok !== true) {
+          // A verified Auth rejection is different from lost response or
+          // Auth-success/SQL-finalize-failure. Never auto-rotate when unsure.
+          const retryInitial=!recoveryMode &&
+            await confirmedInitialPasswordUpdateRejected(error,data)
+          const failure=new Error(data?.error || 'password_setup_failed')
+          failure.retryInitial=retryInitial
+          throw failure
+        }
       } else {
         const { error } = await opsClient.auth.updateUser({ password })
         if (error) throw error
       }
-    } catch {
+    } catch (failure) {
       // A lost HTTP response can mean BOTH steps already succeeded. Before
       // offering any recovery, read the authoritative identity once. This
       // path never writes a second Auth password or an onboarding receipt.
@@ -329,8 +337,17 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
           setConfirmation('')
           return
         }
-        // Subsequent submit verifies the EXISTING password and finalizes
-        // only. Never rotate Auth again on an uncertain first response.
+        if(failure?.retryInitial){
+          // The Edge explicitly rejected the initial Auth update (422).
+          // Do not strand a worker in proof-only recovery when nothing
+          // was accepted by the password-update endpoint.
+          setSaving(false)
+          setRecoveryOffered(false)
+          setPasswordError('سرور درخواست ثبت رمز را رد کرد و فعال‌سازی تکمیل نشد. می‌توانید پس از بررسی رمز، دوباره برای ثبت آن اقدام کنید؛ اگر قبلاً رمز را ثبت کرده‌اید، گزینه تکمیل با همان رمز را انتخاب کنید.')
+          return
+        }
+        // Network/unknown or finalize failures remain ambiguous:
+        // require proof of EXISTING password, no automatic rotation.
         setRecoveryOffered(true)
       }
       setSaving(false)
