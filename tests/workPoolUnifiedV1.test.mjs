@@ -78,8 +78,8 @@ test('long manager descriptions are preserved up to 10k with a hard safe bound',
  assert.equal(text.length,10000)
  assert.equal(build({description:text}).payload.description,text)
  assert.throws(()=>build({description:text+'ج'}),/عنوان، شرح یا واحد کار معتبر نیست/)
- assert.equal(publicDescriptionPasteFits('الف'.repeat(9998),9998,9998,'بد'),true)
- assert.equal(publicDescriptionPasteFits('الف'.repeat(9998),9998,9998,'بده'),false)
- assert.equal(publicDescriptionPasteFits('الف'.repeat(10000),20,25,'مرحبا'),true,
+ assert.equal(publicDescriptionPasteFits('ا'.repeat(9998),9998,9998,'بد'),true)
+ assert.equal(publicDescriptionPasteFits('ا'.repeat(9998),9998,9998,'بده'),false)
+ assert.equal(publicDescriptionPasteFits('ا'.repeat(10000),20,25,'مرحبا'),true,
   'replacing an existing selection is allowed')
 })
