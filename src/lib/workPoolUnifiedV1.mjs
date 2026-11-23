@@ -1,5 +1,12 @@
 // SWTB19: pure client-side presentation and input checks. PostgreSQL is the
 // final authority for role, term, dates, effort, claim and concurrency.
+export const PUBLIC_WORK_DESCRIPTION_MAX=10000
+export function publicDescriptionPasteFits(current,start,end,paste,max=PUBLIC_WORK_DESCRIPTION_MAX){
+ const value=String(current||''),incoming=String(paste||'')
+ const a=Number.isInteger(start)?start:value.length
+ const b=Number.isInteger(end)?end:a
+ return value.length-Math.max(0,b-a)+incoming.length<=max
+}
 export const addDays=(iso,n)=>{
  const d=new Date(String(iso)+'T12:00:00Z')
  if(!Number.isFinite(d.getTime()))return ''
@@ -38,7 +45,7 @@ export function workPackagePayload(d,termId,now=todayTehran(),term=null){
  const claimDeadline=d.claimDeadline||null
  const isInt=n=>Number.isInteger(n)
  if(!['library','research','public_relations'].includes(unitCode)
-  ||title.length<3||title.length>160||description.length<10||description.length>1200
+  ||title.length<3||title.length>160||description.length<10||description.length>PUBLIC_WORK_DESCRIPTION_MAX
   ||instructions.length>3000||!isInt(priority)||priority<1||priority>5)
   throw Error('عنوان، شرح یا واحد کار معتبر نیست.')
  if(!isInt(totalMinutes)||totalMinutes<1||totalMinutes>28800)

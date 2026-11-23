@@ -86,8 +86,8 @@
  border-top:1px solid #e0e9ec;padding-top:.75rem}
 .swtb19-unified-work__detail-section h5{font-size:.9rem;margin:0}
 .swtb19-unified-work__full-description{white-space:pre-wrap;overflow-wrap:anywhere;
- line-height:2.05;font-size:.92rem;margin:0;max-height:min(56vh,34rem);
- overflow-y:auto;min-width:0}
+ line-height:2.05;font-size:.92rem;margin:0;min-width:0;
+ max-height:none;overflow-y:visible;}
 .swtb19-unified-work__detail-facts{display:grid;grid-template-columns:minmax(0,1fr);
  gap:0;margin:0}
 .swtb19-unified-work__detail-facts>div{display:flex;justify-content:space-between;
@@ -102,3 +102,15 @@
   grid-template-columns:minmax(0,1fr)}
  .swtb19-unified-work__full-description{max-height:none}
 }
+
+/* SWTB19 P1.2: no hidden inner scroll for long, paragraph-preserving prose. */
+.swtb19-unified-work__counter{font-size:.78rem;color:#476b75;line-height:1.7}
+.swtb19-unified-work__input-error{font-size:.83rem;color:#934622;
+ background:#fff5e9;border:1px solid #edd3b2;border-radius:.55rem;
+ padding:.6rem .8rem;line-height:1.9;margin:.25rem 0}
+.swtb19-unified-work__edit{display:grid;gap:.65rem;min-width:0;
+ padding:.8rem;border:1px solid #d7e6e8;border-radius:.7rem;background:#fbfdfd}
+.swtb19-unified-work__edit .report-field{display:grid;gap:.35rem;min-width:0}
+.swtb19-unified-work__edit textarea{width:100%;min-height:12rem;
+ resize:vertical;line-height:1.95;white-space:pre-wrap}
+.swtb19-unified-work__edit-hint{font-size:.82rem;line-height:1.85}

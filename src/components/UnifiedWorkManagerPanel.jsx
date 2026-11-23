@@ -2,11 +2,21 @@ import {lazy,Suspense,useCallback,useEffect,useMemo,useRef,useState} from 'react
 const DeskWorkPoolManagerSection=lazy(()=>import('./DeskWorkPoolManagerSection'))
 import JalaliDatePicker from './JalaliDatePicker'
 import {getOperationsTermDashboard,getManagerUnifiedWorkPool,
- createUnifiedWorkPackage,setWorkOpportunityState} from '../lib/operationsV2'
-import {addDays,durationFa,todayTehran,workPackagePayload} from '../lib/workPoolUnifiedV1.mjs'
+ createUnifiedWorkPackage,setWorkOpportunityState,updateUnifiedWorkDescription} from '../lib/operationsV2'
+import {addDays,durationFa,todayTehran,workPackagePayload,
+ PUBLIC_WORK_DESCRIPTION_MAX,publicDescriptionPasteFits} from '../lib/workPoolUnifiedV1.mjs'
 import '../work-pool-unified.css'
 
 const nf=new Intl.NumberFormat('fa-IR')
+const pasteWarning='متن انتخابی از سقف ۱۰٬۰۰۰ کاراکتر بیشتر است؛ پیست انجام نشد تا هیچ بخشی بی‌اطلاع شما حذف نشود.'
+const checkDescriptionPaste=(event,onWarning)=>{
+ const pasted=event.clipboardData?.getData('text')
+ if(typeof pasted!=='string')return
+ const target=event.currentTarget
+ if(!publicDescriptionPasteFits(target.value,target.selectionStart,target.selectionEnd,pasted)){
+  event.preventDefault();onWarning(pasteWarning)
+ }
+}
 const labels={library:'کتابخانه',research:'پژوهش',public_relations:'روابط عمومی'}
 const states={draft:'پیش‌نویس',published:'منتشرشده',paused:'متوقف‌شده',closed:'بسته‌شده'}
 const initial=()=>({
@@ -33,6 +43,10 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
  const [revision,setRevision]=useState(0)
  const [closeId,setCloseId]=useState('')
  const [closeReason,setCloseReason]=useState('')
+ const [descriptionWarning,setDescriptionWarning]=useState('')
+ const [edit,setEdit]=useState({id:'',previous:'',text:'',status:'idle',message:''})
+ const editRequest=useRef(null)
+ const editInputRef=useRef(null)
  const [inspectedId,setInspectedId]=useState('')
  const inspectorRef=useRef(null)
  const inspectorTrigger=useRef(null)
@@ -70,7 +84,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
   try{return workPackagePayload(form,term.id,todayTehran(),term)}
   catch(e){return {error:e.message}}
  },[form,term])
- const hasUnresolved=uncertain||retryReady
+ const hasUnresolved=uncertain||retryReady||['uncertain','retry'].includes(edit.status)
  const disabled=busy||hasUnresolved||view.status!=='ready'
  const create=async(publish,retry=false)=>{
   if(inFlight.current||view.status!=='ready'||uncertain||!globalThis.crypto?.randomUUID)return
@@ -155,6 +169,88 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
  const offers=view.offers.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)))
  const inspected=view.status==='ready'?offers.find(o=>o.id===inspectedId):null
  const inspectedTemplate=inspected?view.templates.find(t=>t.id===inspected.template_id):null
+ const editAllowed=Boolean(inspected&&inspectedTemplate
+  &&inspected.effort_budget_minutes!=null
+  &&['draft','paused'].includes(inspected.state)
+  &&Number(inspected.claimed_count)===0
+  &&Number(inspected.reserved_minutes||0)===0)
+ const beginDescriptionEdit=()=>{
+  if(!editAllowed||busy||hasUnresolved)return
+  editRequest.current=null
+  setEdit({id:inspected.id,previous:inspectedTemplate.description||'',
+   text:inspectedTemplate.description||'',status:'idle',message:''})
+ }
+ const saveDescriptionEdit=async(retry=false)=>{
+  if(inFlight.current||!editAllowed||edit.id!==inspected.id
+   ||!globalThis.crypto?.randomUUID||['uncertain'].includes(edit.status))return
+  const next=edit.text.trim()
+  if(next.length<10||next.length>PUBLIC_WORK_DESCRIPTION_MAX){
+   setEdit(old=>({...old,message:'شرح کار باید بین ۱۰ تا ۱۰٬۰۰۰ کاراکتر باشد.'}))
+   return
+  }
+  if(next===edit.previous){
+   setEdit({id:'',previous:'',text:'',status:'idle',message:''})
+   return
+  }
+  const signature=JSON.stringify([edit.id,edit.previous,next])
+  if(editRequest.current&&editRequest.current.signature!==signature)return
+  if(retry&&(!editRequest.current||edit.status!=='retry'))return
+  if(!retry&&edit.status!=='idle')return
+  const requestId=editRequest.current?.requestId||globalThis.crypto.randomUUID()
+  editRequest.current={requestId,signature,id:edit.id,previous:edit.previous,next}
+  inFlight.current=true;setBusy(true)
+  setEdit(old=>({...old,status:'saving',message:'در حال ثبت اصلاحات…'}))
+  let receipt
+  try{
+   receipt=await updateUnifiedWorkDescription({
+    opportunityId:edit.id,requestId,
+    expectedDescription:edit.previous,newDescription:next,
+   })
+   if(receipt?.ok!==true||receipt.id!==edit.id)
+    throw Error('unconfirmed_description_edit_receipt')
+  }catch{
+   setEdit(old=>({...old,status:'uncertain',
+    message:'نتیجه اصلاح شرح هنوز مشخص نیست؛ پیش از تلاش مجدد از سرور بررسی کنید.'}))
+   inFlight.current=false;setBusy(false)
+   return
+  }
+  editRequest.current=null
+  setEdit({id:'',previous:'',text:'',status:'idle',message:''})
+  setNotice('شرح اصلاح‌شده در سرور ثبت شد؛ فرصت متوقف‌شده را پس از بررسی دوباره منتشر کنید.')
+  inFlight.current=false;setBusy(false)
+  setRevision(n=>n+1)
+ }
+ const verifyDescriptionEdit=async()=>{
+  if(inFlight.current||!editRequest.current)return
+  inFlight.current=true;setBusy(true)
+  const result=await load()
+  const pendingEdit=editRequest.current
+  if(!result){
+   setEdit(old=>({...old,status:'uncertain',
+    message:'بازخوانی سرور ناموفق بود؛ تا دریافت نتیجه دوباره ثبت نکنید.'}))
+  }else{
+   const offer=result.offers.find(o=>o.id===pendingEdit.id)
+   const tpl=result.templates.find(t=>t.id===offer?.template_id)
+   if(tpl?.description===pendingEdit.next){
+    editRequest.current=null
+    setEdit({id:'',previous:'',text:'',status:'idle',message:''})
+    setNotice('اصلاح شرح با بازخوانی سرور تأیید شد؛ درخواست تکراری ارسال نشد.')
+   }else if(offer&&tpl?.description===pendingEdit.previous
+    &&['draft','paused'].includes(offer.state)
+    &&Number(offer.claimed_count)===0&&Number(offer.reserved_minutes||0)===0){
+    setEdit(old=>({...old,status:'retry',
+     message:'شرح قبلی هنوز ثبت است؛ فقط با همان شناسه درخواست می‌توانید دوباره تلاش کنید.'}))
+   }else{
+    editRequest.current=null
+    setEdit({id:'',previous:'',text:'',status:'idle',message:''})
+    setNotice('وضعیت فرصت یا متن آن تغییر کرده است؛ فهرست تازه را بررسی کنید و درخواست جدید را فقط پس از بررسی ثبت کنید.')
+   }
+  }
+  inFlight.current=false;setBusy(false)
+ }
+ useEffect(()=>{
+  if(edit.id&&edit.status==='idle')editInputRef.current?.focus({preventScroll:true})
+ },[edit.id])
  useEffect(()=>{
   if(inspected)inspectorRef.current?.focus({preventScroll:true})
  },[inspected?.id,view.status])
@@ -183,7 +279,11 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
    </div>
    <div className="swtb19-unified-work__actions">
     <button type="button" className="report-btn report-btn--light" disabled={busy}
-     onClick={()=>{if(hasUnresolved)void verify();else setRevision(n=>n+1)}}>بازخوانی فهرست</button>
+     onClick={()=>{
+      if(['uncertain','retry'].includes(edit.status))void verifyDescriptionEdit()
+      else if(hasUnresolved)void verify()
+      else setRevision(n=>n+1)
+     }}>بازخوانی فهرست</button>
     <button type="button" className="report-btn report-btn--primary"
      disabled={disabled} onClick={()=>setOpen(v=>!v)}>{open?'بستن فرم':'تعریف کار جدید'}</button>
    </div>
@@ -206,10 +306,14 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
       disabled={disabled} onChange={e=>setField('title',e.target.value)}
       placeholder="مثلاً ثبت موضوعات قفسه‌های کتابخانه"/></label>
     <label className="report-field"><span>شرح کار و نتیجه مورد انتظار</span>
-     <textarea required minLength={10} maxLength={1200} rows={3}
+     <textarea required minLength={10} maxLength={PUBLIC_WORK_DESCRIPTION_MAX} rows={5}
       value={form.description} disabled={disabled}
-      onChange={e=>setField('description',e.target.value)}
-      placeholder="دانشجو چه کاری انجام دهد و چه نتیجه‌ای تحویل دهد؟"/></label>
+      onPaste={e=>checkDescriptionPaste(e,setDescriptionWarning)}
+      onChange={e=>{setField('description',e.target.value);setDescriptionWarning('')}}
+      placeholder="دانشجو چه کاری انجام دهد و چه نتیجه‌ای تحویل دهد؟"/>
+     <small className="swtb19-unified-work__counter">{nf.format(form.description.length)} از {nf.format(PUBLIC_WORK_DESCRIPTION_MAX)} کاراکتر؛ شرح برای همه افراد واجد شرایط نمایش داده می‌شود.</small>
+    </label>
+    {descriptionWarning&&<p className="swtb19-unified-work__input-error" role="alert">{descriptionWarning}</p>}
     <div className="swtb19-unified-work__two">
      <label className="report-field"><span>واحد مربوط</span>
       <select value={form.unit} disabled={disabled}
@@ -337,6 +441,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
      </p>
      <div className="ow-work-pool-item__actions">
       <button type="button" className="ow-mini-btn swtb19-unified-work__inspect"
+       disabled={['uncertain','retry'].includes(edit.status)||busy}
        aria-expanded={inspectedId===o.id} aria-controls="swtb19-manager-inspector"
        onClick={event=>{
         if(inspectedId===o.id){setInspectedId('');return}
@@ -344,13 +449,13 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
         setInspectedId(o.id)
        }}>مشاهده جزئیات</button>
       {['draft','paused'].includes(o.state)&&
-       <button type="button" className="report-btn report-btn--primary" disabled={disabled}
+       <button type="button" className="report-btn report-btn--primary" disabled={disabled||Boolean(edit.id)}
         onClick={()=>void transition(o.id,'published')}>انتشار</button>}
       {o.state==='published'&&
-       <button type="button" className="ow-mini-btn" disabled={disabled}
+       <button type="button" className="ow-mini-btn" disabled={disabled||Boolean(edit.id)}
         onClick={()=>void transition(o.id,'paused')}>توقف انتخاب</button>}
       {['published','paused'].includes(o.state)&&
-       <button type="button" className="ow-mini-btn" disabled={disabled}
+       <button type="button" className="ow-mini-btn" disabled={disabled||Boolean(edit.id)}
         onClick={()=>{setCloseId(o.id);setCloseReason('')}}>بستن فرصت</button>}
      </div>
      {closeId===o.id&&<div className="ow-work-pool-close">
@@ -373,7 +478,10 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
     <div className="swtb19-unified-work__inspector-heading">
      <h4>جزئیات کار تعریف‌شده</h4>
      <button type="button" className="ow-mini-btn"
-      onClick={()=>{setInspectedId('');inspectorTrigger.current?.focus({preventScroll:true})}}>
+      disabled={busy||['uncertain','retry'].includes(edit.status)}
+      onClick={()=>{setInspectedId('');
+       setEdit({id:'',previous:'',text:'',status:'idle',message:''});
+       inspectorTrigger.current?.focus({preventScroll:true})}}>
       بستن</button>
     </div>
     <strong className="swtb19-unified-work__detail-title">{inspectedTemplate?.title||'عنوان نامشخص'}</strong>
@@ -381,7 +489,47 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
     <section className="swtb19-unified-work__detail-section">
      <h5>شرح کار و نتیجه مورد انتظار</h5>
      <p className="swtb19-unified-work__full-description">{inspectedTemplate?.description||'شرح عمومی در اطلاعات دریافتی موجود نیست.'}</p>
+     {inspectedTemplate?.description?.length===1200&&
+      <p className="swtb19-unified-work__input-error" role="note">
+       این شرح دقیقاً به سقف قدیمی ۱۲۰۰ کاراکتر رسیده است؛ ممکن است هنگام ثبت ناقص شده باشد. ادامه متن را می‌توانید پس از توقف انتخاب وارد کنید.
+      </p>}
     </section>
+    {edit.id===inspected.id?<div className="swtb19-unified-work__edit">
+     <label className="report-field"><span>اصلاح شرح عمومی کار</span>
+      <textarea ref={editInputRef} value={edit.text} rows={8}
+       maxLength={PUBLIC_WORK_DESCRIPTION_MAX}
+       disabled={busy||edit.status!=='idle'}
+       onPaste={e=>checkDescriptionPaste(e,message=>setEdit(old=>({...old,message})))}
+       onChange={e=>setEdit(old=>({...old,text:e.target.value,message:''}))}/>
+      <small className="swtb19-unified-work__counter">
+       {nf.format(edit.text.length)} از {nf.format(PUBLIC_WORK_DESCRIPTION_MAX)} کاراکتر
+      </small>
+     </label>
+     {edit.message&&<p role={edit.status==='uncertain'?'alert':'status'}
+      className="swtb19-unified-work__input-error">{edit.message}</p>}
+     <p className="ow-muted">این اصلاح فقط شرح عمومی را تغییر می‌دهد؛ ساعت، سهم، مهلت، عنوان و سوابق دست‌نخورده می‌مانند. برای انتشار مجدد از فهرست استفاده کنید.</p>
+     <div className="swtb19-unified-work__actions">
+      {edit.status==='idle'&&<button type="button" className="report-btn report-btn--primary"
+       disabled={busy||edit.text.trim().length<10
+        ||edit.text.length>PUBLIC_WORK_DESCRIPTION_MAX||edit.text.trim()===edit.previous}
+       onClick={()=>void saveDescriptionEdit()}>ذخیره اصلاحات</button>}
+      {edit.status==='uncertain'&&<button type="button" className="ow-mini-btn"
+       disabled={busy} onClick={()=>void verifyDescriptionEdit()}>بررسی نتیجه از سرور</button>}
+      {edit.status==='retry'&&<button type="button" className="ow-mini-btn"
+       disabled={busy} onClick={()=>void saveDescriptionEdit(true)}>تلاش مجدد با شناسه قبلی</button>}
+      {edit.status==='idle'&&<button type="button" className="ow-mini-btn"
+       disabled={busy} onClick={()=>setEdit({id:'',previous:'',text:'',status:'idle',message:''})}>انصراف</button>}
+     </div>
+    </div>:inspected.effort_budget_minutes!=null&&<>
+     {editAllowed?
+      <button type="button" className="ow-mini-btn" disabled={busy||hasUnresolved}
+       onClick={beginDescriptionEdit}>اصلاح شرح عمومی</button>
+      :<p className="ow-muted swtb19-unified-work__edit-hint">
+       {inspected.state==='published'&&Number(inspected.claimed_count)===0
+        ?'برای اصلاح شرح، ابتدا «توقف انتخاب» را در کارت کار بزنید. پس از اصلاح، با «انتشار» دوباره فعالش کنید.'
+        :'اصلاح شرح فقط برای فرصت پیش‌نویس یا متوقف‌شده‌ای مجاز است که هنوز هیچ دانشجویی آن را انتخاب نکرده باشد.'}
+      </p>}
+    </>}
     <dl className="swtb19-unified-work__detail-facts">
      <div><dt>واحد انجام کار</dt><dd>{labels[inspectedTemplate?.unit]||'نامشخص'}</dd></div>
      <div><dt>زمان انجام</dt><dd>{faDate(inspected.date)}
@@ -395,7 +543,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
      </>}
      {inspectedTemplate?.priority!=null&&<div><dt>اولویت</dt><dd>{nf.format(inspectedTemplate.priority)}</dd></div>}
     </dl>
-    <p className="ow-muted swtb19-unified-work__detail-note">این صفحه فقط برای مشاهده است. تغییر وضعیت فرصت از دکمه‌های همان ردیف انجام می‌شود؛ ویرایش مشخصات کار در این نسخه فعال نیست.</p>
+    <p className="ow-muted swtb19-unified-work__detail-note">تغییر وضعیت فرصت از کارت آن انجام می‌شود. ویرایش شرح فقط پیش از اولین انتخاب دانشجو و هنگام توقف انتخاب مجاز است؛ سایر مشخصات در این مرحله قابل ویرایش نیستند.</p>
    </aside>}
   </div>}
   </div>

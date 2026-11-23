@@ -22,9 +22,10 @@ const fake={
   if(id==='\0swtb19-manager-api')return [
    'export const getOperationsTermDashboard=async()=>({ok:true,terms:[',
    '{id:"term",label:"نیمسال جاری",state:"active",start_date:"2026-09-23",end_date:"2027-02-09"}]});',
-   "export const getManagerUnifiedWorkPool=async()=>({\"ok\":true,\"templates\":[{\"id\":\"tpl-a\",\"kind\":\"general\",\"state\":\"active\",\"unit\":\"library\",\"title\":\"کار اصلی قفسه\",\"description\":\"شرح نخست مدیریت\\n\\nبخش دوم با جزئیاتِ <script>غیرقابل اجرا</script>\",\"priority\":3}],\"opportunities\":[{\"id\":\"mgr-offer\",\"template_id\":\"tpl-a\",\"state\":\"published\",\"date\":\"2026-12-01\",\"end_date\":\"2026-12-03\",\"claim_deadline\":\"2026-11-29\",\"claimed_count\":0,\"capacity\":3,\"effort_budget_minutes\":240,\"reserved_minutes\":0}]});",
+   "export const getManagerUnifiedWorkPool=async()=>{const p={\"ok\":true,\"templates\":[{\"id\":\"tpl-a\",\"kind\":\"general\",\"state\":\"active\",\"unit\":\"library\",\"title\":\"کار اصلی قفسه\",\"description\":\"شرح نخست مدیریت\\n\\nبخش دوم با جزئیاتِ <script>غیرقابل اجرا</script>\",\"priority\":3}],\"opportunities\":[{\"id\":\"mgr-offer\",\"template_id\":\"tpl-a\",\"state\":\"published\",\"date\":\"2026-12-01\",\"end_date\":\"2026-12-03\",\"claim_deadline\":\"2026-11-29\",\"claimed_count\":0,\"capacity\":3,\"effort_budget_minutes\":240,\"reserved_minutes\":0}]};p.templates[0].description=globalThis.__v1ManagerDescription??p.templates[0].description;p.opportunities[0].state=globalThis.__v1ManagerState||p.opportunities[0].state;p.opportunities[0].claimed_count=globalThis.__v1ManagerClaims??0;return p;}",
    'export const createUnifiedWorkPackage=async()=>{globalThis.__v1Writes++;return {ok:true,id:"op"};};',
-   'export const setWorkOpportunityState=async()=>{throw Error("NO_ACTION");};',
+   "export const setWorkOpportunityState=async({opportunityId,state})=>{globalThis.__v1ManagerState=state;return{id:opportunityId};};",
+   "export const updateUnifiedWorkDescription=async args=>{globalThis.__v1EditCalls.push(args);globalThis.__v1ManagerDescription=args.newDescription;if(globalThis.__v1EditDropResponse)throw Error(\"synthetic_lost_response\");return{ok:true,id:args.opportunityId};};",
   ].join('\n')
   if(id==='\0swtb19-worker-api')return [
    'export const getWorkerUnifiedWorkPool=async()=>({',
@@ -186,4 +187,53 @@ test('manager can inspect published offer without any mutation or worker-private
   assert.equal(m.host.querySelector('#swtb19-manager-inspector'),null)
   assert.equal(document.activeElement,btn)
  }finally{await m.cleanup()}
+})
+
+test('manager edits only paused unclaimed public descriptions; no re-publication or time write',async()=>{
+ globalThis.__v1ManagerState='published'
+ globalThis.__v1ManagerClaims=0
+ globalThis.__v1ManagerDescription=undefined
+ globalThis.__v1EditCalls=[]
+ globalThis.__v1EditDropResponse=false
+ globalThis.__v1Writes=0
+ const m=await mount(Manager)
+ try{
+  const buttons=()=>[...m.host.querySelectorAll('button')]
+  await act(async()=>{buttons().find(x=>x.textContent==='مشاهده جزئیات').click()})
+  assert.ok(!buttons().find(x=>x.textContent==='اصلاح شرح عمومی'),
+   'published opportunity must be paused before editing')
+  await act(async()=>{buttons().find(x=>x.textContent==='توقف انتخاب').click()})
+  assert.equal(globalThis.__v1ManagerState,'paused')
+  for(let k=0;k<8&&!buttons().some(x=>x.textContent==='اصلاح شرح عمومی');k++){
+   await act(async()=>{await Promise.resolve()})
+  }
+  const editButton=buttons().find(x=>x.textContent==='اصلاح شرح عمومی')
+  assert.ok(editButton,'paused unclaimed opportunity now offers edit')
+  await act(async()=>{editButton.click()})
+  const input=m.host.querySelector('.swtb19-unified-work__edit textarea')
+  assert.ok(input)
+  assert.equal(input.maxLength,10000)
+  const full='توضیحات تکمیلی دقیق.\n\n'+'بخش قابل مطالعه '.repeat(170)
+  await act(async()=>{
+   const setter=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set
+   setter.call(input,full)
+   input.dispatchEvent(new window.Event('input',{bubbles:true}))
+  })
+  const save=buttons().find(x=>x.textContent==='ذخیره اصلاحات')
+  assert.ok(save&&!save.disabled)
+  await act(async()=>{save.click()})
+  assert.equal(globalThis.__v1EditCalls.length,1)
+  const call=globalThis.__v1EditCalls[0]
+  assert.equal(call.opportunityId,'mgr-offer')
+  assert.equal(call.expectedDescription.startsWith('شرح نخست مدیریت'),true)
+  assert.equal(call.newDescription,full.trim())
+  assert.equal(globalThis.__v1ManagerDescription,full.trim())
+  assert.equal(globalThis.__v1ManagerState,'paused','editor never silently republishes')
+  assert.equal(globalThis.__v1Writes,0,'no new task/template/claim is created')
+ }finally{
+  await m.cleanup()
+  globalThis.__v1ManagerState='published'
+  globalThis.__v1ManagerDescription=undefined
+  globalThis.__v1ManagerClaims=0
+ }
 })
