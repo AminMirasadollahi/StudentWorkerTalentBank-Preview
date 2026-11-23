@@ -73,7 +73,7 @@ test('student chooses one valid day within range and at least two days ahead',()
 });
 
 test('long manager descriptions are preserved up to 10k with a hard safe bound',()=>{
- const text='الف'.repeat(5000)+'\\n\\n'+'ب'.repeat(4996)
+ const text='ا'.repeat(5000)+'\\n\\n'+'ب'.repeat(4996)
  assert.equal(PUBLIC_WORK_DESCRIPTION_MAX,10000)
  assert.equal(text.length,10000)
  assert.equal(build({description:text}).payload.description,text)
