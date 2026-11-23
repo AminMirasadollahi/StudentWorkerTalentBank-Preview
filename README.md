@@ -1,41 +1,43 @@
-# Student Worker Talent Bank — Operational Frontend (GitHub Pages)
+# Student Worker Talent Bank — operational frontend
 
-**Status:** This is the real deployed React/Vite frontend for the Student Worker Talent Bank of Shahid Rajaee Faculty of Humanities, Babol (Farhangian University). Despite the legacy repository suffix `-Preview`, it is **not** a disabled mock-only intake form.
+This repository is the **live React/Vite frontend** of the Student Worker Talent Bank for Shahid Rajaee Faculty of Humanities, Babol, Farhangian University. The repository suffix `-Preview` is historical: this is **not a mock-only site** and form submission is not generally disabled.
 
-**Production site:** https://aminmirasadollahi.github.io/StudentWorkerTalentBank-Preview/
+**Live GitHub Pages:** https://aminmirasadollahi.github.io/StudentWorkerTalentBank-Preview/
 
-## What is operational here?
+## Runtime responsibilities
+- Persian RTL applicant intake and protected reporting; authenticated worker and manager workspaces.
+- Authorized candidate review, worker lifecycle, term and scheduling views, work assignment, worker time reports and manager review.
+- Manager-publication and worker-selection interfaces for date-scoped general work opportunities and timed library-desk opportunities. Actual eligibility, capacity and claim decisions are **server-side**; displaying an offer does not authorize a claim.
+- Frontend flags, component tests, GitHub Actions CI and production Pages deployment. Merging to public `main` triggers Pages build/deploy.
 
-- Persian RTL applicant intake and protected application reporting.
-- Authenticated worker and manager interfaces built with React/Vite.
-- Candidate review, worker lifecycle and term management, schedules, direct/group work assignment, worker reports and manager approval flows.
-- UI for **public general work opportunities** and **timed library-desk opportunities**. Manager creates a reusable task template, a date-scoped draft opportunity, then explicitly publishes it. Workers can claim only when the server authorizes them.
-- UI release evidence: public `main@fb82a50b89cb02ba6872fc82ea9cf98a994b0964` after PR88, CI and Pages success on 2026-11-18.
+The private repository [StudentWorkerTalentBank](https://github.com/AminMirasadollahi/StudentWorkerTalentBank) owns product rules, backend SQL/Edge source and decisions. The **deployed Supabase database and Edge configuration** remain authoritative for live data and permissions; private historical `src/` and old documents may not match this frontend.
 
-## Important current operating constraints (2026-11-22)
+## Current engineering and acceptance boundary (24 November 2026)
+- The last feature release before this README correction was **PR95**, public `main@a9ebc0b2027e6e5619c640af22269f401284bb40`, with [Pages deployment 45210168778](https://github.com/AminMirasadollahi/StudentWorkerTalentBank-Preview/actions/runs/45210168778) SUCCESS. It visually selects today's Tehran date in the worker month view without opening a write dialog.
+- The 10,000-character description and paused/unclaimed manager correction were deployed in the coordinated PR58/PR94 backend+frontend release on 23 November. The actual previously truncated description requires owner-supplied full text and an authorized pause/edit/republish; it **was not reconstructed** automatically.
+- **Do not confuse deploy verification with human acceptance.** Engineering and human testing follow **independent, linked tracks**. The owner can review in a later desktop session without halting unrelated safe development. [Dual-track policy](https://github.com/AminMirasadollahi/StudentWorkerTalentBank/blob/main/docs/SWTB20_DUAL_TRACK_DEVELOPMENT_AND_HUMAN_ACCEPTANCE_2026-11-24_FA.md) · [human acceptance queue](https://github.com/AminMirasadollahi/StudentWorkerTalentBank/blob/main/qa/manual/SWTB20_HUMAN_ACCEPTANCE_QUEUE_2026-11-24_FA.md) (private repo, access required).
+- Secure partial-onboarding recovery **PR55 (private Edge)** and **PR89 (public UI)** are still **Draft/not deployed**. The live onboarding Edge remained v3 at the last verification, and the authorized deploy was blocked by the available tool. **Do not merge PR89 before a verified Edge-first release.**
+- Work selection requires explicit active-term eligibility and other server permissions. Historical counts such as "zero eligible workers" or "zero offers" are time-specific observations, **not permanent system rules**.
+- Planned presence, task estimates, submitted time and manager-approved time are different facts. Approved aggregates can include historical QA activity and must not be treated as payroll totals without reconciliation.
 
-- Database, privileged RPCs, Edge Functions, Auth secrets, migrations and release authority belong to the **private** repository and the connected Supabase project; they are not shipped to the public frontend.
-- General opportunities are **date-specific**. They require an active term, a job template, capacity, and an eligible worker. In the 2026-11-22 read-only snapshot, **no worker had an explicit `eligible` term membership**, and there were 0 templates/opportunities/claims. Publishing a general opportunity alone does **not** make it claimable. Workers cannot obtain term eligibility merely from the global OBSERVE mode.
-- Timed desk shifts have a global capacity limit of **two concurrent seats**, including manager-assigned shifts. Desk and general opportunities are not interchangeable.
-- Claimed or scheduled work is not approved/billable time. Approved minutes require an actual submitted report and a manager decision; current totals include synthetic QA and must not be treated as payroll evidence.
-- [Private PR55](https://github.com/AminMirasadollahi/StudentWorkerTalentBank/pull/55) and [public PR89](https://github.com/AminMirasadollahi/StudentWorkerTalentBank-Preview/pull/89) for partial onboarding recovery are **drafts, not deployed**. The Edge-first/Pages-second gate must be respected.
+## Security and deployment
+This repository must **never** contain private student records or contact lists, invitation URLs, passwords, JWTs, Supabase service-role/secret keys or SMTP credentials. The frontend uses only intended public configuration and authorized RPC/Edge contracts. Never grant privileges via client UI changes.
 
-## Repository responsibilities
-
-- **This public repository:** the running frontend, public CI/Pages workflow, feature flags, UX components and client-side tests. A push to `main` **triggers a GitHub Pages deployment**.
-- **Private `AminMirasadollahi/StudentWorkerTalentBank`:** canonical product roadmap, release ledger, backend security contracts, migration sources, operating runbooks and decision history. Historic `src/` files there must not be assumed to match today's deployed UI.
-- Never commit student contact lists, application exports, invitation tokens, service-role credentials or unapproved worker details to either repository.
-
-For the current Persian roadmap and the full manager work-opportunity operating guide, follow the private repository's `README.md` → `docs/DOCUMENTATION_INDEX.md` (requires repository access).
+A successful commit/CI or PR merge is not proof the public Pages site deployed: check the **exact SHA and both build/deploy jobs**. For sensitive backend work, check the real migration/Edge source and role permissions separately. Real-worker acceptance remains another independent state.
 
 ## Local development
 
 ```bash
-npm install
+npm install --no-audit --no-fund
 npm run dev
 npm run build
 ```
 
-A dependency lockfile and `npm ci` migration are a separate future engineering change; do not assume the present build is dependency-byte-reproducible.
+At this snapshot, a committed dependency lockfile was not found; `npm install` is not a byte-for-byte reproducible dependency installation. Adding a lockfile and adopting `npm ci` should be handled in a separately tested engineering PR.
 
-**Documentation-only correction:** This README replaces obsolete claims that submissions were disabled. It does not grant permissions, enable a new production feature, deploy backend code or assert completed real-student acceptance.
+## Documentation
+- [Private development roadmap and dual-track policy](https://github.com/AminMirasadollahi/StudentWorkerTalentBank/blob/main/docs/SWTB20_DUAL_TRACK_DEVELOPMENT_AND_HUMAN_ACCEPTANCE_2026-11-24_FA.md)
+- [Live release ledger](https://github.com/AminMirasadollahi/StudentWorkerTalentBank/blob/main/docs/SWTB_RELEASE_LEDGER_CURRENT.md)
+- [Repository and PR triage](https://github.com/AminMirasadollahi/StudentWorkerTalentBank/blob/main/docs/SWTB20_PR_AND_REPOSITORY_TRIAGE_2026-11-24_FA.md)
+
+**Documentation-only change:** this file updates the description of an *already-operational* site; it does not change Auth, worker permissions, SQL, form behavior, claims or approved minutes.
