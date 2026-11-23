@@ -253,6 +253,9 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
   const [editingSlot,setEditingSlot]=useState(null)
   const [draftWindows,setDraftWindows]=useState([])
   const [monthAnchor,setMonthAnchor]=useState(today())
+  // The visible month starts with today highlighted, without opening a
+  // potentially editable day dialog or submitting any presence change.
+  const [highlightedMonthDate,setHighlightedMonthDate]=useState(today())
   const [selectedDate,setSelectedDate]=useState('')
   const [peerSelectedDate,setPeerSelectedDate]=useState('')
   const dateDialogRef=useRef(null)
@@ -335,6 +338,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
 
   useEffect(()=>{
     setEditingDay(null);setEditingSlot(null);setDraftWindows([]);setSelectedDate('');setExceptionSlot(null)
+    setHighlightedMonthDate(today())
     setError('');setNotice('');setSaveState('');setPresenceReason('')
     presenceAttemptLedger.current.reset()
   },[workerId])
@@ -364,6 +368,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
   }
   const chooseMonthDay=date=>{
     if(busy)return
+    setHighlightedMonthDate(date)
     if(selectedDate===date){setSelectedDate('');return}
     const exception=(calendarData.exceptions||[]).find(ex=>ex.worker_id===workerId&&ex.local_date===date)
     const kind=exception?.kind==='unavailable'?'unavailable':'replacement_intervals'
@@ -387,6 +392,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
   useEffect(()=>{
     if(!initialDate)return
     setMonthAnchor(initialDate)
+    setHighlightedMonthDate(initialDate)
     chooseMonthDay(initialDate)
   },[initialDate,workerId])
   const save=async(command,kind)=>{
@@ -479,6 +485,14 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
   const setMonth=direction=>{
     setMonthAnchor(previous=>direction==='previous'
       ?previousPersianMonth(previous):nextPersianMonth(previous))
+    // The previously selected date is outside the new visible month.
+    setHighlightedMonthDate('')
+    setSelectedDate('');setPeerSelectedDate('');setError('');setSaveState('')
+  }
+  const returnToCurrentMonth=()=>{
+    const date=today()
+    setMonthAnchor(date)
+    setHighlightedMonthDate(date)
     setSelectedDate('');setPeerSelectedDate('');setError('');setSaveState('')
   }
   const editWindow=(setter,index,field,value)=>
@@ -656,7 +670,7 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
         <div className="ow-month-navigation">
           <button className="ow-mini-btn" type="button" onClick={()=>setMonth('previous')}
             aria-label="ماه پیشین">ماه قبل</button>
-          <button className="ow-mini-btn" type="button" onClick={()=>setMonthAnchor(today())}
+          <button className="ow-mini-btn" type="button" onClick={returnToCurrentMonth}
             aria-label="بازگشت به ماه جاری">امروز</button>
           <button className="ow-mini-btn" type="button" onClick={()=>setMonth('next')}
             aria-label="ماه بعد">ماه بعد</button>
@@ -676,14 +690,14 @@ function ScheduleEditor({workerId,onSaved,data,onPlanAssignment,initialDate='',s
           const heading=daily.kind==='unavailable'?'عدم حضور':
             daily.kind==='replacement'?'تغییر موقت':'برنامه ثابت'
           return <button type="button" key={day.date}
-            className={'ow-month-day'+(selectedDate===day.date?' is-selected':'')
+            className={'ow-month-day'+(highlightedMonthDate===day.date?' is-selected':'')
               +(day.date===today()?' is-today':'')
               +(hasException?' has-exception':'')}
             onClick={event=>{
               lastDateButtonRef.current=event.currentTarget
               chooseMonthDay(day.date)
             }} disabled={busy}
-            aria-pressed={selectedDate===day.date}
+            aria-pressed={highlightedMonthDate===day.date}
             title={`${pretty(day.date)}: ${daily.kind==='unknown'?'برنامه نامشخص':heading+' '+timings}`}
             aria-label={`${pretty(day.date)}؛ ${daily.kind==='unknown'?'برنامه نامشخص':heading+' '+timings}؛ ${n(tasks.length)} کار`}>
             <b>{n(day.day)}</b>

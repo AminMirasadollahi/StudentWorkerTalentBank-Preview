@@ -371,6 +371,38 @@ test('worker exposes This Month and personal profile without permanent password 
     ['کارهای من','فرصت‌های کاری','زمان حضور','سوابق گزارش‌ها','حساب من'])
  }finally{await ui.dispose()}
 })
+test('monthly presence highlights Tehran today without opening or editing a day',async()=>{
+ const writesBefore=globalThis.__workerExceptionCalls.length
+ const ui=await setup()
+ try{
+  await ui.clickText('زمان حضور')
+  const todayCell=ui.host.querySelector('.ow-month-grid .ow-month-day.is-today')
+  assert.ok(todayCell,'Tehran today is in the current Persian month')
+  assert.ok(todayCell.classList.contains('is-selected'),'today must be selected visually by default')
+  assert.equal(todayCell.getAttribute('aria-pressed'),'true')
+  const dialog=ui.host.querySelector('dialog.ow-presence-date-dialog')
+  assert.ok(dialog)
+  assert.equal(dialog.open,false,'initial default selection must not open a write form')
+  assert.equal(dialog.querySelector('.ow-exception-inline'),null)
+  await ui.clickText('ماه قبل')
+  assert.equal(ui.host.querySelector('.ow-month-day.is-selected'),null,
+   'out-of-month previous selection must not be falsely highlighted')
+  await ui.click('button[aria-label="بازگشت به ماه جاری"]')
+  const restored=ui.host.querySelector('.ow-month-grid .ow-month-day.is-today')
+  assert.ok(restored?.classList.contains('is-selected'),'Today restores the visual default')
+  assert.equal(restored.getAttribute('aria-pressed'),'true')
+  assert.equal(dialog.open,false,'month navigation must not open the write form')
+  await ui.click('.ow-month-grid .ow-month-day.is-today')
+  assert.ok(dialog.querySelector('.ow-exception-inline'),'deliberate click opens details')
+  await ui.click('.ow-presence-date-dialog__head button')
+  assert.equal(dialog.querySelector('.ow-exception-inline'),null)
+  assert.ok(ui.host.querySelector('.ow-month-grid .ow-month-day.is-today.is-selected'),
+   'closing details does not discard the selected visual day')
+  assert.equal(globalThis.__workerExceptionCalls.length,writesBefore,
+   'selection and navigation never write a real presence exception')
+ }finally{await ui.dispose()}
+})
+
 test('month view edits one dated exception through injected fake RPC only',async()=>{
  const ui=await setup()
  const previousWeeklyCalls=globalThis.__workerFocusCalls.length
