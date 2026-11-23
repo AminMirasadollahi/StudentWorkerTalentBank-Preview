@@ -279,7 +279,11 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
    </div>
    <div className="swtb19-unified-work__actions">
     <button type="button" className="report-btn report-btn--light" disabled={busy}
-     onClick={()=>{if(hasUnresolved)void verify();else setRevision(n=>n+1)}}>بازخوانی فهرست</button>
+     onClick={()=>{
+      if(['uncertain','retry'].includes(edit.status))void verifyDescriptionEdit()
+      else if(hasUnresolved)void verify()
+      else setRevision(n=>n+1)
+     }}>بازخوانی فهرست</button>
     <button type="button" className="report-btn report-btn--primary"
      disabled={disabled} onClick={()=>setOpen(v=>!v)}>{open?'بستن فرم':'تعریف کار جدید'}</button>
    </div>
@@ -445,13 +449,13 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
         setInspectedId(o.id)
        }}>مشاهده جزئیات</button>
       {['draft','paused'].includes(o.state)&&
-       <button type="button" className="report-btn report-btn--primary" disabled={disabled}
+       <button type="button" className="report-btn report-btn--primary" disabled={disabled||Boolean(edit.id)}
         onClick={()=>void transition(o.id,'published')}>انتشار</button>}
       {o.state==='published'&&
-       <button type="button" className="ow-mini-btn" disabled={disabled}
+       <button type="button" className="ow-mini-btn" disabled={disabled||Boolean(edit.id)}
         onClick={()=>void transition(o.id,'paused')}>توقف انتخاب</button>}
       {['published','paused'].includes(o.state)&&
-       <button type="button" className="ow-mini-btn" disabled={disabled}
+       <button type="button" className="ow-mini-btn" disabled={disabled||Boolean(edit.id)}
         onClick={()=>{setCloseId(o.id);setCloseReason('')}}>بستن فرصت</button>}
      </div>
      {closeId===o.id&&<div className="ow-work-pool-close">
