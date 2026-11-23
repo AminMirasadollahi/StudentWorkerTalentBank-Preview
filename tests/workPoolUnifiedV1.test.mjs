@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {addDays,durationFa,isISODate,workPackagePayload,shareOptions,selectedDayAllowed}
+import {addDays,durationFa,isISODate,workPackagePayload,shareOptions,selectedDayAllowed,
+ PUBLIC_WORK_DESCRIPTION_MAX,publicDescriptionPasteFits}
  from '../src/lib/workPoolUnifiedV1.mjs'
 
 const active={id:'term-a',state:'active',start_date:'2026-09-23',end_date:'2027-02-09'}
@@ -70,3 +71,15 @@ test('student chooses one valid day within range and at least two days ahead',()
  assert.equal(selectedDayAllowed('2026-11-26',offer,'2026-11-22'),false)
  assert.equal(selectedDayAllowed('2026-12-04',offer,'2026-11-22'),false)
 });
+
+test('long manager descriptions are preserved up to 10k with a hard safe bound',()=>{
+ const text='الف'.repeat(5000)+'\\n\\n'+'ب'.repeat(4996)
+ assert.equal(PUBLIC_WORK_DESCRIPTION_MAX,10000)
+ assert.equal(text.length,10000)
+ assert.equal(build({description:text}).payload.description,text)
+ assert.throws(()=>build({description:text+'ج'}),/عنوان، شرح یا واحد کار معتبر نیست/)
+ assert.equal(publicDescriptionPasteFits('الف'.repeat(9998),9998,9998,'بد'),true)
+ assert.equal(publicDescriptionPasteFits('الف'.repeat(9998),9998,9998,'بده'),false)
+ assert.equal(publicDescriptionPasteFits('الف'.repeat(10000),20,25,'مرحبا'),true,
+  'replacing an existing selection is allowed')
+})
