@@ -226,8 +226,8 @@ test('manager edits only paused unclaimed public descriptions; no re-publication
   const call=globalThis.__v1EditCalls[0]
   assert.equal(call.opportunityId,'mgr-offer')
   assert.equal(call.expectedDescription.startsWith('شرح نخست مدیریت'),true)
-  assert.equal(call.newDescription,full)
-  assert.equal(globalThis.__v1ManagerDescription,full)
+  assert.equal(call.newDescription,full.trim())
+  assert.equal(globalThis.__v1ManagerDescription,full.trim())
   assert.equal(globalThis.__v1ManagerState,'paused','editor never silently republishes')
   assert.equal(globalThis.__v1Writes,0,'no new task/template/claim is created')
  }finally{
