@@ -12,7 +12,7 @@ import {
 import { opsClient } from './lib/operations'
 import { normalizeCandidateEmail, isValidCandidateEmail } from './lib/candidateEmail'
 import { disabledWorkerCopy } from './lib/workerAccess.mjs'
-import { validWorkerPasswordPair, workerPasswordChangeErrorCopy, confirmedInitialPasswordUpdateRejected } from './lib/workerOnboardingRecovery.mjs'
+import { validWorkerPasswordPair, workerPasswordChangeErrorCopy, edgeReportedPasswordUpdateFailure } from './lib/workerOnboardingRecovery.mjs'
 import { watchOperationsResume } from './lib/operationsResume.mjs'
 import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
@@ -283,12 +283,13 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
   const [passwordError, setPasswordError] = useState('')
   const [passwordEstablished, setPasswordEstablished] = useState(!initialPasswordRequired)
   const [recoveryOffered,setRecoveryOffered] = useState(false)
+  const [explicitRetryAvailable,setExplicitRetryAvailable] = useState(false)
   const [settingsOpen,setSettingsOpen] = useState(false)
   const [manualRefreshRevision,setManualRefreshRevision] = useState(0)
 
-  const changePassword = async (event,confirmExisting=false) => {
+  const changePassword = async (event,confirmExisting=false,retryInitialExplicitly=false) => {
     event.preventDefault()
-    const recoveryMode=recoveryOffered||confirmExisting
+    const recoveryMode=(recoveryOffered||confirmExisting)&&!retryInitialExplicitly
     setMessage('')
     setPasswordError('')
     if (!validWorkerPasswordPair(password, confirmation)) {
@@ -304,12 +305,12 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
           { body },
         )
         if (error || data?.ok !== true) {
-          // A verified Auth rejection is different from lost response or
-          // Auth-success/SQL-finalize-failure. Never auto-rotate when unsure.
-          const retryInitial=!recoveryMode &&
-            await confirmedInitialPasswordUpdateRejected(error,data)
+          // Edge 422 is not proof that Auth performed no password update.
+          // Offer a separate explicit retry; default remains proof-only.
+          const offerExplicitRetry=!recoveryMode &&
+            await edgeReportedPasswordUpdateFailure(error,data)
           const failure=new Error(data?.error || 'password_setup_failed')
-          failure.retryInitial=retryInitial
+          failure.offerExplicitRetry=offerExplicitRetry
           throw failure
         }
       } else {
@@ -332,30 +333,27 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
           setSaving(false)
           setPasswordEstablished(true)
           setRecoveryOffered(false)
+          setExplicitRetryAvailable(false)
           setMessage('حساب شما طبق وضعیت سرور آماده استفاده است.')
           setPassword('')
           setConfirmation('')
           return
         }
-        if(failure?.retryInitial){
-          // The Edge explicitly rejected the initial Auth update (422).
-          // Do not strand a worker in proof-only recovery when nothing
-          // was accepted by the password-update endpoint.
-          setSaving(false)
-          setRecoveryOffered(false)
-          setPasswordError('سرور درخواست ثبت رمز را رد کرد و فعال‌سازی تکمیل نشد. می‌توانید پس از بررسی رمز، دوباره برای ثبت آن اقدام کنید؛ اگر قبلاً رمز را ثبت کرده‌اید، گزینه تکمیل با همان رمز را انتخاب کنید.')
-          return
-        }
-        // Network/unknown or finalize failures remain ambiguous:
-        // require proof of EXISTING password, no automatic rotation.
+        // Existing-password proof is always the default. Auth 422 may offer
+        // an additional informed choice, never automatic password rotation.
+        if(failure?.offerExplicitRetry)setExplicitRetryAvailable(true)
+        else if(!recoveryMode)setExplicitRetryAvailable(false)
         setRecoveryOffered(true)
       }
       setSaving(false)
-      setPasswordError(workerPasswordChangeErrorCopy({initialSetup: !passwordEstablished}))
+      setPasswordError(failure?.offerExplicitRetry
+        ? 'سرویس ثبت رمز خطا برگرداند، اما ثبت‌شدن یا نشدن رمز قطعی نیست. ابتدا «تکمیل با همین رمز» را امتحان کنید. فقط اگر می‌خواهید آگاهانه رمز را دوباره تعیین کنید، گزینهٔ جداگانهٔ ثبت مجدد را انتخاب کنید.'
+        : workerPasswordChangeErrorCopy({initialSetup: !passwordEstablished}))
       return
     }
     setSaving(false)
     setRecoveryOffered(false)
+    setExplicitRetryAvailable(false)
     setMessage(recoveryMode?'تکمیل فعال‌سازی حساب تأیید شد.':'رمز اختصاصی حساب شما ثبت شد.')
     setPasswordEstablished(true)
     setSettingsOpen(false)
@@ -399,6 +397,17 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
                 ? recoveryOffered?'تکمیل با همین رمز (بدون تغییر رمز)':'ثبت رمز اختصاصی'
                 : 'تغییر رمز'}
           </button>
+          {!passwordEstablished&&explicitRetryAvailable&&<div className="ops-worker-recovery-existing" role="note">
+            <p className="ow-muted">
+              اگر رمز قبلاً ثبت شده باشد، اقدام زیر ممکن است آن را تغییر دهد.
+              این گزینه فقط با انتخاب خود شما اجرا می‌شود و پیش‌فرض امن همان «تکمیل با همین رمز» است.
+            </p>
+            <button className="ops-recovery-toggle" type="button"
+              disabled={saving||!password||!confirmation}
+              onClick={event=>{void changePassword(event,false,true)}}>
+              ثبت مجدد رمز با انتخاب من (ممکن است رمز قبلی تغییر کند)
+            </button>
+          </div>}
           {!passwordEstablished&&<div className="ops-worker-recovery-existing">
             <p className="ow-muted">اگر قبلاً رمز اختصاصی خود را ثبت کرده‌اید ولی فعال‌سازی کامل نشده،
               گزینه زیر فقط همان رمز را بررسی می‌کند و رمز جدیدی نمی‌سازد.</p>
