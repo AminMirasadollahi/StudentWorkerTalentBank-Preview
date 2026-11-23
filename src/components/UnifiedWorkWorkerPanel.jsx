@@ -26,6 +26,9 @@ export default function UnifiedWorkWorkerPanel({
  const [uncertainId,setUncertainId]=useState('')
  const [retryReady,setRetryReady]=useState(false)
  const [notice,setNotice]=useState('')
+ const [inspectedId,setInspectedId]=useState('')
+ const inspectorRef=useRef(null)
+ const inspectorTrigger=useRef(null)
  const requests=useRef({workerId,items:new Map()})
  if(requests.current.workerId!==workerId){
   requests.current={workerId,items:new Map()}
@@ -53,7 +56,7 @@ export default function UnifiedWorkWorkerPanel({
  useEffect(()=>{void read();return()=>{readSeq.current+=1}},[read,workerId,refreshRevision])
  useEffect(()=>{
   setDates({});setShares({})
-  setUncertainId('');setRetryReady(false);setNotice('')
+  setUncertainId('');setRetryReady(false);setNotice('');setInspectedId('')
  },[workerId])
  const claim=async(item,retry=false)=>{
   if(inFlight.current||view.status!=='ready'||item.claimable!==true||item.my_task_id
@@ -132,6 +135,21 @@ export default function UnifiedWorkWorkerPanel({
  }
  const ordered=view.offers.slice().sort((a,b)=>
   String(a.date).localeCompare(String(b.date))||Number(a.priority)-Number(b.priority))
+ const inspected=view.status==='ready'?ordered.find(item=>item.id===inspectedId):null
+ useEffect(()=>{
+  if(inspected)inspectorRef.current?.focus({preventScroll:true})
+ },[inspected?.id,view.status])
+ useEffect(()=>{
+  if(!inspected)return
+  const onKey=event=>{
+   if(event.key!=='Escape'||document.querySelector('dialog[open]'))return
+   event.preventDefault()
+   setInspectedId('')
+   inspectorTrigger.current?.focus({preventScroll:true})
+  }
+  document.addEventListener('keydown',onKey)
+  return()=>document.removeEventListener('keydown',onKey)
+ },[inspected?.id])
  return <section className="swtb19-unified-work swtb19-unified-work--worker"
   aria-label="فرصت‌های کاری قابل انتخاب">
   <div className="swtb19-unified-work__toolbar">
@@ -149,7 +167,8 @@ export default function UnifiedWorkWorkerPanel({
     className={uncertainId?'report-alert report-alert--error':'ops-alert-success'}>{notice}</div>}
   {view.status==='loading'&&<p role="status">در حال دریافت فرصت‌های مجاز…</p>}
   {view.status==='error'&&<p role="alert">خواندن فرصت‌ها موفق نبود؛ اطلاعات قبلی پنهان شدند.</p>}
-  {view.status==='ready'&&<div className="swtb19-unified-work__list">
+  {view.status==='ready'&&<div className={'swtb19-unified-work__directory'+(inspected?' is-inspecting':'')}>
+   <div className="swtb19-unified-work__list">
    {!ordered.length&&<p className="ow-work-pool-empty">در حال حاضر فرصتی برای انتخاب منتشر نشده است.</p>}
    {ordered.map(item=>{
     const legacy=item.allocation_mode==='legacy'
@@ -163,7 +182,7 @@ export default function UnifiedWorkWorkerPanel({
       <h3>{item.title}</h3>
       <small>{units[item.unit]||item.unit}</small>
      </div>
-     <p>{item.description}</p>
+     <p className="swtb19-unified-work__excerpt">{item.description}</p>
      <div className="swtb19-unified-work__facts">
       <span>زمان انجام: {faDate(item.date)}
        {item.end_date&&item.end_date!==item.date?' تا '+faDate(item.end_date):''}</span>
@@ -192,6 +211,13 @@ export default function UnifiedWorkWorkerPanel({
       </div>
      </div>}
      <div className="ow-work-pool-item__actions">
+      <button type="button" className="ow-mini-btn swtb19-unified-work__inspect"
+       aria-expanded={inspectedId===item.id} aria-controls="swtb19-worker-inspector"
+       onClick={event=>{
+        if(inspectedId===item.id){setInspectedId('');return}
+        inspectorTrigger.current=event.currentTarget
+        setInspectedId(item.id)
+       }}>مشاهده جزئیات</button>
       {item.my_task_id?<span className="ow-work-pool-claimed">این کار قبلاً توسط شما انتخاب شده است.</span>
       :item.claimable===true?<button type="button"
        className="report-btn report-btn--primary" disabled={blocked}
@@ -208,6 +234,35 @@ export default function UnifiedWorkWorkerPanel({
      </div>}
     </article>
    })}
+   </div>
+   {inspected&&<aside id="swtb19-worker-inspector" ref={inspectorRef}
+    className="swtb19-unified-work__inspector" aria-label="جزئیات فرصت همکاری"
+    tabIndex={-1}>
+    <div className="swtb19-unified-work__inspector-heading">
+     <h3>جزئیات فرصت کاری</h3>
+     <button type="button" className="ow-mini-btn"
+      onClick={()=>{setInspectedId('');inspectorTrigger.current?.focus({preventScroll:true})}}>
+      بستن</button>
+    </div>
+    <h4 className="swtb19-unified-work__detail-title">{inspected.title}</h4>
+    <section className="swtb19-unified-work__detail-section">
+     <h5>شرح کامل کار</h5>
+     <p className="swtb19-unified-work__full-description">{inspected.description}</p>
+    </section>
+    <dl className="swtb19-unified-work__detail-facts">
+     <div><dt>واحد کار</dt><dd>{units[inspected.unit]||inspected.unit}</dd></div>
+     <div><dt>زمان انجام</dt><dd>{faDate(inspected.date)}
+      {inspected.end_date&&inspected.end_date!==inspected.date?' تا '+faDate(inspected.end_date):''}</dd></div>
+     <div><dt>مهلت انتخاب</dt><dd>{faDate(inspected.claim_deadline)}</dd></div>
+     <div><dt>حجم باقی‌مانده کار</dt><dd>{inspected.allocation_mode==='legacy'
+      ?durationFa(inspected.estimated_minutes):durationFa(inspected.remaining_minutes)}</dd></div>
+     {inspected.allocation_mode==='legacy'&&
+      <div><dt>جای خالی</dt><dd>{nf.format(inspected.remaining)} نفر</dd></div>}
+    </dl>
+    <p className="ow-muted swtb19-unified-work__detail-note">
+     برای انتخاب روز و سهم زمانی، از همان کارت فرصت استفاده کنید. سهم انتخابی تخمینی است؛ ساعت واقعی پس از گزارش و تأیید مدیر منظور می‌شود.
+    </p>
+   </aside>}
   </div>}
   {deskEnabled&&<Suspense fallback={<p role="status">در حال آماده‌سازی نوبت‌های میز کتابخانه…</p>}>
    <DeskWorkPoolWorkerSection workerId={workerId} refreshRevision={refreshRevision}

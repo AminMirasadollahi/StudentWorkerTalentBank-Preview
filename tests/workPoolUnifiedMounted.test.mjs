@@ -22,14 +22,14 @@ const fake={
   if(id==='\0swtb19-manager-api')return [
    'export const getOperationsTermDashboard=async()=>({ok:true,terms:[',
    '{id:"term",label:"نیمسال جاری",state:"active",start_date:"2026-09-23",end_date:"2027-02-09"}]});',
-   'export const getManagerUnifiedWorkPool=async()=>({ok:true,templates:[],opportunities:[]});',
+   "export const getManagerUnifiedWorkPool=async()=>({\"ok\":true,\"templates\":[{\"id\":\"tpl-a\",\"kind\":\"general\",\"state\":\"active\",\"unit\":\"library\",\"title\":\"کار اصلی قفسه\",\"description\":\"شرح نخست مدیریت\\n\\nبخش دوم با جزئیاتِ <script>غیرقابل اجرا</script>\",\"priority\":3}],\"opportunities\":[{\"id\":\"mgr-offer\",\"template_id\":\"tpl-a\",\"state\":\"published\",\"date\":\"2026-12-01\",\"end_date\":\"2026-12-03\",\"claim_deadline\":\"2026-11-29\",\"claimed_count\":0,\"capacity\":3,\"effort_budget_minutes\":240,\"reserved_minutes\":0}]});",
    'export const createUnifiedWorkPackage=async()=>{globalThis.__v1Writes++;return {ok:true,id:"op"};};',
    'export const setWorkOpportunityState=async()=>{throw Error("NO_ACTION");};',
   ].join('\n')
   if(id==='\0swtb19-worker-api')return [
    'export const getWorkerUnifiedWorkPool=async()=>({',
    'ok:true,scope:"worker_published_work_pool",opportunities:[{',
-   'id:"offer",title:"ثبت وضعیت قفسه",description:"ثبت موضوعات قفسه‌های کتابخانه برای نقشه اولیه",',
+   "id:\"offer\",title:\"ثبت وضعیت قفسه\",description:\"ثبت موضوعات قفسه‌های کتابخانه\\n\\nبخش دومِ توضیحات <script>غیرقابل اجرا</script>\",",
    'unit:"library",date:"2026-12-01",end_date:"2026-12-03",claim_deadline:"2026-11-29",',
    'estimated_minutes:120,priority:3,allocation_mode:"fixed",',
    'effort_budget_minutes:240,remaining_minutes:240,min_share_minutes:120,',
@@ -132,5 +132,58 @@ test('timed desk is optional and preserves the general draft when switching back
   assert.equal(m.host.querySelector('.swtb19-unified-work__general').hidden,false)
   assert.ok(m.host.querySelector('input[placeholder*="قفسه"]'))
   assert.equal(globalThis.__v1Writes,0)
+ }finally{await m.cleanup()}
+})
+
+test('worker preview stays compact; detailed Persian paragraphs render as plain text with focus return',async()=>{
+ globalThis.__v1Claimed=false;globalThis.__v1Claims=[]
+ const m=await mount(Worker,{workerId:'worker-a'})
+ try{
+  const excerpt=m.host.querySelector('.swtb19-unified-work__excerpt')
+  assert.ok(excerpt)
+  assert.equal(excerpt.textContent.includes('\\n'),false,'literal escaping must not appear')
+  assert.ok(excerpt.textContent.includes('\n\n'),'original paragraph breaks preserved')
+  const btn=[...m.host.querySelectorAll('button')].find(x=>x.textContent==='مشاهده جزئیات')
+  assert.ok(btn)
+  assert.equal(btn.getAttribute('aria-expanded'),'false')
+  await act(async()=>{btn.click()})
+  const detail=m.host.querySelector('#swtb19-worker-inspector')
+  assert.ok(detail,'student inspector opened')
+  assert.equal(btn.getAttribute('aria-expanded'),'true')
+  assert.ok(detail.querySelector('.swtb19-unified-work__full-description').textContent.includes('\n\n'))
+  assert.match(detail.textContent,/بخش دومِ توضیحات/)
+  assert.equal(m.host.querySelectorAll('script').length,0,'never parse server text as HTML')
+  assert.ok(m.host.querySelector('[class*="ow-work-pool-item"] button.report-btn--primary'),
+    'claim remains an independent explicit action')
+  await act(async()=>{
+   detail.querySelector('.swtb19-unified-work__inspector-heading button').click()
+  })
+  assert.equal(m.host.querySelector('#swtb19-worker-inspector'),null)
+  assert.equal(document.activeElement,btn,'closing should restore focus to opener')
+  assert.equal(globalThis.__v1Claims.length,0,'inspection never claims work')
+ }finally{await m.cleanup()}
+})
+
+test('manager can inspect published offer without any mutation or worker-private leakage',async()=>{
+ globalThis.__v1Writes=0
+ const m=await mount(Manager)
+ try{
+  const btn=[...m.host.querySelectorAll('button')].find(x=>x.textContent==='مشاهده جزئیات')
+  assert.ok(btn)
+  await act(async()=>{btn.click()})
+  const detail=m.host.querySelector('#swtb19-manager-inspector')
+  assert.ok(detail)
+  assert.match(detail.textContent,/کار اصلی قفسه/)
+  assert.match(detail.textContent,/حجم کل تخمینی/)
+  assert.match(detail.textContent,/سهم رزروشده/)
+  assert.ok(detail.querySelector('.swtb19-unified-work__full-description').textContent.includes('\n\n'))
+  assert.equal(m.host.querySelectorAll('script').length,0)
+  assert.equal(globalThis.__v1Writes,0)
+  await act(async()=>{
+   const ev=new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})
+   document.dispatchEvent(ev)
+  })
+  assert.equal(m.host.querySelector('#swtb19-manager-inspector'),null)
+  assert.equal(document.activeElement,btn)
  }finally{await m.cleanup()}
 })
