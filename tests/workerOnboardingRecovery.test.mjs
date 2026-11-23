@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs'
 import {
  validWorkerPasswordPair,
  workerPasswordChangeErrorCopy,
- confirmedInitialPasswordUpdateRejected,
+ edgeReportedPasswordUpdateFailure,
 } from '../src/lib/workerOnboardingRecovery.mjs'
 
 test('password validation matches deployed Edge rules, without changing password data',()=>{
@@ -49,7 +49,7 @@ test('uncertain first onboarding result reconciles server state before any passw
  const source=readFileSync(new URL('../src/OpsApp.jsx',import.meta.url),'utf8')
  const worker=source.slice(source.indexOf('function WorkerView('),source.indexOf('const accountSettingsPanel=',source.indexOf('function WorkerView(')))
  assert.ok(worker.length>2000,'worker action source available')
- assert.match(worker,/const recoveryMode=recoveryOffered\|\|confirmExisting/)
+ assert.match(worker,/const recoveryMode=\(recoveryOffered\|\|confirmExisting\)&&!retryInitialExplicitly/)
  assert.match(worker,/const body=recoveryMode\?\{password,mode:'confirm_existing_password'\}:\{password\}/)
  assert.match(worker,/const current=await currentOperationsIdentity\(\)/)
  assert.match(worker,/current\.profile\?\.worker_id===profile\.worker_id/)
@@ -68,25 +68,28 @@ test('recovery guidance does not instruct password rotation after ambiguous Auth
  assert.doesNotMatch(message,/رمز دیگری/)
 })
 
-test('only explicit 422/password_update_failed may retry initial password setup',async()=>{
+test('only a structured 422 may offer a separately chosen retry, not prove an unchanged password',async()=>{
  const authReject={context:{status:422,clone(){return{json:async()=>({error:'password_update_failed'})}}}}
- assert.equal(await confirmedInitialPasswordUpdateRejected(authReject,null),true)
- assert.equal(await confirmedInitialPasswordUpdateRejected(authReject,{error:'password_update_failed'}),true)
+ assert.equal(await edgeReportedPasswordUpdateFailure(authReject,null),true)
+ assert.equal(await edgeReportedPasswordUpdateFailure(authReject,{error:'password_update_failed'}),true)
  const ambiguous={context:{status:503,clone(){return{json:async()=>({error:'password_update_failed'})}}}}
- assert.equal(await confirmedInitialPasswordUpdateRejected(ambiguous,null),false)
- assert.equal(await confirmedInitialPasswordUpdateRejected({context:{status:422,clone(){return{json:async()=>({error:'onboarding_finalize_failed'})}}}},null),false)
- assert.equal(await confirmedInitialPasswordUpdateRejected({context:{status:422,clone(){throw Error('no clone')}}},null),false)
- assert.equal(await confirmedInitialPasswordUpdateRejected(new Error('network disconnected'),null),false)
- assert.equal(await confirmedInitialPasswordUpdateRejected(null,{error:'password_update_failed'}),false)
+ assert.equal(await edgeReportedPasswordUpdateFailure(ambiguous,null),false)
+ assert.equal(await edgeReportedPasswordUpdateFailure({context:{status:422,clone(){return{json:async()=>({error:'onboarding_finalize_failed'})}}}},null),false)
+ assert.equal(await edgeReportedPasswordUpdateFailure({context:{status:422,clone(){throw Error('no clone')}}},null),false)
+ assert.equal(await edgeReportedPasswordUpdateFailure(new Error('network disconnected'),null),false)
+ assert.equal(await edgeReportedPasswordUpdateFailure(null,{error:'password_update_failed'}),false)
 })
-test('worker handles definitive Auth rejection separately but keeps ambiguous responses proof-only',()=>{
+test('worker keeps proof-first and only permits informed explicit repeat after structured Auth 422',()=>{
  const source=readFileSync(new URL('../src/OpsApp.jsx',import.meta.url),'utf8')
  const worker=source.slice(source.indexOf('function WorkerView('),source.indexOf('const accountSettingsPanel=',source.indexOf('function WorkerView(')))
- assert.match(worker,/await confirmedInitialPasswordUpdateRejected\(error,data\)/)
- assert.match(worker,/const retryInitial=!recoveryMode/)
- assert.match(worker,/if\(failure\?\.retryInitial\)/)
+ assert.match(worker,/await edgeReportedPasswordUpdateFailure\(error,data\)/)
+ assert.match(worker,/const offerExplicitRetry=!recoveryMode/)
+ assert.match(worker,/if\(failure\?\.offerExplicitRetry\)setExplicitRetryAvailable\(true\)/)
  assert.match(worker,/setRecoveryOffered\(false\)/)
  assert.match(worker,/setRecoveryOffered\(true\)/)
  assert.match(worker,/const current=await currentOperationsIdentity\(\)/)
  assert.match(worker,/mode:'confirm_existing_password'/)
+ assert.match(worker,/setRecoveryOffered\(true\)/)
+ assert.match(source,/void changePassword\(event,false,true\)/)
+ assert.match(source,/ممکن است رمز قبلی تغییر کند/)
 })
