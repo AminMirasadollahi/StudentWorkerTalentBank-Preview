@@ -16,12 +16,12 @@ export function workerPasswordChangeErrorCopy({ initialSetup = false } = {}) {
 }
 
 /**
- * Only a structured Edge 422/password_update_failed reply may offer the
- * initial password setup again. Network failures and finalize failures are
- * ambiguous and MUST use existing-password proof, never automatic rotation.
+ * A structured Edge 422/password_update_failed reply is a reason to OFFER
+ * an explicit user-chosen retry, not proof that Auth made no change.
+ * Default on every uncertain result remains existing-password proof.
  * Supabase FunctionsHttpError carries the HTTP Response in .context.
  */
-export async function confirmedInitialPasswordUpdateRejected(error,data) {
+export async function edgeReportedPasswordUpdateFailure(error,data) {
   const response=error?.context
   if(response?.status!==422)return false
   let body=data
