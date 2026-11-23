@@ -1,6 +1,12 @@
 // SWTB19: pure client-side presentation and input checks. PostgreSQL is the
 // final authority for role, term, dates, effort, claim and concurrency.
 export const PUBLIC_WORK_DESCRIPTION_MAX=10000
+export function publicDescriptionPasteFits(current,start,end,paste,max=PUBLIC_WORK_DESCRIPTION_MAX){
+ const value=String(current||''),incoming=String(paste||'')
+ const a=Number.isInteger(start)?start:value.length
+ const b=Number.isInteger(end)?end:a
+ return value.length-Math.max(0,b-a)+incoming.length<=max
+}
 export const addDays=(iso,n)=>{
  const d=new Date(String(iso)+'T12:00:00Z')
  if(!Number.isFinite(d.getTime()))return ''
