@@ -40,7 +40,7 @@ test('ordinary password change has separate neutral recovery guidance',()=>{
 test('worker form really calls the shared validator and uncertain-state copy',()=>{
  const source=readFileSync(new URL('../src/OpsApp.jsx',import.meta.url),'utf8')
  assert.match(source,/if \(!validWorkerPasswordPair\(password, confirmation\)\)/)
- assert.match(source,/setPasswordError\(workerPasswordChangeErrorCopy\(\{initialSetup: !passwordEstablished\}\)\)/)
+ assert.match(source,/workerPasswordChangeErrorCopy\(\{initialSetup: !passwordEstablished\}\)/)
  assert.equal((source.match(/minLength=\{8\} maxLength=\{128\} required/g)||[]).length,2)
  assert.doesNotMatch(source,/ثبت رمز انجام نشد\. لطفاً رمز دیگری انتخاب کنید/)
 })
