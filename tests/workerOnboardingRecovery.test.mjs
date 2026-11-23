@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs'
 import {
  validWorkerPasswordPair,
  workerPasswordChangeErrorCopy,
+ confirmedInitialPasswordUpdateRejected,
 } from '../src/lib/workerOnboardingRecovery.mjs'
 
 test('password validation matches deployed Edge rules, without changing password data',()=>{
@@ -65,4 +66,27 @@ test('recovery guidance does not instruct password rotation after ambiguous Auth
  assert.match(message,/این مسیر فقط رمز موجود را تأیید می‌کند/)
  assert.match(message,/با همین رمز/)
  assert.doesNotMatch(message,/رمز دیگری/)
+})
+
+test('only explicit 422/password_update_failed may retry initial password setup',async()=>{
+ const authReject={context:{status:422,clone(){return{json:async()=>({error:'password_update_failed'})}}}}
+ assert.equal(await confirmedInitialPasswordUpdateRejected(authReject,null),true)
+ assert.equal(await confirmedInitialPasswordUpdateRejected(authReject,{error:'password_update_failed'}),true)
+ const ambiguous={context:{status:503,clone(){return{json:async()=>({error:'password_update_failed'})}}}}
+ assert.equal(await confirmedInitialPasswordUpdateRejected(ambiguous,null),false)
+ assert.equal(await confirmedInitialPasswordUpdateRejected({context:{status:422,clone(){return{json:async()=>({error:'onboarding_finalize_failed'})}}}},null),false)
+ assert.equal(await confirmedInitialPasswordUpdateRejected({context:{status:422,clone(){throw Error('no clone')}}},null),false)
+ assert.equal(await confirmedInitialPasswordUpdateRejected(new Error('network disconnected'),null),false)
+ assert.equal(await confirmedInitialPasswordUpdateRejected(null,{error:'password_update_failed'}),false)
+})
+test('worker handles definitive Auth rejection separately but keeps ambiguous responses proof-only',()=>{
+ const source=readFileSync(new URL('../src/OpsApp.jsx',import.meta.url),'utf8')
+ const worker=source.slice(source.indexOf('function WorkerView('),source.indexOf('const accountSettingsPanel=',source.indexOf('function WorkerView(')))
+ assert.match(worker,/await confirmedInitialPasswordUpdateRejected\(error,data\)/)
+ assert.match(worker,/const retryInitial=!recoveryMode/)
+ assert.match(worker,/if\(failure\?\.retryInitial\)/)
+ assert.match(worker,/setRecoveryOffered\(false\)/)
+ assert.match(worker,/setRecoveryOffered\(true\)/)
+ assert.match(worker,/const current=await currentOperationsIdentity\(\)/)
+ assert.match(worker,/mode:'confirm_existing_password'/)
 })
