@@ -293,7 +293,7 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
     setMessage('')
     setPasswordError('')
     if (!validWorkerPasswordPair(password, confirmation)) {
-      setPasswordError('رمز جدید باید ۸ تا ۱۲۸ نویسه، غیرخالی و با تکرار یکسان باشد.')
+      setPasswordError('رمز باید ۸ تا ۱۲۸ نویسه، غیرخالی و با تکرار یکسان باشد.')
       return
     }
     setSaving(true)
@@ -372,15 +372,15 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
               <p>حساب شما با لینک اختصاصی باز شده است. برای ادامه، یک رمز جدید حداقل ۸ نویسه‌ای تعیین کنید.</p></>}
         <form onSubmit={changePassword}>
           <label className="report-field">
-            <span>رمز جدید (حداقل ۸ نویسه)</span>
+            <span>{!passwordEstablished&&recoveryOffered?'رمز موجود برای تأیید (حداقل ۸ نویسه)':'رمز جدید (حداقل ۸ نویسه)'}</span>
             <input type="password" minLength={8} maxLength={128} required
-              autoComplete="new-password" dir="ltr"
+              autoComplete={!passwordEstablished&&recoveryOffered?'current-password':'new-password'} dir="ltr"
               value={password} onChange={event => setPassword(event.target.value)}/>
           </label>
           <label className="report-field">
-            <span>تکرار رمز جدید</span>
+            <span>{!passwordEstablished&&recoveryOffered?'تکرار همین رمز موجود':'تکرار رمز جدید'}</span>
             <input type="password" minLength={8} maxLength={128} required
-              autoComplete="new-password" dir="ltr"
+              autoComplete={!passwordEstablished&&recoveryOffered?'current-password':'new-password'} dir="ltr"
               value={confirmation} onChange={event => setConfirmation(event.target.value)}/>
           </label>
           {passwordError && <p className="report-alert report-alert--error" role="alert">{passwordError}</p>}
