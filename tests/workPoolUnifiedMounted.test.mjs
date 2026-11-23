@@ -22,14 +22,14 @@ const fake={
   if(id==='\0swtb19-manager-api')return [
    'export const getOperationsTermDashboard=async()=>({ok:true,terms:[',
    '{id:"term",label:"نیمسال جاری",state:"active",start_date:"2026-09-23",end_date:"2027-02-09"}]});',
-   'export const getManagerUnifiedWorkPool=async()=>({"ok":true,"templates":[{"id":"tpl-a","kind":"general","state":"active","unit":"library","title":"کار اصلی قفسه","description":"شرح نخست مدیریت\n\nبخش دوم با جزئیاتِ <script>غیرقابل اجرا</script>","priority":3}],"opportunities":[{"id":"mgr-offer","template_id":"tpl-a","state":"published","date":"2026-12-01","end_date":"2026-12-03","claim_deadline":"2026-11-29","claimed_count":0,"capacity":3,"effort_budget_minutes":240,"reserved_minutes":0}]});',
+   "export const getManagerUnifiedWorkPool=async()=>({\"ok\":true,\"templates\":[{\"id\":\"tpl-a\",\"kind\":\"general\",\"state\":\"active\",\"unit\":\"library\",\"title\":\"کار اصلی قفسه\",\"description\":\"شرح نخست مدیریت\\n\\nبخش دوم با جزئیاتِ <script>غیرقابل اجرا</script>\",\"priority\":3}],\"opportunities\":[{\"id\":\"mgr-offer\",\"template_id\":\"tpl-a\",\"state\":\"published\",\"date\":\"2026-12-01\",\"end_date\":\"2026-12-03\",\"claim_deadline\":\"2026-11-29\",\"claimed_count\":0,\"capacity\":3,\"effort_budget_minutes\":240,\"reserved_minutes\":0}]});",
    'export const createUnifiedWorkPackage=async()=>{globalThis.__v1Writes++;return {ok:true,id:"op"};};',
    'export const setWorkOpportunityState=async()=>{throw Error("NO_ACTION");};',
   ].join('\n')
   if(id==='\0swtb19-worker-api')return [
    'export const getWorkerUnifiedWorkPool=async()=>({',
    'ok:true,scope:"worker_published_work_pool",opportunities:[{',
-   'id:"offer",title:"ثبت وضعیت قفسه",description:"ثبت موضوعات قفسه‌های کتابخانه\n\nبخش دومِ توضیحات <script>غیرقابل اجرا</script>",',
+   "id:\"offer\",title:\"ثبت وضعیت قفسه\",description:\"ثبت موضوعات قفسه‌های کتابخانه\\n\\nبخش دومِ توضیحات <script>غیرقابل اجرا</script>\",",
    'unit:"library",date:"2026-12-01",end_date:"2026-12-03",claim_deadline:"2026-11-29",',
    'estimated_minutes:120,priority:3,allocation_mode:"fixed",',
    'effort_budget_minutes:240,remaining_minutes:240,min_share_minutes:120,',
