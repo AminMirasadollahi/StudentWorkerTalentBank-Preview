@@ -313,7 +313,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
       placeholder="دانشجو چه کاری انجام دهد و چه نتیجه‌ای تحویل دهد؟"/>
      <small className="swtb19-unified-work__counter">{nf.format(form.description.length)} از {nf.format(PUBLIC_WORK_DESCRIPTION_MAX)} کاراکتر؛ شرح برای همه افراد واجد شرایط نمایش داده می‌شود.</small>
     </label>
-    {descriptionWarning&&<p className="swtb19-unified-work__input-error" role="alert">{descriptionWarning}</p>
+    {descriptionWarning&&<p className="swtb19-unified-work__input-error" role="alert">{descriptionWarning}</p>}
     <div className="swtb19-unified-work__two">
      <label className="report-field"><span>واحد مربوط</span>
       <select value={form.unit} disabled={disabled}
