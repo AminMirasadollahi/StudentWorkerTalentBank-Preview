@@ -93,3 +93,13 @@ test('worker keeps proof-first and only permits informed explicit repeat after s
  assert.match(source,/void changePassword\(event,false,true\)/)
  assert.match(source,/ممکن است رمز قبلی تغییر کند/)
 })
+
+test('existing-password proof uses accurate labels and current-password autocomplete',()=>{
+ const source=readFileSync(new URL('../src/OpsApp.jsx',import.meta.url),'utf8')
+ const panel=source.slice(source.indexOf('const accountSettingsPanel=('),source.indexOf('</form>',source.indexOf('const accountSettingsPanel=(')))
+ assert.match(panel,/رمز موجود برای تأیید/)
+ assert.match(panel,/تکرار همین رمز موجود/)
+ assert.equal((panel.match(/autoComplete=\{!passwordEstablished&&recoveryOffered\?'current-password':'new-password'\}/g)||[]).length,2)
+ assert.match(panel,/ثبت مجدد رمز با انتخاب من/)
+ assert.match(panel,/ممکن است رمز قبلی تغییر کند/)
+})
