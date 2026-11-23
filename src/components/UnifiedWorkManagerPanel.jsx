@@ -46,6 +46,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
  const [descriptionWarning,setDescriptionWarning]=useState('')
  const [edit,setEdit]=useState({id:'',previous:'',text:'',status:'idle',message:''})
  const editRequest=useRef(null)
+ const editInputRef=useRef(null)
  const [inspectedId,setInspectedId]=useState('')
  const inspectorRef=useRef(null)
  const inspectorTrigger=useRef(null)
@@ -168,6 +169,88 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
  const offers=view.offers.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)))
  const inspected=view.status==='ready'?offers.find(o=>o.id===inspectedId):null
  const inspectedTemplate=inspected?view.templates.find(t=>t.id===inspected.template_id):null
+ const editAllowed=Boolean(inspected&&inspectedTemplate
+  &&inspected.effort_budget_minutes!=null
+  &&['draft','paused'].includes(inspected.state)
+  &&Number(inspected.claimed_count)===0
+  &&Number(inspected.reserved_minutes||0)===0)
+ const beginDescriptionEdit=()=>{
+  if(!editAllowed||busy||hasUnresolved)return
+  editRequest.current=null
+  setEdit({id:inspected.id,previous:inspectedTemplate.description||'',
+   text:inspectedTemplate.description||'',status:'idle',message:''})
+ }
+ const saveDescriptionEdit=async(retry=false)=>{
+  if(inFlight.current||!editAllowed||edit.id!==inspected.id
+   ||!globalThis.crypto?.randomUUID||['uncertain'].includes(edit.status))return
+  const next=edit.text.trim()
+  if(next.length<10||next.length>PUBLIC_WORK_DESCRIPTION_MAX){
+   setEdit(old=>({...old,message:'شرح کار باید بین ۱۰ تا ۱۰٬۰۰۰ کاراکتر باشد.'}))
+   return
+  }
+  if(next===edit.previous){
+   setEdit({id:'',previous:'',text:'',status:'idle',message:''})
+   return
+  }
+  const signature=JSON.stringify([edit.id,edit.previous,next])
+  if(editRequest.current&&editRequest.current.signature!==signature)return
+  if(retry&&(!editRequest.current||edit.status!=='retry'))return
+  if(!retry&&edit.status!=='idle')return
+  const requestId=editRequest.current?.requestId||globalThis.crypto.randomUUID()
+  editRequest.current={requestId,signature,id:edit.id,previous:edit.previous,next}
+  inFlight.current=true;setBusy(true)
+  setEdit(old=>({...old,status:'saving',message:'در حال ثبت اصلاحات…'}))
+  let receipt
+  try{
+   receipt=await updateUnifiedWorkDescription({
+    opportunityId:edit.id,requestId,
+    expectedDescription:edit.previous,newDescription:next,
+   })
+   if(receipt?.ok!==true||receipt.id!==edit.id)
+    throw Error('unconfirmed_description_edit_receipt')
+  }catch{
+   setEdit(old=>({...old,status:'uncertain',
+    message:'نتیجه اصلاح شرح هنوز مشخص نیست؛ پیش از تلاش مجدد از سرور بررسی کنید.'}))
+   inFlight.current=false;setBusy(false)
+   return
+  }
+  editRequest.current=null
+  setEdit({id:'',previous:'',text:'',status:'idle',message:''})
+  setNotice('شرح اصلاح‌شده در سرور ثبت شد؛ فرصت متوقف‌شده را پس از بررسی دوباره منتشر کنید.')
+  inFlight.current=false;setBusy(false)
+  setRevision(n=>n+1)
+ }
+ const verifyDescriptionEdit=async()=>{
+  if(inFlight.current||!editRequest.current)return
+  inFlight.current=true;setBusy(true)
+  const result=await load()
+  const pendingEdit=editRequest.current
+  if(!result){
+   setEdit(old=>({...old,status:'uncertain',
+    message:'بازخوانی سرور ناموفق بود؛ تا دریافت نتیجه دوباره ثبت نکنید.'}))
+  }else{
+   const offer=result.offers.find(o=>o.id===pendingEdit.id)
+   const tpl=result.templates.find(t=>t.id===offer?.template_id)
+   if(tpl?.description===pendingEdit.next){
+    editRequest.current=null
+    setEdit({id:'',previous:'',text:'',status:'idle',message:''})
+    setNotice('اصلاح شرح با بازخوانی سرور تأیید شد؛ درخواست تکراری ارسال نشد.')
+   }else if(offer&&tpl?.description===pendingEdit.previous
+    &&['draft','paused'].includes(offer.state)
+    &&Number(offer.claimed_count)===0&&Number(offer.reserved_minutes||0)===0){
+    setEdit(old=>({...old,status:'retry',
+     message:'شرح قبلی هنوز ثبت است؛ فقط با همان شناسه درخواست می‌توانید دوباره تلاش کنید.'}))
+   }else{
+    editRequest.current=null
+    setEdit({id:'',previous:'',text:'',status:'idle',message:''})
+    setNotice('وضعیت فرصت یا متن آن تغییر کرده است؛ فهرست تازه را بررسی کنید و درخواست جدید را فقط پس از بررسی ثبت کنید.')
+   }
+  }
+  inFlight.current=false;setBusy(false)
+ }
+ useEffect(()=>{
+  if(edit.id&&edit.status==='idle')editInputRef.current?.focus({preventScroll:true})
+ },[edit.id])
  useEffect(()=>{
   if(inspected)inspectorRef.current?.focus({preventScroll:true})
  },[inspected?.id,view.status])
