@@ -33,6 +33,9 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
  const [revision,setRevision]=useState(0)
  const [closeId,setCloseId]=useState('')
  const [closeReason,setCloseReason]=useState('')
+ const [inspectedId,setInspectedId]=useState('')
+ const inspectorRef=useRef(null)
+ const inspectorTrigger=useRef(null)
  const pending=useRef(null)
  const inFlight=useRef(false)
  const requestSerial=useRef(0)
@@ -150,6 +153,22 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
   }finally{inFlight.current=false;setBusy(false)}
  }
  const offers=view.offers.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)))
+ const inspected=view.status==='ready'?offers.find(o=>o.id===inspectedId):null
+ const inspectedTemplate=inspected?view.templates.find(t=>t.id===inspected.template_id):null
+ useEffect(()=>{
+  if(inspected)inspectorRef.current?.focus({preventScroll:true})
+ },[inspected?.id,view.status])
+ useEffect(()=>{
+  if(!inspected)return
+  const onKey=event=>{
+   if(event.key!=='Escape'||document.querySelector('dialog[open]'))return
+   event.preventDefault()
+   setInspectedId('')
+   inspectorTrigger.current?.focus({preventScroll:true})
+  }
+  document.addEventListener('keydown',onKey)
+  return()=>document.removeEventListener('keydown',onKey)
+ },[inspected?.id])
  return <section className="swtb19-unified-work" aria-label="تعریف و انتشار کار">
   <label className="swtb19-unified-work__kind">
    <input type="checkbox" checked={deskMode} disabled={busy||hasUnresolved}
@@ -294,7 +313,8 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
       disabled={disabled||Boolean(preview.error)}>{busy?'در حال ثبت…':'ثبت و انتشار کار'}</button>
     </div>
    </form>}
-  {view.status==='ready'&&<div className="swtb19-unified-work__list">
+  {view.status==='ready'&&<div className={'swtb19-unified-work__directory'+(inspected?' is-inspecting':'')}>
+   <div className="swtb19-unified-work__list">
    <h4>کارهای تعریف‌شده ({nf.format(offers.length)})</h4>
    {offers.length===0&&<p className="ow-work-pool-empty">
     هنوز فرصت منتشرشده‌ای وجود ندارد. برای شروع، «تعریف کار جدید» را انتخاب کنید.</p>}
@@ -305,6 +325,8 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
       <strong>{t?.title||'عنوان نامشخص'}</strong>
       <small>{states[o.state]||o.state}</small>
      </div>
+     {typeof t?.description==='string'&&
+      <p className="swtb19-unified-work__excerpt">{t.description}</p>}
      <p className="ow-muted">{labels[t?.unit]||'واحد نامشخص'} {' · '}
       {faDate(o.date)}{o.end_date&&o.end_date!==o.date?' تا '+faDate(o.end_date):''}</p>
      <p>{o.effort_budget_minutes==null
@@ -314,6 +336,13 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
        +' · باقی‌مانده: '+durationFa(o.effort_budget_minutes-(o.reserved_minutes||0))}
      </p>
      <div className="ow-work-pool-item__actions">
+      <button type="button" className="ow-mini-btn swtb19-unified-work__inspect"
+       aria-expanded={inspectedId===o.id} aria-controls="swtb19-manager-inspector"
+       onClick={event=>{
+        if(inspectedId===o.id){setInspectedId('');return}
+        inspectorTrigger.current=event.currentTarget
+        setInspectedId(o.id)
+       }}>مشاهده جزئیات</button>
       {['draft','paused'].includes(o.state)&&
        <button type="button" className="report-btn report-btn--primary" disabled={disabled}
         onClick={()=>void transition(o.id,'published')}>انتشار</button>}
@@ -337,6 +366,37 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
      </div>}
     </article>
    })}
+   </div>
+   {inspected&&<aside id="swtb19-manager-inspector" ref={inspectorRef}
+    className="swtb19-unified-work__inspector" aria-label="جزئیات فرصت انتخاب‌شده"
+    tabIndex={-1}>
+    <div className="swtb19-unified-work__inspector-heading">
+     <h4>جزئیات کار تعریف‌شده</h4>
+     <button type="button" className="ow-mini-btn"
+      onClick={()=>{setInspectedId('');inspectorTrigger.current?.focus({preventScroll:true})}}>
+      بستن</button>
+    </div>
+    <strong className="swtb19-unified-work__detail-title">{inspectedTemplate?.title||'عنوان نامشخص'}</strong>
+    <span className="swtb19-unified-work__detail-status">{states[inspected.state]||inspected.state}</span>
+    <section className="swtb19-unified-work__detail-section">
+     <h5>شرح کار و نتیجه مورد انتظار</h5>
+     <p className="swtb19-unified-work__full-description">{inspectedTemplate?.description||'شرح عمومی در اطلاعات دریافتی موجود نیست.'}</p>
+    </section>
+    <dl className="swtb19-unified-work__detail-facts">
+     <div><dt>واحد انجام کار</dt><dd>{labels[inspectedTemplate?.unit]||'نامشخص'}</dd></div>
+     <div><dt>زمان انجام</dt><dd>{faDate(inspected.date)}
+      {inspected.end_date&&inspected.end_date!==inspected.date?' تا '+faDate(inspected.end_date):''}</dd></div>
+     <div><dt>مهلت انتخاب</dt><dd>{faDate(inspected.claim_deadline)}</dd></div>
+     <div><dt>تعداد انتخاب‌شده</dt><dd>{nf.format(inspected.claimed_count||0)} از {nf.format(inspected.capacity||0)} نفر</dd></div>
+     {inspected.effort_budget_minutes!=null&&<>
+      <div><dt>حجم کل تخمینی</dt><dd>{durationFa(inspected.effort_budget_minutes)}</dd></div>
+      <div><dt>سهم رزروشده</dt><dd>{durationFa(inspected.reserved_minutes||0)}</dd></div>
+      <div><dt>حجم باقی‌مانده</dt><dd>{durationFa(inspected.effort_budget_minutes-(inspected.reserved_minutes||0))}</dd></div>
+     </>}
+     {inspectedTemplate?.priority!=null&&<div><dt>اولویت</dt><dd>{nf.format(inspectedTemplate.priority)}</dd></div>}
+    </dl>
+    <p className="ow-muted swtb19-unified-work__detail-note">این صفحه فقط برای مشاهده است. تغییر وضعیت فرصت از دکمه‌های همان ردیف انجام می‌شود؛ ویرایش مشخصات کار در این نسخه فعال نیست.</p>
+   </aside>}
   </div>}
   </div>
   {deskVisited&&<div hidden={!deskMode} className="swtb19-unified-work__desk">
