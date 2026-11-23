@@ -2,11 +2,21 @@ import {lazy,Suspense,useCallback,useEffect,useMemo,useRef,useState} from 'react
 const DeskWorkPoolManagerSection=lazy(()=>import('./DeskWorkPoolManagerSection'))
 import JalaliDatePicker from './JalaliDatePicker'
 import {getOperationsTermDashboard,getManagerUnifiedWorkPool,
- createUnifiedWorkPackage,setWorkOpportunityState} from '../lib/operationsV2'
-import {addDays,durationFa,todayTehran,workPackagePayload} from '../lib/workPoolUnifiedV1.mjs'
+ createUnifiedWorkPackage,setWorkOpportunityState,updateUnifiedWorkDescription} from '../lib/operationsV2'
+import {addDays,durationFa,todayTehran,workPackagePayload,
+ PUBLIC_WORK_DESCRIPTION_MAX,publicDescriptionPasteFits} from '../lib/workPoolUnifiedV1.mjs'
 import '../work-pool-unified.css'
 
 const nf=new Intl.NumberFormat('fa-IR')
+const pasteWarning='متن انتخابی از سقف ۱۰٬۰۰۰ کاراکتر بیشتر است؛ پیست انجام نشد تا هیچ بخشی بی‌اطلاع شما حذف نشود.'
+const checkDescriptionPaste=(event,onWarning)=>{
+ const pasted=event.clipboardData?.getData('text')
+ if(typeof pasted!=='string')return
+ const target=event.currentTarget
+ if(!publicDescriptionPasteFits(target.value,target.selectionStart,target.selectionEnd,pasted)){
+  event.preventDefault();onWarning(pasteWarning)
+ }
+}
 const labels={library:'کتابخانه',research:'پژوهش',public_relations:'روابط عمومی'}
 const states={draft:'پیش‌نویس',published:'منتشرشده',paused:'متوقف‌شده',closed:'بسته‌شده'}
 const initial=()=>({
@@ -33,6 +43,9 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
  const [revision,setRevision]=useState(0)
  const [closeId,setCloseId]=useState('')
  const [closeReason,setCloseReason]=useState('')
+ const [descriptionWarning,setDescriptionWarning]=useState('')
+ const [edit,setEdit]=useState({id:'',previous:'',text:'',status:'idle',message:''})
+ const editRequest=useRef(null)
  const [inspectedId,setInspectedId]=useState('')
  const inspectorRef=useRef(null)
  const inspectorTrigger=useRef(null)
@@ -70,7 +83,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
   try{return workPackagePayload(form,term.id,todayTehran(),term)}
   catch(e){return {error:e.message}}
  },[form,term])
- const hasUnresolved=uncertain||retryReady
+ const hasUnresolved=uncertain||retryReady||['uncertain','retry'].includes(edit.status)
  const disabled=busy||hasUnresolved||view.status!=='ready'
  const create=async(publish,retry=false)=>{
   if(inFlight.current||view.status!=='ready'||uncertain||!globalThis.crypto?.randomUUID)return
@@ -206,10 +219,14 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
       disabled={disabled} onChange={e=>setField('title',e.target.value)}
       placeholder="مثلاً ثبت موضوعات قفسه‌های کتابخانه"/></label>
     <label className="report-field"><span>شرح کار و نتیجه مورد انتظار</span>
-     <textarea required minLength={10} maxLength={1200} rows={3}
+     <textarea required minLength={10} maxLength={PUBLIC_WORK_DESCRIPTION_MAX} rows={5}
       value={form.description} disabled={disabled}
-      onChange={e=>setField('description',e.target.value)}
-      placeholder="دانشجو چه کاری انجام دهد و چه نتیجه‌ای تحویل دهد؟"/></label>
+      onPaste={e=>checkDescriptionPaste(e,setDescriptionWarning)}
+      onChange={e=>{setField('description',e.target.value);setDescriptionWarning('')}}
+      placeholder="دانشجو چه کاری انجام دهد و چه نتیجه‌ای تحویل دهد؟"/>
+     <small className="swtb19-unified-work__counter">{nf.format(form.description.length)} از {nf.format(PUBLIC_WORK_DESCRIPTION_MAX)} کاراکتر؛ شرح برای همه افراد واجد شرایط نمایش داده می‌شود.</small>
+    </label>
+    {descriptionWarning&&<p className="swtb19-unified-work__input-error" role="alert">{descriptionWarning}</p>
     <div className="swtb19-unified-work__two">
      <label className="report-field"><span>واحد مربوط</span>
       <select value={form.unit} disabled={disabled}
@@ -337,6 +354,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
      </p>
      <div className="ow-work-pool-item__actions">
       <button type="button" className="ow-mini-btn swtb19-unified-work__inspect"
+       disabled={['uncertain','retry'].includes(edit.status)||busy}
        aria-expanded={inspectedId===o.id} aria-controls="swtb19-manager-inspector"
        onClick={event=>{
         if(inspectedId===o.id){setInspectedId('');return}
