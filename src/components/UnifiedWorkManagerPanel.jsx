@@ -474,7 +474,10 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
     <div className="swtb19-unified-work__inspector-heading">
      <h4>جزئیات کار تعریف‌شده</h4>
      <button type="button" className="ow-mini-btn"
-      onClick={()=>{setInspectedId('');inspectorTrigger.current?.focus({preventScroll:true})}}>
+      disabled={busy||['uncertain','retry'].includes(edit.status)}
+      onClick={()=>{setInspectedId('');
+       setEdit({id:'',previous:'',text:'',status:'idle',message:''});
+       inspectorTrigger.current?.focus({preventScroll:true})}}>
       بستن</button>
     </div>
     <strong className="swtb19-unified-work__detail-title">{inspectedTemplate?.title||'عنوان نامشخص'}</strong>
@@ -482,7 +485,47 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
     <section className="swtb19-unified-work__detail-section">
      <h5>شرح کار و نتیجه مورد انتظار</h5>
      <p className="swtb19-unified-work__full-description">{inspectedTemplate?.description||'شرح عمومی در اطلاعات دریافتی موجود نیست.'}</p>
+     {inspectedTemplate?.description?.length===1200&&
+      <p className="swtb19-unified-work__input-error" role="note">
+       این شرح دقیقاً به سقف قدیمی ۱۲۰۰ کاراکتر رسیده است؛ ممکن است هنگام ثبت ناقص شده باشد. ادامه متن را می‌توانید پس از توقف انتخاب وارد کنید.
+      </p>}
     </section>
+    {edit.id===inspected.id?<div className="swtb19-unified-work__edit">
+     <label className="report-field"><span>اصلاح شرح عمومی کار</span>
+      <textarea ref={editInputRef} value={edit.text} rows={8}
+       maxLength={PUBLIC_WORK_DESCRIPTION_MAX}
+       disabled={busy||edit.status!=='idle'}
+       onPaste={e=>checkDescriptionPaste(e,message=>setEdit(old=>({...old,message})))}
+       onChange={e=>setEdit(old=>({...old,text:e.target.value,message:''}))}/>
+      <small className="swtb19-unified-work__counter">
+       {nf.format(edit.text.length)} از {nf.format(PUBLIC_WORK_DESCRIPTION_MAX)} کاراکتر
+      </small>
+     </label>
+     {edit.message&&<p role={edit.status==='uncertain'?'alert':'status'}
+      className="swtb19-unified-work__input-error">{edit.message}</p>}
+     <p className="ow-muted">این اصلاح فقط شرح عمومی را تغییر می‌دهد؛ ساعت، سهم، مهلت، عنوان و سوابق دست‌نخورده می‌مانند. برای انتشار مجدد از فهرست استفاده کنید.</p>
+     <div className="swtb19-unified-work__actions">
+      {edit.status==='idle'&&<button type="button" className="report-btn report-btn--primary"
+       disabled={busy||edit.text.trim().length<10
+        ||edit.text.length>PUBLIC_WORK_DESCRIPTION_MAX||edit.text.trim()===edit.previous}
+       onClick={()=>void saveDescriptionEdit()}>ذخیره اصلاحات</button>}
+      {edit.status==='uncertain'&&<button type="button" className="ow-mini-btn"
+       disabled={busy} onClick={()=>void verifyDescriptionEdit()}>بررسی نتیجه از سرور</button>}
+      {edit.status==='retry'&&<button type="button" className="ow-mini-btn"
+       disabled={busy} onClick={()=>void saveDescriptionEdit(true)}>تلاش مجدد با شناسه قبلی</button>}
+      {edit.status==='idle'&&<button type="button" className="ow-mini-btn"
+       disabled={busy} onClick={()=>setEdit({id:'',previous:'',text:'',status:'idle',message:''})}>انصراف</button>}
+     </div>
+    </div>:inspected.effort_budget_minutes!=null&&<>
+     {editAllowed?
+      <button type="button" className="ow-mini-btn" disabled={busy||hasUnresolved}
+       onClick={beginDescriptionEdit}>اصلاح شرح عمومی</button>
+      :<p className="ow-muted swtb19-unified-work__edit-hint">
+       {inspected.state==='published'&&Number(inspected.claimed_count)===0
+        ?'برای اصلاح شرح، ابتدا «توقف انتخاب» را در کارت کار بزنید. پس از اصلاح، با «انتشار» دوباره فعالش کنید.'
+        :'اصلاح شرح فقط برای فرصت پیش‌نویس یا متوقف‌شده‌ای مجاز است که هنوز هیچ دانشجویی آن را انتخاب نکرده باشد.'}
+      </p>}
+    </>}
     <dl className="swtb19-unified-work__detail-facts">
      <div><dt>واحد انجام کار</dt><dd>{labels[inspectedTemplate?.unit]||'نامشخص'}</dd></div>
      <div><dt>زمان انجام</dt><dd>{faDate(inspected.date)}
@@ -496,7 +539,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
      </>}
      {inspectedTemplate?.priority!=null&&<div><dt>اولویت</dt><dd>{nf.format(inspectedTemplate.priority)}</dd></div>}
     </dl>
-    <p className="ow-muted swtb19-unified-work__detail-note">این صفحه فقط برای مشاهده است. تغییر وضعیت فرصت از دکمه‌های همان ردیف انجام می‌شود؛ ویرایش مشخصات کار در این نسخه فعال نیست.</p>
+    <p className="ow-muted swtb19-unified-work__detail-note">تغییر وضعیت فرصت از کارت آن انجام می‌شود. ویرایش شرح فقط پیش از اولین انتخاب دانشجو و هنگام توقف انتخاب مجاز است؛ سایر مشخصات در این مرحله قابل ویرایش نیستند.</p>
    </aside>}
   </div>}
   </div>
