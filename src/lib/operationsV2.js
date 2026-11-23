@@ -161,6 +161,11 @@ export const getWorkerUnifiedWorkPool=()=>
  rpc('ops_get_worker_work_pool_v1')
 export const createUnifiedWorkPackage=({requestId,payload})=>
  rpc('ops_create_work_package_v1',{p_request_id:requestId,p_payload:payload})
+export const updateUnifiedWorkDescription=({opportunityId,requestId,expectedDescription,newDescription})=>
+ rpc('ops_update_work_opportunity_description_v1',{
+  p_opportunity_id:opportunityId,p_request_id:requestId,
+  p_expected_description:expectedDescription,p_new_description:newDescription,
+ })
 export const claimUnifiedWorkShare=({opportunityId,requestId,date,minutes})=>
  rpc('ops_claim_work_opportunity_v1',{
   p_opportunity_id:opportunityId,p_request_id:requestId,
