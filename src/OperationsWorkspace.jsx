@@ -2790,7 +2790,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       <h1>کارهای من</h1>
       <div className="ow-range-switch" role="group" aria-label="نمای فضای کاری">
         {[['tasks','کارهای واگذارشده و انتخاب‌شده'],['workPool','فرصت‌های قابل انتخاب']].map(([id,title])=>
-          <button type="button" key={id} aria-pressed={section===id} className={section===id?'is-selected':''}
+          <button type="button" key={id} aria-current={section===id?'page':undefined} className={section===id?'is-selected':''}
             onClick={()=>{setSelectedTaskId(null);updateNavigation({section:id})}}>{title}</button>)}
       </div>
       {section==='workPool'&&<p className="ow-muted">انتخاب فرصت داوطلبانه و وابسته به مجوز، ظرفیت و مهلت است؛ انتخاب به‌معنای ساعت تأییدشده نیست.</p>}
