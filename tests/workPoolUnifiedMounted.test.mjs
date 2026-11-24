@@ -38,7 +38,7 @@ const fake={
    'claimable:!globalThis.__v1Claimed,my_task_id:globalThis.__v1Claimed?"task-id":null',
    '} ]});',
    'export const claimUnifiedWorkShare=async(args)=>{',
-   'globalThis.__v1Claims.push(args);globalThis.__v1Claimed=true;',
+   'globalThis.__v1Claims.push(args);if(globalThis.__v1ClaimFailOnce){globalThis.__v1ClaimFailOnce=false;throw Error("synthetic_lost_response");}globalThis.__v1Claimed=true;',
    'return {ok:true,task_id:"task-id",replayed:false};};',
    'export const claimWorkOpportunity=async()=>{throw Error("LEGACY_NOT_CALLED");};',
   ].join('\n')
@@ -70,7 +70,7 @@ async function mount(Component,props={}){
  document.body.appendChild(host)
  const root=createRoot(host)
  await act(async()=>{root.render(createElement(Component,props))})
- return {host,cleanup:async()=>{await act(async()=>root.unmount());host.remove()}}
+ return {host,rerender:async next=>{await act(async()=>root.render(createElement(Component,next)))},cleanup:async()=>{await act(async()=>root.unmount());host.remove()}}
 }
 test('manager sees one primary action; advanced settings remain collapsed until requested',async()=>{
  globalThis.__v1Writes=0
@@ -236,4 +236,38 @@ test('manager edits only paused unclaimed public descriptions; no re-publication
   globalThis.__v1ManagerDescription=undefined
   globalThis.__v1ManagerClaims=0
  }
+})
+
+// No network or production user: retain an ambiguous request across navigation and denied work reads.
+test('SWTB21 unified claim keeps its identity after leaving the view and rechecking authorization',async()=>{
+ globalThis.__v1Claimed=false;globalThis.__v1Claims=[];globalThis.__v1ClaimFailOnce=true
+ const receipts=[]
+ const props={workerId:'worker-a',onClaimed:id=>receipts.push(id)}
+ const m=await mount(Worker,props)
+ const button=label=>[...m.host.querySelectorAll('button')].find(x=>x.textContent.includes(label))
+ try{
+  const first=button('انتخاب این کار');assert.ok(first)
+  await act(async()=>first.click())
+  assert.equal(globalThis.__v1Claims.length,1)
+  const request=globalThis.__v1Claims[0]
+  assert.ok(request.requestId)
+  assert.match(m.host.textContent,/نتیجه انتخاب نامشخص/)
+  await m.rerender({...props,active:false})
+  await m.rerender({...props,active:false,authorized:false})
+  assert.doesNotMatch(m.host.textContent,/ثبت وضعیت قفسه|بخش دومِ توضیحات/)
+  assert.equal(m.host.querySelector('button'),null)
+  assert.equal(globalThis.__v1Claims.length,1)
+  await m.rerender({...props,active:true,authorized:true})
+  assert.match(m.host.textContent,/نتیجه انتخاب نامشخص/)
+  const retry=button('تلاش مجدد با همان شناسه')
+  assert.ok(retry?.disabled)
+  const read=button('بررسی نتیجه از سرور')||button('بررسی وضعیت از سرور')||button('بازخوانی')
+  assert.ok(read)
+  await act(async()=>read.click())
+  const retry2=button('تلاش مجدد با همان شناسه');assert.ok(retry2&&!retry2.disabled)
+  await act(async()=>retry2.click())
+  assert.equal(globalThis.__v1Claims.length,2)
+  assert.deepEqual(globalThis.__v1Claims[1],request)
+  assert.deepEqual(receipts,['task-id'])
+ }finally{globalThis.__v1ClaimFailOnce=false;await m.cleanup()}
 })

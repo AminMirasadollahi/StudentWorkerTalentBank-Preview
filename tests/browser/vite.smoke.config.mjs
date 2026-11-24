@@ -2,6 +2,7 @@
    This configuration is never used by the public Pages deployment. */
 import {defineConfig} from 'vite'
 import react from '@vitejs/plugin-react'
+import {fileURLToPath} from 'node:url'
 
 const v2=[
  'export const getLibraryDeskShifts=async()=>({ok:true,shifts:globalThis.__qaDeskShifts||[]});',
@@ -12,8 +13,8 @@ const v2=[
  'export const saveOperationsTerm=async()=>{throw Error("BROWSER_TERM_WRITE_FORBIDDEN")};',
  'export const saveOperationsAllocation=async()=>{throw Error("BROWSER_BUDGET_WRITE_FORBIDDEN")};',
  'export const saveOperationsBudgetPool=async a=>{if(!globalThis.__qaAllowTermWrites)throw Error("BROWSER_POOL_WRITE_FORBIDDEN");(globalThis.__qaTermWrites??=[]).push(a);const data=globalThis.__qaTermData;const found=data.pools.find(p=>p.id===a.id);const p={id:a.id||"SYNTHETIC-POOL-"+data.pools.length,label:a.label,units:a.units,allocated_minutes:a.minutes,approved_minutes:0,pending_minutes:0,pending_reports:0,unreported_tasks:0,unreported_estimate_minutes:0,remaining_minutes:a.minutes};if(found)Object.assign(found,p);else data.pools.push(p);return {ok:true,pool_id:p.id};};',
- 'export const getMyWorkV2=async()=>globalThis.__qaWorkerData;',
- 'export const getMyWorkerProfileV2=async()=>({worker_id:"SWTB_CHROMIUM_SYNTHETIC_WORKER",name:"دانشجوکار ساختگی",major:"رشته ساختگی",entry_year:"1405",unit:"library"});',
+ 'export const getMyWorkV2=async()=>{if(globalThis.__qaWorkerDenied)throw Error("SYNTHETIC_WORK_DENIED");return globalThis.__qaWorkerData;};',
+ 'export const getMyWorkerProfileV2=async()=>({worker_id:globalThis.__qaCurrentWorker||"SWTB_CHROMIUM_SYNTHETIC_WORKER",name:"دانشجوکار ساختگی",major:"رشته ساختگی",entry_year:"1405",unit:"library"});',
  'export const getMyProfileChangeRequests=async()=>globalThis.__qaProfileRequests;',
  'export const getWorkerStateHistory=async()=>({ok:true,scope:"synthetic",events:[]});',
  'export const setWorkerState=async()=>{globalThis.__qaWriteAttempts++;throw Error("BROWSER_WORKER_STATE_MUTATION_FORBIDDEN")};',
@@ -32,6 +33,8 @@ const isolates={
  enforce:'pre',
  resolveId(source,importer){
   const from=(importer||'').split('?')[0].replaceAll('\\','/')
+  if(/\/src\/components\/(?:WorkPoolWorkerPanel|UnifiedWorkWorkerPanel|DeskWorkPoolWorkerSection)\.jsx$/.test(from)&&source==='../lib/operationsV2')
+   return fileURLToPath(new URL('./swtb21-worker-pool-api.mjs',import.meta.url))
   if(from.endsWith('/src/OperationsWorkspace.jsx')){
    if(source==='./lib/operationsV2')return '\0swtb7-fake-v2'
    if(source==='./lib/operations')return '\0swtb7-fake-legacy'

@@ -415,3 +415,6 @@ try{
  await browser?.close().catch(()=>{})
  await server?.close().catch(()=>{})
 }
+
+// Run the focused worker workspace browser regression using its own isolated fixture/server.
+await import('./run-swtb21-worker-workspace-smoke.mjs')

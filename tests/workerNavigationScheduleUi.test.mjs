@@ -22,6 +22,7 @@ const plugin={
  name:'worker-focus-ui-fully-isolated',
  enforce:'pre',
  resolveId(source,importer){
+    if(importer?.endsWith('/src/OperationsWorkspace.jsx')&&source==='./components/WorkPoolWorkerPanel')return '\0qa-pool-no-network'
     if((importer?.endsWith('/src/OperationsWorkspace.jsx')&&source==='./lib/operationsV2')
       ||(importer?.endsWith('/src/components/TaskAssignmentEditor.jsx')&&source==='../lib/operationsV2')
       ||(importer?.endsWith('/src/components/TermBudgetPanel.jsx')&&source==='../lib/operationsV2')
@@ -38,6 +39,7 @@ const plugin={
    return '\0qa-worker-no-network'
  },
  load(id){
+    if(id==='\0qa-pool-no-network')return `import React,{useEffect} from 'react';export default function Pool({workerId,active,authorized,onClaimed}){useEffect(()=>{globalThis.__qaPoolMounts=(globalThis.__qaPoolMounts||0)+1},[]);if(!authorized)return null;return React.createElement('div',{'data-testid':'synthetic-pool','data-active':String(active)},React.createElement('button',{'data-testid':'synthetic-confirmed-receipt',onClick:()=>void onClaimed(globalThis.__qaReceiptTaskId)},'Synthetic receipt'));}`
     if(id==='\0qa-v2-no-network')return [
       'export const getOperationsTermDashboard=async()=>({ok:true,term:null,terms:[],units:[],workers:[],weeks:[],pools:[]});',
       'export const saveOperationsTerm=async()=>{throw Error("QA_TERM_WRITE_DENIED")};',
@@ -1427,4 +1429,47 @@ test('zero-credit worker history renders an accessible donut and monthly baselin
   assert.equal(globalThis.__workerFocusCalls.length,beforeWrites,
     'a visual graph must never create approval or presence data')
  }finally{globalThis.__workerFocusFixture=fixture();await ui.dispose()}
+})
+
+// Only the actual WorkerOperations parent is mounted; the pool API/UI is an isolated stub.
+test('SWTB21 workspace routes an exact receipt, retains one pool, and hides it on a denied read',async()=>{
+ globalThis.__workerFocusFixture=fixture()
+ globalThis.__workerReadDenied=false
+ globalThis.__qaPoolMounts=0
+ globalThis.__qaReceiptTaskId='FAKE-TASK'
+ const ui=await setup(IdentityHarness)
+ const selector='[data-testid="synthetic-pool"]'
+ const waitForPool=async()=>{
+  for(let i=0;i<30&&!ui.host.querySelector(selector);i++)
+   await act(async()=>{await new Promise(resolve=>setTimeout(resolve,20))})
+  assert.ok(ui.host.querySelector(selector),'isolated lazy pool mounted')
+ }
+ try{
+  assert.ok(ui.host.querySelector('.ow-worker-workspace-switch'))
+  assert.equal(ui.host.querySelector(selector),null)
+  await ui.clickText('فرصت‌های قابل انتخاب')
+  await waitForPool()
+  assert.equal(ui.host.querySelector(selector).dataset.active,'true')
+  await ui.click('[data-testid="synthetic-confirmed-receipt"]')
+  assert.match(ui.host.querySelector('.ow-worker-tasks').textContent,/کار نمونه دانشجوکار/)
+  assert.ok(ui.host.querySelector('#ow-task-inspector'))
+  assert.equal(ui.host.querySelector(selector).dataset.active,'false')
+  assert.ok(ui.host.querySelector(selector).closest('[hidden]'))
+  await ui.clickText('فرصت‌های کاری')
+  assert.equal(ui.host.querySelector(selector).dataset.active,'true')
+  assert.equal(globalThis.__qaPoolMounts,1)
+  globalThis.__qaReceiptTaskId='MISSING-FAKE-TASK'
+  await ui.click('[data-testid="synthetic-confirmed-receipt"]')
+  assert.equal(ui.host.querySelector(selector).dataset.active,'true')
+  assert.match(ui.host.textContent,/وظیفه در فهرست تازه مشاهده نشد/)
+  globalThis.__workerReadDenied=true
+  await ui.click('[data-testid="profile-refresh"]')
+  assert.ok(ui.host.querySelector('.ow-access-recheck'))
+  assert.equal(ui.host.querySelector(selector),null)
+  assert.doesNotMatch(ui.host.textContent,/Synthetic receipt|کار نمونه دانشجوکار/)
+  globalThis.__workerReadDenied=false
+  await ui.clickText('تلاش مجدد برای دریافت اطلاعات')
+  await waitForPool()
+  assert.equal(globalThis.__qaPoolMounts,1,'same scoped pool persists through denied read')
+ }finally{globalThis.__workerReadDenied=false;await ui.dispose()}
 })

@@ -1,4 +1,4 @@
-import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react'
+import {lazy,Suspense,useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react'
 import JalaliDatePicker from './JalaliDatePicker'
 import {getWorkerUnifiedWorkPool,claimUnifiedWorkShare,
  claimWorkOpportunity} from '../lib/operationsV2'
@@ -17,7 +17,7 @@ const pickDate=item=>Array.isArray(item.available_dates)&&item.available_dates.l
  :(item.date<addDays(todayTehran(),2)?addDays(todayTehran(),2):item.date)
 
 export default function UnifiedWorkWorkerPanel({
- workerId,refreshRevision=0,onClaimed,onGuide,
+ workerId,refreshRevision=0,onClaimed,onGuide,active=true,authorized=true,
 }){
  const [view,setView]=useState({status:'loading',offers:[]})
  const [dates,setDates]=useState({})
@@ -34,8 +34,20 @@ export default function UnifiedWorkWorkerPanel({
   requests.current={workerId,items:new Map()}
  }
  const inFlight=useRef(false)
+ const alive=useRef(false)
+ useLayoutEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
  const readSeq=useRef(0)
+ const authorizedRef=useRef(authorized)
+ useLayoutEffect(()=>{
+  authorizedRef.current=authorized
+  if(!authorized){
+   readSeq.current+=1
+   setView({status:'loading',offers:[]})
+   setRetryReady(false)
+  }
+ },[authorized])
  const read=useCallback(async()=>{
+  if(!alive.current||!authorizedRef.current)return null
   const index=++readSeq.current
   setView(v=>({...v,status:'loading'}))
   try{
@@ -53,13 +65,13 @@ export default function UnifiedWorkWorkerPanel({
    return null
   }
  },[])
- useEffect(()=>{void read();return()=>{readSeq.current+=1}},[read,workerId,refreshRevision])
+ useEffect(()=>{if(active&&authorized)void read();return()=>{readSeq.current+=1}},[read,workerId,refreshRevision,active,authorized])
  useEffect(()=>{
   setDates({});setShares({})
   setUncertainId('');setRetryReady(false);setNotice('');setInspectedId('')
  },[workerId])
  const claim=async(item,retry=false)=>{
-  if(inFlight.current||view.status!=='ready'||item.claimable!==true||item.my_task_id
+  if(!active||!authorizedRef.current||!alive.current||inFlight.current||view.status!=='ready'||item.claimable!==true||item.my_task_id
     ||uncertainId&&(uncertainId!==item.id||!retryReady)
     ||retryReady&&!retry)return
   if(!globalThis.crypto?.randomUUID){
@@ -91,34 +103,34 @@ export default function UnifiedWorkWorkerPanel({
    if(receipt?.ok!==true||typeof receipt.task_id!=='string')
     throw Error('claim_receipt_not_verified')
   }catch{
-   if(requests.current.workerId===workerId){
+   if(alive.current&&requests.current.workerId===workerId){
     setUncertainId(item.id);setRetryReady(false)
     setNotice('نتیجه انتخاب نامشخص است. ابتدا وضعیت را از سرور بازخوانی کنید؛ تلاش مجدد تا آن زمان غیرفعال است.')
    }
    inFlight.current=false
-   if(requests.current.workerId===workerId)setBusyId('')
+   if(alive.current&&requests.current.workerId===workerId)setBusyId('')
    return
   }
   // A successful claim remains valid even if reloading the list or
   // navigation fails after the server commit.
-  if(requests.current.workerId===workerId){
+  if(alive.current&&requests.current.workerId===workerId){
    requests.current.items.delete(item.id)
    setUncertainId('');setRetryReady(false)
    setNotice(receipt.replayed
     ?'انتخاب قبلی تأیید شد؛ کار تکراری ساخته نشده است.'
     :'سهم کار به شما واگذار شد. ساعت واقعی باید بعداً گزارش و تأیید شود.')
    await read()
-   if(requests.current.workerId===workerId){
+   if(alive.current&&requests.current.workerId===workerId){
     try{await onClaimed?.(receipt.task_id)}
     catch{setNotice('انتخاب در سرور ثبت شد، اما جابه‌جایی صفحه انجام نشد؛ «کارهای من» را باز کنید.')}
    }
   }
   inFlight.current=false
-  if(requests.current.workerId===workerId)setBusyId('')
+  if(alive.current&&requests.current.workerId===workerId)setBusyId('')
  }
  const refresh=async()=>{
   const items=await read()
-  if(!items||!uncertainId||requests.current.workerId!==workerId)return
+  if(!alive.current||!items||!uncertainId||requests.current.workerId!==workerId)return
   const offer=items.find(x=>x.id===uncertainId)
   if(offer?.my_task_id){
    requests.current.items.delete(uncertainId)
@@ -135,7 +147,7 @@ export default function UnifiedWorkWorkerPanel({
  }
  const ordered=view.offers.slice().sort((a,b)=>
   String(a.date).localeCompare(String(b.date))||Number(a.priority)-Number(b.priority))
- const inspected=view.status==='ready'?ordered.find(item=>item.id===inspectedId):null
+ const inspected=authorized&&active&&view.status==='ready'?ordered.find(item=>item.id===inspectedId):null
  useEffect(()=>{
   if(inspected)inspectorRef.current?.focus({preventScroll:true})
  },[inspected?.id,view.status])
@@ -151,13 +163,14 @@ export default function UnifiedWorkWorkerPanel({
   return()=>document.removeEventListener('keydown',onKey)
  },[inspected?.id])
  return <section className="swtb19-unified-work swtb19-unified-work--worker"
-  aria-label="فرصت‌های کاری قابل انتخاب">
+  aria-label="فرصت‌های کاری قابل انتخاب" data-swtb-guide="work-pool-list" hidden={!authorized}>
+  {authorized&&<>
   <div className="swtb19-unified-work__toolbar">
    <div><h2>فرصت‌های همکاری</h2>
     <p>کار موردنظر را انتخاب کنید. زمان درج‌شده سهم تخمینی است، نه ساعت تأییدشده.</p>
    </div>
    <div className="swtb19-unified-work__actions">
-    <button type="button" className="ow-mini-btn" onClick={()=>onGuide?.('workPool')}>
+    <button type="button" className="ow-mini-btn" data-swtb-guide="help-workPool" onClick={()=>onGuide?.('workPool')}>
      ؟ راهنمای این بخش</button>
     <button type="button" className="report-btn report-btn--light"
      disabled={busyId!==''} onClick={()=>void refresh()}>بازخوانی</button>
@@ -264,9 +277,10 @@ export default function UnifiedWorkWorkerPanel({
     </p>
    </aside>}
   </div>}
-  {deskEnabled&&<Suspense fallback={<p role="status">در حال آماده‌سازی نوبت‌های میز کتابخانه…</p>}>
+  </>}
+  {deskEnabled&&<Suspense fallback={authorized&&active?<p role="status">در حال آماده‌سازی نوبت‌های میز کتابخانه…</p>:null}>
    <DeskWorkPoolWorkerSection workerId={workerId} refreshRevision={refreshRevision}
-    onClaimed={onClaimed}/>
+    onClaimed={onClaimed} active={active} authorized={authorized}/>
   </Suspense>}
  </section>
 }

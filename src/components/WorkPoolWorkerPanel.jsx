@@ -1,4 +1,4 @@
-import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react'
+import {lazy,Suspense,useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react'
 // Hidden until D2A/D2B are safely installed; D1 remains untouched by default.
 const deskPoolUIEnabled=import.meta.env?.VITE_SWTB21_DESK_POOL_UI!=='false'
 const unifiedUIEnabled=import.meta.env?.VITE_SWTB19_UNIFIED_WORK_UI==='true'
@@ -11,10 +11,10 @@ const fa=new Intl.NumberFormat('fa-IR')
 const pretty=new Intl.DateTimeFormat('fa-IR-u-ca-persian',{dateStyle:'medium',timeZone:'UTC'})
 const dateName=x=>x?pretty.format(new Date(x+'T12:00:00Z')):'—'
 const units={library:'کتابخانه',research:'پژوهش',public_relations:'روابط عمومی'}
-export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaimed,onGuide}){
- if(unifiedUIEnabled)return <Suspense fallback={<p role="status">در حال آماده‌سازی فرصت‌های کاری…</p>}>
+export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaimed,onGuide,active=true,authorized=true}){
+ if(unifiedUIEnabled)return <Suspense fallback={authorized&&active?<p role="status">در حال آماده‌سازی فرصت‌های کاری…</p>:null}>
   <UnifiedWorkWorkerPanel workerId={workerId} refreshRevision={refreshRevision}
-   onClaimed={onClaimed} onGuide={onGuide}/>
+   onClaimed={onClaimed} onGuide={onGuide} active={active} authorized={authorized}/>
  </Suspense>
  const [view,setView]=useState({status:'loading',items:[]})
  const [busyId,setBusyId]=useState('')
@@ -25,8 +25,20 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
  if(keys.current.workerId!==workerId)
   keys.current={workerId,requests:new Map()}
  const inFlight=useRef(false)
+ const alive=useRef(false)
+ useLayoutEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
  const seq=useRef(0)
+ const authorizedRef=useRef(authorized)
+ useLayoutEffect(()=>{
+  authorizedRef.current=authorized
+  if(!authorized){
+   seq.current+=1
+   setView({status:'loading',items:[]})
+   setRetryReady(false)
+  }
+ },[authorized])
  const load=useCallback(async()=>{
+  if(!alive.current||!authorizedRef.current)return null
   const stamp=++seq.current
   setView({status:'loading',items:[]})
   try{
@@ -42,13 +54,13 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
    return null
   }
  },[])
- useEffect(()=>{void load();return()=>{seq.current+=1}},[load,workerId,refreshRevision])
+ useEffect(()=>{if(active&&authorized)void load();return()=>{seq.current+=1}},[load,workerId,refreshRevision,active,authorized])
  useEffect(()=>{
   // A reused worker panel must not carry another worker's pending notice.
   setUncertainId('');setRetryReady(false);setNotice('')
  },[workerId])
  const claim=async item=>{
-  if(inFlight.current||view.status!=='ready'||item.claimable!==true||item.my_task_id
+  if(!active||!authorizedRef.current||!alive.current||inFlight.current||view.status!=='ready'||item.claimable!==true||item.my_task_id
     ||uncertainId===item.id&&!retryReady)return
   if(!globalThis.crypto?.randomUUID){
    setNotice('امکان تولید شناسه امن درخواست وجود ندارد؛ انتخاب کار انجام نشد.')
@@ -70,19 +82,19 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
    }catch{
     // ONLY a missing/invalid claim receipt is ambiguous. A later UI
     // navigation or read failure must not invalidate a confirmed receipt.
-    if(keys.current.workerId===workerId){
+    if(alive.current&&keys.current.workerId===workerId){
      setUncertainId(item.id)
      setRetryReady(false)
      setNotice('نتیجه انتخاب مشخص نیست. ابتدا وضعیت را از سرور بازخوانی کنید؛ تا آن زمان تلاش مجدد غیرفعال است.')
     }
     return
    }
-   if(keys.current.workerId!==workerId)return
+   if(!alive.current||keys.current.workerId!==workerId)return
    keys.current.requests.delete(item.id)
    setUncertainId('')
    setRetryReady(false)
    const freshOffers=await load()
-   if(keys.current.workerId!==workerId)return
+   if(!alive.current||keys.current.workerId!==workerId)return
    setNotice(freshOffers===null
     ?'انتخاب کار در سرور تأیید شد، اما فهرست فرصت‌ها به‌روزرسانی نشد. نتیجه را در «کارهای من» بررسی کنید.'
     :receipt.replayed===true
@@ -93,24 +105,24 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
    }catch{
     // The server already accepted this claim; a broken parent navigation
     // must NEVER re-enable an uncertain-claim retry or issue a new UUID.
-    if(keys.current.workerId===workerId)
+    if(alive.current&&keys.current.workerId===workerId)
      setNotice('انتخاب کار در سرور تأیید شد، اما انتقال به «کارهای من» انجام نشد. این بخش را دستی باز کنید.')
    }
   }finally{
    inFlight.current=false
-   if(keys.current.workerId===workerId)setBusyId('')
+   if(alive.current&&keys.current.workerId===workerId)setBusyId('')
   }
  }
  const refresh=async()=>{
   const items=await load()
-  if(!items||!uncertainId||keys.current.workerId!==workerId)return
+  if(!alive.current||!items||!uncertainId||keys.current.workerId!==workerId)return
   const offer=items.find(item=>item.id===uncertainId)
   if(offer?.my_task_id){
    keys.current.requests.delete(uncertainId)
    setUncertainId('')
    setRetryReady(false)
    setNotice('انتخاب قبلی شما در اطلاعات سرور تأیید شد؛ کار تکراری ایجاد نمی‌شود.')
-   onClaimed?.(offer.my_task_id)
+   try{await onClaimed?.(offer.my_task_id)}catch{setNotice('انتخاب ثبت شده است؛ کارهای من را باز کنید.')}
   }else{
    const mayRetry=offer?.claimable===true
    setRetryReady(mayRetry)
@@ -123,7 +135,8 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
   String(a.date).localeCompare(String(b.date))||
   Number(a.priority)-Number(b.priority))
  return <section className="report-panel ow-work-pool ow-worker-work-pool"
-  data-swtb-guide="work-pool-list" aria-label="فرصت‌های کاری قابل انتخاب">
+  data-swtb-guide="work-pool-list" aria-label="فرصت‌های کاری قابل انتخاب" hidden={!authorized}>
+  {authorized&&<>
   <div className="report-panel-heading">
    <div className="ow-worker-title-inline"><h2>فرصت‌های کاری</h2>
     <WorkerInfoHint label="درباره انتخاب فرصت کاری"
@@ -184,9 +197,10 @@ export default function WorkPoolWorkerPanel({workerId,refreshRevision=0,onClaime
     </article>)}
    </div>
   </>}
-  {deskPoolUIEnabled&&<Suspense fallback={<p role="status">در حال آماده‌سازی نوبت‌های میز کتابخانه…</p>}>
+  </>}
+  {deskPoolUIEnabled&&<Suspense fallback={authorized&&active?<p role="status">در حال آماده‌سازی نوبت‌های میز کتابخانه…</p>:null}>
     <DeskWorkPoolWorkerSection workerId={workerId} refreshRevision={refreshRevision}
-      onClaimed={onClaimed}/>
+      onClaimed={onClaimed} active={active} authorized={authorized}/>
   </Suspense>}
  </section>
 }

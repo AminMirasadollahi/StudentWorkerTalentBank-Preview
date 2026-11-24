@@ -5,7 +5,7 @@ import { trapModalTab } from './lib/dialogFocusTrap.mjs'
 import {canonicalPresencePayload,createPresenceAttemptLedger,interpretPresenceReceipt,workerPresenceItems,managerPresenceItems} from './lib/presenceChanges.mjs'
 import {requestPresenceChange,listPresenceChanges} from './lib/presenceChangesApi.js'
 import {WorkerPresenceRequests,ManagerPresenceReviewQueue} from './components/PresenceChangePanels.jsx'
-import { selectWorkerTaskFocus, summarizeWorkerTaskFocus } from './lib/workerTaskFocus.mjs'
+import { selectWorkerTaskFocus, summarizeWorkerTaskFocus, locateClaimedWorkerTask } from './lib/workerTaskFocus.mjs'
 import {projectWorkerReportActivity,summarizeWorkerReportActivity} from './lib/workerReportActivity.mjs'
 import {filterPerformanceByWorkDate} from './lib/workerPerformance.mjs'
 import WorkerPerformancePanel from './components/WorkerPerformancePanel.jsx'
@@ -2519,6 +2519,13 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     acknowledgedActions.current={workerId:profile.worker_id,items:new Map(),profileRequests:new Map()}
   const [localNavigation,setLocalNavigation]=useState({section:'tasks',taskRange:'today'})
   const [submissionReceipt,setSubmissionReceipt]=useState(null)
+  const [claimReceipt,setClaimReceipt]=useState(null)
+  const [visitedPoolWorker,setVisitedPoolWorker]=useState(null)
+  const claimContext=useRef(null)
+  const claimSession=useRef({workerId:profile.worker_id})
+  if(claimSession.current.workerId!==profile.worker_id)
+    claimSession.current={workerId:profile.worker_id}
+  const session=claimSession.current
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
   const [charterInfoOpen,setCharterInfoOpen]=useState(false)
   const charterInfoTriggerRef=useRef(null)
@@ -2544,22 +2551,31 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [readFailed,setReadFailed]=useState(false)
+  const poolAuthorized=!readFailed&&workSnapshot.workerId===profile.worker_id
+  const poolActive=workPoolUIEnabled&&poolAuthorized&&!settingsOpen&&section==='workPool'
+  useEffect(()=>{if(poolActive)setVisitedPoolWorker(session)},[poolActive,session])
+  useLayoutEffect(()=>{
+    claimContext.current={session,section,settingsOpen,readFailed,guideScope,poolAuthorized}
+    return()=>{claimContext.current=null}
+  },[session,section,settingsOpen,readFailed,guideScope,poolAuthorized])
   const readSequence=useRef(0)
   const refresh=async()=>{
     const sequence=++readSequence.current
     setLoading(true);setError('')
     try{
       const result=await getMyWorkV2()
-      if(sequence!==readSequence.current)return
-      setWorkSnapshot({workerId:profile.worker_id,data:scopeSelfWorkRows(result,profile.worker_id)})
+      if(sequence!==readSequence.current||claimSession.current!==session)return
+      const scoped=scopeSelfWorkRows(result,profile.worker_id)
+      setWorkSnapshot({workerId:profile.worker_id,data:scoped})
       setReadFailed(false)
+      return scoped
     }catch(e){
-      if(sequence!==readSequence.current)return
+      if(sequence!==readSequence.current||claimSession.current!==session)return
       // Never retain a visible old work list after a failed authorization refresh.
       setWorkSnapshot({workerId:profile.worker_id,data:{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]}})
       setReadFailed(true)
       setError(readableError(e))
-    }finally{if(sequence===readSequence.current)setLoading(false)}
+    }finally{if(sequence===readSequence.current&&claimSession.current===session)setLoading(false)}
   }
   useEffect(()=>{void refresh()},[profile.worker_id,refreshRevision])
   // Returning from Profile/Presence/History should get the latest canonical
@@ -2599,7 +2615,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     ['completed','انجام‌شده','کارهای تکمیل‌شده'],
   ]
   const focusHeading=focusOptions.find(item=>item[0]===taskView)
-  const inspectedTask=visible.find(t=>t.id===selectedTaskId)
+  const inspectedTask=!settingsOpen&&section==='tasks'?visible.find(t=>t.id===selectedTaskId):undefined
   const inspectedReport=inspectedTask
     ?records.filter(r=>r.task_id===inspectedTask.id).sort(
       (a,b)=>(b.work_date||'').localeCompare(a.work_date||''))[0]:null
@@ -2616,7 +2632,22 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     document.addEventListener('keydown',onKeyDown)
     return()=>document.removeEventListener('keydown',onKeyDown)
   },[inspectedTask?.id])
-  const sectionNames={tasks:'کارهای من',availability:'زمان حضور',workPool:'فرصت‌های کاری',
+  const handleConfirmedClaim=async taskId=>{
+    const current=()=>claimContext.current?.session===session?claimContext.current:null
+    if(!current()||typeof taskId!=='string'||!taskId)return
+    setClaimReceipt({session,taskId,found:null})
+    if(!current().poolAuthorized){setClaimReceipt({session,taskId,found:false});return}
+    const fresh=await refresh()
+    const context=current()
+    if(!context)return
+    const target=locateClaimedWorkerTask(fresh?.tasks,today(),taskId)
+    setClaimReceipt({session,taskId,found:Boolean(target)})
+    // Do not steal navigation from another section, settings or an active guide.
+    if(context.section!=='workPool'||context.settingsOpen||context.guideScope||!context.poolAuthorized||!target)return
+    setSelectedTaskId(taskId)
+    updateNavigation({section:'tasks',taskView:target})
+  }
+  const sectionNames={tasks:'کارهای من',availability:'زمان حضور',workPool:'کارهای من / فرصت‌های قابل انتخاب',
     history:'سوابق گزارش‌ها',profile:'حساب من'}
   // Offer only after authorized read; temporary dismissal is per tab session.
   // Existing legacy "seen" preferences are respected without re-prompting.
@@ -2662,13 +2693,13 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     completed:'هنوز کاری با وضعیت تکمیل‌شده ثبت نشده است.',
     calendar:'کاری برای این بازهٔ زمانی ثبت نشده است.',
   }
-  if(readFailed)return <div className="ow-workspace ow-worker-workspace ow-access-recheck" role="alert">
+  return <div className={`ow-workspace ow-worker-workspace ${readFailed?'ow-access-recheck':`ow-b3-layout ${sidebarCollapsed?'ow-b3-is-collapsed':''}`}`}>
+    {readFailed?<div role="alert">
     <p>برنامهٔ کاری در دسترس نیست. تا بررسی دوبارهٔ دسترسی، اطلاعات قبلی نمایش داده نمی‌شوند.</p>
     <div className="report-alert report-alert--error">{error}</div>
     <button type="button" className="report-btn report-btn--light" disabled={loading}
       onClick={()=>{void refresh()}}>تلاش مجدد برای دریافت اطلاعات</button>
-  </div>
-  return <div className={`ow-workspace ow-worker-workspace ow-b3-layout ${sidebarCollapsed?'ow-b3-is-collapsed':''}`}>
+  </div>:<>
     <a className="ow-b3-skip" href="#ow-b3-main">رفتن به محتوای اصلی</a>
     <aside className="ow-b3-sidebar" aria-label="ناوبری اصلی دانشجوکار">
       <div className="ow-b3-brand" title="پنل دانشجوکار · دانشکده علوم انسانی شهید رجایی بابل">
@@ -2707,7 +2738,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
             aria-haspopup="dialog"
             onClick={()=>{
               setGuideScope(null)
-              setGuideWelcomeOpen(false)
+              setGuideWelcomeWorkerId(null)
               setCharterInfoOpen(true)
             }}>
             <svg className="swtb-policy-action-icon" viewBox="0 0 24 24" fill="none"
@@ -2743,8 +2774,9 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           {!sidebarCollapsed&&' جمع‌کردن سایدبار'}
         </button>
       </div>
-    </aside>
-    <div className="ow-b3-stage" id="ow-b3-main" tabIndex={-1}>
+    </aside></>}
+    <div className="ow-b3-stage" id="ow-b3-main" tabIndex={-1} hidden={readFailed} inert={readFailed}>
+      {!readFailed&&<>
       <header className="ow-b3-toolbar">
         <span className="ow-b3-breadcrumb">فضای کاری <span aria-hidden="true">›</span>
           <strong>{settingsOpen?'تنظیمات حساب':sectionNames[section]}</strong></span>
@@ -2754,6 +2786,19 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       {settingsOpen&&settingsPanel}
       {loading&&<p className="ow-muted" role="status">در حال دریافت برنامه…</p>}
     {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
+    {!settingsOpen&&workPoolUIEnabled&&['tasks','workPool'].includes(section)&&<div className="ow-worker-workspace-switch" aria-label="فضای کار دانشجوکار">
+      <h1>کارهای من</h1>
+      <div className="ow-range-switch" role="group" aria-label="نمای فضای کاری">
+        {[['tasks','کارهای واگذارشده و انتخاب‌شده'],['workPool','فرصت‌های قابل انتخاب']].map(([id,title])=>
+          <button type="button" key={id} aria-current={section===id?'page':undefined} className={section===id?'is-selected':''}
+            onClick={()=>{setSelectedTaskId(null);updateNavigation({section:id})}}>{title}</button>)}
+      </div>
+      {section==='workPool'&&<p className="ow-muted">انتخاب فرصت داوطلبانه و وابسته به مجوز، ظرفیت و مهلت است؛ انتخاب به‌معنای ساعت تأییدشده نیست.</p>}
+    </div>}
+    {!settingsOpen&&claimReceipt?.session===session&&<div className="ops-alert-success" role="status">
+      انتخاب شما در سرور تأیید شد. {claimReceipt.found===false?'وظیفه در فهرست تازه مشاهده نشد؛ فهرست کارها را بازخوانی کنید.':'ثبت و تأیید زمان، مراحل جداگانه هستند.'}
+      <button type="button" className="ow-mini-btn" onClick={()=>setClaimReceipt(null)}>بستن پیام</button>
+    </div>}
     {!settingsOpen&&section==='tasks'&&<section className="report-panel ow-worker-task-workspace">
       {submissionReceipt?.workerId===profile.worker_id&&
         <div className="ow-worker-submission-receipt" role="status">
@@ -2768,7 +2813,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           </div>
         </div>}
       <div className="ow-worker-task-intro">
-        <div className="ow-worker-title-inline"><h1>کارهای من</h1>
+        <div className="ow-worker-title-inline">{workPoolUIEnabled?<h2>کارهای واگذارشده و انتخاب‌شده</h2>:<h1>کارهای من</h1>}
           <WorkerInfoHint label="راهنمای اولویت‌بندی کارها" text="دسته نیازمند اقدام، کارهای موعدرسیده و درخواست‌های نیازمند اصلاح را نشان می‌دهد. برای کارهای بعدی، دسته‌های دیگر یا فیلتر تاریخ را انتخاب کنید."/>
         </div>
         <div className="ow-b3-guide-heading">
@@ -2858,12 +2903,14 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         <p className="ow-muted">برای انجام یا اصلاح گزارش، از دکمهٔ همان ردیف استفاده کنید.</p>
       </aside>}
       </div>
-    </section>}
-    {!settingsOpen&&workPoolUIEnabled&&section==='workPool'&&<Suspense fallback={<p className="ow-muted" role="status">در حال آماده‌سازی فرصت‌های کاری…</p>}>
-      <WorkPoolWorkerPanel key={profile.worker_id} workerId={profile.worker_id}
-        onGuide={openWorkerGuide} refreshRevision={refreshRevision}
-        onClaimed={()=>{void refresh();updateNavigation({section:'tasks',taskView:'upcoming'})}}/>
-    </Suspense>}
+    </section>}</>}
+    {workPoolUIEnabled&&(poolActive||visitedPoolWorker===session)&&<div hidden={!poolActive} inert={!poolActive}>
+      <Suspense fallback={poolActive?<p className="ow-muted" role="status">در حال آماده‌سازی فرصت‌های کاری…</p>:null}>
+        <WorkPoolWorkerPanel key={profile.worker_id} workerId={profile.worker_id} active={poolActive} authorized={poolAuthorized}
+          onGuide={openWorkerGuide} refreshRevision={refreshRevision} onClaimed={handleConfirmedClaim}/>
+      </Suspense>
+    </div>}
+    {!readFailed&&<>
     {!settingsOpen&&section==='availability'&&<section className="report-panel ow-worker-availability-panel">
       <div className="ow-b3-guide-heading">
         <h2>برنامه حضور</h2>
@@ -2897,18 +2944,19 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}
       approvedMinutesTotal={data.approved_minutes_total} refreshRevision={refreshRevision}/>}
+    </>}
     </div>
-    {workerCharterInfoEnabled&&charterInfoOpen&&<Suspense
+    {!readFailed&&workerCharterInfoEnabled&&charterInfoOpen&&<Suspense
       fallback={<p role="status">در حال بارگذاری متن چارچوب همکاری…</p>}>
       <WorkerAgreementModalPreview open={charterInfoOpen} onClose={()=>{
         setCharterInfoOpen(false)
         requestAnimationFrame(()=>charterInfoTriggerRef.current?.focus({preventScroll:true}))
       }}/>
     </Suspense>}
-    {guideWelcomeWorkerId===profile.worker_id&&<WorkerGuideWelcome key={profile.worker_id}
+    {!readFailed&&guideWelcomeWorkerId===profile.worker_id&&<WorkerGuideWelcome key={profile.worker_id}
       onBegin={disable=>{if(!applyGuideAutoPreference(disable))return false;openWorkerGuide('all');return true}}
       onSkip={disable=>{if(!applyGuideAutoPreference(disable))return false;setGuideWelcomeWorkerId(null);return true}}/>}
-    {guideScope&&<WorkerGuideSpotlight key={guideScope} scope={guideScope}
+    {!readFailed&&guideScope&&<WorkerGuideSpotlight key={guideScope} scope={guideScope}
       currentSection={section}
       onNavigate={next=>updateNavigation({section:next})}
       includeWorkPool={workPoolUIEnabled} onClose={closeWorkerGuide}/>}
