@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {buildDirectAssignmentPayload,validateDirectAssignmentReceipt,createDirectAssignmentSession} from '../src/lib/directAssignmentSession.mjs'
+import {buildDirectAssignmentPayload,validateDirectAssignmentReceipt,createDirectAssignmentSession,fixtureVerifiedRollback} from '../src/lib/directAssignmentSession.mjs'
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0')
 const A=id(1),B=id(2),W=id(10),X=id(11),K=id(100),T=id(200)
 const draft={kind:'direct',workerIds:[W],unit:'library',title:' QA title ',instructions:'شرح آزمایشی',date:'2026-12-01',minutes:60,startMinute:null,endMinute:null,reason:null}
@@ -112,4 +112,25 @@ test('read started before recheck cannot enable replay even after same actor rev
  s.setAccess({status:'checking'});s.setAccess({status:'verified',actorId:A})
  d.resolve({found:false});assert.equal(await reading,'unknown')
  assert.equal(s.snapshot().retryReady,false);assert.equal(await s.retry(),'blocked');assert.equal(calls.length,1)
+})
+
+test('trusted synthetic first-attempt rejection preserves draft and permits explicit revision',async()=>{
+ const keys=[K,id(101)]
+ const {s,calls}=fixture(async p=>calls.length===1?fixtureVerifiedRollback('worker_not_eligible_for_term'):direct(p),undefined,()=>keys.shift())
+ assert.equal(await s.submit(draft),'rejected')
+ assert.equal(s.snapshot().rejectionCode,'worker_not_eligible_for_term')
+ assert.equal(s.acknowledge(),false);assert.equal(await s.retry(),'blocked');assert.equal(await s.submit(draft),'blocked')
+ const original=s.reviseRejected();assert.equal(original.p_instructions,draft.instructions);assert.equal(s.snapshot().state,'idle')
+ assert.equal(await s.submit({...draft,title:'Revised task'}),'confirmed')
+ assert.ok(calls[0].p_request_id!==calls[1].p_request_id)
+})
+test('raw error shape, thrown proof and unrecognized code cannot prove rollback',async()=>{
+ for(const write of [async()=>({code:'worker_not_active',status:400}),async()=>{throw fixtureVerifiedRollback('worker_not_active')},async()=>fixtureVerifiedRollback('not_a_verified_code')]){
+  const {s}=fixture(write);assert.equal(await s.submit(draft),'unknown');assert.equal(s.reviseRejected(),null)
+ }
+})
+test('replay rejection stays unknown because prior commit may exist',async()=>{
+ let n=0
+ const {s,calls}=fixture(async()=>{if(++n===1)throw Error('network');return fixtureVerifiedRollback('worker_not_active')})
+ await s.submit(draft);await s.reconcile();assert.equal(await s.retry(),'unknown');assert.equal(s.snapshot().retryReady,false);assert.equal(s.reviseRejected(),null);assert.equal(calls.length,2)
 })

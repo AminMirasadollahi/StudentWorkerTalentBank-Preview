@@ -41,10 +41,18 @@ export function validateDirectAssignmentReceipt(raw,p){
  }
  return Object.freeze({ok:true,request_id:raw.request_id,kind:raw.kind,result:Object.freeze(result)})
 }
-// No arbitrary thrown errors or HTTP status alone can prove a rollback.
-// Only a future audited adapter may return an explicit, authenticated,
-// first-attempt server rollback proof. This core intentionally treats ALL
-// failures as unknown until that separate classification is implemented.
+// Synthetic adapter boundary ONLY. Never brand an arbitrary SDK error,
+// HTTP response/status or server text as proof. No real transport is wired.
+// A future audited production adapter must establish the provenance of
+// exactly one attempted transaction before it may produce this outcome.
+const rollbackEvidence=new WeakMap()
+const rejectionCodes=new Set(['invalid_assignment','invalid_unit','worker_not_active','worker_not_eligible_for_term','task_term_not_active','short_notice_reason_required','library_desk_capacity_exceeded','library_desk_worker_overlap','library_desk_shift_already_started','invalid_library_desk_interval','invalid_group_members'])
+export function fixtureVerifiedRollback(code){
+ if(!rejectionCodes.has(code))throw Error('UNRECOGNIZED_FIXTURE_ROLLBACK')
+ const proof=Object.freeze({})
+ rollbackEvidence.set(proof,code)
+ return proof
+}
 export function createDirectAssignmentSession({write,read,makeId}){
  if(typeof write!=='function'||typeof read!=='function'||typeof makeId!=='function')throw Error('INVALID_SESSION_DEPENDENCIES')
  let actor=null,access='denied',generation=0,accessEpoch=0,pending=null,used=new Set(),disposed=false
@@ -53,7 +61,7 @@ export function createDirectAssignmentSession({write,read,makeId}){
  const snapshot=()=>{
   if(!allowed())return Object.freeze({state:access==='checking'?'checking':'unavailable'})
   if(!pending)return Object.freeze({state:'idle'})
-  return Object.freeze({state:pending.state,requestId:pending.payload.p_request_id,payload:pending.payload,receipt:pending.receipt??null,retryReady:pending.state==='unknown'&&pending.retryReady===true})
+  return Object.freeze({state:pending.state,requestId:pending.payload.p_request_id,payload:pending.payload,receipt:pending.receipt??null,rejectionCode:pending.state==='rejected'?pending.rejectionCode:null,retryReady:pending.state==='unknown'&&pending.retryReady===true})
  }
  const setAccess=next=>{
   if(disposed)return
@@ -70,10 +78,13 @@ export function createDirectAssignmentSession({write,read,makeId}){
  const result=(g,p)=>current(g,p)?(allowed()?p.state:'hidden'):'stale'
  async function send(p){
   const g=generation
-  p.state='sending';p.retryReady=false
+  p.state='sending';p.retryReady=false;p.attempts++
   try{
    const raw=await write(p.payload)
    if(!current(g,p))return 'stale'
+   const rejection=object(raw)?rollbackEvidence.get(raw):undefined
+   if(rejection&&p.attempts===1){p.rejectionCode=rejection;p.receipt=null;p.state='rejected';return result(g,p)}
+   // A rejection on replay cannot establish that the earlier attempt failed.
    const confirmed=validateDirectAssignmentReceipt(raw,p.payload)
    p.receipt=confirmed
    p.state=confirmed?'confirmed':'unknown'
@@ -92,7 +103,7 @@ export function createDirectAssignmentSession({write,read,makeId}){
    if(used.has(payload.p_request_id))return 'invalid'
   }catch{return 'invalid'}
   used.add(payload.p_request_id)
-  const p={payload,state:'sending',receipt:null,retryReady:false}
+  const p={payload,state:'sending',receipt:null,retryReady:false,attempts:0,rejectionCode:null}
   pending=p
   return send(p)
  }
@@ -122,6 +133,12 @@ export function createDirectAssignmentSession({write,read,makeId}){
   if(!allowed()||pending?.state!=='confirmed')return false
   pending=null;return true
  }
+ const reviseRejected=()=>{
+  if(!allowed()||pending?.state!=='rejected')return null
+  const payload=pending.payload
+  pending=null
+  return payload
+ }
  const dispose=()=>{clear();disposed=true}
- return Object.freeze({snapshot,setAccess,submit,reconcile,retry,acknowledge,dispose})
+ return Object.freeze({snapshot,setAccess,submit,reconcile,retry,acknowledge,reviseRejected,dispose})
 }
