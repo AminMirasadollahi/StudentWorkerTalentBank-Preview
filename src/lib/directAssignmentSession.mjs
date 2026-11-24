@@ -47,8 +47,8 @@ export function validateDirectAssignmentReceipt(raw,p){
 // failures as unknown until that separate classification is implemented.
 export function createDirectAssignmentSession({write,read,makeId}){
  if(typeof write!=='function'||typeof read!=='function'||typeof makeId!=='function')throw Error('INVALID_SESSION_DEPENDENCIES')
- let actor=null,access='denied',generation=0,pending=null,used=new Set(),disposed=false
- const clear=()=>{generation++;pending=null;used=new Set();actor=null;access='denied'}
+ let actor=null,access='denied',generation=0,accessEpoch=0,pending=null,used=new Set(),disposed=false
+ const clear=()=>{generation++;accessEpoch++;pending=null;used=new Set();actor=null;access='denied'}
  const allowed=()=>!disposed&&access==='verified'&&actor!==null
  const snapshot=()=>{
   if(!allowed())return Object.freeze({state:access==='checking'?'checking':'unavailable'})
@@ -58,7 +58,7 @@ export function createDirectAssignmentSession({write,read,makeId}){
  const setAccess=next=>{
   if(disposed)return
   if(next?.status==='checking'){
-   if(actor){access='checking';if(pending)pending.retryReady=false}
+   if(actor){accessEpoch++;access='checking';if(pending)pending.retryReady=false}
    return
   }
   if(next?.status!=='verified'||!uuid(next.actorId)){clear();return}
@@ -98,7 +98,7 @@ export function createDirectAssignmentSession({write,read,makeId}){
  }
  async function reconcile(){
   if(!allowed()||pending?.state!=='unknown')return 'blocked'
-  const p=pending,g=generation
+  const p=pending,g=generation,epoch=accessEpoch
   p.state='checking_receipt';p.retryReady=false
   try{
    const r=await read(p.payload.p_request_id)
@@ -107,7 +107,7 @@ export function createDirectAssignmentSession({write,read,makeId}){
    p.receipt=receipt;p.state=receipt?'confirmed':'unknown'
    // A missing read is NOT proof of rollback. It permits only explicit
    // identical-key replay, not a new UUID or changed draft.
-   p.retryReady=!receipt&&allowed()&&object(r)&&r.found===false&&!Object.hasOwn(r,'receipt')
+   p.retryReady=!receipt&&allowed()&&accessEpoch===epoch&&object(r)&&r.found===false&&!Object.hasOwn(r,'receipt')
   }catch{
    if(!current(g,p))return 'stale'
    p.state='unknown';p.receipt=null;p.retryReady=false

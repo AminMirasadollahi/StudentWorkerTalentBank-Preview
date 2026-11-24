@@ -105,3 +105,11 @@ test('new instance does not recover browser reload or use storage automatically'
  const f=fixture(async()=>{throw Error('timeout')});await f.s.submit(draft)
  const fresh=fixture();assert.deepEqual(fresh.s.snapshot(),{state:'idle'});assert.equal(fresh.calls.length,0)
 })
+
+test('read started before recheck cannot enable replay even after same actor reverified',async()=>{
+ const d=deferred(),{s,calls}=fixture(async()=>{throw Error('timeout')},()=>d.promise)
+ await s.submit(draft);const reading=s.reconcile()
+ s.setAccess({status:'checking'});s.setAccess({status:'verified',actorId:A})
+ d.resolve({found:false});assert.equal(await reading,'unknown')
+ assert.equal(s.snapshot().retryReady,false);assert.equal(await s.retry(),'blocked');assert.equal(calls.length,1)
+})
