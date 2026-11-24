@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState} from 'react'
 import {projectDayPresence} from '../lib/presenceDayProjection.mjs'
 import FocusedReviewQueue from './FocusedReviewQueue.jsx'
-import {managerReviewItems} from '../lib/managerReviewRows.mjs'
+import {managerReviewItems,EMPTY_MANAGER_INBOX_FILTERS,filterManagerInbox,managerReviewSubmissionDay} from '../lib/managerReviewRows.mjs'
+import JalaliDatePicker from './JalaliDatePicker.jsx'
 import {
   listPresenceChanges,cancelPresenceChange,reviewPresenceChange,
 } from '../lib/presenceChangesApi.js'
@@ -106,14 +107,16 @@ export function WorkerPresenceRequests({workerId,revision=0,onEffectiveChange}) 
 }
 
 export function ManagerPresenceReviewQueue({workers=[],tasks=[],data=null,otherItems=[],
- renderOtherReview=()=>null,onCreateTask,revision=0,onEffectiveChange}) {
+ renderOtherReview=()=>null,onCreateTask,revision=0,onEffectiveChange,filters,onFiltersChange}) {
  const [items,setItems]=useState([])
  const [loading,setLoading]=useState(true)
  const [error,setError]=useState('')
  const [busyId,setBusyId]=useState('')
  const [notes,setNotes]=useState({})
  const [retrospective,setRetrospective]=useState({})
- const [kindFilter,setKindFilter]=useState('all')
+ const [localFilters,setLocalFilters]=useState(EMPTY_MANAGER_INBOX_FILTERS)
+ const chosenFilters=filters??localFilters
+ const changeFilters=patch=>(onFiltersChange??setLocalFilters)(previous=>({...previous,...patch}))
  const seq=useRef(0)
  const reload=async()=>{
    const v=++seq.current
@@ -170,7 +173,16 @@ export function ManagerPresenceReviewQueue({workers=[],tasks=[],data=null,otherI
  // A presence RPC failure must not block independently authorized time or
  // profile reviews. Never present the partial list as the complete count.
  const allItems=error?otherItems:[...otherItems,...presenceProjection]
- const visibleItems=kindFilter==='all'?allItems:allItems.filter(item=>item.kind===kindFilter)
+ const visibleItems=filterManagerInbox(allItems,chosenFilters)
+ const badRange=Boolean(chosenFilters.from&&chosenFilters.to&&chosenFilters.from>chosenFilters.to)
+ const unitLabels={library:'کتابخانه',public_relations:'روابط عمومی',research:'پژوهش',
+  unknown:'واحد نامشخص',not_applicable:'بدون واحد فعالیت (حضور / مشخصات)'}
+ const workerOptions=new Map(workers.map(w=>[w.id,w.name]))
+ for(const item of allItems)if(item.workerId&&!workerOptions.has(item.workerId))workerOptions.set(item.workerId,'دانشجوکار با نام نامشخص')
+ const unitOptions=[...new Set(allItems.map(item=>item.activityUnit).filter(Boolean))]
+ const displayedUnitOptions=[...new Set([...unitOptions,...(chosenFilters.unit?[chosenFilters.unit]:[])])]
+ const refreshAll=()=>{if(onEffectiveChange)void onEffectiveChange();else void reload().catch(()=>{})}
+ const missingSubmissionDates=allItems.filter(item=>!managerReviewSubmissionDay(item)).length
  const renderPresenceRequest=record=>{
    const item=record.request
    const worker=workers.find(w=>w.id===item.worker_id)
@@ -221,7 +233,7 @@ export function ManagerPresenceReviewQueue({workers=[],tasks=[],data=null,otherI
        new Intl.NumberFormat('fa-IR').format(otherItems.filter(x=>x.kind==='profile').length)+' اصلاح مشخصات'}
      </small>
      <button type="button" className="report-btn report-btn--light"
-       disabled={loading||!!busyId} onClick={()=>{void reload().catch(()=>{})}}>بازخوانی صف</button>
+       disabled={loading||!!busyId} onClick={refreshAll}>بازخوانی کل کارتابل</button>
      {onCreateTask&&<button type="button" className="report-btn report-btn--light"
        onClick={onCreateTask}>+ واگذاری کار جدید</button>}
    </div>
@@ -234,18 +246,52 @@ export function ManagerPresenceReviewQueue({workers=[],tasks=[],data=null,otherI
       فهرست حضور تا بازخوانی موفق نمایش داده نمی‌شود. {error}
    </div>}
    {!loading&&<>
-     <label className="report-field swtb19-review-kind-filter">
-       <span>نوع درخواست</span>
-       <select value={kindFilter} aria-label="فیلتر نوع درخواست کارتابل"
-         onChange={e=>setKindFilter(e.target.value)}>
-         <option value="all">همه درخواست‌ها</option>
-         <option value="time">گزارش ساعت و زمان اضافه</option>
-         <option value="profile">اصلاح مشخصات</option>
-         <option value="presence">تغییر برنامه حضور</option>
+     <div className="swtb20-inbox-filters" aria-label="فیلترهای کارتابل">
+      <label className="report-field"><span>نوع درخواست</span>
+       <select value={chosenFilters.kind} aria-label="فیلتر نوع درخواست کارتابل"
+        onChange={e=>changeFilters({kind:e.target.value})}>
+        <option value="all">همه درخواست‌ها</option>
+        <option value="time">گزارش ساعت و زمان اضافه</option>
+        <option value="profile">اصلاح مشخصات</option>
+        <option value="presence">تغییر برنامه حضور</option>
        </select>
-     </label>
+      </label>
+      <label className="report-field"><span>دانشجوکار</span>
+       <select aria-label="فیلتر دانشجوکار کارتابل" value={chosenFilters.workerId}
+        onChange={e=>changeFilters({workerId:e.target.value})}>
+        <option value="">همه دانشجوکاران</option>
+        {chosenFilters.workerId&&!workerOptions.has(chosenFilters.workerId)&&<option value={chosenFilters.workerId}>دانشجوکار انتخاب‌شده (در فهرست فعلی نیست)</option>}
+        {[...workerOptions].map(([id,name])=><option key={id} value={id}>{name||'نام نامشخص'}</option>)}
+       </select>
+      </label>
+      <label className="report-field"><span>واحد فعالیت</span>
+       <select aria-label="فیلتر واحد فعالیت کارتابل" value={chosenFilters.unit}
+        onChange={e=>changeFilters({unit:e.target.value})}>
+        <option value="">همه واحدها و درخواست‌های بدون واحد</option>
+        {displayedUnitOptions.map(unit=><option key={unit} value={unit}>{unitLabels[unit]||'واحد نامشخص'}</option>)}
+       </select>
+      </label>
+      <div className="report-field"><span>از تاریخ ارسال</span>
+       <JalaliDatePicker value={chosenFilters.from} onChange={value=>changeFilters({from:value})} ariaLabel="از تاریخ ارسال درخواست"/>
+      </div>
+      <div className="report-field"><span>تا تاریخ ارسال</span>
+       <JalaliDatePicker value={chosenFilters.to} onChange={value=>changeFilters({to:value})} ariaLabel="تا تاریخ ارسال درخواست"/>
+      </div>
+      <label className="report-field"><span>ترتیب رسیدگی</span>
+       <select aria-label="ترتیب درخواست‌های کارتابل" value={chosenFilters.order} onChange={e=>changeFilters({order:e.target.value})}>
+        <option value="oldest">قدیمی‌ترین ارسال ابتدا</option>
+        <option value="newest">جدیدترین ارسال ابتدا</option>
+       </select>
+      </label>
+      <button type="button" className="report-btn report-btn--light" onClick={()=>changeFilters(EMPTY_MANAGER_INBOX_FILTERS)}>پاک‌کردن فیلترها</button>
+     </div>
+     {badRange&&<p role="alert" className="ow-warning">تاریخ آغاز نباید بعد از تاریخ پایان باشد.</p>}
+     <p className="ow-muted" role="status">{new Intl.NumberFormat('fa-IR').format(visibleItems.length)} از {new Intl.NumberFormat('fa-IR').format(allItems.length)} درخواست قابل دسترس
+       {error?' (شمار ناقص)':''}
+     </p>
+     {(chosenFilters.from||chosenFilters.to)&&missingSubmissionDates>0&&<p className="ow-muted" role="status">درخواست‌های بدون تاریخ ارسال معتبر در فیلتر تاریخ قرار نمی‌گیرند.</p>}
      <FocusedReviewQueue items={visibleItems} label="درخواست‌های نیازمند تصمیم مدیر"
-       emptyText={error?'درخواست‌های حضور هنوز بارگذاری نشده‌اند؛ در فهرست‌های قابل دسترس موردی مطابق فیلتر نیست.':
+       emptyText={badRange?'بازه تاریخ معتبر نیست.':error?'درخواست‌های حضور هنوز بارگذاری نشده‌اند؛ در فهرست‌های قابل دسترس موردی مطابق فیلتر نیست.':
          allItems.length===0?'هیچ درخواستی منتظر رسیدگی نیست.':'درخواستی مطابق فیلتر انتخاب‌شده وجود ندارد.'}
        renderReview={item=>item.kind==='presence'
          ?renderPresenceRequest(item):renderOtherReview(item)}/>

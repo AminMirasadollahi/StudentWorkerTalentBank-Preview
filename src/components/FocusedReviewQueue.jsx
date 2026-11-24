@@ -21,8 +21,9 @@ export default function FocusedReviewQueue({
    // an unmounted form or auto-select the next potentially sensitive case.
    directoryHeading.current?.focus?.({preventScroll:true})
   }
+  if(!selected&&selectedKey)setSelectedKey('')
   lastKey.current=selected?.key||''
- },[selected?.key])
+ },[selected?.key,selectedKey])
  return <div className="swtb22-review-workspace" aria-label={label}>
   <div className="swtb22-review-directory" role="region" aria-label={label+' ـ فهرست'}>
    <div className="swtb22-review-directory-heading">

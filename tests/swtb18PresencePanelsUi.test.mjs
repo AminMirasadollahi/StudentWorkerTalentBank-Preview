@@ -168,6 +168,8 @@ test('manager sees a single canonical list for time, profile and presence with t
   assert.equal(ui.host.querySelectorAll('.swtb22-review-row').length,1)
   assert.match(ui.host.querySelector('.swtb22-review-row').textContent,/گزارش ساختگی ساعت/)
   assert.equal(ui.host.querySelectorAll('.swtb19-presence-review-detail').length,0)
+  await act(async()=>{select.value='presence';select.dispatchEvent(new window.Event('change',{bubbles:true}))})
+  assert.equal(ui.host.querySelectorAll('.swtb19-presence-review-detail').length,0,'filtered-out detail must not reopen automatically')
  }finally{await ui.unmount()}
 })
 test('failed presence read leaves authorized time review available with incomplete-total warning',async()=>{
@@ -183,6 +185,36 @@ test('failed presence read leaves authorized time review available with incomple
    'independently scoped time reviews remain usable')
   assert.match(ui.host.querySelector('.swtb22-review-row').textContent,/PARTIAL_PRIVATE_ROW/)
   assert.doesNotMatch(ui.host.textContent,/Synthetic change of attendance/)
+  assert.equal(globalThis.__swtb18qa.reviewCalls.length,0)
+ }finally{await ui.unmount()}
+})
+
+test('unified inbox filters worker and activity unit, reset filters, and refresh all sources via parent',async()=>{
+ fake('manager')
+ let refreshed=0
+ const otherItems=[
+  {key:'time:1',kind:'time',title:'گزارش الف',subtitle:'',badge:'گزارش',workerId:'FAKE-WORKER',activityUnit:'library',submittedAt:'2026-11-20T10:00:00Z'},
+  {key:'profile:2',kind:'profile',title:'اصلاح ب',subtitle:'',badge:'اصلاح',workerId:'B',activityUnit:'not_applicable',submittedAt:'2026-11-19T10:00:00Z'},
+ ]
+ const ui=await mount(ManagerPresenceReviewQueue,{
+  workers:[{id:'FAKE-WORKER',name:'الف'},{id:'B',name:'ب'}],otherItems,
+  onEffectiveChange:async()=>{refreshed++;return true},
+ })
+ const choose=async(label,value)=>{const input=ui.host.querySelector('[aria-label="'+label+'"]');assert.ok(input);await act(async()=>{input.value=value;input.dispatchEvent(new window.Event('change',{bubbles:true}))})}
+ const rows=()=>[...ui.host.querySelectorAll('.swtb22-review-row')]
+ try{
+  assert.equal(rows().length,3)
+  await choose('فیلتر دانشجوکار کارتابل','FAKE-WORKER')
+  assert.equal(rows().length,2)
+  await choose('فیلتر واحد فعالیت کارتابل','library')
+  assert.equal(rows().length,1)
+  assert.match(rows()[0].textContent,/گزارش الف/)
+  const reset=[...ui.host.querySelectorAll('button')].find(x=>x.textContent==='پاک‌کردن فیلترها')
+  await act(async()=>reset.click())
+  assert.equal(rows().length,3)
+  const refresh=[...ui.host.querySelectorAll('button')].find(x=>x.textContent==='بازخوانی کل کارتابل')
+  await act(async()=>refresh.click())
+  assert.equal(refreshed,1)
   assert.equal(globalThis.__swtb18qa.reviewCalls.length,0)
  }finally{await ui.unmount()}
 })

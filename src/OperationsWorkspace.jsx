@@ -36,7 +36,7 @@ import FocusedReviewQueue from './components/FocusedReviewQueue'
 import ManagerHistoryExplorer from './components/ManagerHistoryExplorer'
 import {managerHistoryProjection,managerHistoryExportMetadata} from './lib/managerHistoryExport.mjs'
 import {buildManagerHistoryWorkbook} from './lib/managerHistoryWorkbook.mjs'
-import {managerReviewItems} from './lib/managerReviewRows.mjs'
+import {managerReviewItems,EMPTY_MANAGER_INBOX_FILTERS} from './lib/managerReviewRows.mjs'
 import {buildOriginalWorkerNameIndex,selectManagerWorkerProfiles} from './lib/managerWorkerProfileSearch.mjs'
 // Load the optional manager surface ONLY after backend rollout explicitly enables it.
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
@@ -1235,6 +1235,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const [readFailed,setReadFailed]=useState(false)
   const readSequence=useRef(0)
   const [notice,setNotice]=useState('')
+  const [inboxFilters,setInboxFilters]=useState(EMPTY_MANAGER_INBOX_FILTERS)
   const [historyShown,setHistoryShown]=useState(100)
   const [historyUnreportedShown,setHistoryUnreportedShown]=useState(50)
   const [historyLifetimeOpen,setHistoryLifetimeOpen]=useState(false)
@@ -1402,7 +1403,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     </Suspense>}
     {view==='inbox'&&presenceApprovalUIEnabled&&!loading&&!readFailed&&<ManagerPresenceReviewQueue
       workers={workers} tasks={data.tasks||[]} data={data} revision={refreshRevision}
-      otherItems={inboxReviewItems}
+      otherItems={inboxReviewItems} filters={inboxFilters} onFiltersChange={setInboxFilters}
       renderOtherReview={item=>item.kind==='profile'
         ?<ProfileChangeReview key={item.key} request={item.request}
           worker={item.worker} onDone={refresh}/>
