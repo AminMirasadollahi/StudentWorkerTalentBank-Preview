@@ -121,3 +121,37 @@ test('flagged-off navigation never mounts hidden work pool or term membership bu
   assert.ok(route(ui.host,'approvals'))
  }finally{await ui.cleanup()}
 })
+
+test('canonical work hub maps both internal routes to one sidebar destination',()=>{
+ const flags={workHubFixture:true}
+ assert.equal(flatten(flags).length,10)
+ assert.ok(!flatten(flags).some(x=>x.id==='workPool'))
+ for(const workView of ['tasks','workPool']){
+  const n={...initial(),section:'work',workView}
+  const item=currentManagerDestination(n,flags)
+  assert.equal(item.id,'tasks');assert.equal(item.label,'مدیریت کارها')
+  assert.equal(nextManagerNavigation(n,item).workView,workView)
+ }
+ const disabled={workHubFixture:true,workPoolEnabled:false}
+ assert.equal(currentManagerDestination({...initial(),section:'work',workView:'tasks'},disabled).label,'کارها و واگذاری')
+ assert.equal(currentManagerDestination({...initial(),section:'work',workView:'workPool'},disabled).id,'inbox')
+})
+test('hub entry retains existing internal context; explicit tasks shortcut still goes to direct assignments',()=>{
+ const previous={...initial(),workView:'workPool',workPoolKind:'desk'}
+ const item=flatten({workHubFixture:true}).find(x=>x.id==='tasks')
+ const opened=nextManagerNavigation(previous,item)
+ assert.equal(opened.workView,'workPool');assert.equal(opened.workPoolKind,'desk');assert.equal(opened.taskSearch,previous.taskSearch)
+ const direct=nextManagerNavigation(opened,{section:'work',view:'tasks'})
+ assert.equal(direct.workView,'tasks');assert.equal(direct.workPoolKind,'desk')
+ assert.equal(nextManagerNavigation({...previous,workView:'history'},item).workView,'tasks')
+})
+test('fixture sidebar hides duplicate opportunity route and uses a single current parent',async()=>{
+ const ui=await mount({workHubFixture:true})
+ try{
+  assert.equal(route(ui.host,'workPool'),null)
+  await act(async()=>route(ui.host,'tasks').click())
+  assert.equal(route(ui.host,'tasks').textContent.trim(),'مدیریت کارها')
+  assert.equal(ui.host.querySelectorAll('[aria-current="page"]').length,1)
+  assert.equal(route(ui.host,'tasks').getAttribute('aria-current'),'page')
+ }finally{await ui.cleanup()}
+})

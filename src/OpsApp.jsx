@@ -17,6 +17,8 @@ import { watchOperationsResume } from './lib/operationsResume.mjs'
 import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
 import ManagerWorkspaceNav from './components/ManagerWorkspaceNav'
+import ManagerWorkHubTabs from './components/ManagerWorkHubTabs'
+import {createWorkPoolRouteFence} from './lib/workPoolRouteFence.mjs'
 import ManagerCandidatesWorkspace from './components/ManagerCandidatesWorkspace'
 import {candidateOnboardingLabel,candidateAuthSignInLabel,candidateDisplayName,candidateDisplayMajor} from './lib/managerCandidateView.mjs'
 import {fetchCandidatesWithAuthorizedWorkerIdentity} from './lib/managerCandidateWorkerOverlay.mjs'
@@ -563,7 +565,23 @@ function CandidateCard({
   )
 }
 
-function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 }) {
+function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refreshRevision = 0, workHubFixture=false }) {
+  const [fence]=useState(createWorkPoolRouteFence)
+  const [routeNotice,setRouteNotice]=useState('')
+  const routeFence=managerShellEnabled&&workHubFixture===true&&managerNavFlags.workPoolEnabled?fence:null
+  const setNavigation=change=>{
+   if(!routeFence){commitNavigation(change);return}
+   const next=typeof change==='function'?change(navigation):change
+   if(!routeFence.permitsNavigation(navigation,next)){
+    setRouteNotice('ابتدا نتیجه درخواست فرصت کاری را تعیین‌تکلیف کنید؛ جابه‌جایی فعلاً ممکن نیست.')
+    return
+   }
+   setRouteNotice('')
+   commitNavigation(prev=>{
+    const candidate=typeof change==='function'?change(prev):change
+    return routeFence.permitsNavigation(prev,candidate)?candidate:prev
+   })
+  }
   const [rows, setRows] = useState([])
   const [busyId, setBusyId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -716,14 +734,15 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   const activeCount = rows.filter(row => Boolean(row.worker_id)).length
   const readyCount = rows.filter(row => !row.worker_id
     && row.interview_status === 'approved' && row.clearance_status === 'cleared').length
-  const currentDestination=currentManagerDestination(navigation,managerNavFlags)
+  const navFlags={...managerNavFlags,workHubFixture:managerShellEnabled&&workHubFixture===true}
+  const currentDestination=currentManagerDestination(navigation,navFlags)
   const navigateManager=item=>setNavigation(previous=>nextManagerNavigation(previous,item))
 
   return (
     <main className={'report-shell report-shell--dashboard ops-root'+
       (managerShellEnabled?' swtb22-manager-enabled':'')} dir="rtl">
       {managerShellEnabled&&<ManagerWorkspaceNav navigation={navigation}
-       onNavigate={navigateManager} {...managerNavFlags}/>}
+       onNavigate={navigateManager} {...navFlags}/>}
       <div className={managerShellEnabled?'swtb22-manager-main':undefined}>
       <header className="report-header">
         <div>
@@ -816,9 +835,11 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
          <button type="button" onClick={()=>navigateManager({section:'work',view:'availability'})}>برنامه حضور</button>
         </div>
        </section>}
+      {routeFence&&routeNotice&&<p role="alert" className="report-alert report-alert--error">{routeNotice}</p>}
+      <ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>
       {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation}
         refreshRevision={refreshRevision + manualWorkRevision}
-        hideSectionTabs={managerShellEnabled} loadOriginalCandidates={getOperationsCandidates} />}
+        hideSectionTabs={managerShellEnabled} loadOriginalCandidates={getOperationsCandidates} workPoolRouteFence={routeFence} />}
       {issuedCredentials && (
         <div className="ops-modal" role="dialog" aria-modal="true" aria-labelledby="ops-credentials-title">
           <div className="ops-modal__card">
@@ -863,7 +884,8 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   )
 }
 
-export default function OpsApp({ mode = 'admin' }) {
+// Explicit synthetic preview seam. main.jsx never supplies this prop.
+export default function OpsApp({ mode = 'admin', workHubFixture=false }) {
   // This does NOT trust a cached session for authorization. When the fresh
   // server identity check returns no user but a local Supabase session still
   // exists, we cannot distinguish temporary network failure from revoked
@@ -1116,7 +1138,7 @@ export default function OpsApp({ mode = 'admin' }) {
   const authorizedView = identity.role === 'admin'
     ? <AdminView key={'admin:' + identity.user?.id}
         onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
-        refreshRevision={dataRefreshRevision}/>
+        refreshRevision={dataRefreshRevision} workHubFixture={workHubFixture}/>
     : identity.role === 'worker_disabled'
       ? <WorkerDisabledView key={'disabled:' + identity.user?.id + ':' + identity.profile?.state}
           profile={identity.profile} onLogout={logout}/>
