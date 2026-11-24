@@ -7,7 +7,7 @@ const dayName=date=>date?dayFa.format(new Date(date+'T12:00:00Z')):'—'
 const timeName=min=>String(Math.floor(min/60)).padStart(2,'0')+':'+String(min%60).padStart(2,'0')
 
 export default function DeskWorkPoolWorkerSection({
- workerId,refreshRevision=0,onClaimed,active=true,
+ workerId,refreshRevision=0,onClaimed,active=true,authorized=true,
 }){
  const [snapshot,setSnapshot]=useState({status:'loading',offers:[]})
  const [busy,setBusy]=useState(false)
@@ -22,8 +22,17 @@ export default function DeskWorkPoolWorkerSection({
  if(requestKeys.current.workerId!==workerId){
   requestKeys.current={workerId,ids:new Map()}
  }
+ const authorizedRef=useRef(authorized)
+ useLayoutEffect(()=>{
+  authorizedRef.current=authorized
+  if(!authorized){
+   seq.current+=1
+   setSnapshot({status:'loading',offers:[]})
+   setRetryReady(false)
+  }
+ },[authorized])
  const read=useCallback(async()=>{
-  if(!alive.current)return false
+  if(!alive.current||!authorizedRef.current)return false
   const i=++seq.current
   setSnapshot({status:'loading',offers:[]})
   try{
@@ -54,9 +63,9 @@ export default function DeskWorkPoolWorkerSection({
   }
  },[])
  useEffect(()=>{
-  if(active)void read()
+  if(active&&authorized)void read()
   return ()=>{seq.current+=1}
- },[read,workerId,refreshRevision,active])
+ },[read,workerId,refreshRevision,active,authorized])
  useEffect(()=>{
   // An unresolved receipt belongs only to the worker who initiated it.
   setUncertainId('');setRetryReady(false);setNotice('')
@@ -81,7 +90,7 @@ export default function DeskWorkPoolWorkerSection({
   }
  }
  const claim=async o=>{
-  if(!active||!alive.current||pending.current||snapshot.status!=='ready'||o.claimable!==true
+  if(!active||!authorizedRef.current||!alive.current||pending.current||snapshot.status!=='ready'||o.claimable!==true
    ||o.my_task_id||uncertainId&&(uncertainId!==o.id||!retryReady))return
   if(!globalThis.crypto?.randomUUID){
    setNotice('تولید شناسه امن درخواست در مرورگر ممکن نیست؛ هیچ رزروی ارسال نشد.')
@@ -132,6 +141,7 @@ export default function DeskWorkPoolWorkerSection({
    setBusy(false)
   }
  }
+ if(!authorized)return null
  return <section className="ow-desk-pool-block" aria-label="نوبت‌های کتابخانه برای انتخاب">
   <div className="ow-desk-pool-heading">
    <div><h3>نوبت‌های میز کتابخانه</h3>
