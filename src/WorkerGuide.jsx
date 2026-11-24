@@ -26,29 +26,37 @@ const safeRect=(rect,vw,vh)=>({
 export function WorkerGuideWelcome({onBegin,onSkip}){
  const modal=useRef(null)
  const [dontShowAgain,setDontShowAgain]=useState(false)
+ const [preferenceError,setPreferenceError]=useState(false)
+ const choose=action=>{if(action(dontShowAgain)===false)setPreferenceError(true)}
  useLayoutEffect(()=>{
   openModal(modal.current)
   return()=>closeModal(modal.current)
  },[])
  return <dialog className="swtb-guide-welcome" ref={modal} dir="rtl"
    aria-labelledby="swtb-guide-welcome-title" onKeyDown={trapModalTab}
-   onCancel={e=>{e.preventDefault();onSkip(dontShowAgain)}}>
+   onCancel={e=>{e.preventDefault();choose(onSkip)}}>
    <div className="swtb-guide-welcome__eyebrow">راهنمای آغاز کار</div>
    <h2 id="swtb-guide-welcome-title" tabIndex={-1}>به پنل دانشجوکار خوش آمدید</h2>
-   <p>اینجا می‌توانید وظایف، برنامه حضور، گزارش‌های کار و مشخصات خود را مدیریت کنید.</p>
-   <p>با یک راهنمای تصویری کوتاه، بخش‌های اصلی سامانه را بشناسید. هر وقت خواستید نیز می‌توانید از دکمه «راهنمای سامانه» یا «راهنمای این بخش» دوباره استفاده کنید.</p>
+   <p>برای شروع همکاری، این سه قدم را دنبال کنید:</p>
+   <ol className="swtb-guide-welcome__quickstart">
+     <li><strong>زمان‌های آزاد خود را مشخص کنید.</strong> در «زمان حضور»، روزها و ساعت‌های قابل همکاری را با توجه به برنامه کلاس‌ها تنظیم و ذخیره کنید.</li>
+     <li><strong>کارهای خود را بررسی کنید.</strong> در «کارهای من»، شرح کار، زمان مورد انتظار و تاریخ انجام را بخوانید.</li>
+     <li><strong>پس از انجام واقعی کار، گزارش بفرستید.</strong> نتیجه بررسی مدیر و مدت تأییدشده را در «سوابق گزارش‌ها» ببینید.</li>
+   </ol>
+   <p>برنامه حضور، ثبت حضور واقعی یا ساعت تأییدشده نیست. برای آشنایی با جزئیات، راهنمای تصویری را باز کنید.</p>
    <label className="swtb-guide-welcome__option">
      <input type="checkbox" checked={dontShowAgain}
-       onChange={event=>setDontShowAgain(event.target.checked)}/>
+       onChange={event=>{setDontShowAgain(event.target.checked);setPreferenceError(false)}}/>
      <span>دیگر به‌صورت خودکار نشان نده
-       <small>این انتخاب فقط در همین مرورگر ذخیره می‌شود؛ راهنمای سامانه همیشه در دسترس است. در حالت خصوصی یا پس از پاک‌کردن داده مرورگر ممکن است دوباره نمایش داده شود.</small>
+       <small>این انتخاب فقط در همین مرورگر ذخیره می‌شود؛ راهنمای سامانه همیشه در دسترس است. بدون انتخاب این گزینه، راهنما ممکن است در نشست بعدی مرورگر دوباره پیشنهاد شود.</small>
      </span>
    </label>
+   {preferenceError&&<p role="alert">تنظیم نمایش خودکار ذخیره نشد. برای ادامه می‌توانید تیک گزینه را بردارید.</p>}
    <div className="swtb-guide-welcome__actions">
      <button type="button" className="swtb-guide-button swtb-guide-button--primary"
-       onClick={onBegin}>شروع راهنمای سامانه</button>
+       onClick={()=>choose(onBegin)}>شروع راهنمای سامانه</button>
      <button type="button" className="swtb-guide-button"
-       onClick={()=>onSkip(dontShowAgain)}>فعلاً نه</button>
+       onClick={()=>choose(onSkip)}>فعلاً نه</button>
    </div>
  </dialog>
 }
