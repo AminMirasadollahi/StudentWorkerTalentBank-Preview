@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useRef,useState} from 'react'
+import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react'
 import {claimDeskWorkOffer,getWorkerDeskWorkPool} from '../lib/operationsV2'
 
 const fa=new Intl.NumberFormat('fa-IR')
@@ -7,7 +7,7 @@ const dayName=date=>date?dayFa.format(new Date(date+'T12:00:00Z')):'—'
 const timeName=min=>String(Math.floor(min/60)).padStart(2,'0')+':'+String(min%60).padStart(2,'0')
 
 export default function DeskWorkPoolWorkerSection({
- workerId,refreshRevision=0,onClaimed,
+ workerId,refreshRevision=0,onClaimed,active=true,
 }){
  const [snapshot,setSnapshot]=useState({status:'loading',offers:[]})
  const [busy,setBusy]=useState(false)
@@ -16,11 +16,14 @@ export default function DeskWorkPoolWorkerSection({
  const [notice,setNotice]=useState('')
  const seq=useRef(0)
  const pending=useRef(false)
+ const alive=useRef(false)
+ useLayoutEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
  const requestKeys=useRef({workerId,ids:new Map()})
  if(requestKeys.current.workerId!==workerId){
   requestKeys.current={workerId,ids:new Map()}
  }
  const read=useCallback(async()=>{
+  if(!alive.current)return false
   const i=++seq.current
   setSnapshot({status:'loading',offers:[]})
   try{
@@ -51,16 +54,16 @@ export default function DeskWorkPoolWorkerSection({
   }
  },[])
  useEffect(()=>{
-  void read()
+  if(active)void read()
   return ()=>{seq.current+=1}
- },[read,workerId,refreshRevision])
+ },[read,workerId,refreshRevision,active])
  useEffect(()=>{
   // An unresolved receipt belongs only to the worker who initiated it.
   setUncertainId('');setRetryReady(false);setNotice('')
  },[workerId])
  const refresh=async()=>{
   const items=await read()
-  if(!items||requestKeys.current.workerId!==workerId)return
+  if(!alive.current||!items||requestKeys.current.workerId!==workerId)return
   if(uncertainId){
    const offer=items.find(x=>x.id===uncertainId)
    if(offer?.my_task_id){
@@ -68,6 +71,7 @@ export default function DeskWorkPoolWorkerSection({
     setUncertainId('')
     setRetryReady(false)
     setNotice('رزرو قبلی شما از سرور تأیید شد.')
+    try{await onClaimed?.(offer.my_task_id)}catch{setNotice('رزرو ثبت شده است؛ کارهای من را باز کنید.')}
    }else{
     setRetryReady(Boolean(offer?.claimable))
     setNotice(offer?.claimable
@@ -77,7 +81,7 @@ export default function DeskWorkPoolWorkerSection({
   }
  }
  const claim=async o=>{
-  if(pending.current||snapshot.status!=='ready'||o.claimable!==true
+  if(!active||!alive.current||pending.current||snapshot.status!=='ready'||o.claimable!==true
    ||o.my_task_id||uncertainId&&(uncertainId!==o.id||!retryReady))return
   if(!globalThis.crypto?.randomUUID){
    setNotice('تولید شناسه امن درخواست در مرورگر ممکن نیست؛ هیچ رزروی ارسال نشد.')
@@ -99,19 +103,19 @@ export default function DeskWorkPoolWorkerSection({
    }catch{
     // Only claim transport/receipt errors can make the outcome unknown.
     // A later read or navigation error cannot undo a confirmed reservation.
-    if(requestKeys.current.workerId===workerId){
+    if(alive.current&&requestKeys.current.workerId===workerId){
      setUncertainId(o.id)
      setRetryReady(false)
      setNotice('نتیجه رزرو مشخص نیست. ابتدا اطلاعات سرور را بازخوانی کنید؛ تا آن زمان رزرو دوباره مجاز نیست.')
     }
     return
    }
-   if(requestKeys.current.workerId!==workerId)return
+   if(!alive.current||requestKeys.current.workerId!==workerId)return
    requestKeys.current.ids.delete(o.id)
    setUncertainId('')
    setRetryReady(false)
    const refreshed=await read()
-   if(requestKeys.current.workerId!==workerId)return
+   if(!alive.current||requestKeys.current.workerId!==workerId)return
    setNotice(refreshed===false
     ?'رزرو نوبت در سرور تأیید شد، اما دریافت فهرست تازه موفق نبود. نتیجه را در «کارهای من» بررسی کنید.'
     :reply.replayed
@@ -120,7 +124,7 @@ export default function DeskWorkPoolWorkerSection({
    try{
     await onClaimed?.(reply.task_id)
    }catch{
-    if(requestKeys.current.workerId===workerId)
+    if(alive.current&&requestKeys.current.workerId===workerId)
      setNotice('رزرو نوبت در سرور تأیید شد، اما انتقال به «کارهای من» انجام نشد. این بخش را دستی باز کنید.')
    }
   }finally{
