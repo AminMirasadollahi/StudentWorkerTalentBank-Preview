@@ -2564,18 +2564,18 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     setLoading(true);setError('')
     try{
       const result=await getMyWorkV2()
-      if(sequence!==readSequence.current)return
+      if(sequence!==readSequence.current||claimSession.current!==session)return
       const scoped=scopeSelfWorkRows(result,profile.worker_id)
       setWorkSnapshot({workerId:profile.worker_id,data:scoped})
       setReadFailed(false)
       return scoped
     }catch(e){
-      if(sequence!==readSequence.current)return
+      if(sequence!==readSequence.current||claimSession.current!==session)return
       // Never retain a visible old work list after a failed authorization refresh.
       setWorkSnapshot({workerId:profile.worker_id,data:{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]}})
       setReadFailed(true)
       setError(readableError(e))
-    }finally{if(sequence===readSequence.current)setLoading(false)}
+    }finally{if(sequence===readSequence.current&&claimSession.current===session)setLoading(false)}
   }
   useEffect(()=>{void refresh()},[profile.worker_id,refreshRevision])
   // Returning from Profile/Presence/History should get the latest canonical
@@ -2636,7 +2636,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     const current=()=>claimContext.current?.session===session?claimContext.current:null
     if(!current()||typeof taskId!=='string'||!taskId)return
     setClaimReceipt({session,taskId,found:null})
-    if(!current().poolAuthorized)return
+    if(!current().poolAuthorized){setClaimReceipt({session,taskId,found:false});return}
     const fresh=await refresh()
     const context=current()
     if(!context)return
