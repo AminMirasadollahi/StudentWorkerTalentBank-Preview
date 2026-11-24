@@ -36,3 +36,12 @@ export function summarizeWorkerTaskFocus(tasks,todayIso) {
   completed:selectWorkerTaskFocus(tasks,todayIso,'completed').length,
  }
 }
+
+// A receipt is not a task row: navigate only to an exact authorized match.
+export function locateClaimedWorkerTask(tasks,todayIso,taskId){
+ if(typeof taskId!=='string'||!taskId||!Array.isArray(tasks))return null
+ for(const view of ['action','pending','upcoming','completed']){
+  if(selectWorkerTaskFocus(tasks,todayIso,view).some(task=>task.id===taskId))return view
+ }
+ return null
+}
