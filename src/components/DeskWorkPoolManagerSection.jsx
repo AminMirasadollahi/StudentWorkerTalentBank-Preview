@@ -54,6 +54,7 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0,routeFence
  const pending=useRef(false)
  const sequence=useRef(0)
  const refresh=useCallback(async()=>{
+  routeFence?.invalidateReview(owner)
   const i=++sequence.current
   setView({status:'loading',terms:[],templates:[],offers:[]})
   try{
@@ -77,7 +78,7 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0,routeFence
     setView({status:'error',terms:[],templates:[],offers:[]})
    return false
   }
- },[])
+ },[routeFence,owner])
  useEffect(()=>{void refresh();return()=>{sequence.current+=1}},[refresh,refreshRevision,revision])
  const submit=async (operation,fn,after)=>{
   if(pending.current||uncertain||blockedByOther||view.status!=='ready')return

@@ -56,6 +56,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
  const inFlight=useRef(false)
  const requestSerial=useRef(0)
  const load=useCallback(async()=>{
+  routeFence?.invalidateReview(owner)
   const serial=++requestSerial.current
   setView(v=>({...v,status:'loading'}))
   try{
@@ -73,10 +74,10 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
    setView(snapshot)
    return snapshot
   }catch{
-   if(serial===requestSerial.current)setView(v=>({...v,status:'error'}))
+   if(serial===requestSerial.current)setView(v=>routeFence?{status:'error',terms:[],templates:[],offers:[]}:{...v,status:'error'})
    return null
   }
- },[])
+ },[routeFence,owner])
  useEffect(()=>{void load();return()=>{requestSerial.current+=1}},[load,revision,refreshRevision])
  const activeTerms=view.terms.filter(x=>x.state==='active')
  const term=activeTerms.find(x=>x.id===termSelection)||activeTerms[0]

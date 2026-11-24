@@ -11,7 +11,7 @@ export function createWorkPoolRouteFence(){
   current=Object.freeze({owner,kind,status:'busy'});emit();return true
  }
  const retry=(owner,kind)=>{
-  if(current?.owner!==owner||current.kind!==kind||current.status!=='unknown')return false
+  if(!['create','edit'].includes(kind)||current?.owner!==owner||current.kind!==kind||current.status!=='unknown')return false
   current=Object.freeze({...current,status:'busy'});emit();return true
  }
  const unknown=owner=>{
@@ -23,7 +23,7 @@ export function createWorkPoolRouteFence(){
   current=null;emit();return true
  }
  const reviewReady=owner=>{
-  if(current?.owner!==owner||current.status!=='unknown')return false
+  if(current?.owner!==owner||current.status!=='unknown'||!['legacy','desk','transition'].includes(current.kind))return false
   current=Object.freeze({...current,status:'reviewed'});emit();return true
  }
  const acknowledgeReview=owner=>{

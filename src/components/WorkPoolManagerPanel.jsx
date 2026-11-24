@@ -61,6 +61,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
  const pending=useRef(false)
  const readIndex=useRef(0)
  const reload=useCallback(async()=>{
+  routeFence?.invalidateReview(owner)
   const seq=++readIndex.current
   setSnapshot({status:'loading',terms:[],items:null})
   try{
@@ -80,7 +81,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
     setSnapshot({status:'error',terms:[],items:null})
    return false
   }
- },[routeFence])
+ },[routeFence,owner])
  useEffect(()=>{if(!unifiedUIEnabled)void reload()},[reload,revision,refreshRevision])
  const run=async(id,action,success)=>{
   if(pending.current||uncertain||blockedByOther)return

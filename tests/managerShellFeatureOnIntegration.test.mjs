@@ -43,9 +43,10 @@ const mock={
   ].join('\n')
   if(id==='\0swtb22-workspaces')return [
    'import React from "react";',
-   'export function AdminOperations({navigation,hideSectionTabs}){',
+   'const fixtureOwner=Symbol("synthetic work-pool owner");',
+   'export function AdminOperations({navigation,hideSectionTabs,workPoolRouteFence:fence}){',
    'return React.createElement("div",{"data-testid":"manager-stage"},',
-   ' "WORK_VIEW="+navigation.workView+";HIDE_TABS="+String(hideSectionTabs));}',
+   ' "WORK_VIEW="+navigation.workView+";HIDE_TABS="+String(hideSectionTabs),fence&&navigation.workView==="workPool"&&React.createElement("button",{onClick:()=>{fence.begin(fixtureOwner,"create");fence.unknown(fixtureOwner)}},"درخواست نامطمئن نمونه"),fence&&React.createElement("button",{onClick:()=>fence.confirmed(fixtureOwner)},"تأیید رسید نمونه"));}',
    'export function WorkerOperations(){return React.createElement("div",',
    '{"data-testid":"worker-stage"},"WORKER_ONLY")}',
   ].join('\n')
@@ -245,5 +246,25 @@ test('review-only work hub in real OpsApp uses one canonical parent and existing
   await act(async()=>route(ui.host,'applicants').click())
   assert.equal(ui.host.querySelector('[aria-label="بخش‌های مدیریت کارها"]'),null)
   assert.equal(ui.host.querySelector('[data-testid="manager-stage"]'),null)
+ }finally{await ui.cleanup()}
+})
+
+test('real manager route setter blocks hub tab and sidebar exits until simulated receipt confirmation',async()=>{
+ const ui=await mount(true)
+ const click=async label=>{
+  const b=[...ui.host.querySelectorAll('button')].find(x=>x.textContent.trim()===label)
+  assert.ok(b,label);await act(async()=>b.click())
+ }
+ try{
+  await act(async()=>route(ui.host,'tasks').click())
+  await click('فرصت‌های قابل انتخاب');await click('درخواست نامطمئن نمونه')
+  await click('وظایف واگذارشده')
+  assert.match(ui.host.textContent,/WORK_VIEW=workPool/)
+  assert.match(ui.host.textContent,/جابه‌جایی فعلاً ممکن نیست/)
+  await act(async()=>route(ui.host,'applicants').click())
+  assert.match(ui.host.textContent,/WORK_VIEW=workPool/)
+  await click('تأیید رسید نمونه');await click('وظایف واگذارشده')
+  assert.match(ui.host.textContent,/WORK_VIEW=tasks/)
+  assert.doesNotMatch(ui.host.textContent,/جابه‌جایی فعلاً ممکن نیست/)
  }finally{await ui.cleanup()}
 })
