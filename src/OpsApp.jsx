@@ -18,6 +18,7 @@ import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
 import ManagerWorkspaceNav from './components/ManagerWorkspaceNav'
 import ManagerWorkHubTabs from './components/ManagerWorkHubTabs'
+import {createWorkPoolRouteFence} from './lib/workPoolRouteFence.mjs'
 import ManagerCandidatesWorkspace from './components/ManagerCandidatesWorkspace'
 import {candidateOnboardingLabel,candidateAuthSignInLabel,candidateDisplayName,candidateDisplayMajor} from './lib/managerCandidateView.mjs'
 import {fetchCandidatesWithAuthorizedWorkerIdentity} from './lib/managerCandidateWorkerOverlay.mjs'
@@ -564,7 +565,23 @@ function CandidateCard({
   )
 }
 
-function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0, workHubFixture=false }) {
+function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refreshRevision = 0, workHubFixture=false }) {
+  const [fence]=useState(createWorkPoolRouteFence)
+  const [routeNotice,setRouteNotice]=useState('')
+  const routeFence=managerShellEnabled&&workHubFixture===true&&managerNavFlags.workPoolEnabled?fence:null
+  const setNavigation=change=>{
+   if(!routeFence){commitNavigation(change);return}
+   const next=typeof change==='function'?change(navigation):change
+   if(!routeFence.permitsNavigation(navigation,next)){
+    setRouteNotice('ابتدا نتیجه درخواست فرصت کاری را تعیین‌تکلیف کنید؛ جابه‌جایی فعلاً ممکن نیست.')
+    return
+   }
+   setRouteNotice('')
+   commitNavigation(prev=>{
+    const candidate=typeof change==='function'?change(prev):change
+    return routeFence.permitsNavigation(prev,candidate)?candidate:prev
+   })
+  }
   const [rows, setRows] = useState([])
   const [busyId, setBusyId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -818,10 +835,11 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0, w
          <button type="button" onClick={()=>navigateManager({section:'work',view:'availability'})}>برنامه حضور</button>
         </div>
        </section>}
+      {routeFence&&routeNotice&&<p role="alert" className="report-alert report-alert--error">{routeNotice}</p>}
       <ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>
       {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation}
         refreshRevision={refreshRevision + manualWorkRevision}
-        hideSectionTabs={managerShellEnabled} loadOriginalCandidates={getOperationsCandidates} />}
+        hideSectionTabs={managerShellEnabled} loadOriginalCandidates={getOperationsCandidates} workPoolRouteFence={routeFence} />}
       {issuedCredentials && (
         <div className="ops-modal" role="dialog" aria-modal="true" aria-labelledby="ops-credentials-title">
           <div className="ops-modal__card">

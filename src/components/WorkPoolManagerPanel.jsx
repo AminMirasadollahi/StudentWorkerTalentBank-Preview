@@ -6,6 +6,7 @@ const unifiedUIEnabled=import.meta.env?.VITE_SWTB19_UNIFIED_WORK_UI==='true'
 const UnifiedWorkManagerPanel=lazy(()=>import('./UnifiedWorkManagerPanel'))
 const DeskWorkPoolManagerSection=lazy(()=>import('./DeskWorkPoolManagerSection'))
 import JalaliDatePicker from './JalaliDatePicker'
+import {useWorkPoolFence} from './useWorkPoolFence.mjs'
 import {plusIsoDays} from '../lib/persianMonthCalendar.mjs'
 import {getOperationsTermDashboard,getManagerWorkPool,
  createWorkTemplate,createWorkOpportunity,setWorkOpportunityState
@@ -22,7 +23,8 @@ const todayISO=()=>{
  const part=k=>pieces.find(p=>p.type===k)?.value||''
  return part('year')+'-'+part('month')+'-'+part('day')
 }
-export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='general',onKindChange}){
+export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='general',onKindChange,routeFence=null}){
+ const {owner,lock,blockedByOther}=useWorkPoolFence(routeFence)
  const today=todayISO()
  const [revision,setRevision]=useState(0)
  const [editorMode,setEditorMode]=useState('')
@@ -43,7 +45,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
  const [localKind,setLocalKind]=useState(activeKind)
  const kind=onKindChange?activeKind:localKind
  const [deskVisited,setDeskVisited]=useState(activeKind==='desk')
- const selectKind=next=>{setLocalKind(next);onKindChange?.(next);
+ const selectKind=next=>{if(routeFence?.getSnapshot())return;setLocalKind(next);onKindChange?.(next);
   if(next==='desk')setDeskVisited(true)}
  useEffect(()=>{if(kind==='desk')setDeskVisited(true)},[kind])
  const [snapshot,setSnapshot]=useState({status:'loading',terms:[],items:null})
@@ -71,24 +73,29 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
       items?.ok!==true||!Array.isArray(items.templates)||
       !Array.isArray(items.opportunities))throw Error('work_pool_invalid_manager_response')
    setSnapshot({status:'ready',terms:terms.terms,items})
-   setUncertain(false)
+   if(!routeFence)setUncertain(false)
+   return true
   }catch{
    if(seq===readIndex.current)
     setSnapshot({status:'error',terms:[],items:null})
+   return false
   }
- },[])
+ },[routeFence])
  useEffect(()=>{if(!unifiedUIEnabled)void reload()},[reload,revision,refreshRevision])
  const run=async(id,action,success)=>{
-  if(pending.current||uncertain)return
+  if(pending.current||uncertain||blockedByOther)return
+  if(routeFence&&!routeFence.begin(owner,'legacy'))return
   pending.current=true;setBusy(id);setNotice('')
   try{
    const response=await action()
    if(!response||!response.id)throw Error('unconfirmed_work_pool_change')
+   routeFence?.confirmed(owner)
    success?.(response)
    setNotice('تغییر ثبت شد؛ فهرست از سرور بازخوانی می‌شود.')
    setRevision(v=>v+1)
   }catch{
    // Without a server idempotency key on manager creation, never auto-repeat.
+   routeFence?.unknown(owner)
    setUncertain(true)
    setNotice('نتیجه درخواست قطعی نیست. پیش از هر ثبت دوباره، فهرست را بازخوانی و بررسی کنید.')
   }finally{pending.current=false;setBusy('')}
@@ -120,14 +127,14 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
  const opportunities=snapshot.items?.opportunities||[]
  const ordered=opportunities.slice().sort((a,b)=>
   (a.date||'').localeCompare(b.date||'')||String(a.id).localeCompare(String(b.id)))
- const formDisabled=busy!==''||uncertain||snapshot.status!=='ready'
+ const formDisabled=busy!==''||uncertain||blockedByOther||snapshot.status!=='ready'
  // SWTB19: do not expose database-originated general/desk subtypes as
  // required top-level navigation. The unified screen discloses timed desk
  // only when the manager explicitly needs an hourly shift.
  if(unifiedUIEnabled)return <section className="report-panel ow-work-pool swtb22-work-pool"
   aria-label="تعریف و انتشار فعالیت">
    <Suspense fallback={<p role="status">در حال آماده‌سازی تعریف کار…</p>}>
-    <UnifiedWorkManagerPanel refreshRevision={refreshRevision}/>
+    <UnifiedWorkManagerPanel refreshRevision={refreshRevision} routeFence={routeFence}/>
    </Suspense>
   </section>
  const editorSurface=(<div key="editor" className="ow-work-pool-compose" ref={editorRootRef}>
@@ -254,18 +261,20 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
      :'الگوهای کار مستقل از نوبت‌های تاریخ‌دارند. فقط فرصت منتشرشده می‌تواند توسط دانشجوکار واجد شرایط انتخاب شود.'}</p>
    </div>
    <button type="button" className="report-btn report-btn--light"
-    onClick={()=>{setUncertain(false);setRevision(x=>x+1)}} disabled={busy!==''}>
+    onClick={async()=>{if(!routeFence){setUncertain(false);setRevision(x=>x+1);return}if(pending.current)return;routeFence.invalidateReview(owner);pending.current=true;setBusy('read');try{if(await reload())routeFence.reviewReady(owner)}finally{pending.current=false;setBusy('')}}} disabled={busy!==''}>
     بازخوانی</button>
   </div>
   {focusUIEnabled&&deskPoolUIEnabled&&<div className="swtb22-kind-switch" role="group" aria-label="نوع فرصت کاری">
-   <button type="button" aria-pressed={kind==='general'} onClick={()=>selectKind('general')}>فرصت‌های عمومی</button>
-   <button type="button" aria-pressed={kind==='desk'} onClick={()=>selectKind('desk')}>نوبت‌های زمان‌دار کتابخانه</button>
+   <button type="button" aria-pressed={kind==='general'} disabled={Boolean(lock)} onClick={()=>selectKind('general')}>فرصت‌های عمومی</button>
+   <button type="button" aria-pressed={kind==='desk'} disabled={Boolean(lock)} onClick={()=>selectKind('desk')}>نوبت‌های زمان‌دار کتابخانه</button>
   </div>}
   <div className="swtb22-work-pool-kind-view" hidden={focusUIEnabled&&kind==='desk'}>
   {unifiedUIEnabled?<Suspense fallback={<p role="status">در حال آماده‌سازی تعریف کار…</p>}>
-   <UnifiedWorkManagerPanel refreshRevision={refreshRevision}/>
+   <UnifiedWorkManagerPanel refreshRevision={refreshRevision} routeFence={routeFence}/>
   </Suspense>:<>
   <p className="ow-compact-hint">{deskPoolUIEnabled?'فرصت‌های عمومی در این بخش و نوبت‌های زمان‌دار کتابخانه در بخش بعدی همین صفحه مدیریت می‌شوند.':'این بخش فقط برای کارهای عمومی است. نوبت‌های زمان‌دار کتابخانه، کار گروهی و درخواست‌های نیازمند تأیید مدیر همچنان از مسیرهای تخصصی خود انجام می‌شوند.'} انتخاب کار، ساعت تأییدشده ایجاد نمی‌کند.</p>
+  {blockedByOther&&<p role="alert">عملیات حل‌نشده دیگری وجود دارد؛ ثبت جدید مسدود است.</p>}
+  {lock?.owner===owner&&lock.status==='reviewed'&&<button type="button" disabled={busy!==''||snapshot.status!=='ready'} className="ow-mini-btn" onClick={()=>{if(routeFence.acknowledgeReview(owner))setUncertain(false)}}>تأیید بررسی فهرست (بدون اثبات ثبت یا لغو)</button>}
   {notice&&<p role={uncertain?'alert':'status'} className={uncertain?'report-alert report-alert--error':'ops-alert-success'}>{notice}</p>}
   {snapshot.status==='loading'&&<p role="status" className="ow-muted">در حال دریافت الگوها و فرصت‌ها…</p>}
   {snapshot.status==='error'&&<div role="alert" className="report-alert report-alert--error">اطلاعات مخزن در دسترس نیست. امکان ثبت تا بازخوانی موفق متوقف است.</div>}
@@ -281,7 +290,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
   </div>
   {deskPoolUIEnabled&&(!focusUIEnabled||deskVisited)&&<div className="swtb22-work-pool-kind-view" hidden={focusUIEnabled&&kind!=='desk'}>
    <Suspense fallback={<p role="status">در حال آماده‌سازی نوبت‌های کتابخانه…</p>}>
-    <DeskWorkPoolManagerSection refreshRevision={refreshRevision}/>
+    <DeskWorkPoolManagerSection refreshRevision={refreshRevision} routeFence={routeFence}/>
   </Suspense>
   </div>}
  </section>

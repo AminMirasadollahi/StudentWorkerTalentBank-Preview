@@ -6,6 +6,7 @@ import {getOperationsTermDashboard,getManagerUnifiedWorkPool,
 import {addDays,durationFa,todayTehran,workPackagePayload,
  PUBLIC_WORK_DESCRIPTION_MAX,publicDescriptionPasteFits} from '../lib/workPoolUnifiedV1.mjs'
 import '../work-pool-unified.css'
+import {useWorkPoolFence} from './useWorkPoolFence.mjs'
 
 const nf=new Intl.NumberFormat('fa-IR')
 const pasteWarning='متن انتخابی از سقف ۱۰٬۰۰۰ کاراکتر بیشتر است؛ پیست انجام نشد تا هیچ بخشی بی‌اطلاع شما حذف نشود.'
@@ -29,7 +30,8 @@ const initial=()=>({
 const faDate=x=>x?new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
  dateStyle:'medium',timeZone:'UTC'}).format(new Date(x+'T12:00:00Z')):'—'
 
-export default function UnifiedWorkManagerPanel({refreshRevision=0}){
+export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=null}){
+ const {owner,lock,blockedByOther}=useWorkPoolFence(routeFence)
  const [form,setForm]=useState(initial)
  const [view,setView]=useState({status:'loading',terms:[],templates:[],offers:[]})
  const [termSelection,setTermSelection]=useState('')
@@ -85,9 +87,9 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
   catch(e){return {error:e.message}}
  },[form,term])
  const hasUnresolved=uncertain||retryReady||['uncertain','retry'].includes(edit.status)
- const disabled=busy||hasUnresolved||view.status!=='ready'
+ const disabled=busy||hasUnresolved||blockedByOther||view.status!=='ready'
  const create=async(publish,retry=false)=>{
-  if(inFlight.current||view.status!=='ready'||uncertain||!globalThis.crypto?.randomUUID)return
+  if(inFlight.current||blockedByOther||view.status!=='ready'||uncertain||!globalThis.crypto?.randomUUID||(routeFence&&['saving','uncertain','retry'].includes(edit.status)))return
   let resolved
   try{resolved=workPackagePayload(form,term?.id,todayTehran(),term)}
   catch(e){setNotice(e.message);return}
@@ -100,6 +102,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
   if(retryReady&&!retry)return
   if(retry&&!pending.current)return
   const requestId=pending.current?.requestId||globalThis.crypto.randomUUID()
+  if(routeFence&&!(retry?routeFence.retry(owner,'create'):routeFence.begin(owner,'create')))return
   pending.current={requestId,signature,publish}
   inFlight.current=true;setBusy(true);setNotice('')
   let receipt
@@ -108,12 +111,14 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
    if(receipt?.ok!==true||typeof receipt.id!=='string')
     throw Error('unconfirmed_manager_receipt')
   }catch{
+   routeFence?.unknown(owner)
    setUncertain(true);setRetryReady(false)
    setNotice('نتیجه ذخیره مشخص نیست. پیش از تکرار، «بررسی نتیجه از سرور» را بزنید.')
    inFlight.current=false;setBusy(false)
    return
   }
   // A confirmed server receipt stays confirmed even if the read/navigation fails.
+  routeFence?.confirmed(owner)
   pending.current=null;setUncertain(false);setRetryReady(false)
   setForm(initial());setOpen(false)
   setNotice(publish?'کار ثبت و منتشر شد. فقط دانشجوی واجد شرایط می‌تواند آن را انتخاب کند.'
@@ -122,12 +127,14 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
   setRevision(n=>n+1)
  }
  const verify=async()=>{
-  if(inFlight.current)return
+  if(inFlight.current||blockedByOther)return
+  if(routeFence){inFlight.current=true;routeFence.invalidateReview(owner)}
   setBusy(true)
   const state=await load()
   if(state&&pending.current){
    const found=state.offers.find(o=>o.manager_request_id===pending.current.requestId)
    if(found){
+    routeFence?.confirmed(owner)
     pending.current=null;setUncertain(false);setRetryReady(false)
     setForm(initial());setOpen(false)
     setNotice('ثبت قبلی در سرور تأیید شد؛ هیچ کار تکراری ساخته نشد.')
@@ -138,11 +145,12 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
   }else if(state){
    // An uncertain pause/publish/close has no manager request UUID, so an
    // authorized list read-back is the safe way to inspect the actual state.
-   setUncertain(false);setRetryReady(false)
-   setNotice('فهرست تازه از سرور دریافت شد؛ وضعیت فرصت را پیش از اقدام بعدی بررسی کنید.')
+   if(routeFence){routeFence.reviewReady(owner);setNotice('فهرست تازه دریافت شد؛ وضعیت فرصت را بررسی و سپس بررسی را تأیید کنید.')}
+   else{setUncertain(false);setRetryReady(false);setNotice('فهرست تازه از سرور دریافت شد؛ وضعیت فرصت را پیش از اقدام بعدی بررسی کنید.')}
   }else{
    setNotice('بازخوانی موفق نبود؛ ثبت دوباره تا روشن شدن نتیجه غیرفعال است.')
   }
+  if(routeFence)inFlight.current=false
   setBusy(false)
  }
  const applyExisting=id=>{
@@ -153,15 +161,18 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
    shareMinutes:String(t.estimated_minutes)}))
  }
  const transition=async(id,state,reason=null)=>{
-  if(inFlight.current||hasUnresolved)return
+  if(inFlight.current||hasUnresolved||blockedByOther)return
+  if(routeFence&&!routeFence.begin(owner,'transition'))return
   inFlight.current=true;setBusy(true);setNotice('')
   try{
    const reply=await setWorkOpportunityState({opportunityId:id,state,reason})
    if(reply?.id!==id)throw Error('unconfirmed_state_change')
+   routeFence?.confirmed(owner)
    setCloseId('');setCloseReason('')
    setNotice('وضعیت فرصت تغییر کرد؛ فهرست بازخوانی می‌شود.')
    setRevision(v=>v+1)
   }catch{
+   routeFence?.unknown(owner)
    setNotice('نتیجه تغییر وضعیت نامشخص است؛ پیش از اقدام مجدد، فهرست را بازخوانی کنید.')
    setUncertain(true)
   }finally{inFlight.current=false;setBusy(false)}
@@ -181,7 +192,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
    text:inspectedTemplate.description||'',status:'idle',message:''})
  }
  const saveDescriptionEdit=async(retry=false)=>{
-  if(inFlight.current||!editAllowed||edit.id!==inspected.id
+  if(inFlight.current||blockedByOther||!editAllowed||edit.id!==inspected.id
    ||!globalThis.crypto?.randomUUID||['uncertain'].includes(edit.status))return
   const next=edit.text.trim()
   if(next.length<10||next.length>PUBLIC_WORK_DESCRIPTION_MAX){
@@ -197,6 +208,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
   if(retry&&(!editRequest.current||edit.status!=='retry'))return
   if(!retry&&edit.status!=='idle')return
   const requestId=editRequest.current?.requestId||globalThis.crypto.randomUUID()
+  if(routeFence&&!(retry?routeFence.retry(owner,'edit'):routeFence.begin(owner,'edit')))return
   editRequest.current={requestId,signature,id:edit.id,previous:edit.previous,next}
   inFlight.current=true;setBusy(true)
   setEdit(old=>({...old,status:'saving',message:'در حال ثبت اصلاحات…'}))
@@ -209,11 +221,13 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
    if(receipt?.ok!==true||receipt.id!==edit.id)
     throw Error('unconfirmed_description_edit_receipt')
   }catch{
+   routeFence?.unknown(owner)
    setEdit(old=>({...old,status:'uncertain',
     message:'نتیجه اصلاح شرح هنوز مشخص نیست؛ پیش از تلاش مجدد از سرور بررسی کنید.'}))
    inFlight.current=false;setBusy(false)
    return
   }
+  routeFence?.confirmed(owner)
   editRequest.current=null
   setEdit({id:'',previous:'',text:'',status:'idle',message:''})
   setNotice('شرح اصلاح‌شده در سرور ثبت شد؛ فرصت متوقف‌شده را پس از بررسی دوباره منتشر کنید.')
@@ -221,7 +235,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
   setRevision(n=>n+1)
  }
  const verifyDescriptionEdit=async()=>{
-  if(inFlight.current||!editRequest.current)return
+  if(inFlight.current||blockedByOther||!editRequest.current)return
   inFlight.current=true;setBusy(true)
   const result=await load()
   const pendingEdit=editRequest.current
@@ -232,6 +246,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
    const offer=result.offers.find(o=>o.id===pendingEdit.id)
    const tpl=result.templates.find(t=>t.id===offer?.template_id)
    if(tpl?.description===pendingEdit.next){
+    routeFence?.confirmed(owner)
     editRequest.current=null
     setEdit({id:'',previous:'',text:'',status:'idle',message:''})
     setNotice('اصلاح شرح با بازخوانی سرور تأیید شد؛ درخواست تکراری ارسال نشد.')
@@ -240,6 +255,8 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
     &&Number(offer.claimed_count)===0&&Number(offer.reserved_minutes||0)===0){
     setEdit(old=>({...old,status:'retry',
      message:'شرح قبلی هنوز ثبت است؛ فقط با همان شناسه درخواست می‌توانید دوباره تلاش کنید.'}))
+   }else if(routeFence){
+    setEdit(old=>({...old,status:'uncertain',message:'نتیجه قبلی هنوز قابل اثبات نیست؛ شناسه درخواست حفظ می‌شود و ثبت جدید مسدود است.'}))
    }else{
     editRequest.current=null
     setEdit({id:'',previous:'',text:'',status:'idle',message:''})
@@ -257,18 +274,18 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
  useEffect(()=>{
   if(!inspected)return
   const onKey=event=>{
-   if(event.key!=='Escape'||document.querySelector('dialog[open]'))return
+   if(event.key!=='Escape'||document.querySelector('dialog[open]')||routeFence?.getSnapshot())return
    event.preventDefault()
    setInspectedId('')
    inspectorTrigger.current?.focus({preventScroll:true})
   }
   document.addEventListener('keydown',onKey)
   return()=>document.removeEventListener('keydown',onKey)
- },[inspected?.id])
+ },[inspected?.id,routeFence])
  return <section className="swtb19-unified-work" aria-label="تعریف و انتشار کار">
   <label className="swtb19-unified-work__kind">
-   <input type="checkbox" checked={deskMode} disabled={busy||hasUnresolved}
-    onChange={e=>{const next=e.target.checked;setDeskMode(next);
+   <input type="checkbox" checked={deskMode} disabled={busy||hasUnresolved||Boolean(lock)}
+    onChange={e=>{if(routeFence?.getSnapshot())return;const next=e.target.checked;setDeskMode(next);
      if(next)setDeskVisited(true)}}/>
    <span>این فعالیت، نوبت حضور با ساعت مشخص در میز کتابخانه است.</span>
   </label>
@@ -296,6 +313,8 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
     {retryReady&&<button type="button" className="ow-mini-btn" disabled={busy}
       onClick={()=>void create(Boolean(pending.current?.publish),true)}>تلاش مجدد با شناسه قبلی</button>}
    </div>}
+  {blockedByOther&&!deskMode&&<p role="alert">عملیات حل‌نشده دیگری وجود دارد؛ ثبت جدید مسدود است.</p>}
+  {lock?.owner===owner&&lock.kind==='transition'&&lock.status==='reviewed'&&<button type="button" className="ow-mini-btn" disabled={busy||view.status!=='ready'} onClick={()=>{if(routeFence.acknowledgeReview(owner)){setUncertain(false);setNotice('بررسی فهرست تأیید شد؛ این تأیید، رسید تراکنش نیست.')}}}>تأیید بررسی وضعیت فرصت</button>}
   {view.status==='error'&&<p role="alert">اطلاعات مدیر دریافت نشد؛ ساخت کار تا بازخوانی موفق غیرفعال است.</p>}
   {view.status==='loading'&&<p role="status">در حال دریافت کارها و نیمسال فعال…</p>}
   {open&&view.status==='ready'&&<form className="swtb19-unified-work__form"
@@ -550,7 +569,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0}){
   {deskVisited&&<div hidden={!deskMode} className="swtb19-unified-work__desk">
    <p className="ow-muted">این حالت ویژه نوبت میز کتابخانه است: تاریخ و ساعت شروع/پایان مشخص، با ظرفیت هم‌زمان حداکثر دو نفر. قواعد مستقل نوبت‌ها حفظ می‌شوند.</p>
    <Suspense fallback={<p role="status">در حال آماده‌سازی نوبت ساعت‌دار…</p>}>
-    <DeskWorkPoolManagerSection refreshRevision={refreshRevision}/>
+    <DeskWorkPoolManagerSection refreshRevision={refreshRevision} routeFence={routeFence}/>
    </Suspense>
   </div>}
  </section>

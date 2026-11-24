@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react'
 import JalaliDatePicker from './JalaliDatePicker'
+import {useWorkPoolFence} from './useWorkPoolFence.mjs'
 const focusUIEnabled=import.meta.env?.VITE_SWTB22_WORK_POOL_FOCUS_UI==='true'
 import {plusIsoDays} from '../lib/persianMonthCalendar.mjs'
 import {getOperationsTermDashboard,getManagerWorkPool,getManagerDeskWorkPool,
@@ -22,7 +23,8 @@ const todayTehran=()=>{
  return [v('year'),v('month'),v('day')].join('-')
 }
 const labels={draft:'پیش‌نویس',published:'منتشرشده',paused:'متوقف',closed:'بسته‌شده'}
-export default function DeskWorkPoolManagerSection({refreshRevision=0}){
+export default function DeskWorkPoolManagerSection({refreshRevision=0,routeFence=null}){
+ const {owner,lock,blockedByOther}=useWorkPoolFence(routeFence)
  const [view,setView]=useState({status:'loading',terms:[],templates:[],offers:[]})
  const [draft,setDraft]=useState({title:'',description:'',instructions:'',
   minutes:'60',priority:'3'})
@@ -69,29 +71,34 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0}){
    setView({status:'ready',terms:t.terms,
     templates:templates.templates.filter(x=>x.kind==='library_desk'&&x.state==='active'),
     offers:offers.offers})
+   return true
   }catch{
    if(sequence.current===i)
     setView({status:'error',terms:[],templates:[],offers:[]})
+   return false
   }
  },[])
  useEffect(()=>{void refresh();return()=>{sequence.current+=1}},[refresh,refreshRevision,revision])
  const submit=async (operation,fn,after)=>{
-  if(pending.current||uncertain||view.status!=='ready')return
+  if(pending.current||uncertain||blockedByOther||view.status!=='ready')return
+  if(routeFence&&!routeFence.begin(owner,'desk'))return
   pending.current=true;setBusy(true);setNotice('')
   try{
    const reply=await fn()
    if(typeof reply?.id!=='string')throw Error('desk_manager_result_unknown')
+   routeFence?.confirmed(owner)
    after?.(reply)
    setNotice('درخواست ثبت شد و اطلاعات دوباره از سرور دریافت می‌شود.')
    setRevision(v=>v+1)
   }catch{
+   routeFence?.unknown(owner)
    setUncertain(true)
    setNotice('نتیجه درخواست مشخص نیست. برای جلوگیری از ثبت تکراری، ابتدا اطلاعات را از سرور بازخوانی و بررسی کنید.')
   }finally{
    pending.current=false;setBusy(false)
   }
  }
- const inactive=busy||uncertain||view.status!=='ready'
+ const inactive=busy||uncertain||blockedByOther||view.status!=='ready'
  const createTemplate=e=>{
   e.preventDefault()
   if(draft.title.trim().length<3||draft.description.trim().length<10)return
@@ -244,9 +251,11 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0}){
     <p className="ow-muted">هر نوبت، زمان شروع و پایان مشخص دارد. ظرفیت دو نفر در کل میز کتابخانه محاسبه می‌شود، نه فقط در یک فرصت کاری.</p>
    </div>
    <button type="button" className="ow-mini-btn" disabled={busy}
-    onClick={()=>{setUncertain(false);setRevision(x=>x+1)}}>
+    onClick={async()=>{if(!routeFence){setUncertain(false);setRevision(x=>x+1);return}if(pending.current)return;routeFence.invalidateReview(owner);pending.current=true;setBusy(true);try{if(await refresh())routeFence.reviewReady(owner)}finally{pending.current=false;setBusy(false)}}}>
     بازخوانی نوبت‌ها</button>
   </div>
+  {blockedByOther&&<p role="alert">عملیات حل‌نشده دیگری وجود دارد؛ ثبت جدید مسدود است.</p>}
+  {lock?.owner===owner&&lock.status==='reviewed'&&<button type="button" disabled={busy||view.status!=='ready'} className="ow-mini-btn" onClick={()=>{if(routeFence.acknowledgeReview(owner))setUncertain(false)}}>تأیید بررسی فهرست (بدون اثبات ثبت یا لغو)</button>}
   {notice&&<div className={uncertain?'report-alert report-alert--error':'ops-alert-success'}
     role={uncertain?'alert':'status'}>{notice}</div>}
   {view.status==='loading'&&<p role="status">در حال خواندن نوبت‌ها…</p>}
