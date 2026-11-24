@@ -105,7 +105,8 @@ async function mount(options={}){
    taskWorkerId:'',taskUnit:'',taskState:'',taskSearch:'',taskOrder:'latest',
   })
   return createElement(AdminOperations,{navigation:nav,setNavigation:setNav,
-   hideSectionTabs:options.hideSectionTabs!==false,refreshRevision:revision})
+   hideSectionTabs:options.hideSectionTabs!==false,refreshRevision:revision,
+   loadOriginalCandidates:options.loadOriginalCandidates})
  }
  let rev=0
  async function render(){await act(async()=>{
@@ -215,6 +216,40 @@ test('inbox direct assignment shortcut opens the focused editor, not only the ta
   assert.ok(editor(ui.host),'the tasks view must mount after using the inbox shortcut')
   assert.equal(editor(ui.host).open,true,'the user intent is to create, not merely browse tasks')
   assert.equal(document.activeElement?.id,'swtb22-task-editor-heading')
+  assert.equal(globalThis.__qaD3Writes,0)
+ }finally{await ui.cleanup()}
+})
+
+test('manager worker directory finds registration and approved previous name without changing current identity',async()=>{
+ const f=fixture()
+ f.workers[0].application_id='FAKE-APP1'
+ f.workers[1].application_id='FAKE-APP2'
+ f.profile_requests=[
+  {id:'R1',worker_id:'FAKE-W1',field_code:'full_name',review_state:'approved',proposed_value:'نام میانی نمونه'},
+  {id:'R2',worker_id:'FAKE-W1',field_code:'full_name',review_state:'pending',proposed_value:'نام پیشنهادی نمونه'},
+ ]
+ let reads=0
+ const ui=await mount({view:'profiles',fixture:f,loadOriginalCandidates:async()=>{reads++;return [
+  {id:'FAKE-APP1',worker_id:'FAKE-W1',full_name:'نام اولیه نمونه'},
+  {id:'FAKE-APP2',worker_id:'FAKE-W2',full_name:'نام دوم'},
+ ]}})
+ const directory=ui.host.querySelector('.ow-people-directory')
+ const input=directory.querySelector('input')
+ const search=async value=>{await act(async()=>{
+  Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,value)
+  input.dispatchEvent(new window.Event('input',{bubbles:true}))
+ }) }
+ try{
+  assert.equal(reads,1)
+  await search('نام اولیه')
+  assert.equal(directory.querySelectorAll('button').length,1)
+  assert.match(directory.textContent,/دانشجوکار ساختگی الف/)
+  assert.match(directory.textContent,/مطابق نام زمان ثبت‌نام/)
+  await search('میانی')
+  assert.equal(directory.querySelectorAll('button').length,1)
+  assert.match(directory.textContent,/مطابق نام قبلی تأییدشده/)
+  await search('پیشنهادی')
+  assert.equal(directory.querySelectorAll('button').length,0)
   assert.equal(globalThis.__qaD3Writes,0)
  }finally{await ui.cleanup()}
 })

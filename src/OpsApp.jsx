@@ -818,7 +818,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
        </section>}
       {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation}
         refreshRevision={refreshRevision + manualWorkRevision}
-        hideSectionTabs={managerShellEnabled} />}
+        hideSectionTabs={managerShellEnabled} loadOriginalCandidates={getOperationsCandidates} />}
       {issuedCredentials && (
         <div className="ops-modal" role="dialog" aria-modal="true" aria-labelledby="ops-credentials-title">
           <div className="ops-modal__card">
