@@ -1,6 +1,6 @@
 import test,{before,after} from 'node:test'
 import assert from 'node:assert/strict'
-import {managerReviewItems} from '../src/lib/managerReviewRows.mjs'
+import {managerReviewItems,filterManagerInbox,managerReviewSubmissionDay} from '../src/lib/managerReviewRows.mjs'
 
 const workers=[{id:'FAKE-A',name:'دانشجوکار نمونه الف'}]
 const tasks=[{id:'FAKE-T',title:'ثبت نسخه‌های آزمایشی',worker_id:'FAKE-A',
@@ -77,4 +77,33 @@ test('pending presence is counted exactly once alongside time and profile, but n
  assert.equal(managerReviewItems({...opts,mode:'presence'}).length,1)
  assert.equal(all.some(x=>x.key==='presence:FAKE-P2'),false)
  assert.equal(JSON.stringify(presenceChanges).includes('"status":"approved"'),true)
+})
+
+test('unified inbox filters use activity unit, worker and Tehran submission day, not scheduled date',()=>{
+ const list=managerReviewItems({
+  workers,tasks,
+  timeEntries:[{...pending[0],submitted_at:'2026-11-20T21:00:00Z'},
+   {...pending[2],submitted_at:'2026-11-20T10:00:00Z'}],
+  profileChanges:[{...changes[0],created_at:'2026-11-19T09:00:00Z'}],
+  presenceChanges:[{id:'P',worker_id:'FAKE-A',status:'pending',local_date:'2030-01-01',
+   requested_at:'2026-11-20T22:00:00Z'}],
+ })
+ const before=JSON.stringify(list)
+ const keys=f=>filterManagerInbox(list,f).map(x=>x.key)
+ assert.deepEqual(keys({}),['profile:FAKE-C1','time:FAKE-R3','time:FAKE-R1','presence:P'])
+ assert.deepEqual(keys({order:'newest'}),['presence:P','time:FAKE-R1','time:FAKE-R3','profile:FAKE-C1'])
+ assert.deepEqual(keys({unit:'library'}),['time:FAKE-R1'])
+ assert.deepEqual(keys({unit:'unknown'}),['time:FAKE-R3'])
+ assert.deepEqual(keys({unit:'not_applicable'}),['profile:FAKE-C1','presence:P'])
+ assert.deepEqual(keys({workerId:'FAKE-B'}),[])
+ assert.deepEqual(keys({workerId:'FAKE-A',kind:'time',from:'2026-11-21',to:'2026-11-21'}),['time:FAKE-R1'])
+ assert.deepEqual(keys({from:'2026-11-22',to:'2026-11-21'}),[])
+ assert.equal(managerReviewSubmissionDay(list.find(x=>x.key==='presence:P')),'2026-11-21')
+ assert.equal(JSON.stringify(list),before)
+})
+test('missing or zone-less submitted timestamps are last and excluded only when date filters apply',()=>{
+ const list=[{key:'b',kind:'time',submittedAt:null},{key:'a',kind:'time',submittedAt:'2026-11-20T08:00:00Z'},
+  {key:'c',kind:'presence',submittedAt:'2026-11-20T08:00:00'}]
+ for(const order of ['oldest','newest'])assert.deepEqual(filterManagerInbox(list,{order}).map(x=>x.key),['a','b','c'])
+ assert.deepEqual(filterManagerInbox(list,{from:'2026-11-20'}).map(x=>x.key),['a'])
 })
