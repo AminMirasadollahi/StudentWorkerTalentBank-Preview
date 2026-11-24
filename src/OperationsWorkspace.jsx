@@ -2551,12 +2551,13 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
   const [readFailed,setReadFailed]=useState(false)
-  const poolActive=workPoolUIEnabled&&!settingsOpen&&!readFailed&&section==='workPool'
+  const poolAuthorized=!readFailed&&workSnapshot.workerId===profile.worker_id
+  const poolActive=workPoolUIEnabled&&poolAuthorized&&!settingsOpen&&section==='workPool'
   useEffect(()=>{if(poolActive)setVisitedPoolWorker(session)},[poolActive,session])
   useLayoutEffect(()=>{
-    claimContext.current={session,section,settingsOpen,readFailed,guideScope}
+    claimContext.current={session,section,settingsOpen,readFailed,guideScope,poolAuthorized}
     return()=>{claimContext.current=null}
-  },[session,section,settingsOpen,readFailed,guideScope])
+  },[session,section,settingsOpen,readFailed,guideScope,poolAuthorized])
   const readSequence=useRef(0)
   const refresh=async()=>{
     const sequence=++readSequence.current
@@ -2635,14 +2636,14 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     const current=()=>claimContext.current?.session===session?claimContext.current:null
     if(!current()||typeof taskId!=='string'||!taskId)return
     setClaimReceipt({session,taskId,found:null})
-    if(current().readFailed)return
+    if(!current().poolAuthorized)return
     const fresh=await refresh()
     const context=current()
     if(!context)return
     const target=locateClaimedWorkerTask(fresh?.tasks,today(),taskId)
     setClaimReceipt({session,taskId,found:Boolean(target)})
     // Do not steal navigation from another section, settings or an active guide.
-    if(context.section!=='workPool'||context.settingsOpen||context.guideScope||context.readFailed||!target)return
+    if(context.section!=='workPool'||context.settingsOpen||context.guideScope||!context.poolAuthorized||!target)return
     setSelectedTaskId(taskId)
     updateNavigation({section:'tasks',taskView:target})
   }
@@ -2692,13 +2693,13 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     completed:'هنوز کاری با وضعیت تکمیل‌شده ثبت نشده است.',
     calendar:'کاری برای این بازهٔ زمانی ثبت نشده است.',
   }
-  if(readFailed)return <div className="ow-workspace ow-worker-workspace ow-access-recheck" role="alert">
+  return <div className={`ow-workspace ow-worker-workspace ${readFailed?'ow-access-recheck':`ow-b3-layout ${sidebarCollapsed?'ow-b3-is-collapsed':''}`}`}>
+    {readFailed?<div role="alert">
     <p>برنامهٔ کاری در دسترس نیست. تا بررسی دوبارهٔ دسترسی، اطلاعات قبلی نمایش داده نمی‌شوند.</p>
     <div className="report-alert report-alert--error">{error}</div>
     <button type="button" className="report-btn report-btn--light" disabled={loading}
       onClick={()=>{void refresh()}}>تلاش مجدد برای دریافت اطلاعات</button>
-  </div>
-  return <div className={`ow-workspace ow-worker-workspace ow-b3-layout ${sidebarCollapsed?'ow-b3-is-collapsed':''}`}>
+  </div>:<>
     <a className="ow-b3-skip" href="#ow-b3-main">رفتن به محتوای اصلی</a>
     <aside className="ow-b3-sidebar" aria-label="ناوبری اصلی دانشجوکار">
       <div className="ow-b3-brand" title="پنل دانشجوکار · دانشکده علوم انسانی شهید رجایی بابل">
@@ -2773,8 +2774,9 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           {!sidebarCollapsed&&' جمع‌کردن سایدبار'}
         </button>
       </div>
-    </aside>
-    <div className="ow-b3-stage" id="ow-b3-main" tabIndex={-1}>
+    </aside></>}
+    <div className="ow-b3-stage" id="ow-b3-main" tabIndex={-1} hidden={readFailed} inert={readFailed}>
+      {!readFailed&&<>
       <header className="ow-b3-toolbar">
         <span className="ow-b3-breadcrumb">فضای کاری <span aria-hidden="true">›</span>
           <strong>{settingsOpen?'تنظیمات حساب':sectionNames[section]}</strong></span>
@@ -2901,13 +2903,14 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         <p className="ow-muted">برای انجام یا اصلاح گزارش، از دکمهٔ همان ردیف استفاده کنید.</p>
       </aside>}
       </div>
-    </section>}
+    </section>}</>}
     {workPoolUIEnabled&&(poolActive||visitedPoolWorker===session)&&<div hidden={!poolActive} inert={!poolActive}>
       <Suspense fallback={poolActive?<p className="ow-muted" role="status">در حال آماده‌سازی فرصت‌های کاری…</p>:null}>
-        <WorkPoolWorkerPanel key={profile.worker_id} workerId={profile.worker_id} active={poolActive}
+        <WorkPoolWorkerPanel key={profile.worker_id} workerId={profile.worker_id} active={poolActive} authorized={poolAuthorized}
           onGuide={openWorkerGuide} refreshRevision={refreshRevision} onClaimed={handleConfirmedClaim}/>
       </Suspense>
     </div>}
+    {!readFailed&&<>
     {!settingsOpen&&section==='availability'&&<section className="report-panel ow-worker-availability-panel">
       <div className="ow-b3-guide-heading">
         <h2>برنامه حضور</h2>
@@ -2941,18 +2944,19 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}
       approvedMinutesTotal={data.approved_minutes_total} refreshRevision={refreshRevision}/>}
+    </>}
     </div>
-    {workerCharterInfoEnabled&&charterInfoOpen&&<Suspense
+    {!readFailed&&workerCharterInfoEnabled&&charterInfoOpen&&<Suspense
       fallback={<p role="status">در حال بارگذاری متن چارچوب همکاری…</p>}>
       <WorkerAgreementModalPreview open={charterInfoOpen} onClose={()=>{
         setCharterInfoOpen(false)
         requestAnimationFrame(()=>charterInfoTriggerRef.current?.focus({preventScroll:true}))
       }}/>
     </Suspense>}
-    {guideWelcomeWorkerId===profile.worker_id&&<WorkerGuideWelcome key={profile.worker_id}
+    {!readFailed&&guideWelcomeWorkerId===profile.worker_id&&<WorkerGuideWelcome key={profile.worker_id}
       onBegin={disable=>{if(!applyGuideAutoPreference(disable))return false;openWorkerGuide('all');return true}}
       onSkip={disable=>{if(!applyGuideAutoPreference(disable))return false;setGuideWelcomeWorkerId(null);return true}}/>}
-    {guideScope&&<WorkerGuideSpotlight key={guideScope} scope={guideScope}
+    {!readFailed&&guideScope&&<WorkerGuideSpotlight key={guideScope} scope={guideScope}
       currentSection={section}
       onNavigate={next=>updateNavigation({section:next})}
       includeWorkPool={workPoolUIEnabled} onClose={closeWorkerGuide}/>}
