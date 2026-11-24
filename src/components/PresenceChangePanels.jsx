@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react'
 import {projectDayPresence} from '../lib/presenceDayProjection.mjs'
 import FocusedReviewQueue from './FocusedReviewQueue.jsx'
-import {managerReviewItems,EMPTY_MANAGER_INBOX_FILTERS,filterManagerInbox} from '../lib/managerReviewRows.mjs'
+import {managerReviewItems,EMPTY_MANAGER_INBOX_FILTERS,filterManagerInbox,managerReviewSubmissionDay} from '../lib/managerReviewRows.mjs'
 import JalaliDatePicker from './JalaliDatePicker.jsx'
 import {
   listPresenceChanges,cancelPresenceChange,reviewPresenceChange,
@@ -182,7 +182,7 @@ export function ManagerPresenceReviewQueue({workers=[],tasks=[],data=null,otherI
  const unitOptions=[...new Set(allItems.map(item=>item.activityUnit).filter(Boolean))]
  const displayedUnitOptions=[...new Set([...unitOptions,...(chosenFilters.unit?[chosenFilters.unit]:[])])]
  const refreshAll=()=>{if(onEffectiveChange)void onEffectiveChange();else void reload().catch(()=>{})}
- const countByKind=kind=>allItems.filter(item=>item.kind===kind).length
+ const missingSubmissionDates=allItems.filter(item=>!managerReviewSubmissionDay(item)).length
  const renderPresenceRequest=record=>{
    const item=record.request
    const worker=workers.find(w=>w.id===item.worker_id)
@@ -287,9 +287,9 @@ export function ManagerPresenceReviewQueue({workers=[],tasks=[],data=null,otherI
      </div>
      {badRange&&<p role="alert" className="ow-warning">تاریخ آغاز نباید بعد از تاریخ پایان باشد.</p>}
      <p className="ow-muted" role="status">{new Intl.NumberFormat('fa-IR').format(visibleItems.length)} از {new Intl.NumberFormat('fa-IR').format(allItems.length)} درخواست قابل دسترس
-       {' · '}{new Intl.NumberFormat('fa-IR').format(countByKind('time'))} گزارش · {new Intl.NumberFormat('fa-IR').format(countByKind('profile'))} اصلاح مشخصات · {new Intl.NumberFormat('fa-IR').format(countByKind('presence'))} حضور
        {error?' (شمار ناقص)':''}
      </p>
+     {(chosenFilters.from||chosenFilters.to)&&missingSubmissionDates>0&&<p className="ow-muted" role="status">درخواست‌های بدون تاریخ ارسال معتبر در فیلتر تاریخ قرار نمی‌گیرند.</p>}
      <FocusedReviewQueue items={visibleItems} label="درخواست‌های نیازمند تصمیم مدیر"
        emptyText={badRange?'بازه تاریخ معتبر نیست.':error?'درخواست‌های حضور هنوز بارگذاری نشده‌اند؛ در فهرست‌های قابل دسترس موردی مطابق فیلتر نیست.':
          allItems.length===0?'هیچ درخواستی منتظر رسیدگی نیست.':'درخواستی مطابق فیلتر انتخاب‌شده وجود ندارد.'}
