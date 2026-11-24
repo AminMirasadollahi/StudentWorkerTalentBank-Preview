@@ -1152,7 +1152,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
   </section>
 }
 export function AdminOperations({ navigation, setNavigation, refreshRevision = 0,
-  hideSectionTabs = false, loadOriginalCandidates }) {
+  hideSectionTabs = false, loadOriginalCandidates, assignmentReceiptPort=null }) {
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const view=navigation.workView
   const profileWorkerId=navigation.profileWorkerId||''
@@ -1439,7 +1439,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       {!focusedTasks&&<section className="report-panel">
         <h2>واگذاری کار</h2>
         <TaskAssignmentEditor workers={active} data={data}
-          defaultWorkerId={workerId} defaultDate={date} onSaved={refresh}/>
+          assignmentReceiptPort={assignmentReceiptPort} defaultWorkerId={workerId} defaultDate={date} onSaved={refresh}/>
       </section>}
       <section className={'report-panel'+(focusedTasks?' swtb22-task-directory':'')}>
         <div className="report-panel-heading swtb22-task-heading">
@@ -1542,7 +1542,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
          onClick={()=>closeTaskEditor()}>بستن و حفظ پیش‌نویس</button>
        </div>
        <TaskAssignmentEditor key={taskEditorRevision}
-        workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
+        assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
         onSaved={refresh} onCancel={()=>closeTaskEditor()}
         onClose={()=>closeTaskEditor(true)}/>
       </dialog>}
@@ -1640,7 +1640,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         <button type="button" className="ow-mini-btn"
           onClick={()=>setAssignmentDialogDate('')}>بستن</button>
       </div>
-      <TaskAssignmentEditor key={assignmentDialogDate} workers={active} data={data}
+      <TaskAssignmentEditor key={assignmentDialogDate} assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data}
         defaultDate={assignmentDialogDate} defaultWorkerId={workerId}
         onSaved={refresh} onClose={()=>setAssignmentDialogDate('')}/>
     </dialog>}

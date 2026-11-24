@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useRef,useState} from 'react'
+import {Fragment,useEffect,useMemo,useRef,useState} from 'react'
 import JalaliDatePicker from './JalaliDatePicker'
 import {assignWorkerTask} from '../lib/operations'
 import {assignGroupTask,assignLibraryDeskShift,cancelLibraryDeskShift,getLibraryDeskShifts} from '../lib/operationsV2'
@@ -15,7 +15,13 @@ const localToday=()=>{
 }
 const dayAfter=(date,increment)=>{const d=new Date(date+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+increment);return d.toISOString().slice(0,10)}
 const unitNames={library:'کتابخانه',research:'پژوهش',public_relations:'روابط عمومی'}
-export default function TaskAssignmentEditor({workers=[],data={},defaultDate,defaultWorkerId='',onSaved,onClose,onCancel}) {
+export default function TaskAssignmentEditor({workers=[],data={},defaultDate,defaultWorkerId='',onSaved,onClose,onCancel,assignmentReceiptPort=null}) {
+ // Opt-in fixture-only seam. Production callers do not supply this port.
+ // A missing/invalid snapshot in port mode is blocked, never a legacy fallback.
+ const receiptMode=assignmentReceiptPort!==null
+ const receiptBlocked=receiptMode&&assignmentReceiptPort?.snapshot?.state!=='idle'
+ const Fields=receiptMode?'fieldset':Fragment
+ const fieldProps=receiptMode?{disabled:receiptBlocked,style:{border:0,margin:0,padding:0,minWidth:0}}:{}
  const [workerIds,setWorkerIds]=useState(defaultWorkerId?[defaultWorkerId]:[])
  const [filter,setFilter]=useState('')
  const [date,setDate]=useState(defaultDate||localToday())
@@ -88,12 +94,30 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const toggle=id=>setWorkerIds(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id])
  const submit=async event=>{
   event.preventDefault()
-  if(submitLock.current||cancelLock.current||busy||committed||!Object.hasOwn(unitNames,taskUnit)||
+  if(receiptBlocked||submitLock.current||cancelLock.current||busy||committed||!Object.hasOwn(unitNames,taskUnit)||
     selected.length===0||selected.length!==workerIds.length||date<localToday()||
     !routineGroupOk||!estimateValid||!deskCanSubmit)return
   submitLock.current=true
   setBusy(true);setError('');setNotice('')
   try {
+    if(receiptMode){
+      // The session above the route owns the immutable request and receipt.
+      // No legacy writer, onSaved, onClose or success UI from this seam.
+      if(typeof assignmentReceiptPort?.submit!=='function'){
+        setError('مسیر آزمایشی واگذاری آماده نیست. هیچ درخواست جدیدی ارسال نشد.')
+        return
+      }
+      const outcome=await assignmentReceiptPort.submit({
+        kind:libraryTemplateSelected?'desk':'direct',
+        workerIds:selected.map(w=>w.id),unit:taskUnit,title,instructions,date,
+        minutes:libraryTemplateSelected?null:estimateInt,
+        startMinute:libraryTemplateSelected?interval.startMinute:null,
+        endMinute:libraryTemplateSelected?interval.endMinute:null,
+        reason:reason||null,
+      })
+      if(outcome==='invalid')setError('اطلاعات واگذاری معتبر نیست. پیش‌نویس حفظ شده است.')
+      return
+    }
     if(libraryTemplateSelected){
       // No generic-task fallback: the server must atomically reserve seats
       // and create the underlying worker tasks with the exact interval.
@@ -124,6 +148,10 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
       setNotice('واگذاری با موفقیت ثبت شد؛ فقط تازه‌سازی فهرست ناموفق بود. برای مشاهده نتیجه، صفحه را دوباره بارگذاری کنید.')
     }
   } catch(err) {
+    if(receiptMode){
+      setError('نتیجه مسیر آزمایشی مشخص نیست. از ثبت مجدد مستقل خودداری کنید.')
+      return
+    }
     const message=String(err?.message||'')
     setError(message.includes('short_notice_reason_required')?'علت واگذاری نزدیک ضروری است.':
       message.includes('worker_not_active')?'یکی از افراد دیگر فعال نیست.':
@@ -146,7 +174,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const confirmCancel=async shiftId=>{
   const draft=cancelDraft
   const reasonText=String(draft?.reason||'').trim()
-  if(!deskVerified||busy||cancelLock.current||!draft||
+  if(receiptMode||!deskVerified||busy||cancelLock.current||!draft||
      draft.id!==shiftId||reasonText.length<5||reasonText.length>500)return
   cancelLock.current=true;setCancelBusy(true);setCancelError('')
   try{
@@ -171,6 +199,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const options=workers.filter(w=>w.state==='active'&&
   (w.name||'').toLocaleLowerCase('fa-IR').includes(filter.toLocaleLowerCase('fa-IR')))
  return <form className="ow-assignment-form" onSubmit={submit}>
+  <Fields {...fieldProps}>
   {taskUnit==='library'&&<div className="ow-library-template-panel" aria-label="قالب خدمات جاری کتابخانه">
     <div>
       <strong>مسئولیت ثابت کتابخانه</strong>
@@ -267,7 +296,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
               <span>{clockFa(s.start_minute)} تا {clockFa(s.end_minute)}</span>
               <span>{workers.find(w=>w.id===s.worker_id)?.name||'دانشجوکار'}</span>
               <button type="button" className="ow-desk-cancel-trigger"
-                aria-expanded={cancelDraft?.id===s.id} disabled={cancelBusy||busy}
+                aria-expanded={cancelDraft?.id===s.id} disabled={receiptMode||cancelBusy||busy}
                 onClick={()=>{setCancelError('');setCancelDraft(prev=>
                   prev?.id===s.id?null:{id:s.id,reason:''})}}>
                 لغو نوبت
@@ -337,13 +366,14 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
     </div>
   </details>}
   <p className="ow-muted">واحد انتخاب‌شده به خودِ کار تعلق دارد، نه به واحد اولیهٔ ثبت‌نام دانشجو. ساعت گزارش‌شده و تأییدشدهٔ هر نفر زیر همین واحد محاسبه می‌شود. در کار گروهی، یک واحد برای همهٔ اعضای آن کار در نظر گرفته می‌شود.</p>
+  </Fields>
   {error&&<p role="alert" className="report-alert report-alert--error">{error}</p>}
   {notice&&<p role="status" className="ops-alert-success">{notice}</p>}
   <div className="ow-actions">
     {(onClose||onCancel)&&<button type="button" className="report-btn report-btn--light"
       onClick={onCancel||onClose}>انصراف</button>}
     <button type="submit" className="report-btn report-btn--primary"
-      disabled={busy||cancelBusy||committed||!Object.hasOwn(unitNames,taskUnit)||!selected.length||selected.length!==workerIds.length||date<localToday()||!routineGroupOk||!estimateValid||!deskCanSubmit}>
+      disabled={receiptBlocked||busy||cancelBusy||committed||!Object.hasOwn(unitNames,taskUnit)||!selected.length||selected.length!==workerIds.length||date<localToday()||!routineGroupOk||!estimateValid||!deskCanSubmit}>
       {busy?'در حال ثبت…':selected.length>1?'واگذاری گروهی':'واگذاری کار'}
     </button>
   </div>
