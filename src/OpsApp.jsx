@@ -17,6 +17,7 @@ import { watchOperationsResume } from './lib/operationsResume.mjs'
 import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
 import ManagerWorkspaceNav from './components/ManagerWorkspaceNav'
+import DirectAssignmentFixtureHost from './components/DirectAssignmentFixtureHost'
 import ManagerCandidatesWorkspace from './components/ManagerCandidatesWorkspace'
 import {candidateOnboardingLabel,candidateAuthSignInLabel,candidateDisplayName,candidateDisplayMajor} from './lib/managerCandidateView.mjs'
 import {fetchCandidatesWithAuthorizedWorkerIdentity} from './lib/managerCandidateWorkerOverlay.mjs'
@@ -563,7 +564,7 @@ function CandidateCard({
   )
 }
 
-function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 }) {
+function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0, assignmentReceiptPort=null }) {
   const [rows, setRows] = useState([])
   const [busyId, setBusyId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -601,6 +602,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
 
   const refresh = async () => {
     const readId=++candidateReadSequence.current
+    assignmentReceiptPort?.setReadState?.('checking')
     // Never display a prior authorized snapshot while a new manager
     // permission/data read is pending. A rejected read stays blank;
     // only its own latest successful response may repopulate the list.
@@ -625,6 +627,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
       })
       if(readId!==candidateReadSequence.current)return false
       setRows(results)
+      assignmentReceiptPort?.setReadState?.('ready')
       return true
     } catch (e) {
       if(readId!==candidateReadSequence.current)return false
@@ -635,6 +638,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
       setCandidateDrafts({})
       setSelectedCandidateId('')
       setError(getMessage(e))
+      assignmentReceiptPort?.setReadState?.('failed')
       return false
     } finally {
       if(readId===candidateReadSequence.current)setLoading(false)
@@ -645,6 +649,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   // module. Other, unmounted workspaces fetch when they are selected.
   useEffect(() => {
     if (adminSection === 'candidates' && candidateView === 'applicants') void refresh()
+    return ()=>{if(assignmentReceiptPort)candidateReadSequence.current+=1}
   }, [adminSection, candidateView, refreshRevision])
   const refreshCurrentSection = () => {
     if (adminSection === 'work') setManualWorkRevision(v => v + 1)
@@ -816,7 +821,9 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
          <button type="button" onClick={()=>navigateManager({section:'work',view:'availability'})}>برنامه حضور</button>
         </div>
        </section>}
+      {adminSection !== 'work' && assignmentReceiptPort?.panel}
       {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation}
+        assignmentReceiptPort={assignmentReceiptPort}
         refreshRevision={refreshRevision + manualWorkRevision}
         hideSectionTabs={managerShellEnabled} loadOriginalCandidates={getOperationsCandidates} />}
       {issuedCredentials && (
@@ -863,7 +870,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   )
 }
 
-export default function OpsApp({ mode = 'admin' }) {
+export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null }) {
   // This does NOT trust a cached session for authorization. When the fresh
   // server identity check returns no user but a local Supabase session still
   // exists, we cannot distinguish temporary network failure from revoked
@@ -1114,9 +1121,15 @@ export default function OpsApp({ mode = 'admin' }) {
   // tab focus, but never present or accept input in privileged UI while
   // permission is being checked. Identity/role/revocation changes remount.
   const authorizedView = identity.role === 'admin'
-    ? <AdminView key={'admin:' + identity.user?.id}
+    ? (assignmentReceiptFixture===null
+      ? <AdminView key={'admin:' + identity.user?.id}
         onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
         refreshRevision={dataRefreshRevision}/>
+      : <DirectAssignmentFixtureHost key={'fixture-admin:' + identity.user?.id}
+         actorId={identity.user?.id} checking={recheckingAccess} fixture={assignmentReceiptFixture}>
+         {port=><AdminView onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
+          refreshRevision={dataRefreshRevision} assignmentReceiptPort={port}/>}
+        </DirectAssignmentFixtureHost>)
     : identity.role === 'worker_disabled'
       ? <WorkerDisabledView key={'disabled:' + identity.user?.id + ':' + identity.profile?.state}
           profile={identity.profile} onLogout={logout}/>

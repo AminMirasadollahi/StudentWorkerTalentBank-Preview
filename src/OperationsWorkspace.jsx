@@ -1258,6 +1258,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const refresh=async ()=>{
     // Ignore older in-flight responses after a newer role check has completed.
     const sequence=++readSequence.current
+    assignmentReceiptPort?.setReadState?.('checking')
     setLoading(true)
     try{
       const result=await getAdminWorkV2()
@@ -1265,6 +1266,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       setData(result||{workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       setReadFailed(false)
       setError('')
+      assignmentReceiptPort?.setReadState?.('ready')
       return true
     }catch(e){
       if(sequence!==readSequence.current)return false
@@ -1276,10 +1278,11 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       setTaskEditorOpen(false)
       setTaskEditorRevision(v=>v+1)
       setError(readableError(e))
+      assignmentReceiptPort?.setReadState?.('failed')
       return false
     }finally{if(sequence===readSequence.current)setLoading(false)}
   }
-  useEffect(()=>{void refresh()},[refreshRevision])
+  useEffect(()=>{void refresh();return ()=>{if(assignmentReceiptPort)readSequence.current++}},[refreshRevision,assignmentReceiptPort?.committedRevision])
 
   const workers=data.workers||[]
   const active=workers.filter(w=>w.state==='active')
@@ -1363,6 +1366,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   </div>
 
   return <div className="ow-workspace">
+    {!(assignmentDialogDate||(focusedTasks&&view==='tasks'&&taskEditorOpen))&&assignmentReceiptPort?.panel}
     {(!hideSectionTabs||view==='inbox')&&<div className="ow-summary ow-summary--actionable">
       <article><button type="button" className="ow-manager-kpi-action"
         onClick={()=>setView('profiles')} aria-label="نمایش پرونده‌های دانشجوکارها">
@@ -1438,7 +1442,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     {view==='tasks'&&<>
       {!focusedTasks&&<section className="report-panel">
         <h2>واگذاری کار</h2>
-        <TaskAssignmentEditor workers={active} data={data}
+        <TaskAssignmentEditor key={assignmentReceiptPort?.editorRevision??0} workers={active} data={data}
           assignmentReceiptPort={assignmentReceiptPort} defaultWorkerId={workerId} defaultDate={date} onSaved={refresh}/>
       </section>}
       <section className={'report-panel'+(focusedTasks?' swtb22-task-directory':'')}>
@@ -1541,7 +1545,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         <button type="button" className="report-btn report-btn--light"
          onClick={()=>closeTaskEditor()}>بستن و حفظ پیش‌نویس</button>
        </div>
-       <TaskAssignmentEditor key={taskEditorRevision}
+       {taskEditorOpen&&!assignmentDialogDate&&assignmentReceiptPort?.panel}
+       <TaskAssignmentEditor key={assignmentReceiptPort?taskEditorRevision+':'+assignmentReceiptPort.editorRevision:taskEditorRevision}
         assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
         onSaved={refresh} onCancel={()=>closeTaskEditor()}
         onClose={()=>closeTaskEditor(true)}/>
@@ -1640,7 +1645,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         <button type="button" className="ow-mini-btn"
           onClick={()=>setAssignmentDialogDate('')}>بستن</button>
       </div>
-      <TaskAssignmentEditor key={assignmentDialogDate} assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data}
+      {assignmentReceiptPort?.panel}
+      <TaskAssignmentEditor key={assignmentReceiptPort?assignmentDialogDate+':'+assignmentReceiptPort.editorRevision:assignmentDialogDate} assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data}
         defaultDate={assignmentDialogDate} defaultWorkerId={workerId}
         onSaved={refresh} onClose={()=>setAssignmentDialogDate('')}/>
     </dialog>}
