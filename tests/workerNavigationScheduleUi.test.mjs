@@ -308,6 +308,8 @@ test('weekly presence uses keyboard-accessible hour/minute dropdowns without rou
    'time editor must stay progressively disclosed until a slot is chosen')
   await ui.click('button[aria-label="ویرایش برنامه شنبه نوبت 1"]')
   const form=ui.host.querySelector('form.ow-slot-editor')
+  assert.ok(form.getAttribute('aria-label'))
+  assert.equal(form.querySelector('.ow-slot-editor__heading'),null,'redundant visible heading removed')
   assert.ok(form,'one day-level time editor follows the selected weekly row')
   assert.ok(form.previousElementSibling.classList.contains('ow-week-row'))
   assert.equal(form.querySelectorAll('select').length,4,'hour and minute for both endpoints')
@@ -1356,7 +1358,10 @@ test('global and V4 presence tours open, and the optional work-pool guide is wir
  const beforeWrites=globalThis.__workerFocusCalls.length
  const ui=await setup()
  try{
+  const guideKey='swtb-worker-guide:v1:'+worker
+  const beforePreference=window.localStorage.getItem(guideKey)
   await ui.click('[data-swtb-guide="help-global"]')
+  assert.equal(window.localStorage.getItem(guideKey),beforePreference,'manual help must not persist opt-out')
   let dialog=ui.host.querySelector('.swtb-guide-spotlight')
   assert.ok(dialog&&dialog.open,'global worker guide must be visible after click')
   assert.match(dialog.textContent,/مرحله ۱ از ۱۶/)

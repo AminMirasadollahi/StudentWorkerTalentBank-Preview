@@ -36,14 +36,14 @@ after(async()=>{
  }
  for(const k of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT'])delete globalThis[k]
 })
-async function mount(){
+async function mount({reject=false}={}){
  const host=document.createElement('div')
  document.body.appendChild(host)
  const root=createRoot(host)
  const calls=[]
  await act(async()=>root.render(createElement(WorkerGuideWelcome,{
-   onBegin:()=>calls.push('begin'),
-   onSkip:value=>calls.push(value),
+   onBegin:value=>{calls.push(['begin',value]);return !reject},
+   onSkip:value=>{calls.push(value);return !reject},
  })))
  const checkbox=host.querySelector('input[type="checkbox"]')
  assert.ok(checkbox,'explicit auto-open opt-out is present')
@@ -93,6 +93,28 @@ test('Start guide uses explicit begin callback and never impersonates a skip',as
    const begin=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent==='شروع راهنمای سامانه')
    assert.ok(begin)
    await act(async()=>begin.click())
-   assert.deepEqual(ui.calls,['begin'])
+   assert.deepEqual(ui.calls,[['begin',false]])
+ }finally{await ui.dispose()}
+})
+
+test('quickstart contains three genuine actions and does not request sign-out',async()=>{
+ const ui=await mount()
+ try{
+  assert.equal(ui.host.querySelectorAll('.swtb-guide-welcome__quickstart li').length,3)
+  assert.match(ui.host.textContent,/پس از انجام واقعی کار/)
+  assert.match(ui.host.textContent,/برنامه حضور، ثبت حضور واقعی یا ساعت تأییدشده نیست/)
+  assert.doesNotMatch(ui.host.textContent,/خارج شوید/)
+ }finally{await ui.dispose()}
+})
+test('Start respects explicit opt-out, storage failure is visible and checkbox change clears it',async()=>{
+ const ui=await mount({reject:true})
+ try{
+  const begin=Array.from(ui.host.querySelectorAll('button')).find(b=>b.textContent==='شروع راهنمای سامانه')
+  await act(async()=>ui.checkbox.click())
+  await act(async()=>begin.click())
+  assert.deepEqual(ui.calls,[['begin',true]])
+  assert.match(ui.host.querySelector('[role="alert"]').textContent,/ذخیره نشد/)
+  await act(async()=>ui.checkbox.click())
+  assert.equal(ui.host.querySelector('[role="alert"]'),null)
  }finally{await ui.dispose()}
 })

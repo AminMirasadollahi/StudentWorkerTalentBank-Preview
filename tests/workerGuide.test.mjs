@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {WORKER_GUIDE_VERSION,GUIDE_SECTIONS,SECTION_GUIDES,
- getWorkerGuideSteps,workerGuideStorageKey,isWorkerGuideSection
+ getWorkerGuideSteps,workerGuideStorageKey,isWorkerGuideSection,
+ workerGuideSessionStorageKey,shouldAutoOfferWorkerGuide,suppressWorkerGuideAutoOffers
 } from '../src/lib/workerGuide.mjs'
 test('same contextual definitions power whole application and isolated sections',()=>{
  const full=getWorkerGuideSteps('all')
@@ -42,4 +43,29 @@ test('invalid scope does not construct a tour or mix worker identities',()=>{
  assert.equal(isWorkerGuideSection('tasks'),true)
  assert.equal(isWorkerGuideSection('workPool'),true)
  assert.equal(isWorkerGuideSection('admin'),false)
+})
+
+test('auto offer is worker-scoped, respects legacy seen and separates permanent/session suppression',()=>{
+ const key=workerGuideStorageKey('A')
+ assert.notEqual(workerGuideSessionStorageKey('A'),workerGuideSessionStorageKey('B'))
+ assert.equal(workerGuideSessionStorageKey(null),null)
+ assert.equal(shouldAutoOfferWorkerGuide('A',null,null),true)
+ assert.equal(shouldAutoOfferWorkerGuide('A','seen',null),false)
+ assert.equal(shouldAutoOfferWorkerGuide('A','suppressed',null),false)
+ assert.equal(shouldAutoOfferWorkerGuide('A',null,'offered'),false)
+ assert.equal(shouldAutoOfferWorkerGuide('B',null,null),true)
+ assert.equal(shouldAutoOfferWorkerGuide(null,null,null),false)
+ const store=new Map()
+ const storage={setItem:(k,v)=>store.set(k,v),getItem:k=>store.get(k)}
+ assert.equal(suppressWorkerGuideAutoOffers('A',storage),true)
+ assert.equal(store.get(key),'suppressed')
+ assert.equal(store.has(workerGuideStorageKey('B')),false)
+ assert.equal(suppressWorkerGuideAutoOffers('A',{setItem(){throw Error('denied')}}),false)
+ assert.equal(suppressWorkerGuideAutoOffers('A',{setItem(){},getItem(){return null}}),false)
+})
+test('monthly guidance reflects the deployed restore-weekly action and possible manager review',()=>{
+ const step=getWorkerGuideSteps('availability').find(x=>x.anchor==='availability-month')
+ assert.match(step.description,/حذف استثنا و بازگشت به برنامه هفتگی/)
+ assert.match(step.description,/بررسی مدیر/)
+ assert.doesNotMatch(step.description,/در دسترس نیست/)
 })

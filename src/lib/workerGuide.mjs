@@ -21,7 +21,7 @@ export const SECTION_GUIDES=Object.freeze({
   step('availability','nav-availability','زمان حضور','این بخش برنامه شخصی قابل ویرایش و نمای اختیاری برنامه همکاران را در یک صفحه جمع می‌کند. برنامه حضور، ثبت حضور واقعی یا ساعت تأییدشده نیست.'),
   step('availability','availability-week','برنامه ثابت هفتگی','برای هر روز می‌توانید تا چهار نوبت زمانی تنظیم کنید. ذخیره برنامه هر روز مستقل است و خانه خالی به معنی غیبت قطعی نیست.'),
   step('availability','availability-peers','برنامه همکاران و محور ساعت','گزینه نمایش همکاران در ابتدا خاموش است. با روشن‌کردن آن فقط بازه‌های مجاز و خواندنی همکاران روی محور زمان مشترک دیده می‌شوند؛ برنامه شخصی همچنان قابل ویرایش است.'),
-  step('availability','availability-month','تقویم و تغییرات یک روز','یک روز را انتخاب کنید تا برنامه همان تاریخ را ببینید و در صورت نیاز، عدم حضور یا ساعت جایگزین آینده را ثبت کنید. برای بازگرداندن یک استثنای ثبت‌شده به برنامه ثابت، فعلاً گزینه مستقل حذف در پنل در دسترس نیست.'),
+  step('availability','availability-month','تقویم و تغییرات یک روز','یک روز را انتخاب کنید تا برنامه همان تاریخ را ببینید و در صورت نیاز، عدم حضور یا ساعت جایگزین آینده را ثبت کنید. اگر برای روزی استثنا ثبت شده است، از گزینه حذف استثنا و بازگشت به برنامه هفتگی استفاده کنید. بسته به زمان تغییر، درخواست ممکن است نیازمند بررسی مدیر باشد.'),
  ]),
  history:Object.freeze([
   step('history','nav-history','سوابق گزارش‌ها','گزارش‌های مجاز و بارگذاری‌شده خودتان، مدت زمان درخواست‌شده و نتیجه رسیدگی مدیر را اینجا پیگیری کنید.'),
@@ -44,5 +44,19 @@ export function getWorkerGuideSteps(scope='all',{includeWorkPool=true}={}){
 export function workerGuideStorageKey(workerId){
  if(typeof workerId!=='string'||!workerId)return null
  return 'swtb-worker-guide:v'+WORKER_GUIDE_VERSION+':'+workerId
+}
+// Browser-local preferences, never authorization or server-side consent.
+export function workerGuideSessionStorageKey(workerId){
+ const key=workerGuideStorageKey(workerId)
+ return key?key+':session-offer':null
+}
+export function shouldAutoOfferWorkerGuide(workerId,permanentValue,sessionValue){
+ return Boolean(workerGuideStorageKey(workerId))&&permanentValue!=='seen'&&
+  permanentValue!=='suppressed'&&sessionValue!=='offered'
+}
+export function suppressWorkerGuideAutoOffers(workerId,storage){
+ const key=workerGuideStorageKey(workerId)
+ if(!key||!storage)return false
+ try{storage.setItem(key,'suppressed');return storage.getItem(key)==='suppressed'}catch{return false}
 }
 export function isWorkerGuideSection(section){return GUIDE_SECTIONS.includes(section)}
