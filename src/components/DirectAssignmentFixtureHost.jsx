@@ -56,12 +56,15 @@ export default function DirectAssignmentFixtureHost({actorId,checking,fixture,ch
   setEditor(e=>({...e,revision:e.revision+1,seed}))
   redraw()
  }
- const snapshot=checking||!same()||instance.readState!=='ready'?{state:'checking'}:instance.session.snapshot()
+ // Do not mount children until layout initialization establishes the owner.
+ // Their initial data-read effect must never capture a null/stale port.
+ if(!same())return null
+ const snapshot=checking||instance.readState!=='ready'?{state:'checking'}:instance.session.snapshot()
  const panel=<DirectAssignmentReceiptPanel snapshot={snapshot}
   onReconcile={()=>void run(instance.session.reconcile)} onRetry={()=>void run(instance.session.retry)}
   onAcknowledge={acknowledge} onRevise={revise}/>
  // Never expose a private seed during verification, failure or stale owner.
- const port={snapshot,submit:d=>same()?run(instance.session.submit,d):Promise.resolve('blocked'),
+ const port={snapshot,submit:d=>run(instance.session.submit,d),
   setReadState,panel,editorRevision:editor.revision,initialPayload:usable()?editor.seed:null,
   committedRevision:editor.committedRevision}
  return children(port)
