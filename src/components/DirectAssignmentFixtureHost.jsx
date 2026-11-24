@@ -65,7 +65,7 @@ export default function DirectAssignmentFixtureHost({actorId,checking,fixture,ch
   onAcknowledge={acknowledge} onRevise={revise}/>
  // Never expose a private seed during verification, failure or stale owner.
  const port={snapshot,submit:d=>run(instance.session.submit,d),
-  setReadState,panel,editorRevision:editor.revision,initialPayload:usable()?editor.seed:null,
+  setReadState,panel,editorRevision:editor.revision,initialPayload:usable()?(snapshot.payload??editor.seed):null,
   committedRevision:editor.committedRevision}
  return children(port)
 }

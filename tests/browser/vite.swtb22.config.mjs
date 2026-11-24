@@ -10,7 +10,7 @@ const api=[
  'opportunities:globalThis.__qaGeneralOffers||[]});',
  'export const getManagerDeskWorkPool=async()=>({ok:true,scope:"manager_desk_offers",offers:globalThis.__qaDeskOffers||[]});',
  // Real AdminOperations/TaskAssignmentEditor in this fixture, but fake-only data:
- 'export const getAdminWorkV2=async()=>globalThis.__qaAdminWork;',
+ 'export const getAdminWorkV2=async()=>{if(globalThis.__qaAssignmentReadFail===true)throw Error("SYNTHETIC_READ_FAILED");return globalThis.__qaAdminWork;}',
  'export const getMyWorkV2=async()=>({});',
  'export const getMyWorkerProfileV2=async()=>({});',
  'export const getMyProfileChangeRequests=async()=>[];',

@@ -1360,6 +1360,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
 
   if(readFailed)return <div className="ow-workspace ow-access-recheck" role="alert">
     <p>اطلاعات مدیریتی در دسترس نیست. تا بررسی دوبارهٔ مجوز، داده‌های قبلی نمایش داده نمی‌شوند.</p>
+    {assignmentReceiptPort?.committedRevision>0&&<p role="status">ثبت آخرین واگذاری تأیید شده بود؛ خطای بازخوانی به معنای لغو آن نیست. برای تازه‌سازی فقط اطلاعات را دوباره دریافت کنید.</p>}
     <Message error={error}/>
     <button type="button" className="report-btn report-btn--light" disabled={loading}
       onClick={()=>{void refresh()}}>تلاش مجدد برای دریافت اطلاعات</button>
