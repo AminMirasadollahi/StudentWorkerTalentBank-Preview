@@ -37,6 +37,7 @@ import ManagerHistoryExplorer from './components/ManagerHistoryExplorer'
 import {managerHistoryProjection,managerHistoryExportMetadata} from './lib/managerHistoryExport.mjs'
 import {buildManagerHistoryWorkbook} from './lib/managerHistoryWorkbook.mjs'
 import {managerReviewItems} from './lib/managerReviewRows.mjs'
+import {buildOriginalWorkerNameIndex,selectManagerWorkerProfiles} from './lib/managerWorkerProfileSearch.mjs'
 // Load the optional manager surface ONLY after backend rollout explicitly enables it.
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
 const WorkPoolManagerPanel = lazy(()=>import('./components/WorkPoolManagerPanel'))
@@ -1029,11 +1030,26 @@ function ProfileChangeReview({request,worker,onDone}) {
    {error&&<p role="alert" className="report-alert report-alert--error">{error}</p>}
  </article>
 }
-function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=false}) {
+function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=false,
+  loadOriginalCandidates,loading=false}) {
   const workers=data.workers||[]
   const [query,setQuery]=useState('')
-  const shownWorkers=workers.filter(w=>w.name?.toLocaleLowerCase('fa-IR')
-    .includes(query.trim().toLocaleLowerCase('fa-IR')))
+  const [originalSnapshot,setOriginalSnapshot]=useState(null)
+  useEffect(()=>{
+    if(loading||typeof loadOriginalCandidates!=='function')return
+    let cancelled=false
+    // Retain only the matching original names, not candidate contact/details.
+    Promise.resolve().then(()=>loadOriginalCandidates()).then(rows=>{
+      if(cancelled)return
+      setOriginalSnapshot({data,...buildOriginalWorkerNameIndex(data.workers,rows)})
+    }).catch(()=>{
+      if(!cancelled)setOriginalSnapshot({data,names:new Map(),complete:false})
+    })
+    return()=>{cancelled=true}
+  },[data,loading,loadOriginalCandidates])
+  const original=(!loading&&originalSnapshot?.data===data)?originalSnapshot:null
+  const shownWorkers=selectManagerWorkerProfiles(workers,loading?[]:data.profile_requests,
+    original?.names,query)
   const selected=workers.find(w=>w.id===selectedId)
   const scoped=selected?scopeWorkerHistory(data,selectedId):null
   const summary=scoped?summarizeWorkerHistory(scoped):null
@@ -1055,11 +1071,15 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
     <div className="ow-profile-layout">
       <aside className="ow-people-directory" aria-label="فهرست دانشجوکارها">
         <input type="search" value={query} onChange={e=>setQuery(e.target.value)}
-          aria-label="جست‌وجوی دانشجوکار در پروفایل‌ها" placeholder="جست‌وجوی دانشجوکار"/>
-        {shownWorkers.map(w=><button type="button" key={w.id}
+          aria-label="جست‌وجوی دانشجوکار در پروفایل‌ها" placeholder="نام فعلی یا قبلی"/>
+        <p className="ow-muted">نام فعلی، نام زمان ثبت‌نام و اصلاحات تأییدشدهٔ موجود در سوابق قابل جست‌وجو هستند.</p>
+        {typeof loadOriginalCandidates==='function'&&!original&&<p className="ow-muted" role="status">در حال دریافت نام‌های زمان ثبت‌نام…</p>}
+        {original&&!original.complete&&<p className="ow-muted" role="status">برخی نام‌های زمان ثبت‌نام در دسترس نیستند؛ نتایج ممکن است محدود باشند.</p>}
+        {shownWorkers.map(({worker:w,matchKind})=><button type="button" key={w.id}
           className={selectedId===w.id?'is-selected':''} onClick={()=>onChange(w.id)}>
           <strong>{w.name}</strong>
           <small>{unitLabels[w.unit]||w.unit}</small>
+          {matchKind!=='current'&&<small>{matchKind==='original'?'مطابق نام زمان ثبت‌نام':'مطابق نام قبلی تأییدشده'}</small>}
           {(data.profile_requests||[]).some(r=>r.worker_id===w.id&&r.review_state==='pending')
             &&<i aria-label="درخواست منتظر بررسی">•</i>}
         </button>)}
@@ -1132,7 +1152,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
   </section>
 }
 export function AdminOperations({ navigation, setNavigation, refreshRevision = 0,
-  hideSectionTabs = false }) {
+  hideSectionTabs = false, loadOriginalCandidates }) {
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const view=navigation.workView
   const profileWorkerId=navigation.profileWorkerId||''
@@ -1610,7 +1630,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     </section>}
 
     {view==='profiles'&&<ManagerWorkerProfile data={data} selectedId={profileWorkerId}
-      onChange={setProfileWorkerId} onDone={refresh} focusedReview={focusedReview}/>} 
+      onChange={setProfileWorkerId} onDone={refresh} focusedReview={focusedReview}
+      loading={loading} loadOriginalCandidates={loadOriginalCandidates}/>} 
     {assignmentDialogDate&&<dialog ref={assignmentDialogRef} className="ow-assignment-dialog"
       onCancel={e=>{e.preventDefault();setAssignmentDialogDate('')}} aria-label="تعریف کار جدید در تقویم">
       <div className="ow-presence-section-title">
