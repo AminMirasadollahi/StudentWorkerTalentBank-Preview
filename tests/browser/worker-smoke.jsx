@@ -48,9 +48,22 @@ globalThis.__qaProfileRequests=[
   review_note:'درخواست نمونه به‌دلیل وجود مغایرت آزمایشی رد شده است؛ جهت بررسی بعدی از مسیر تعریف‌شده اقدام کنید'},
 ]
 globalThis.__qaWriteAttempts=0
+globalThis.__qaCurrentWorker=workerId
+globalThis.__qaPoolState={}
+globalThis.__qaClaimCalls=[]
+globalThis.__qaPoolReads=0
+globalThis.__qaClaimMode='ok'
 
 function App(){
  const [nav,setNav]=useState({section:'tasks',taskRange:'today'})
+ const [identity,setIdentity]=useState(workerId)
+ const [revision,setRevision]=useState(0)
+ useLayoutEffect(()=>{
+  globalThis.__qaSetWorker=(next,data)=>{globalThis.__qaCurrentWorker=next;globalThis.__qaWorkerData=data;setIdentity(next)}
+  globalThis.__qaSetNav=setNav
+  globalThis.__qaRefresh=()=>setRevision(n=>n+1)
+  return()=>{delete globalThis.__qaSetWorker;delete globalThis.__qaSetNav;delete globalThis.__qaRefresh}
+ },[])
  const [frozen,setFrozen]=useState(false)
  const [settingsOpen,setSettingsOpen]=useState(false)
  const curtainRef=useRef(null)
@@ -77,11 +90,11 @@ function App(){
  return <div className="ops-root report-shell ops-worker-b3-view" dir="rtl">
   <div className={frozen?'ops-recheck-frozen':undefined}
        inert={frozen} aria-hidden={frozen?'true':undefined}>
-   <WorkerOperations profile={{worker_id:workerId}} navigation={nav}
+   <WorkerOperations profile={{worker_id:identity}} navigation={nav} refreshRevision={revision}
       workerName="دانشجوکار ساختگی" loginEmail="synthetic@example.invalid"
       settingsPanel={mockSettings} settingsOpen={settingsOpen}
       onToggleSettings={()=>setSettingsOpen(open=>!open)}
-      onRefresh={()=>{}} onLogout={()=>{}}
+      onRefresh={()=>setRevision(n=>n+1)} onLogout={()=>{}}
       setNavigation={setNav}/> 
   </div>
   <dialog className="ops-recheck-curtain ops-root" ref={curtainRef}
