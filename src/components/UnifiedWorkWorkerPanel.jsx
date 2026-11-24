@@ -17,7 +17,7 @@ const pickDate=item=>Array.isArray(item.available_dates)&&item.available_dates.l
  :(item.date<addDays(todayTehran(),2)?addDays(todayTehran(),2):item.date)
 
 export default function UnifiedWorkWorkerPanel({
- workerId,refreshRevision=0,onClaimed,onGuide,active=true,
+ workerId,refreshRevision=0,onClaimed,onGuide,active=true,authorized=true,
 }){
  const [view,setView]=useState({status:'loading',offers:[]})
  const [dates,setDates]=useState({})
@@ -37,8 +37,17 @@ export default function UnifiedWorkWorkerPanel({
  const alive=useRef(false)
  useLayoutEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
  const readSeq=useRef(0)
+ const authorizedRef=useRef(authorized)
+ useLayoutEffect(()=>{
+  authorizedRef.current=authorized
+  if(!authorized){
+   readSeq.current+=1
+   setView({status:'loading',offers:[]})
+   setRetryReady(false)
+  }
+ },[authorized])
  const read=useCallback(async()=>{
-  if(!alive.current)return null
+  if(!alive.current||!authorizedRef.current)return null
   const index=++readSeq.current
   setView(v=>({...v,status:'loading'}))
   try{
@@ -56,13 +65,13 @@ export default function UnifiedWorkWorkerPanel({
    return null
   }
  },[])
- useEffect(()=>{if(active)void read();return()=>{readSeq.current+=1}},[read,workerId,refreshRevision,active])
+ useEffect(()=>{if(active&&authorized)void read();return()=>{readSeq.current+=1}},[read,workerId,refreshRevision,active,authorized])
  useEffect(()=>{
   setDates({});setShares({})
   setUncertainId('');setRetryReady(false);setNotice('');setInspectedId('')
  },[workerId])
  const claim=async(item,retry=false)=>{
-  if(!active||!alive.current||inFlight.current||view.status!=='ready'||item.claimable!==true||item.my_task_id
+  if(!active||!authorizedRef.current||!alive.current||inFlight.current||view.status!=='ready'||item.claimable!==true||item.my_task_id
     ||uncertainId&&(uncertainId!==item.id||!retryReady)
     ||retryReady&&!retry)return
   if(!globalThis.crypto?.randomUUID){
@@ -138,7 +147,7 @@ export default function UnifiedWorkWorkerPanel({
  }
  const ordered=view.offers.slice().sort((a,b)=>
   String(a.date).localeCompare(String(b.date))||Number(a.priority)-Number(b.priority))
- const inspected=active&&view.status==='ready'?ordered.find(item=>item.id===inspectedId):null
+ const inspected=authorized&&active&&view.status==='ready'?ordered.find(item=>item.id===inspectedId):null
  useEffect(()=>{
   if(inspected)inspectorRef.current?.focus({preventScroll:true})
  },[inspected?.id,view.status])
@@ -154,7 +163,8 @@ export default function UnifiedWorkWorkerPanel({
   return()=>document.removeEventListener('keydown',onKey)
  },[inspected?.id])
  return <section className="swtb19-unified-work swtb19-unified-work--worker"
-  aria-label="فرصت‌های کاری قابل انتخاب" data-swtb-guide="work-pool-list">
+  aria-label="فرصت‌های کاری قابل انتخاب" data-swtb-guide="work-pool-list" hidden={!authorized}>
+  {authorized&&<>
   <div className="swtb19-unified-work__toolbar">
    <div><h2>فرصت‌های همکاری</h2>
     <p>کار موردنظر را انتخاب کنید. زمان درج‌شده سهم تخمینی است، نه ساعت تأییدشده.</p>
@@ -267,9 +277,10 @@ export default function UnifiedWorkWorkerPanel({
     </p>
    </aside>}
   </div>}
-  {deskEnabled&&<Suspense fallback={<p role="status">در حال آماده‌سازی نوبت‌های میز کتابخانه…</p>}>
+  </>}
+  {deskEnabled&&<Suspense fallback={authorized&&active?<p role="status">در حال آماده‌سازی نوبت‌های میز کتابخانه…</p>:null}>
    <DeskWorkPoolWorkerSection workerId={workerId} refreshRevision={refreshRevision}
-    onClaimed={onClaimed} active={active}/>
+    onClaimed={onClaimed} active={active} authorized={authorized}/>
   </Suspense>}
  </section>
 }
