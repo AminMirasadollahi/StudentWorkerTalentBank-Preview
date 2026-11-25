@@ -111,3 +111,49 @@ test('normal V2 host submits in one action; receipt still requires explicit ackn
   assert.equal(m.port().committedRevision,1)
  }finally{await m.cleanup()}
 })
+
+test('existing shift cancellation locks assignment and duplicate cancellation above editor route',async()=>{
+ const base=fixture(false),calls=[]
+ let resolve
+ const f={...base,transport:{...base.transport,cancelExistingShift:args=>{
+  calls.push(args)
+  return new Promise(r=>{resolve=r})
+ }}}
+ const m=await mount(f)
+ const args={shiftId:id(301),reason:'synthetic cancellation'}
+ let pending
+ try{
+  assert.equal(m.port().snapshot.state,'idle')
+  await act(async()=>{pending=m.port().cancelExistingShift(args)})
+  assert.equal(m.port().snapshot.state,'cancelling_shift')
+  assert.match(m.host.textContent,/در حال لغو نوبت ثبت‌شده/)
+  await assert.rejects(m.port().cancelExistingShift(args),/SHIFT_CANCEL_BLOCKED/)
+  assert.equal(await m.port().submit(draft),'blocked')
+  assert.equal(base.calls.filter(x=>x.p_action==='reserve').length,0)
+  assert.deepEqual(calls,[args])
+  await act(async()=>{resolve({ok:true,shift_id:args.shiftId,state:'cancelled'});await pending})
+  assert.equal(m.port().snapshot.state,'idle')
+  assert.equal(m.port().committedRevision,0,'shift cancellation is not a new assignment receipt')
+ }finally{await m.cleanup()}
+})
+test('existing shift response from before access recheck is unconfirmed, not replayed',async()=>{
+ const base=fixture(false),calls=[]
+ let resolve,pending
+ const f={...base,transport:{...base.transport,cancelExistingShift:args=>{
+  calls.push(args)
+  return new Promise(r=>{resolve=r})
+ }}}
+ const m=await mount(f)
+ const args={shiftId:id(302),reason:'synthetic cancellation'}
+ try{
+  await act(async()=>{pending=m.port().cancelExistingShift(args);pending.catch(()=>{})})
+  await m.paint(true)
+  assert.equal(m.port().snapshot.state,'checking')
+  await m.paint(false)
+  assert.equal(m.port().snapshot.state,'cancelling_shift')
+  await act(async()=>{resolve({ok:true,shift_id:args.shiftId,state:'cancelled'});await assert.rejects(pending,/SHIFT_CANCEL_UNCONFIRMED/)})
+  assert.equal(m.port().snapshot.state,'idle')
+  assert.equal(calls.length,1)
+  assert.equal(m.port().committedRevision,0)
+ }finally{await m.cleanup()}
+})
