@@ -69,3 +69,14 @@ test('cross-panel visual rules stay confined to worker CSS and legible',()=>{
  assert.ok(!visual.includes('.swtb22-term-'),'must not style manager')
  assert.match(visual,/@media\(forced-colors:active\)/)
 })
+
+test('SWTB22 chosen task keeps full paragraph layout and reports actual date separately from plan',()=>{
+ const card=jsx.slice(jsx.indexOf('function WorkerTaskCard('),jsx.indexOf('function WorkerTaskCard(')+20000)
+ assert.match(card,/تاریخ واقعی انجام کار \(شمسی\)/)
+ assert.match(card,/تاریخ برنامه‌ریزی: \{pretty\(task.planned_date\)\}/)
+ assert.match(card,/JalaliDatePicker value=\{date\} max=\{today\(\)\} min=\{shift\(today\(\),-90\)\}/)
+ assert.match(card,/task\.instructions\}/)
+ assert.match(jsx,/className="ow-task-full-description"\>\{inspectedTask\.instructions\}/)
+ assert.match(css,/\.ow-task-full-description\s*\{\s*white-space:pre-wrap; overflow-wrap:anywhere;/)
+ assert.match(css,/\.ow-worker-task-instructions p\s*\{[^}]*white-space:pre-wrap/)
+})
