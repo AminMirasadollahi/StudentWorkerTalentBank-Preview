@@ -1151,7 +1151,7 @@ export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, 
       ? <AssignmentRecoveryReviewHost key={'review-admin:' + identity.user?.id}
          config={recoveryReviewConfig} auth={opsClient.auth} actorId={identity.user?.id}
          checking={recheckingAccess||busy} onLogout={logout}>
-         {port=><AdminView onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
+         {(port,guardedLogout)=><AdminView onLogout={guardedLogout} navigation={adminNavigation} setNavigation={setAdminNavigation}
           refreshRevision={dataRefreshRevision} assignmentReceiptPort={port} workHubFixture={workHubFixture}/>}
         </AssignmentRecoveryReviewHost>
       : assignmentReceiptFixture===null
