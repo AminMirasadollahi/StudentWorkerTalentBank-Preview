@@ -14,7 +14,7 @@ export default function AssignmentRecoveryFixtureHost({actorId,checking,fixture,
   setEditor(e=>({revision:e.revision+1,committedRevision:e.committedRevision+(previous.state==='committed'?1:0)}))
  }
  const run=async(i,fn,...args)=>{
-  if(!usable(i))return 'blocked'
+  if(!usable(i)||(i.shiftCancellation&&fn!==i.session.discover))return 'blocked'
   const p=fn(...args);redraw()
   const result=await p
   if(!usable(i))return 'stale'
@@ -28,12 +28,13 @@ export default function AssignmentRecoveryFixtureHost({actorId,checking,fixture,
   const verified=usable(i)
   if(i.verified===verified)return
   i.verified=verified
+  i.accessGeneration++
   i.session.setAccess(verified?{status:'verified',actorId:i.actorId}:{status:'checking'})
   if(verified)void run(i,i.session.discover)
   redraw()
  }
  useLayoutEffect(()=>{
-  const i={actorId,session:createAssignmentRecoverySession(fixture),checking:true,readState:'ready',verified:false,ack:null}
+  const i={actorId,session:createAssignmentRecoverySession(fixture),checking:true,readState:'ready',verified:false,ack:null,shiftCancellation:null,accessGeneration:0}
   owner.current=i
   setEditor({revision:0,committedRevision:0});redraw()
   return ()=>{if(owner.current===i)owner.current=null;i.session.dispose()}
@@ -56,12 +57,28 @@ export default function AssignmentRecoveryFixtureHost({actorId,checking,fixture,
   i.ack={state:previous.state,epoch:previous.epoch}
   void run(i,i.session.acknowledge)
  }
- const snapshot=checking||i.readState!=='ready'?{state:'checking'}:i.session.snapshot()
+ // Existing-shift cancellation is separate from the V2 intent ledger. Keep
+ // its in-flight lock above route/editor remounts; never retry automatically.
+ const cancelExistingShift=async args=>{
+  if(!usable(i)||i.shiftCancellation||!i.session.snapshot().canStart||typeof fixture.cancelExistingShift!=='function')throw Error('SHIFT_CANCEL_BLOCKED')
+  const attempt={generation:i.accessGeneration};i.shiftCancellation=attempt;redraw()
+  try{
+   const result=await fixture.cancelExistingShift(args)
+   if(!usable(i)||i.accessGeneration!==attempt.generation||i.shiftCancellation!==attempt)throw Error('SHIFT_CANCEL_UNCONFIRMED')
+   if(result?.ok!==true||result.shift_id!==args?.shiftId||result.state!=='cancelled')throw Error('SHIFT_CANCEL_UNCONFIRMED')
+   return result
+  }finally{
+   if(i.shiftCancellation===attempt)i.shiftCancellation=null
+   if(same(i))redraw()
+  }
+ }
+ const snapshot=checking||i.readState!=='ready'?{state:'checking'}:i.shiftCancellation?{state:'cancelling_shift',canStart:false}:i.session.snapshot()
  const panel=<AssignmentRecoveryPanel snapshot={snapshot} onDiscover={()=>void run(i,i.session.discover)}
   onRetryReserve={()=>void run(i,i.session.retryReserve)} onCommit={()=>void run(i,i.session.commit)}
   onCancel={()=>void run(i,i.session.cancel)} onAcknowledge={acknowledge}/>
  const manualReserve=fixture.manualReserve===true // focused review tests only
  const port={version:2,manualReserve,snapshot,submit:d=>run(i,manualReserve?i.session.reserve:i.session.submit,d),setReadState,panel,
+  ...(typeof fixture.cancelExistingShift==='function'?{cancelExistingShift}:{}),
   editorRevision:editor.revision,initialPayload:usable(i)?snapshot.payload:null,committedRevision:editor.committedRevision}
  return children(port)
 }
