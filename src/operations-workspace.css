@@ -211,7 +211,8 @@
   padding:0.35rem 0.55rem; background:#fcfefe; }
 .ow-worker-task-instructions > summary { cursor:pointer; color:#34586b;
   font-size:0.76rem; font-weight:600; }
-.ow-worker-task-instructions p { margin:0.3rem 0 0; }
+.ow-worker-task-instructions p { margin:0.3rem 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.ow-task-full-description { white-space:pre-wrap; overflow-wrap:anywhere; }
 .ow-worker-action-detail .report-field textarea { resize:vertical; min-height:3.15rem; }
 .ow-worker-submit-actions { display:flex; gap:0.55rem; flex-wrap:wrap; }
 .ow-worker-submit-actions .report-btn--light { color:#58717e; border-color:#d5e1e5; }
