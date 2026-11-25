@@ -45,6 +45,7 @@ const mock={
    'import React from "react";',
    'const fixtureOwner=Symbol("synthetic work-pool owner");',
    'export function AdminOperations({navigation,hideSectionTabs,workPoolRouteFence:fence,assignmentReceiptPort:port}){',
+   'React.useEffect(()=>{if(port?.beginScopedRead){const settle=port.beginScopedRead("work");settle("ready")}},[port?.readScopeOwner,port?.committedRevision]);',
    'return React.createElement("div",{"data-testid":"manager-stage"},',
    ' "WORK_VIEW="+navigation.workView+";HIDE_TABS="+String(hideSectionTabs),port?.panel,port&&navigation.workView==="tasks"&&React.createElement("button",{disabled:port.snapshot.state!=="idle",onClick:()=>void port.submit({kind:"direct",workerIds:["00000000-0000-4000-8000-000000000010"],unit:"library",title:"Synthetic integration draft",instructions:"Synthetic description",date:"2026-12-01",minutes:60,startMinute:null,endMinute:null,reason:null})},"آماده‌سازی ترکیبی"),fence&&navigation.workView==="workPool"&&React.createElement("button",{onClick:()=>{fence.begin(fixtureOwner,"create");fence.unknown(fixtureOwner)}},"درخواست نامطمئن نمونه"),fence&&React.createElement("button",{onClick:()=>fence.confirmed(fixtureOwner)},"تأیید رسید نمونه"));}',
    'export function WorkerOperations(){return React.createElement("div",',
