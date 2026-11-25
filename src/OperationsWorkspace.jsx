@@ -1258,7 +1258,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const refresh=async ()=>{
     // Ignore older in-flight responses after a newer role check has completed.
     const sequence=++readSequence.current
-    assignmentReceiptPort?.setReadState?.('checking')
+    const settleRead=assignmentReceiptPort?.beginScopedRead?.('work')
+    if(!settleRead)assignmentReceiptPort?.setReadState?.('checking')
     setLoading(true)
     try{
       const result=await getAdminWorkV2()
@@ -1266,7 +1267,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       setData(result||{workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       setReadFailed(false)
       setError('')
-      assignmentReceiptPort?.setReadState?.('ready')
+      if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')
       return true
     }catch(e){
       if(sequence!==readSequence.current)return false
@@ -1278,7 +1279,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       setTaskEditorOpen(false)
       setTaskEditorRevision(v=>v+1)
       setError(readableError(e))
-      assignmentReceiptPort?.setReadState?.('failed')
+      if(settleRead)settleRead('failed');else assignmentReceiptPort?.setReadState?.('failed')
       return false
     }finally{if(sequence===readSequence.current)setLoading(false)}
   }
