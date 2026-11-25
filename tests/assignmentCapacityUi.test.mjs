@@ -429,3 +429,52 @@ test('missing fixture snapshot blocks real editor; no fallback even under synthe
   assert.deepEqual(m.counts(),{saved:0,closed:0})
  }finally{await m.finish()}
 })
+
+test('V2 editor uses only explicit existing-shift cancellation capability, not the legacy RPC',async()=>{
+ const calls=[]
+ const shiftId=receiptId(301)
+ const port={version:2,snapshot:{state:'idle'},submit:async()=>{throw Error('UNEXPECTED_ASSIGNMENT')},
+  cancelExistingShift:async args=>{
+   calls.push(args)
+   globalThis.__qaDeskShifts=globalThis.__qaDeskShifts.map(s=>s.id===args.shiftId?{...s,state:'cancelled'}:s)
+   return {ok:true,state:'cancelled'}
+  }}
+ const m=await receiptEditorFixture(async()=>{throw Error('MUST_NOT_WRITE')},{portOverride:port})
+ try{
+  globalThis.__qaDeskShifts=[{id:shiftId,worker_id:receiptWorkers[0].id,state:'scheduled',start_minute:540,end_minute:600}]
+  await m.unit()
+  await act(async()=>m.host.querySelector('.ow-library-template-panel button').click())
+  const trigger=m.host.querySelector('.ow-desk-cancel-trigger')
+  assert.ok(trigger);assert.equal(trigger.disabled,false)
+  await act(async()=>trigger.click())
+  await fill(m.host.querySelector('input[aria-label="علت لغو نوبت"]'),'دلیل لغو معتبر')
+  const confirm=m.host.querySelector('.ow-desk-cancel-actions .report-btn--primary')
+  port.snapshot={state:'reserved'};await m.redraw()
+  assert.equal(confirm.disabled,true)
+  // Even a synthetic event must not dispatch an existing-shift cancellation.
+  await act(async()=>confirm.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.equal(calls.length,0)
+  port.snapshot={state:'idle'};await m.redraw()
+  await act(async()=>m.host.querySelector('.ow-desk-cancel-actions .report-btn--primary').click())
+  assert.deepEqual(calls,[{shiftId,reason:'دلیل لغو معتبر'}])
+  assert.equal(globalThis.__qaDeskCancels.length,0)
+  assert.equal(globalThis.__qaDeskCalls.length,0)
+  assert.equal(m.calls.length,0)
+  assert.equal(m.host.querySelector('.ow-desk-cancel-trigger'),null)
+  assert.deepEqual(m.counts(),{saved:1,closed:0})
+ }finally{await m.finish()}
+})
+test('receipt editor without explicit existing-shift cancellation capability stays blocked',async()=>{
+ const port={version:2,snapshot:{state:'idle'},submit:async()=>{throw Error('MUST_NOT_WRITE')}}
+ const m=await receiptEditorFixture(async()=>{throw Error('MUST_NOT_WRITE')},{portOverride:port})
+ try{
+  globalThis.__qaDeskShifts=[{id:receiptId(302),worker_id:receiptWorkers[0].id,state:'scheduled',start_minute:540,end_minute:600}]
+  await m.unit()
+  await act(async()=>m.host.querySelector('.ow-library-template-panel button').click())
+  const trigger=m.host.querySelector('.ow-desk-cancel-trigger')
+  assert.ok(trigger);assert.equal(trigger.disabled,true)
+  await act(async()=>trigger.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.equal(m.host.querySelector('.ow-desk-cancel-confirm'),null)
+  assert.equal(globalThis.__qaDeskCancels.length,0)
+ }finally{await m.finish()}
+})
