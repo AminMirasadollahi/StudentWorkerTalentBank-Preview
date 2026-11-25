@@ -43,9 +43,10 @@ const mock={
   ].join('\n')
   if(id==='\0swtb22-workspaces')return [
    'import React from "react";',
-   'export function AdminOperations({navigation,hideSectionTabs}){',
+   'const fixtureOwner=Symbol("synthetic work-pool owner");',
+   'export function AdminOperations({navigation,hideSectionTabs,workPoolRouteFence:fence,assignmentReceiptPort:port}){',
    'return React.createElement("div",{"data-testid":"manager-stage"},',
-   ' "WORK_VIEW="+navigation.workView+";HIDE_TABS="+String(hideSectionTabs));}',
+   ' "WORK_VIEW="+navigation.workView+";HIDE_TABS="+String(hideSectionTabs),port?.panel,port&&navigation.workView==="tasks"&&React.createElement("button",{disabled:port.snapshot.state!=="idle",onClick:()=>void port.submit({kind:"direct",workerIds:["00000000-0000-4000-8000-000000000010"],unit:"library",title:"Synthetic integration draft",instructions:"Synthetic description",date:"2026-12-01",minutes:60,startMinute:null,endMinute:null,reason:null})},"آماده‌سازی ترکیبی"),fence&&navigation.workView==="workPool"&&React.createElement("button",{onClick:()=>{fence.begin(fixtureOwner,"create");fence.unknown(fixtureOwner)}},"درخواست نامطمئن نمونه"),fence&&React.createElement("button",{onClick:()=>fence.confirmed(fixtureOwner)},"تأیید رسید نمونه"));}',
    'export function WorkerOperations(){return React.createElement("div",',
    '{"data-testid":"worker-stage"},"WORKER_ONLY")}',
   ].join('\n')
@@ -85,11 +86,11 @@ after(async()=>{
    '__swtb22CandidateRows','__swtb22CandidateReads',
    '__swtb22CandidateReadDenied'])delete globalThis[x]
 })
-async function mount(){
- identity={role:'admin',user:{id:'FAKE_ADMIN',email:'manager@example.invalid'}}
+async function mount(workHubFixture=false,assignmentReceiptFixture=null){
+ identity={role:'admin',user:{id:assignmentReceiptFixture?'00000000-0000-4000-8000-000000000001':'FAKE_ADMIN',email:'manager@example.invalid'}}
  const host=document.createElement('div');document.body.append(host)
  const root=createRoot(host)
- await act(async()=>{root.render(createElement(App,{mode:'admin'}))})
+ await act(async()=>{root.render(createElement(App,{mode:'admin',workHubFixture,assignmentReceiptFixture}))})
  return {host,cleanup:async()=>{await act(async()=>root.unmount());host.remove()}}
 }
 const route=(host,id)=>host.querySelector('[data-swtb22-route="'+id+'"]')
@@ -217,4 +218,103 @@ test('candidate read denial wipes old candidate list and inspector instead of sh
   globalThis.__swtb22CandidateRows=[]
   await ui.cleanup()
  }
+})
+
+test('review-only work hub in real OpsApp uses one canonical parent and existing route content',async()=>{
+ const ui=await mount(true)
+ const click=async label=>{
+  const b=[...ui.host.querySelectorAll('button')].find(x=>x.textContent.trim()===label)
+  assert.ok(b,label);await act(async()=>b.click())
+ }
+ try{
+  assert.equal(route(ui.host,'workPool'),null)
+  await act(async()=>route(ui.host,'tasks').click())
+  assert.equal(ui.host.querySelector('.report-header h1').textContent,'مدیریت کارها')
+  assert.match(ui.host.textContent,/WORK_VIEW=tasks;HIDE_TABS=true/)
+  assert.equal(ui.host.querySelectorAll('[data-testid="manager-stage"]').length,1)
+  assert.equal(ui.host.querySelectorAll('[aria-current="page"]').length,1)
+  await click('فرصت‌های قابل انتخاب')
+  assert.match(ui.host.textContent,/WORK_VIEW=workPool;HIDE_TABS=true/)
+  assert.equal(ui.host.querySelector('.report-header h1').textContent,'مدیریت کارها')
+  assert.equal(route(ui.host,'tasks').getAttribute('aria-current'),'page')
+  const group=ui.host.querySelector('[aria-label="بخش‌های مدیریت کارها"]')
+  assert.equal(group.querySelectorAll('[aria-pressed="true"]').length,1)
+  await act(async()=>route(ui.host,'tasks').click())
+  assert.match(ui.host.textContent,/WORK_VIEW=workPool/)
+  await click('وظایف واگذارشده')
+  assert.match(ui.host.textContent,/WORK_VIEW=tasks/)
+  await act(async()=>route(ui.host,'applicants').click())
+  assert.equal(ui.host.querySelector('[aria-label="بخش‌های مدیریت کارها"]'),null)
+  assert.equal(ui.host.querySelector('[data-testid="manager-stage"]'),null)
+ }finally{await ui.cleanup()}
+})
+
+test('real manager route setter blocks hub tab and sidebar exits until simulated receipt confirmation',async()=>{
+ const ui=await mount(true)
+ const click=async label=>{
+  const b=[...ui.host.querySelectorAll('button')].find(x=>x.textContent.trim()===label)
+  assert.ok(b,label);await act(async()=>b.click())
+ }
+ try{
+  await act(async()=>route(ui.host,'tasks').click())
+  await click('فرصت‌های قابل انتخاب');await click('درخواست نامطمئن نمونه')
+  await click('وظایف واگذارشده')
+  assert.match(ui.host.textContent,/WORK_VIEW=workPool/)
+  assert.match(ui.host.textContent,/جابه‌جایی فعلاً ممکن نیست/)
+  await act(async()=>route(ui.host,'applicants').click())
+  assert.match(ui.host.textContent,/WORK_VIEW=workPool/)
+  await click('تأیید رسید نمونه');await click('وظایف واگذارشده')
+  assert.match(ui.host.textContent,/WORK_VIEW=tasks/)
+  assert.doesNotMatch(ui.host.textContent,/جابه‌جایی فعلاً ممکن نیست/)
+ }finally{await ui.cleanup()}
+})
+
+test('combined real OpsApp keeps V2 receipt owner across hub and candidate routes while pool fence guards its own exits',async()=>{
+ let server={ok:true,epoch:0,active:null}
+ const calls=[]
+ const fixture=Object.freeze({version:2,makeId:()=> '00000000-0000-4000-8000-000000000100',
+  write:async p=>{
+   calls.push(p.p_action)
+   const a={request_id:p.p_request_id,kind:p.p_kind,status:'reserved'}
+   if(p.p_action==='reserve')server={...server,active:a}
+   else server={...server,active:{...a,status:'committed',receipt:{ok:true,request_id:a.request_id,kind:a.kind,result:{id:'00000000-0000-4000-8000-000000000200',state:'assigned',short_notice:false}}}}
+   return server
+  },
+  control:async p=>{
+   calls.push(p.p_action)
+   if(p.p_action==='acknowledge')server={ok:true,epoch:server.epoch+1,active:null}
+   return server
+  }})
+ const ui=await mount(true,fixture)
+ const click=async label=>{
+  const b=[...ui.host.querySelectorAll('button')].find(x=>x.textContent.trim()===label)
+  assert.ok(b,label);await act(async()=>b.click())
+ }
+ try{
+  await act(async()=>route(ui.host,'tasks').click())
+  await click('آماده‌سازی ترکیبی')
+  assert.match(ui.host.textContent,/هنوز کاری ثبت نشده/)
+  assert.equal(calls.filter(x=>x==='commit').length,0)
+  await click('فرصت‌های قابل انتخاب')
+  assert.match(ui.host.textContent,/WORK_VIEW=workPool/)
+  assert.match(ui.host.textContent,/هنوز کاری ثبت نشده/)
+  await click('درخواست نامطمئن نمونه')
+  await click('وظایف واگذارشده')
+  assert.match(ui.host.textContent,/WORK_VIEW=workPool/)
+  assert.match(ui.host.textContent,/جابه‌جایی فعلاً ممکن نیست/)
+  await click('تأیید رسید نمونه')
+  await act(async()=>route(ui.host,'applicants').click())
+  assert.equal(ui.host.querySelector('[data-testid="manager-stage"]'),null)
+  assert.match(ui.host.textContent,/هنوز کاری ثبت نشده/)
+  await act(async()=>route(ui.host,'tasks').click())
+  await click('وظایف واگذارشده')
+  await click('ثبت نهایی واگذاری')
+  assert.match(ui.host.textContent,/ثبت واگذاری تأیید شد/)
+  await click('تأیید و بستن رسید')
+  assert.equal(calls.filter(x=>x==='reserve').length,1)
+  assert.equal(calls.filter(x=>x==='commit').length,1)
+  assert.equal(calls.filter(x=>x==='acknowledge').length,1)
+  assert.equal(server.epoch,1)
+  assert.equal(ui.host.querySelectorAll('[aria-label="بخش‌های مدیریت کارها"]').length,1)
+ }finally{await ui.cleanup()}
 })

@@ -1152,7 +1152,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
   </section>
 }
 export function AdminOperations({ navigation, setNavigation, refreshRevision = 0,
-  hideSectionTabs = false, loadOriginalCandidates, assignmentReceiptPort=null }) {
+  hideSectionTabs = false, loadOriginalCandidates, assignmentReceiptPort=null, workPoolRouteFence=null }) {
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const view=navigation.workView
   const profileWorkerId=navigation.profileWorkerId||''
@@ -1398,7 +1398,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     {view==='terms'&&<TermBudgetPanel workers={workers} refreshRevision={refreshRevision}
       focusedUI={hideSectionTabs&&focusTermBudgetUIEnabled}/>}
     {workPoolUIEnabled&&view==='workPool'&&<Suspense fallback={<p className="ow-muted">در حال آماده‌سازی مخزن وظایف…</p>}>
-      <WorkPoolManagerPanel refreshRevision={refreshRevision}
+      <WorkPoolManagerPanel refreshRevision={refreshRevision} routeFence={workPoolRouteFence}
        activeKind={navigation.workPoolKind||'general'}
        onKindChange={kind=>setNavigation(previous=>({...previous,workPoolKind:kind}))}/>
     </Suspense>}

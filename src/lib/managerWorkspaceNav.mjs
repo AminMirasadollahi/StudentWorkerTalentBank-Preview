@@ -19,18 +19,24 @@ export const MANAGER_WORKSPACE_GROUPS = [
   {id:'candidateReport',section:'candidates',view:'report',label:'آمار و خروجی پذیرش',description:'گزارش آماری فرایند داوطلبان و پذیرش.'},
  ]},
 ]
+// Review-only opt-in: a single parent maps to the existing internal views.
+export const workHubEnabled=flags=>flags?.workHubFixture===true&&flags.workPoolEnabled!==false
+export const isWorkHubView=view=>view==='tasks'||view==='workPool'
 export const visibleManagerGroups=(flags={})=>MANAGER_WORKSPACE_GROUPS.map(group=>({
  ...group,items:group.items.filter(item=>
   item.requires==='workPool'?flags.workPoolEnabled!==false:
-  item.requires==='termMembership'?flags.termMembershipEnabled!==false:true),
+  item.requires==='termMembership'?flags.termMembershipEnabled!==false:true)
+  .filter(item=>!workHubEnabled(flags)||item.id!=='workPool')
+  .map(item=>workHubEnabled(flags)&&item.id==='tasks'?{...item,hub:true,label:'مدیریت کارها',description:'پیگیری وظایف واگذارشده و تعریف فرصت‌های قابل انتخاب.'}:item),
 }))
 export const currentManagerDestination=(nav,flags={})=>{
  const items=visibleManagerGroups(flags).flatMap(group=>group.items)
+ const workView=workHubEnabled(flags)&&isWorkHubView(nav?.workView)?'tasks':nav?.workView
  return items.find(item=>item.section===nav?.section&&item.view===
-  (item.section==='work'?nav?.workView:nav?.candidateView))
+  (item.section==='work'?workView:nav?.candidateView))
   ||items.find(item=>item.id===(nav?.section==='work'?'inbox':'applicants'))
 }
 export const nextManagerNavigation=(previous,item)=>({
  ...previous,section:item.section,
- ...(item.section==='work'?{workView:item.view}:{candidateView:item.view}),
+ ...(item.section==='work'?{workView:item.hub===true&&isWorkHubView(previous?.workView)?previous.workView:item.view}:{candidateView:item.view}),
 })

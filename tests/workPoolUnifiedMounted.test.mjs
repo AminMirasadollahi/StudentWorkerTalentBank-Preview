@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {JSDOM} from 'jsdom'
 import {act,createElement} from 'react'
 import {createServer} from 'vite'
+import {createWorkPoolRouteFence} from '../src/lib/workPoolRouteFence.mjs'
 
 const fake={
  name:'swtb19-unified-ui-no-network',enforce:'pre',
@@ -270,4 +271,33 @@ test('SWTB21 unified claim keeps its identity after leaving the view and recheck
   assert.deepEqual(globalThis.__v1Claims[1],request)
   assert.deepEqual(receipts,['task-id'])
  }finally{globalThis.__v1ClaimFailOnce=false;await m.cleanup()}
+})
+
+test('unified description lost response holds fence through explicit read-back, blocks desk toggle and Escape',async()=>{
+ const f=createWorkPoolRouteFence()
+ globalThis.__v1ManagerState='paused';globalThis.__v1ManagerClaims=0;globalThis.__v1ManagerDescription=undefined
+ globalThis.__v1EditCalls=[];globalThis.__v1EditDropResponse=true;globalThis.__v1Writes=0
+ const m=await mount(Manager,{routeFence:f})
+ const btn=label=>[...m.host.querySelectorAll('button')].find(b=>b.textContent===label)
+ try{
+  await act(async()=>btn('مشاهده جزئیات').click())
+  await act(async()=>btn('اصلاح شرح عمومی').click())
+  const input=m.host.querySelector('.swtb19-unified-work__edit textarea')
+  const next='شرح آزمایشی جدید و کامل برای بررسی رسید'
+  await act(async()=>{
+   Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set.call(input,next)
+   input.dispatchEvent(new window.Event('input',{bubbles:true}))
+  })
+  await act(async()=>btn('ذخیره اصلاحات').click())
+  assert.equal(globalThis.__v1EditCalls.length,1)
+  assert.equal(f.getSnapshot()?.kind,'edit');assert.equal(f.getSnapshot()?.status,'unknown')
+  assert.equal(f.permitsNavigation({section:'work',workView:'workPool'},{section:'work',workView:'tasks'}),false)
+  assert.equal(m.host.querySelector('.swtb19-unified-work__kind input').disabled,true)
+  await act(async()=>document.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})))
+  assert.ok(m.host.querySelector('#swtb19-manager-inspector'))
+  await act(async()=>btn('بررسی نتیجه از سرور').click())
+  assert.equal(f.getSnapshot(),null)
+  assert.equal(globalThis.__v1EditCalls.length,1)
+  assert.equal(globalThis.__v1Writes,0)
+ }finally{await m.cleanup();globalThis.__v1ManagerState='published';globalThis.__v1ManagerDescription=undefined;globalThis.__v1EditDropResponse=false}
 })
