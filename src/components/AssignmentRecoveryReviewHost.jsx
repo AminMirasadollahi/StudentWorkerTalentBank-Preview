@@ -54,15 +54,17 @@ export default function AssignmentRecoveryReviewHost({config,auth,actorId,checki
   if(checking)owner.current?.pause()
   else owner.current?.schedule()
  },[checking])
+ // Invalidate synchronously, before the parent's asynchronous sign-out.
+ const guardedLogout=()=>{owner.current?.controller.terminate();return onLogout?.()}
  const ready=!checking&&state.status==='ready'&&state.fixture!==null
  return <>
   {!ready&&<section className="ops-root" dir="rtl" role="status">
    <p>{state.status==='blocked'?'مسیر آزمایشی واگذاری در دسترس نیست؛ هیچ ثبت جایگزینی انجام نمی‌شود.':'در حال تأیید دسترسی مسیر جدید واگذاری…'}</p>
    {state.status==='blocked'&&!state.terminal&&<button type="button" className="report-btn report-btn--light" onClick={()=>owner.current?.schedule()}>بررسی مجدد دسترسی</button>}
-   <button type="button" className="report-btn report-btn--light" onClick={onLogout}>خروج از حساب</button>
+   <button type="button" className="report-btn report-btn--light" onClick={guardedLogout}>خروج از حساب</button>
   </section>}
   {state.fixture&&<div inert={!ready} aria-hidden={!ready?'true':undefined} hidden={!ready}>
-   <AssignmentRecoveryFixtureHost actorId={actorId} checking={!ready} fixture={state.fixture}>{children}</AssignmentRecoveryFixtureHost>
+   <AssignmentRecoveryFixtureHost actorId={actorId} checking={!ready} fixture={state.fixture}>{port=>children(port,guardedLogout)}</AssignmentRecoveryFixtureHost>
   </div>}
  </>
 }
