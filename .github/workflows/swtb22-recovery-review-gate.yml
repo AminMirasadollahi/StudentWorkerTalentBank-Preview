@@ -3,6 +3,7 @@ on:
   pull_request:
     branches:
       - review/swtb21-u01-integrated-manager-20261125
+      - main
     types: [opened, synchronize, reopened]
 permissions:
   contents: read
@@ -67,4 +68,38 @@ jobs:
           export SWTB22_BROWSER_TOOL_DIR="$RUNNER_TEMP/swtb22-browser-tool"
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "$SWTB22_BROWSER_TOOL_DIR" --ignore-scripts --no-audit --no-fund playwright@1.56.1
           node tests/browser/run-swtb22-operational-recovery-smoke.mjs
+          git diff --exit-code -- package.json package-lock.json
+
+  released-manager-ui-hotfix:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/swtb22-restore-released-manager-ui-20261125'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify actual released UI flags and compile release configuration
+        env:
+          VITE_SWTB22_RECOVERY_REVIEW_UI: 'false'
+          VITE_SWTB22_RECOVERY_RELEASE_UI: 'true'
+          VITE_SWTB22_RECOVERY_RELEASE_PROJECT_REF: pmwxryavkrjcdobwkryw
+          VITE_SUPABASE_URL: https://pmwxryavkrjcdobwkryw.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
+        run: |
+          set -euo pipefail
+          node --input-type=module -e 'import {loadEnv} from "vite"; const e=loadEnv("production",process.cwd(),"VITE_"); for(const k of ["VITE_SWTB22_MANAGER_SHELL_UI","VITE_SWTB22_WORK_POOL_FOCUS_UI","VITE_SWTB22_TASKS_FOCUS_UI","VITE_SWTB22_PRESENCE_FOCUS_UI","VITE_SWTB22_REVIEW_FOCUS_UI","VITE_SWTB22_HISTORY_FOCUS_UI","VITE_SWTB22_TERM_FOCUS_UI"]){if(e[k]!=="true")throw Error("SWTB22_RELEASED_UI_DISABLED:"+k)}; console.log("SWTB22_RELEASED_UI_FLAGS_PASS")'
+          ! grep -Eq 'VITE_SWTB22_MANAGER_SHELL_UI:[[:space:]]*.*false' .github/workflows/pages.yml
+          npm run build -- --outDir /tmp/swtb22-released-ui-hotfix
+      - name: Native Chrome sidebar and focused editor recovery flow (synthetic API)
+        run: |
+          set -euo pipefail
+          export SWTB22_BROWSER_TOOL_DIR="$RUNNER_TEMP/swtb22-browser-tool"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "$SWTB22_BROWSER_TOOL_DIR" --ignore-scripts --no-audit --no-fund playwright@1.56.1
+          SWTB22_TEST_RELEASED_UI=1 node tests/browser/run-swtb22-operational-recovery-smoke.mjs
           git diff --exit-code -- package.json package-lock.json

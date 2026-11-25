@@ -67,10 +67,11 @@ jobs:
           VITE_SWTB22_RECOVERY_RELEASE_PROJECT_REF: pmwxryavkrjcdobwkryw
           VITE_SUPABASE_URL: https://pmwxryavkrjcdobwkryw.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SWTB22_PRODUCTION_PUBLISHABLE_KEY }}
-          VITE_SWTB22_MANAGER_SHELL_UI: 'false'
+          # Preserve the already released manager layout from .env.production.
         run: |
           set -euo pipefail
           [[ "$VITE_SUPABASE_PUBLISHABLE_KEY" =~ ^sb_publishable_[A-Za-z0-9_-]+$ ]]
+          node --input-type=module -e 'import {loadEnv} from "vite"; const e=loadEnv("production",process.cwd(),"VITE_"); for(const k of ["VITE_SWTB22_MANAGER_SHELL_UI","VITE_SWTB22_WORK_POOL_FOCUS_UI","VITE_SWTB22_TASKS_FOCUS_UI","VITE_SWTB22_PRESENCE_FOCUS_UI","VITE_SWTB22_REVIEW_FOCUS_UI","VITE_SWTB22_HISTORY_FOCUS_UI","VITE_SWTB22_TERM_FOCUS_UI"]){if(e[k]!=="true")throw Error("SWTB22_RELEASED_UI_DISABLED:"+k)}; console.log("SWTB22_RELEASED_UI_FLAGS_PASS")'
           npm run build
           test -f dist/index.html
       - name: Record exact built output and resolved lockfile fingerprint

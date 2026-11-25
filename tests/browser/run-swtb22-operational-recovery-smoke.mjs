@@ -12,7 +12,8 @@ const project='aaaaaaaaaaaaaaaaaaaa',origin='https://'+project+'.supabase.co'
 const key='sb_publishable_synthetic_browser_only'
 Object.assign(process.env,{VITE_SWTB22_RECOVERY_REVIEW_UI:'true',VITE_SWTB22_RECOVERY_RELEASE_UI:'false',
  VITE_SWTB22_RECOVERY_REVIEW_PROJECT_REF:project,VITE_SUPABASE_URL:origin,VITE_SUPABASE_PUBLISHABLE_KEY:key,
- VITE_SWTB22_MANAGER_SHELL_UI:'false'})
+ VITE_SWTB22_MANAGER_SHELL_UI:process.env.SWTB22_TEST_RELEASED_UI==='1'?'true':'false'})
+const releasedUi=process.env.SWTB22_TEST_RELEASED_UI==='1'
 const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0')
 const now=Math.floor(Date.now()/1000),user={id:id(1),aud:'authenticated',role:'authenticated',email:'synthetic@example.invalid',is_anonymous:false,app_metadata:{provider:'email',providers:['email']},user_metadata:{},created_at:'2026-01-01T00:00:00Z'}
 const encode=v=>Buffer.from(JSON.stringify(v)).toString('base64url')
@@ -24,7 +25,7 @@ const fixture=createRecoveryBrowserFixture(),calls=[],unexpected=[],errors=[]
 let server,browser,context,page
 const count=action=>fixture.calls.filter(c=>c.action===action).length
 try{
- server=await createServer({configFile:resolve('vite.config.js'),base:'/',server:{host:'127.0.0.1',port:4187,strictPort:true},logLevel:'error'})
+ server=await createServer({configFile:resolve('vite.config.js'),mode:releasedUi?'production':'development',base:'/',server:{host:'127.0.0.1',port:4187,strictPort:true},logLevel:'error'})
  await server.listen()
  browser=await chromium.launch({headless:true,channel:'chrome',args:['--no-sandbox','--disable-background-networking']})
  context=await browser.newContext({viewport:{width:1440,height:900},locale:'fa-IR',serviceWorkers:'block'})
@@ -52,6 +53,7 @@ try{
   if(rpc==='ops_is_admin')return respond(200,true)
   if(rpc==='ops_list_candidates')return respond(200,[])
   if(rpc==='ops_get_operations_v3')return respond(200,work)
+  if(releasedUi&&rpc==='ops_list_presence_changes')return respond(200,{ok:true,scope:'manager',items:[]})
   if(rpc==='ops_get_admin_student_worker_report')return respond(200,{rows:[],summary:{},filters:{}})
   if(rpc==='ops_assignment_recovery_control_v2'||rpc==='ops_assignment_recovery_write_v2'){
    const args=req.postDataJSON()
@@ -67,8 +69,22 @@ try{
  page.setDefaultTimeout(15000)
  const url='http://127.0.0.1:4187/?page=operations'
  await page.goto(url,{waitUntil:'domcontentloaded'})
- await page.getByRole('button',{name:'برنامه و کارها',exact:true}).waitFor()
- await page.getByRole('button',{name:'برنامه و کارها',exact:true}).click()
+ const sidebar=page.locator('.swtb22-manager-sidebar')
+ const openTaskEditor=async()=>{
+  if(releasedUi){
+   await sidebar.locator('[data-swtb22-route="tasks"]').click()
+   await page.locator('button[aria-controls="swtb22-task-assign-dialog"]').click()
+   await page.locator('#swtb22-task-assign-dialog[open]').waitFor()
+  }else await page.getByRole('button',{name:'برنامه و کارها',exact:true}).click()
+ }
+ if(releasedUi){
+  await sidebar.waitFor()
+  assert.equal(await sidebar.locator('[data-swtb22-route="workPool"]').count(),1)
+  const candidateResponse=page.waitForResponse(r=>r.url()===origin+'/rest/v1/rpc/ops_list_candidates'&&r.request().method()==='POST')
+  await sidebar.locator('[data-swtb22-route="applicants"]').click()
+  assert.equal((await candidateResponse).status(),200)
+ }else await page.getByRole('button',{name:'برنامه و کارها',exact:true}).waitFor()
+ await openTaskEditor()
  const form=page.locator('form.ow-assignment-form')
  await form.waitFor()
  await page.waitForFunction(()=>document.querySelector('form.ow-assignment-form fieldset')?.disabled===false&&document.querySelector('.ow-worker-option-list input[type="checkbox"]'))
@@ -89,8 +105,13 @@ try{
  assert.equal(fixture.view().active?.status,'committed')
  assert.equal(count('reserve'),1);assert.equal(count('commit'),1)
  assert.equal(await form.locator('button[type="submit"]').isDisabled(),true)
- await page.getByRole('button',{name:'داشبورد و داوطلبان',exact:true}).click()
- await page.getByRole('button',{name:'آمار و خروجی‌ها',exact:true}).click()
+ if(releasedUi){
+  await page.getByRole('button',{name:'بستن و حفظ پیش‌نویس'}).click()
+  await sidebar.locator('[data-swtb22-route="candidateReport"]').click()
+ }else{
+  await page.getByRole('button',{name:'داشبورد و داوطلبان',exact:true}).click()
+  await page.getByRole('button',{name:'آمار و خروجی‌ها',exact:true}).click()
+ }
  await page.getByText(/ثبت واگذاری تأیید شد/).waitFor()
  assert.equal(await form.count(),0)
  assert.equal(count('commit'),1)
@@ -108,7 +129,7 @@ try{
  assert.equal((await ack.json()).epoch,1)
  await page.waitForFunction(()=>!document.querySelector('.ow-assignment-recovery')&&!document.body.textContent.includes('در حال بستن رسید'))
  assert.equal(fixture.view().epoch,1);assert.equal(fixture.view().active,null)
- await page.getByRole('button',{name:'برنامه و کارها',exact:true}).click()
+ await openTaskEditor()
  await page.waitForFunction(()=>document.querySelector('form.ow-assignment-form fieldset')?.disabled===false&&document.querySelector('.ow-worker-option-list input[type="checkbox"]'))
  assert.equal(await form.locator('input[maxlength="160"]').inputValue(),'')
  await fill('واگذاری ساختگی سالم دوم')
@@ -119,11 +140,15 @@ try{
  assert.equal(count('reserve'),2);assert.equal(count('commit'),2);assert.equal(count('acknowledge'),2)
  assert.ok(calls.includes('ops_get_admin_student_worker_report'))
  assert.ok(calls.includes('ops_list_candidates'));assert.ok(calls.includes('ops_get_operations_v3'))
+ if(releasedUi){
+  await page.getByRole('button',{name:'بستن و حفظ پیش‌نویس'}).click()
+  await page.locator('#swtb22-task-assign-dialog[open]').waitFor({state:'detached'})
+ }
  await page.getByRole('button',{name:'خروج',exact:true}).click()
- await page.waitForFunction(()=>!document.querySelector('form.ow-assignment-form')&&!document.querySelector('nav[aria-label="بخش‌های مدیریت دانشجوکار"]'))
+ await page.waitForFunction(()=>!document.querySelector('form.ow-assignment-form')&&!document.querySelector('nav[aria-label="بخش‌های مدیریت دانشجوکار"]')&&!document.querySelector('.swtb22-manager-sidebar'))
  assert.deepEqual(unexpected,[],'only explicitly intercepted synthetic endpoints')
  assert.deepEqual(errors,[],'no native browser errors')
- console.log('SWTB22_ACTUAL_OPSAPP_SYNTHETIC_CHROME_PASS')
+ console.log(releasedUi?'SWTB22_RELEASED_MANAGER_UI_RECOVERY_CHROME_PASS':'SWTB22_ACTUAL_OPSAPP_SYNTHETIC_CHROME_PASS')
  console.log(JSON.stringify({reserve:count('reserve'),commit:count('commit'),acknowledge:count('acknowledge'),epoch:fixture.view().epoch,unexpected_requests:unexpected.length,page_errors:errors.length,production_network:false,hosted_auth:false}))
 }finally{
  await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})
