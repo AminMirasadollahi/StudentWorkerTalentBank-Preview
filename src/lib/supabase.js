@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
+import {resolveRecoveryReviewConfig} from './recoveryReviewLifecycle.mjs'
+if(resolveRecoveryReviewConfig(import.meta.env).mode==='blocked')throw Error('SWTB22_REVIEW_CONFIG_BLOCKED')
 
 const fallbackUrl = 'https://pmwxryavkrjcdobwkryw.supabase.co'
 const fallbackPublishableKey = 'sb_publishable_HybJBqEBQVXaDYE2KbQlLg_jGIwi7on'

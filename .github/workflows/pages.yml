@@ -1,53 +1,114 @@
-name: Deploy Preview to GitHub Pages
+# SWTB22 proposed coordinated Pages publication. No automatic push deployment.
+# Do not merge or dispatch until the approved release procedure is ready.
+name: Publish approved SWTB22 release to GitHub Pages
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+    inputs:
+      expected_commit:
+        description: Exact approved main commit SHA (40 hex characters)
+        required: true
+        type: string
+      backend_cutover_verified:
+        description: Operator confirms approved recovery scope and backend cutover gates
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages-preview
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      pages: read
     steps:
-      - name: Checkout
+      - name: Validate explicit release authorization and exact commit
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_commit }}
+          APPROVED_SHA: ${{ vars.SWTB22_RELEASE_APPROVED_SHA }}
+          CUTOVER_CONFIRMED: ${{ inputs.backend_cutover_verified }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" == refs/heads/main ]]
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_SHA" == "$GITHUB_SHA" && "$APPROVED_SHA" == "$GITHUB_SHA" ]]
+          [[ "$CUTOVER_CONFIRMED" == true ]]
+      - name: Checkout exact authorized source
         uses: actions/checkout@v4
-
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify checkout
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
       - name: Configure Pages
         uses: actions/configure-pages@v5
-
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
-
-      - name: Build
-        run: npm run build
-
-      - name: Upload Pages artifact
+        run: |
+          test -f package-lock.json
+          npm ci --no-audit --no-fund
+          git diff --exit-code -- package.json package-lock.json
+      - name: Build explicit production recovery mode
+        env:
+          VITE_SWTB22_RECOVERY_REVIEW_UI: 'false'
+          VITE_SWTB22_RECOVERY_RELEASE_UI: 'true'
+          VITE_SWTB22_RECOVERY_RELEASE_PROJECT_REF: pmwxryavkrjcdobwkryw
+          VITE_SUPABASE_URL: https://pmwxryavkrjcdobwkryw.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SWTB22_PRODUCTION_PUBLISHABLE_KEY }}
+          VITE_SWTB22_MANAGER_SHELL_UI: 'false'
+        run: |
+          set -euo pipefail
+          [[ "$VITE_SUPABASE_PUBLISHABLE_KEY" =~ ^sb_publishable_[A-Za-z0-9_-]+$ ]]
+          npm run build
+          test -f dist/index.html
+      - name: Record exact built output and resolved lockfile fingerprint
+        run: |
+          set -euo pipefail
+          test -f package-lock.json
+          LOCK_SHA="$(sha256sum package-lock.json | cut -d' ' -f1)"
+          DIST_SHA="$(cd dist && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)"
+          {
+            echo "### SWTB22 release build receipt"
+            echo "Source commit: $GITHUB_SHA"
+            echo "Resolved lockfile SHA256: $LOCK_SHA"
+            echo "Output file manifest SHA256: $DIST_SHA"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload exact built Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
   deploy:
+    if: github.ref == 'refs/heads/main' && inputs.backend_cutover_verified == true && vars.SWTB22_RELEASE_APPROVED_SHA == github.sha
+    needs: build
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     steps:
-      - name: Deploy
+      - name: Reject stale main commit before publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CURRENT_SHA="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+          test "$CURRENT_SHA" = "$GITHUB_SHA"
+      - name: Publish artifact built by this run
         id: deployment
         uses: actions/deploy-pages@v4

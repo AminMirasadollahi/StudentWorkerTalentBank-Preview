@@ -17,6 +17,12 @@ import { watchOperationsResume } from './lib/operationsResume.mjs'
 import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
 import ManagerWorkspaceNav from './components/ManagerWorkspaceNav'
+import ManagerWorkHubTabs from './components/ManagerWorkHubTabs'
+import {createWorkPoolRouteFence} from './lib/workPoolRouteFence.mjs'
+import DirectAssignmentFixtureHost from './components/DirectAssignmentFixtureHost'
+import AssignmentRecoveryFixtureHost from './components/AssignmentRecoveryFixtureHost'
+import AssignmentRecoveryReviewHost from './components/AssignmentRecoveryReviewHost'
+import {resolveRecoveryReviewConfig} from './lib/recoveryReviewLifecycle.mjs'
 import ManagerCandidatesWorkspace from './components/ManagerCandidatesWorkspace'
 import {candidateOnboardingLabel,candidateAuthSignInLabel,candidateDisplayName,candidateDisplayMajor} from './lib/managerCandidateView.mjs'
 import {fetchCandidatesWithAuthorizedWorkerIdentity} from './lib/managerCandidateWorkerOverlay.mjs'
@@ -37,6 +43,7 @@ import './manager-shell.css'
 const emailInvitesAvailable = import.meta.env.VITE_OPS_EMAIL_INVITES_AVAILABLE === 'true'
 // Rollback-safe preview: preserve the current manager UI until the new shell is accepted.
 const managerShellEnabled=import.meta.env.VITE_SWTB22_MANAGER_SHELL_UI==='true'
+const recoveryReviewConfig=resolveRecoveryReviewConfig(import.meta.env)
 const managerNavFlags={
  workPoolEnabled:import.meta.env.VITE_SWTB21_WORK_POOL_UI!=='false',
  termMembershipEnabled:import.meta.env.VITE_SWTB21_TERM_MEMBERSHIP_UI!=='false',
@@ -563,7 +570,23 @@ function CandidateCard({
   )
 }
 
-function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 }) {
+function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refreshRevision = 0, workHubFixture=false, assignmentReceiptPort=null }) {
+  const [fence]=useState(createWorkPoolRouteFence)
+  const [routeNotice,setRouteNotice]=useState('')
+  const routeFence=managerShellEnabled&&workHubFixture===true&&managerNavFlags.workPoolEnabled?fence:null
+  const setNavigation=change=>{
+   if(!routeFence){commitNavigation(change);return}
+   const next=typeof change==='function'?change(navigation):change
+   if(!routeFence.permitsNavigation(navigation,next)){
+    setRouteNotice('ابتدا نتیجه درخواست فرصت کاری را تعیین‌تکلیف کنید؛ جابه‌جایی فعلاً ممکن نیست.')
+    return
+   }
+   setRouteNotice('')
+   commitNavigation(prev=>{
+    const candidate=typeof change==='function'?change(prev):change
+    return routeFence.permitsNavigation(prev,candidate)?candidate:prev
+   })
+  }
   const [rows, setRows] = useState([])
   const [busyId, setBusyId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -582,6 +605,9 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   const selectedCandidateId = navigation.candidateId||''
   const adminSection = navigation.section
   const candidateView = navigation.candidateView || 'applicants'
+  const recoveryReadScope=adminSection==='work'?'work':candidateView==='report'?'report':'candidates'
+  // Fence before paint; passive data reads can only settle their own route.
+  useLayoutEffect(()=>{assignmentReceiptPort?.setReadScope?.(recoveryReadScope)},[recoveryReadScope,assignmentReceiptPort?.readScopeOwner])
   const setCandidateView = value => setNavigation(previous => ({ ...previous, candidateView: value }))
   const setFilter = value => setNavigation(previous => ({ ...previous, candidateFilter: value }))
   const setCandidateSearch = value => setNavigation(previous=>({...previous,candidateSearch:value}))
@@ -601,6 +627,8 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
 
   const refresh = async () => {
     const readId=++candidateReadSequence.current
+    const settleRead=assignmentReceiptPort?.beginScopedRead?.('candidates')
+    if(!settleRead)assignmentReceiptPort?.setReadState?.('checking')
     // Never display a prior authorized snapshot while a new manager
     // permission/data read is pending. A rejected read stays blank;
     // only its own latest successful response may repopulate the list.
@@ -625,6 +653,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
       })
       if(readId!==candidateReadSequence.current)return false
       setRows(results)
+      if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')
       return true
     } catch (e) {
       if(readId!==candidateReadSequence.current)return false
@@ -635,6 +664,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
       setCandidateDrafts({})
       setSelectedCandidateId('')
       setError(getMessage(e))
+      if(settleRead)settleRead('failed');else assignmentReceiptPort?.setReadState?.('failed')
       return false
     } finally {
       if(readId===candidateReadSequence.current)setLoading(false)
@@ -645,6 +675,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   // module. Other, unmounted workspaces fetch when they are selected.
   useEffect(() => {
     if (adminSection === 'candidates' && candidateView === 'applicants') void refresh()
+    return ()=>{if(assignmentReceiptPort)candidateReadSequence.current+=1}
   }, [adminSection, candidateView, refreshRevision])
   const refreshCurrentSection = () => {
     if (adminSection === 'work') setManualWorkRevision(v => v + 1)
@@ -716,14 +747,15 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   const activeCount = rows.filter(row => Boolean(row.worker_id)).length
   const readyCount = rows.filter(row => !row.worker_id
     && row.interview_status === 'approved' && row.clearance_status === 'cleared').length
-  const currentDestination=currentManagerDestination(navigation,managerNavFlags)
+  const navFlags={...managerNavFlags,workHubFixture:managerShellEnabled&&workHubFixture===true}
+  const currentDestination=currentManagerDestination(navigation,navFlags)
   const navigateManager=item=>setNavigation(previous=>nextManagerNavigation(previous,item))
 
   return (
     <main className={'report-shell report-shell--dashboard ops-root'+
       (managerShellEnabled?' swtb22-manager-enabled':'')} dir="rtl">
       {managerShellEnabled&&<ManagerWorkspaceNav navigation={navigation}
-       onNavigate={navigateManager} {...managerNavFlags}/>}
+       onNavigate={navigateManager} {...navFlags}/>}
       <div className={managerShellEnabled?'swtb22-manager-main':undefined}>
       <header className="report-header">
         <div>
@@ -816,9 +848,13 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
          <button type="button" onClick={()=>navigateManager({section:'work',view:'availability'})}>برنامه حضور</button>
         </div>
        </section>}
+      {routeFence&&routeNotice&&<p role="alert" className="report-alert report-alert--error">{routeNotice}</p>}
+      <ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>
+      {adminSection !== 'work' && assignmentReceiptPort?.panel}
       {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation}
+        assignmentReceiptPort={assignmentReceiptPort}
         refreshRevision={refreshRevision + manualWorkRevision}
-        hideSectionTabs={managerShellEnabled} loadOriginalCandidates={getOperationsCandidates} />}
+        hideSectionTabs={managerShellEnabled} loadOriginalCandidates={getOperationsCandidates} workPoolRouteFence={routeFence} />}
       {issuedCredentials && (
         <div className="ops-modal" role="dialog" aria-modal="true" aria-labelledby="ops-credentials-title">
           <div className="ops-modal__card">
@@ -863,7 +899,7 @@ function AdminView({ onLogout, navigation, setNavigation, refreshRevision = 0 })
   )
 }
 
-export default function OpsApp({ mode = 'admin' }) {
+export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, workHubFixture=false }) {
   // This does NOT trust a cached session for authorization. When the fresh
   // server identity check returns no user but a local Supabase session still
   // exists, we cannot distinguish temporary network failure from revoked
@@ -1113,10 +1149,24 @@ export default function OpsApp({ mode = 'admin' }) {
   // Keep same-account unsent form state through a role revalidation on
   // tab focus, but never present or accept input in privileged UI while
   // permission is being checked. Identity/role/revocation changes remount.
+  const ReceiptHost=assignmentReceiptFixture?.version===2?AssignmentRecoveryFixtureHost:DirectAssignmentFixtureHost
   const authorizedView = identity.role === 'admin'
-    ? <AdminView key={'admin:' + identity.user?.id}
+    ? (assignmentReceiptFixture===null&&recoveryReviewConfig.mode!=='off'
+      ? <AssignmentRecoveryReviewHost key={'review-admin:' + identity.user?.id}
+         config={recoveryReviewConfig} auth={opsClient.auth} actorId={identity.user?.id}
+         checking={recheckingAccess||busy} onLogout={logout}>
+         {(port,guardedLogout)=><AdminView onLogout={guardedLogout} navigation={adminNavigation} setNavigation={setAdminNavigation}
+          refreshRevision={dataRefreshRevision} assignmentReceiptPort={port} workHubFixture={workHubFixture}/>}
+        </AssignmentRecoveryReviewHost>
+      : assignmentReceiptFixture===null
+      ? <AdminView key={'admin:' + identity.user?.id}
         onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
-        refreshRevision={dataRefreshRevision}/>
+        refreshRevision={dataRefreshRevision} workHubFixture={workHubFixture}/>
+      : <ReceiptHost key={'fixture-admin:' + identity.user?.id}
+         actorId={identity.user?.id} checking={recheckingAccess} fixture={assignmentReceiptFixture}>
+         {port=><AdminView onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
+          refreshRevision={dataRefreshRevision} assignmentReceiptPort={port} workHubFixture={workHubFixture}/>}
+        </ReceiptHost>)
     : identity.role === 'worker_disabled'
       ? <WorkerDisabledView key={'disabled:' + identity.user?.id + ':' + identity.profile?.state}
           profile={identity.profile} onLogout={logout}/>

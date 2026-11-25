@@ -1152,7 +1152,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
   </section>
 }
 export function AdminOperations({ navigation, setNavigation, refreshRevision = 0,
-  hideSectionTabs = false, loadOriginalCandidates }) {
+  hideSectionTabs = false, loadOriginalCandidates, assignmentReceiptPort=null, workPoolRouteFence=null }) {
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const view=navigation.workView
   const profileWorkerId=navigation.profileWorkerId||''
@@ -1258,6 +1258,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const refresh=async ()=>{
     // Ignore older in-flight responses after a newer role check has completed.
     const sequence=++readSequence.current
+    const settleRead=assignmentReceiptPort?.beginScopedRead?.('work')
+    if(!settleRead)assignmentReceiptPort?.setReadState?.('checking')
     setLoading(true)
     try{
       const result=await getAdminWorkV2()
@@ -1265,6 +1267,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       setData(result||{workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       setReadFailed(false)
       setError('')
+      if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')
       return true
     }catch(e){
       if(sequence!==readSequence.current)return false
@@ -1276,10 +1279,11 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       setTaskEditorOpen(false)
       setTaskEditorRevision(v=>v+1)
       setError(readableError(e))
+      if(settleRead)settleRead('failed');else assignmentReceiptPort?.setReadState?.('failed')
       return false
     }finally{if(sequence===readSequence.current)setLoading(false)}
   }
-  useEffect(()=>{void refresh()},[refreshRevision])
+  useEffect(()=>{void refresh();return ()=>{if(assignmentReceiptPort)readSequence.current++}},[refreshRevision,assignmentReceiptPort?.committedRevision])
 
   const workers=data.workers||[]
   const active=workers.filter(w=>w.state==='active')
@@ -1357,12 +1361,14 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
 
   if(readFailed)return <div className="ow-workspace ow-access-recheck" role="alert">
     <p>اطلاعات مدیریتی در دسترس نیست. تا بررسی دوبارهٔ مجوز، داده‌های قبلی نمایش داده نمی‌شوند.</p>
+    {assignmentReceiptPort?.committedRevision>0&&<p role="status">ثبت آخرین واگذاری تأیید شده بود؛ خطای بازخوانی به معنای لغو آن نیست. برای تازه‌سازی فقط اطلاعات را دوباره دریافت کنید.</p>}
     <Message error={error}/>
     <button type="button" className="report-btn report-btn--light" disabled={loading}
       onClick={()=>{void refresh()}}>تلاش مجدد برای دریافت اطلاعات</button>
   </div>
 
   return <div className="ow-workspace">
+    {!(assignmentDialogDate||(focusedTasks&&view==='tasks'&&taskEditorOpen))&&assignmentReceiptPort?.panel}
     {(!hideSectionTabs||view==='inbox')&&<div className="ow-summary ow-summary--actionable">
       <article><button type="button" className="ow-manager-kpi-action"
         onClick={()=>setView('profiles')} aria-label="نمایش پرونده‌های دانشجوکارها">
@@ -1393,7 +1399,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     {view==='terms'&&<TermBudgetPanel workers={workers} refreshRevision={refreshRevision}
       focusedUI={hideSectionTabs&&focusTermBudgetUIEnabled}/>}
     {workPoolUIEnabled&&view==='workPool'&&<Suspense fallback={<p className="ow-muted">در حال آماده‌سازی مخزن وظایف…</p>}>
-      <WorkPoolManagerPanel refreshRevision={refreshRevision}
+      <WorkPoolManagerPanel refreshRevision={refreshRevision} routeFence={workPoolRouteFence}
        activeKind={navigation.workPoolKind||'general'}
        onKindChange={kind=>setNavigation(previous=>({...previous,workPoolKind:kind}))}/>
     </Suspense>}
@@ -1438,8 +1444,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     {view==='tasks'&&<>
       {!focusedTasks&&<section className="report-panel">
         <h2>واگذاری کار</h2>
-        <TaskAssignmentEditor workers={active} data={data}
-          defaultWorkerId={workerId} defaultDate={date} onSaved={refresh}/>
+        <TaskAssignmentEditor key={assignmentReceiptPort?.editorRevision??0} workers={active} data={data}
+          assignmentReceiptPort={assignmentReceiptPort} defaultWorkerId={workerId} defaultDate={date} onSaved={refresh}/>
       </section>}
       <section className={'report-panel'+(focusedTasks?' swtb22-task-directory':'')}>
         <div className="report-panel-heading swtb22-task-heading">
@@ -1541,8 +1547,9 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         <button type="button" className="report-btn report-btn--light"
          onClick={()=>closeTaskEditor()}>بستن و حفظ پیش‌نویس</button>
        </div>
-       <TaskAssignmentEditor key={taskEditorRevision}
-        workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
+       {taskEditorOpen&&!assignmentDialogDate&&assignmentReceiptPort?.panel}
+       <TaskAssignmentEditor key={assignmentReceiptPort?taskEditorRevision+':'+assignmentReceiptPort.editorRevision:taskEditorRevision}
+        assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
         onSaved={refresh} onCancel={()=>closeTaskEditor()}
         onClose={()=>closeTaskEditor(true)}/>
       </dialog>}
@@ -1640,7 +1647,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         <button type="button" className="ow-mini-btn"
           onClick={()=>setAssignmentDialogDate('')}>بستن</button>
       </div>
-      <TaskAssignmentEditor key={assignmentDialogDate} workers={active} data={data}
+      {assignmentReceiptPort?.panel}
+      <TaskAssignmentEditor key={assignmentReceiptPort?assignmentDialogDate+':'+assignmentReceiptPort.editorRevision:assignmentDialogDate} assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data}
         defaultDate={assignmentDialogDate} defaultWorkerId={workerId}
         onSaved={refresh} onClose={()=>setAssignmentDialogDate('')}/>
     </dialog>}

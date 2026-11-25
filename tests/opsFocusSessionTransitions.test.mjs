@@ -61,7 +61,7 @@ const stub = {
     if (id === '\0qa-session-workspaces') {
       return [
         'import React from "react";',
-        'export function AdminOperations({refreshRevision=0}){React.useEffect(()=>{globalThis.__qaAdminMounts=(globalThis.__qaAdminMounts||0)+1},[]);React.useEffect(()=>{globalThis.__qaAdminReads=(globalThis.__qaAdminReads||0)+1},[refreshRevision]);return React.createElement("div", {"data-testid":"admin-work"}, "ADMIN_WORK_MOUNTED")}',
+        'export function AdminOperations({refreshRevision=0,assignmentReceiptPort:p}){React.useEffect(()=>{globalThis.__qaAdminMounts=(globalThis.__qaAdminMounts||0)+1},[]);React.useEffect(()=>{globalThis.__qaAdminReads=(globalThis.__qaAdminReads||0)+1;p?.setReadState?.("checking");p?.setReadState?.("ready")},[refreshRevision,p?.committedRevision]);const h=React.createElement;return h("div",{"data-testid":"admin-work"},"ADMIN_WORK_MOUNTED",p&&h("button",{disabled:p.snapshot.state!=="idle",onClick:()=>void p.submit(globalThis.__qaAssignmentDraft)},"ثبت نمونه"),p&&h("button",{onClick:()=>p.setReadState("failed")},"خطای خواندن نمونه"),p&&h("button",{onClick:()=>p.setReadState("ready")},"بازخوانی موفق نمونه"),p?.panel,p?.initialPayload&&h("span",null,p.initialPayload.p_title),p&&h("span",{"data-testid":"editor-revision"},String(p.editorRevision)))}',
         'export function WorkerOperations({refreshRevision=0,loginEmail="",onRefresh}){React.useEffect(()=>{globalThis.__qaWorkerReads=(globalThis.__qaWorkerReads||0)+1},[refreshRevision]);return React.createElement("div", {"data-testid":"worker-work"}, React.createElement("span",null,"WORKER_WORK_MOUNTED ",loginEmail), React.createElement("button",{type:"button",onClick:onRefresh},"به‌روزرسانی"))}',
       ].join('\n')
     }
@@ -108,14 +108,14 @@ function userVisibleText(host) {
   return clone.textContent
 }
 
-async function mount(initial = worker(), mode = initial.role === 'admin' ? 'admin' : 'worker') {
+async function mount(initial = worker(), mode = initial.role === 'admin' ? 'admin' : 'worker', assignmentReceiptFixture=null) {
   globalThis.__qaHasLocalSession = false
   currentIdentity = initial
   deferredIdentity = null
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
-  await act(async () => { root.render(createElement(OpsApp, {mode})) })
+  await act(async () => { root.render(createElement(OpsApp, {mode,assignmentReceiptFixture})) })
   async function resolve(identity) {
     currentIdentity = identity
     deferredIdentity = null
@@ -393,4 +393,60 @@ test('P3: manager sees integrated subview and header/focus refresh of report onl
   await ui.resolve(worker())
   assert.equal(ui.host.querySelector('[data-testid="admin-report"]'),null,'role change removes report UI')
  }finally{await ui.unmount();delete globalThis.__qaReportReads}
+})
+
+const fixtureId=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0')
+const fixtureAdmin=admin({id:fixtureId(1)})
+const fixtureDraft={kind:'direct',workerIds:[fixtureId(2)],unit:'library',title:'عنوان خصوصی آزمایشی',instructions:'شرح خصوصی آزمایشی',date:'2026-12-01',minutes:60,startMinute:null,endMinute:null,reason:null}
+const fixtureReceipt=p=>({ok:true,request_id:p.p_request_id,kind:p.p_kind,result:{id:fixtureId(201),state:'assigned',short_notice:false}})
+const clickFixture=async(ui,label)=>{const b=[...ui.host.querySelectorAll('button')].find(x=>x.textContent===label);assert.ok(b,label);await act(async()=>b.click())}
+const makeFixture=(write,read=async()=>({found:false}))=>{
+ let n=100;const writes=[],reads=[]
+ globalThis.__qaAssignmentDraft=fixtureDraft
+ return {writes,reads,fixture:{makeId:()=>fixtureId(n++),write:p=>{writes.push(p);return write(p)},read:k=>{reads.push(k);return read(k)}}}
+}
+test('real AdminView owner retains unresolved assignment across candidate and work route mounts',async()=>{
+ let n=0
+ const x=makeFixture(async p=>{if(++n===1)throw Error('synthetic disconnect');return fixtureReceipt(p)})
+ const ui=await mount(fixtureAdmin,'admin',x.fixture)
+ try{
+  await clickFixture(ui,'برنامه و کارها');await clickFixture(ui,'ثبت نمونه')
+  assert.match(userVisibleText(ui.host),/نتیجه ثبت هنوز مشخص نیست/)
+  await clickFixture(ui,'داشبورد و داوطلبان');assert.match(userVisibleText(ui.host),/نتیجه ثبت هنوز مشخص نیست/)
+  await clickFixture(ui,'بررسی رسید');assert.match(userVisibleText(ui.host),/ارسال مجدد همان درخواست/)
+  await clickFixture(ui,'ارسال مجدد همان درخواست');assert.match(userVisibleText(ui.host),/واگذاری ثبت شد/)
+  assert.equal(x.writes.length,2);assert.equal(x.writes[0],x.writes[1])
+  await clickFixture(ui,'تأیید و بستن رسید');await clickFixture(ui,'برنامه و کارها')
+  assert.equal(ui.host.querySelector('[data-testid="editor-revision"]').textContent,'1')
+  assert.doesNotMatch(userVisibleText(ui.host),/واگذاری ثبت شد/)
+ }finally{await ui.unmount();delete globalThis.__qaAssignmentDraft}
+})
+test('scoped read failure hides receipt and disables replay until authorized fresh read',async()=>{
+ const x=makeFixture(async()=>{throw Error('synthetic disconnect')})
+ const ui=await mount(fixtureAdmin,'admin',x.fixture)
+ try{
+  await clickFixture(ui,'برنامه و کارها');await clickFixture(ui,'ثبت نمونه');await clickFixture(ui,'بررسی رسید')
+  assert.match(userVisibleText(ui.host),/ارسال مجدد همان درخواست/)
+  await clickFixture(ui,'خطای خواندن نمونه')
+  assert.doesNotMatch(userVisibleText(ui.host),/ارسال مجدد همان درخواست|نتیجه ثبت هنوز مشخص نیست/)
+  await clickFixture(ui,'بازخوانی موفق نمونه')
+  assert.match(userVisibleText(ui.host),/نتیجه ثبت هنوز مشخص نیست/)
+  assert.doesNotMatch(userVisibleText(ui.host),/ارسال مجدد همان درخواست/)
+  assert.equal(x.writes.length,1)
+ }finally{await ui.unmount();delete globalThis.__qaAssignmentDraft}
+})
+test('real OpsApp recheck hides pending receipt; switched actor never receives late confirmation',async()=>{
+ let finish
+ const x=makeFixture(()=>new Promise(resolve=>{finish=resolve}))
+ const ui=await mount(fixtureAdmin,'admin',x.fixture)
+ try{
+  await clickFixture(ui,'برنامه و کارها');await clickFixture(ui,'ثبت نمونه')
+  assert.match(userVisibleText(ui.host),/در حال ثبت واگذاری/)
+  const release=await ui.pending()
+  assert.doesNotMatch(userVisibleText(ui.host),/در حال ثبت واگذاری|عنوان خصوصی آزمایشی/)
+  await release(admin({id:fixtureId(3)}))
+  await act(async()=>finish(fixtureReceipt(x.writes[0])))
+  assert.doesNotMatch(userVisibleText(ui.host),/واگذاری ثبت شد|عنوان خصوصی آزمایشی|ADMIN_WORK_MOUNTED/)
+  assert.equal(x.writes.length,1)
+ }finally{await ui.unmount();delete globalThis.__qaAssignmentDraft}
 })

@@ -4,6 +4,7 @@ import {JSDOM} from 'jsdom'
 import {act, createElement, useState} from 'react'
 import {createServer} from 'vite'
 import {firstMatchingWeekday,isoWeekday} from '../src/lib/assignmentCapacity.mjs'
+import {createDirectAssignmentSession,fixtureVerifiedRollback} from '../src/lib/directAssignmentSession.mjs'
 
 // Mount real private operations UI with synthetic data, stubbing all RPC imports.
 const tehranToday=()=>{
@@ -351,4 +352,129 @@ test('committed group assignment cannot be submitted twice when post-save refres
   await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))
   assert.equal(globalThis.__qaGroupCalls.length,1)
  }finally{await act(async()=>root.unmount());host.remove()}
+})
+
+const receiptId=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0')
+const receiptWorkers=[{id:receiptId(10),name:'نمونه اول',unit:'library',state:'active'},{id:receiptId(11),name:'نمونه دوم',unit:'research',state:'active'}]
+async function receiptEditorFixture(write,{route='editor',portOverride}={}){
+ const d=new Date(date+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+3)
+ const day=d.toISOString().slice(0,10)
+ const data={workers:receiptWorkers,tasks:[],weekly_slots:[],exceptions:[],time_entries:[]}
+ globalThis.__qaCapacityData=data;globalThis.__qaGroupCalls=[];globalThis.__qaDeskCalls=[];globalThis.__qaDeskCancels=[]
+ globalThis.__qaDeskReadFail=false;globalThis.__qaDeskShifts=[];globalThis.__qaPermitDesk=true;globalThis.__qaPermitDeskCancel=true
+ const calls=[];let saved=0,closed=0,key=100
+ const session=createDirectAssignmentSession({makeId:()=>receiptId(key++),write:p=>{calls.push(p);return write(p)},read:async()=>({found:false})})
+ session.setAccess({status:'verified',actorId:receiptId(1)})
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host)
+ let redraw
+ function Harness(){
+  const [nav,setNav]=useState({section:'work',workView:'tasks',workerId:receiptWorkers[0].id})
+  const [,setVersion]=useState(0);redraw=()=>setVersion(v=>v+1)
+  const port=portOverride??{snapshot:session.snapshot(),submit:async draft=>{const p=session.submit(draft);redraw();const result=await p;redraw();return result}}
+  return route==='workspace'?createElement(Component,{navigation:nav,setNavigation:setNav,assignmentReceiptPort:port}):
+   createElement(Editor,{workers:receiptWorkers,data,defaultWorkerId:receiptWorkers[0].id,defaultDate:day,assignmentReceiptPort:port,onSaved:()=>{saved++},onClose:()=>{closed++}})
+ }
+ await act(async()=>root.render(createElement(Harness)))
+ const unit=async()=>{const select=host.querySelector('select[aria-label="واحد انجام کار"]');await act(async()=>{select.value='library';select.dispatchEvent(new window.Event('change',{bubbles:true}))})}
+ const submit=async()=>{const form=host.querySelector('form.ow-assignment-form');await act(async()=>form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})))}
+ const finish=async()=>{session.dispose();await act(async()=>root.unmount());host.remove()}
+ return {host,session,calls,unit,submit,finish,redraw:async()=>{await act(async()=>redraw())},counts:()=>({saved,closed}),day}
+}
+test('actual single editor passes exact typed draft to session; unknown blocks duplicate and legacy writer',async()=>{
+ const m=await receiptEditorFixture(async()=>{throw Error('synthetic response lost')})
+ try{
+  await m.unit();await fill(labeledField(m.host,'عنوان کار'),'عنوان معتبر نمونه');await fill(labeledField(m.host,'شرح مورد انتظار'),'شرح کامل نمونه')
+  await m.submit()
+  assert.equal(m.session.snapshot().state,'unknown');assert.equal(m.calls.length,1)
+  assert.equal(m.calls[0].p_kind,'direct');assert.equal(m.calls[0].p_estimate_minutes,60);assert.equal(m.calls[0].p_planned_date,m.day)
+  assert.equal(m.calls[0].p_instructions,'شرح کامل نمونه');assert.deepEqual(m.calls[0].p_worker_ids,[receiptWorkers[0].id])
+  assert.equal(m.host.querySelector('fieldset').disabled,true)
+  assert.equal(m.host.querySelector('button[type="submit"]').disabled,true)
+  await m.submit();assert.equal(m.calls.length,1);assert.deepEqual(m.counts(),{saved:0,closed:0})
+  assert.equal(globalThis.__qaGroupCalls.length,0);assert.equal(globalThis.__qaDeskCalls.length,0)
+ }finally{await m.finish()}
+})
+test('real workspace inline editor propagates fixture port; group rejection preserves draft for revision',async()=>{
+ const m=await receiptEditorFixture(async()=>fixtureVerifiedRollback('worker_not_eligible_for_term'),{route:'workspace'})
+ try{
+  await m.unit();const checkboxes=m.host.querySelectorAll('.ow-worker-option-list input[type="checkbox"]')
+  await act(async()=>checkboxes[1].click());await fill(labeledField(m.host,'عنوان کار'),'عنوان گروهی نمونه')
+  await fill(labeledField(m.host,'علت واگذاری امروز یا فردا'),'دلیل معتبر آزمایشی')
+  await m.submit()
+  assert.equal(m.session.snapshot().state,'rejected');assert.equal(m.calls.length,1);assert.equal(m.calls[0].p_worker_ids.length,2)
+  assert.equal(globalThis.__qaGroupCalls.length,0)
+  assert.ok(m.session.reviseRejected());await m.redraw()
+  assert.equal(labeledField(m.host,'عنوان کار').value,'عنوان گروهی نمونه');assert.equal(m.host.querySelector('fieldset').disabled,false)
+ }finally{await m.finish()}
+})
+test('real desk editor uses interval payload and never legacy booking or cancel',async()=>{
+ const m=await receiptEditorFixture(async p=>({ok:true,request_id:p.p_request_id,kind:'desk',result:{ok:true,assigned:p.p_worker_ids.map((worker_id,i)=>({worker_id,task_id:receiptId(200+i)})),shift_date:p.p_planned_date,start_minute:p.p_start_minute,end_minute:p.p_end_minute,minutes_per_worker:p.p_end_minute-p.p_start_minute}}))
+ try{
+  await m.unit();const template=m.host.querySelector('.ow-library-template-panel button')
+  await act(async()=>template.click())
+  await fill(m.host.querySelector('input[aria-label="شروع نوبت کتابخانه"]'),'09:00')
+  await fill(m.host.querySelector('input[aria-label="پایان نوبت کتابخانه"]'),'10:00')
+  await m.submit()
+  assert.equal(m.session.snapshot().state,'confirmed');assert.equal(m.calls.length,1);assert.equal(m.calls[0].p_kind,'desk')
+  assert.equal(m.calls[0].p_start_minute,540);assert.equal(m.calls[0].p_end_minute,600);assert.equal(m.calls[0].p_estimate_minutes,null)
+  assert.equal(globalThis.__qaDeskCalls.length,0);assert.equal(globalThis.__qaDeskCancels.length,0);assert.deepEqual(m.counts(),{saved:0,closed:0})
+ }finally{await m.finish()}
+})
+test('missing fixture snapshot blocks real editor; no fallback even under synthetic submit event',async()=>{
+ const m=await receiptEditorFixture(async()=>{throw Error('MUST_NOT_WRITE')},{portOverride:{}})
+ try{
+  await m.unit();await fill(labeledField(m.host,'عنوان کار'),'عنوان معتبر نمونه')
+  await m.submit();assert.equal(m.calls.length,0)
+  assert.equal(m.host.querySelector('button[type="submit"]').disabled,true)
+  assert.deepEqual(m.counts(),{saved:0,closed:0})
+ }finally{await m.finish()}
+})
+
+test('V2 editor uses only explicit existing-shift cancellation capability, not the legacy RPC',async()=>{
+ const calls=[]
+ const shiftId=receiptId(301)
+ const port={version:2,snapshot:{state:'idle'},submit:async()=>{throw Error('UNEXPECTED_ASSIGNMENT')},
+  cancelExistingShift:async args=>{
+   calls.push(args)
+   globalThis.__qaDeskShifts=globalThis.__qaDeskShifts.map(s=>s.id===args.shiftId?{...s,state:'cancelled'}:s)
+   return {ok:true,state:'cancelled'}
+  }}
+ const m=await receiptEditorFixture(async()=>{throw Error('MUST_NOT_WRITE')},{portOverride:port})
+ try{
+  globalThis.__qaDeskShifts=[{id:shiftId,worker_id:receiptWorkers[0].id,state:'scheduled',start_minute:540,end_minute:600}]
+  await m.unit()
+  await act(async()=>m.host.querySelector('.ow-library-template-panel button').click())
+  const trigger=m.host.querySelector('.ow-desk-cancel-trigger')
+  assert.ok(trigger);assert.equal(trigger.disabled,false)
+  await act(async()=>trigger.click())
+  await fill(m.host.querySelector('input[aria-label="علت لغو نوبت"]'),'دلیل لغو معتبر')
+  const confirm=m.host.querySelector('.ow-desk-cancel-actions .report-btn--primary')
+  port.snapshot={state:'reserved'};await m.redraw()
+  assert.equal(confirm.disabled,true)
+  // Even a synthetic event must not dispatch an existing-shift cancellation.
+  await act(async()=>confirm.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.equal(calls.length,0)
+  port.snapshot={state:'idle'};await m.redraw()
+  await act(async()=>m.host.querySelector('.ow-desk-cancel-actions .report-btn--primary').click())
+  assert.deepEqual(calls,[{shiftId,reason:'دلیل لغو معتبر'}])
+  assert.equal(globalThis.__qaDeskCancels.length,0)
+  assert.equal(globalThis.__qaDeskCalls.length,0)
+  assert.equal(m.calls.length,0)
+  assert.equal(m.host.querySelector('.ow-desk-cancel-trigger'),null)
+  assert.deepEqual(m.counts(),{saved:1,closed:0})
+ }finally{await m.finish()}
+})
+test('receipt editor without explicit existing-shift cancellation capability stays blocked',async()=>{
+ const port={version:2,snapshot:{state:'idle'},submit:async()=>{throw Error('MUST_NOT_WRITE')}}
+ const m=await receiptEditorFixture(async()=>{throw Error('MUST_NOT_WRITE')},{portOverride:port})
+ try{
+  globalThis.__qaDeskShifts=[{id:receiptId(302),worker_id:receiptWorkers[0].id,state:'scheduled',start_minute:540,end_minute:600}]
+  await m.unit()
+  await act(async()=>m.host.querySelector('.ow-library-template-panel button').click())
+  const trigger=m.host.querySelector('.ow-desk-cancel-trigger')
+  assert.ok(trigger);assert.equal(trigger.disabled,true)
+  await act(async()=>trigger.dispatchEvent(new window.MouseEvent('click',{bubbles:true})))
+  assert.equal(m.host.querySelector('.ow-desk-cancel-confirm'),null)
+  assert.equal(globalThis.__qaDeskCancels.length,0)
+ }finally{await m.finish()}
 })

@@ -1,0 +1,70 @@
+name: SWTB22 recovery review gate (NO DEPLOY)
+on:
+  pull_request:
+    branches:
+      - review/swtb21-u01-integrated-manager-20261125
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: swtb22-recovery-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  focused:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'review/swtb22-recovery-access-binding-v1-20261125'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exact application and test dependencies
+        run: |
+          set -euo pipefail
+          test -f package-lock.json
+          npm ci --no-audit --no-fund
+          git diff --exit-code -- package.json package-lock.json
+      - name: Focused pure and mounted tests for changed modules
+        run: |
+          node --test tests/recoveryAccessBinding.test.mjs tests/scopedRecoveryHttpTransport.test.mjs tests/scopedExistingShiftCancellation.test.mjs tests/recoveryReviewLifecycle.test.mjs tests/assignmentCapacityUi.test.mjs tests/assignmentRecoveryHostMounted.test.mjs tests/assignmentRecoveryReviewHostMounted.test.mjs
+      - name: Compile unchanged default entry without deployment
+        run: npm run build -- --outDir /tmp/swtb22-default-build
+      - name: Compile explicit synthetic review entry without deployment
+        env:
+          VITE_SWTB22_RECOVERY_REVIEW_UI: 'true'
+          VITE_SWTB22_RECOVERY_REVIEW_PROJECT_REF: aaaaaaaaaaaaaaaaaaaa
+          VITE_SUPABASE_URL: https://aaaaaaaaaaaaaaaaaaaa.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
+        run: npm run build -- --outDir /tmp/swtb22-review-build
+      - name: Reject wrong target configuration before build
+        env:
+          VITE_SWTB22_RECOVERY_REVIEW_UI: 'true'
+          VITE_SWTB22_RECOVERY_REVIEW_PROJECT_REF: aaaaaaaaaaaaaaaaaaaa
+          VITE_SUPABASE_URL: https://bbbbbbbbbbbbbbbbbbbb.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
+        run: |
+          if npm run build -- --outDir /tmp/swtb22-invalid-build >/tmp/swtb22-invalid.log 2>&1; then
+            echo 'INVALID_REVIEW_BUILD_UNEXPECTED_SUCCESS'
+            exit 1
+          fi
+          grep -q SWTB22_REVIEW_CONFIG_BLOCKED /tmp/swtb22-invalid.log
+          echo SWTB22_INVALID_TARGET_REJECTED
+      - name: Compile explicit operational candidate without deploy or network calls
+        env:
+          VITE_SWTB22_RECOVERY_RELEASE_UI: 'true'
+          VITE_SWTB22_RECOVERY_RELEASE_PROJECT_REF: pmwxryavkrjcdobwkryw
+          VITE_SUPABASE_URL: https://pmwxryavkrjcdobwkryw.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
+        run: npm run build -- --outDir /tmp/swtb22-operational-candidate
+      - name: Native Chrome actual manager entry with synthetic intercepted API
+        run: |
+          set -euo pipefail
+          google-chrome --version
+          export SWTB22_BROWSER_TOOL_DIR="$RUNNER_TEMP/swtb22-browser-tool"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "$SWTB22_BROWSER_TOOL_DIR" --ignore-scripts --no-audit --no-fund playwright@1.56.1
+          node tests/browser/run-swtb22-operational-recovery-smoke.mjs
+          git diff --exit-code -- package.json package-lock.json
