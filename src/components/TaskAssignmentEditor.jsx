@@ -20,6 +20,11 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  // A missing/invalid snapshot in port mode is blocked, never a legacy fallback.
  const receiptMode=assignmentReceiptPort!==null
  const receiptBlocked=receiptMode&&assignmentReceiptPort?.snapshot?.state!=='idle'
+ // Existing-shift cancellation is distinct from cancelling a V2 intent.
+ // Only an explicitly supplied, scoped V2 capability may perform it.
+ const receiptCancelAllowed=assignmentReceiptPort?.version===2&&!receiptBlocked&&
+   typeof assignmentReceiptPort?.cancelExistingShift==='function'
+ const deskCancelAllowed=!receiptMode||receiptCancelAllowed
  const Fields=receiptMode?'fieldset':Fragment
  const fieldProps=receiptMode?{disabled:receiptBlocked,style:{border:0,margin:0,padding:0,minWidth:0}}:{}
  const seed=assignmentReceiptPort?.initialPayload
@@ -175,14 +180,18 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const confirmCancel=async shiftId=>{
   const draft=cancelDraft
   const reasonText=String(draft?.reason||'').trim()
-  if(receiptMode||!deskVerified||busy||cancelLock.current||!draft||
-     draft.id!==shiftId||reasonText.length<5||reasonText.length>500)return
+  if(!deskCancelAllowed||!deskVerified||busy||submitLock.current||cancelLock.current||!draft||
+     draft.id!==shiftId||reasonText.length<5||reasonText.length>500||
+     !visibleDeskShifts(deskRead.shifts).some(s=>s.id===shiftId))return
   cancelLock.current=true;setCancelBusy(true);setCancelError('')
   try{
-   const result=await cancelLibraryDeskShift({shiftId,reason:reasonText})
+   // Never call the legacy cancellation RPC from an injected receipt editor.
+   const cancel=receiptMode?assignmentReceiptPort.cancelExistingShift:cancelLibraryDeskShift
+   const result=await cancel({shiftId,reason:reasonText})
    if(result?.ok!==true)throw Error('shift_cancel_not_confirmed')
    setCancelDraft(null)
    setNotice('نوبت و وظیفه مرتبط لغو شدند؛ ظرفیت آزادشده پس از بازخوانی نمایش داده می‌شود.')
+   setDeskRead({date,state:'loading',shifts:[]})
    setDeskRevision(v=>v+1)
    // Database commit already succeeded; failure to refresh parent is not a
    // cancellation error and must never retry the mutation.
@@ -194,6 +203,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
     message.includes('shift_not_available')?
     'نوبت قبلاً لغو شده یا دیگر برای لغو در دسترس نیست.':
     'تأیید لغو دریافت نشد؛ فهرست نوبت‌ها را بازخوانی و پیش از اقدام دوباره بررسی کنید.')
+   setDeskRead({date,state:'loading',shifts:[]})
    setDeskRevision(v=>v+1)
   }finally{cancelLock.current=false;setCancelBusy(false)}
  }
@@ -297,7 +307,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
               <span>{clockFa(s.start_minute)} تا {clockFa(s.end_minute)}</span>
               <span>{workers.find(w=>w.id===s.worker_id)?.name||'دانشجوکار'}</span>
               <button type="button" className="ow-desk-cancel-trigger"
-                aria-expanded={cancelDraft?.id===s.id} disabled={receiptMode||cancelBusy||busy}
+                aria-expanded={cancelDraft?.id===s.id} disabled={!deskCancelAllowed||cancelBusy||busy}
                 onClick={()=>{setCancelError('');setCancelDraft(prev=>
                   prev?.id===s.id?null:{id:s.id,reason:''})}}>
                 لغو نوبت
@@ -314,7 +324,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
                   <button type="button" className="report-btn report-btn--light"
                     disabled={cancelBusy} onClick={()=>setCancelDraft(null)}>بازگشت</button>
                   <button type="button" className="report-btn report-btn--primary"
-                    disabled={cancelBusy||cancelDraft.reason.trim().length<5}
+                    disabled={!deskCancelAllowed||cancelBusy||busy||cancelDraft.reason.trim().length<5}
                     onClick={()=>{void confirmCancel(s.id)}}>
                     {cancelBusy?'در حال لغو…':'تأیید لغو نوبت'}
                   </button>
