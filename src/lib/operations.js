@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { classifyOperationsIdentity } from './workerAccess.mjs'
-import {resolveRecoveryReviewConfig} from './recoveryReviewLifecycle.mjs'
+import {resolveRecoveryReviewConfig,assertLegacyAssignmentAllowed} from './recoveryReviewLifecycle.mjs'
 const reviewConfig=resolveRecoveryReviewConfig(import.meta.env)
 if(reviewConfig.mode==='blocked')throw Error('SWTB22_REVIEW_CONFIG_BLOCKED')
 
@@ -100,6 +100,7 @@ export async function setDateException(workerId, date, kind, intervals, note) {
   }))
 }
 export async function assignWorkerTask({workerId,unit,title,instructions,date,minutes,shortNoticeReason}) {
+  assertLegacyAssignmentAllowed(import.meta.env)
   return assertResult(await opsClient.rpc('ops_assign_task', {
     p_worker_id:workerId, p_unit_code:unit,
     p_title:title, p_instructions:instructions || '',
