@@ -605,6 +605,9 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   const selectedCandidateId = navigation.candidateId||''
   const adminSection = navigation.section
   const candidateView = navigation.candidateView || 'applicants'
+  const recoveryReadScope=adminSection==='work'?'work':candidateView==='report'?'report':'candidates'
+  // Fence before paint; passive data reads can only settle their own route.
+  useLayoutEffect(()=>{assignmentReceiptPort?.setReadScope?.(recoveryReadScope)},[recoveryReadScope,assignmentReceiptPort?.readScopeOwner])
   const setCandidateView = value => setNavigation(previous => ({ ...previous, candidateView: value }))
   const setFilter = value => setNavigation(previous => ({ ...previous, candidateFilter: value }))
   const setCandidateSearch = value => setNavigation(previous=>({...previous,candidateSearch:value}))
@@ -624,7 +627,8 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
 
   const refresh = async () => {
     const readId=++candidateReadSequence.current
-    assignmentReceiptPort?.setReadState?.('checking')
+    const settleRead=assignmentReceiptPort?.beginScopedRead?.('candidates')
+    if(!settleRead)assignmentReceiptPort?.setReadState?.('checking')
     // Never display a prior authorized snapshot while a new manager
     // permission/data read is pending. A rejected read stays blank;
     // only its own latest successful response may repopulate the list.
@@ -649,7 +653,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
       })
       if(readId!==candidateReadSequence.current)return false
       setRows(results)
-      assignmentReceiptPort?.setReadState?.('ready')
+      if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')
       return true
     } catch (e) {
       if(readId!==candidateReadSequence.current)return false
@@ -660,7 +664,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
       setCandidateDrafts({})
       setSelectedCandidateId('')
       setError(getMessage(e))
-      assignmentReceiptPort?.setReadState?.('failed')
+      if(settleRead)settleRead('failed');else assignmentReceiptPort?.setReadState?.('failed')
       return false
     } finally {
       if(readId===candidateReadSequence.current)setLoading(false)
