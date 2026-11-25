@@ -1,0 +1,99 @@
+import test,{before,after} from 'node:test'
+import assert from 'node:assert/strict'
+import {JSDOM} from 'jsdom'
+import React,{act} from 'react'
+import {createServer} from 'vite'
+let dom,vite,Host,createRoot
+before(async()=>{
+ dom=new JSDOM('<!doctype html><html lang="fa" dir="rtl"><body></body></html>',{url:'https://fixture.invalid',pretendToBeVisual:true})
+ globalThis.window=dom.window;globalThis.document=dom.window.document;globalThis.HTMLElement=dom.window.HTMLElement;globalThis.IS_REACT_ACT_ENVIRONMENT=true
+ ;({createRoot}=await import('react-dom/client'))
+ vite=await createServer({server:{middlewareMode:true},appType:'custom',logLevel:'error'})
+ Host=(await vite.ssrLoadModule('/src/components/AssignmentRecoveryFixtureHost.jsx')).default
+})
+after(async()=>{await vite?.close();dom?.window.close();for(const k of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT'])delete globalThis[k]})
+const h=React.createElement,id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0'),A=id(1),K=id(100)
+const draft={kind:'direct',workerIds:[id(10)],unit:'library',title:'Synthetic private title',instructions:'Synthetic private instructions',date:'2026-12-01',minutes:60,startMinute:null,endMinute:null,reason:null}
+const envelope=(epoch=0,active=null)=>({ok:true,epoch,active})
+function fixture(){
+ let server=envelope(),mode='',n=100
+ const calls=[]
+ const transport=Object.freeze({version:2,makeId:()=>id(n++),
+  write:async p=>{
+   calls.push(p)
+   if(p.p_epoch!==server.epoch)throw Error('stale')
+   const a={request_id:p.p_request_id,kind:p.p_kind,status:'reserved'}
+   if(p.p_action==='reserve')server=envelope(p.p_epoch,a)
+   else server=envelope(p.p_epoch,{...a,status:'committed',receipt:{ok:true,request_id:p.p_request_id,kind:p.p_kind,result:{id:id(200),state:'assigned',short_notice:false}}})
+   if(mode===p.p_action)throw Error('lost response')
+   return server
+  },
+  control:async p=>{
+   calls.push(p)
+   if(p.p_action==='cancel'&&server.active.status==='reserved')server=envelope(server.epoch,{...server.active,status:'cancelled'})
+   if(p.p_action==='acknowledge')server=envelope(server.epoch+1)
+   if(mode===p.p_action)throw Error('lost response')
+   return server
+  }})
+ return {transport,calls,mode:m=>{mode=m},server:()=>server}
+}
+async function mount(f,options={}){
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host)
+ let port
+ const paint=(checking=false,actorId=A)=>root.render(h(Host,{actorId,checking,fixture:f.transport},p=>{port=p;return h('main',null,h('button',{disabled:p.snapshot.state!=='idle',onClick:()=>void p.submit(draft)},'آماده‌سازی نمونه'),p.panel,h('span',{'data-revision':p.editorRevision,'data-committed':p.committedRevision}))}))
+ await act(async()=>paint())
+ const click=async label=>{const b=[...host.querySelectorAll('button')].find(x=>x.textContent===label);assert.ok(b,label);await act(async()=>b.click())}
+ return {host,click,port:()=>port,paint:async(...args)=>{await act(async()=>paint(...args))},cleanup:async()=>{await act(async()=>root.unmount());host.remove()}}
+}
+test('real V2 host requires explicit reserve then commit and acknowledges exactly once',async()=>{
+ const f=fixture(),m=await mount(f)
+ try{
+  assert.equal(m.port().snapshot.state,'idle')
+  await m.click('آماده‌سازی نمونه')
+  assert.match(m.host.textContent,/هنوز کاری ثبت نشده/)
+  assert.equal(f.calls.filter(x=>x.p_action==='commit').length,0)
+  await m.click('ثبت نهایی واگذاری');assert.match(m.host.textContent,/ثبت واگذاری تأیید شد/)
+  await m.click('تأیید و بستن رسید')
+  assert.equal(m.port().snapshot.state,'idle');assert.equal(m.port().editorRevision,1);assert.equal(m.port().committedRevision,1)
+  assert.equal(f.calls.filter(x=>x.p_action==='commit').length,1)
+ }finally{await m.cleanup()}
+})
+test('fresh host remount discovers reserved intent without draft and permits only cancellation',async()=>{
+ const f=fixture(),a=await mount(f)
+ await a.click('آماده‌سازی نمونه');await a.cleanup()
+ const b=await mount(f)
+ try{
+  assert.match(b.host.textContent,/متن اصلی در این نشست در دسترس نیست/)
+  assert.equal(b.port().initialPayload,null)
+  assert.doesNotMatch(b.host.textContent,/ثبت نهایی واگذاری|Synthetic private/)
+  await b.click('لغو ایمن درخواست');await b.click('بستن نتیجه لغو')
+  assert.equal(b.port().snapshot.state,'idle');assert.equal(b.port().editorRevision,1);assert.equal(b.port().committedRevision,0)
+  assert.equal(f.calls.filter(x=>x.p_action==='commit').length,0)
+ }finally{await b.cleanup()}
+})
+test('lost ack uses advanced epoch read to reset editor and refresh once',async()=>{
+ const f=fixture(),m=await mount(f)
+ try{
+  await m.click('آماده‌سازی نمونه');await m.click('ثبت نهایی واگذاری')
+  f.mode('acknowledge');await m.click('تأیید و بستن رسید')
+  assert.equal(m.port().snapshot.state,'unknown');assert.equal(m.port().committedRevision,0)
+  f.mode('');await m.click('بررسی وضعیت درخواست')
+  assert.equal(m.port().snapshot.state,'idle');assert.equal(m.port().committedRevision,1)
+ }finally{await m.cleanup()}
+})
+test('scoped read failure and recheck suppress projection and actions until fresh discover',async()=>{
+ const f=fixture(),m=await mount(f)
+ try{
+  await m.click('آماده‌سازی نمونه')
+  await act(async()=>m.port().setReadState('failed'))
+  assert.equal(m.port().snapshot.state,'checking');assert.equal(m.port().initialPayload,null)
+  assert.doesNotMatch(m.host.textContent,/ثبت نهایی واگذاری/)
+  await act(async()=>m.port().setReadState('ready'))
+  assert.equal(m.port().snapshot.state,'reserved')
+  await m.paint(true)
+  assert.equal(m.port().snapshot.state,'checking')
+  await m.paint(false)
+  assert.equal(m.port().snapshot.state,'reserved')
+  assert.equal(f.calls.filter(x=>x.p_action==='commit').length,0)
+ }finally{await m.cleanup()}
+})

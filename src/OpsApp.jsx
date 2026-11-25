@@ -18,6 +18,7 @@ import { AdminOperations, WorkerOperations } from './OperationsWorkspace'
 import ReportApp from './ReportApp'
 import ManagerWorkspaceNav from './components/ManagerWorkspaceNav'
 import DirectAssignmentFixtureHost from './components/DirectAssignmentFixtureHost'
+import AssignmentRecoveryFixtureHost from './components/AssignmentRecoveryFixtureHost'
 import ManagerCandidatesWorkspace from './components/ManagerCandidatesWorkspace'
 import {candidateOnboardingLabel,candidateAuthSignInLabel,candidateDisplayName,candidateDisplayMajor} from './lib/managerCandidateView.mjs'
 import {fetchCandidatesWithAuthorizedWorkerIdentity} from './lib/managerCandidateWorkerOverlay.mjs'
@@ -1120,16 +1121,17 @@ export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null }
   // Keep same-account unsent form state through a role revalidation on
   // tab focus, but never present or accept input in privileged UI while
   // permission is being checked. Identity/role/revocation changes remount.
+  const ReceiptHost=assignmentReceiptFixture?.version===2?AssignmentRecoveryFixtureHost:DirectAssignmentFixtureHost
   const authorizedView = identity.role === 'admin'
     ? (assignmentReceiptFixture===null
       ? <AdminView key={'admin:' + identity.user?.id}
         onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
         refreshRevision={dataRefreshRevision}/>
-      : <DirectAssignmentFixtureHost key={'fixture-admin:' + identity.user?.id}
+      : <ReceiptHost key={'fixture-admin:' + identity.user?.id}
          actorId={identity.user?.id} checking={recheckingAccess} fixture={assignmentReceiptFixture}>
          {port=><AdminView onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
           refreshRevision={dataRefreshRevision} assignmentReceiptPort={port}/>}
-        </DirectAssignmentFixtureHost>)
+        </ReceiptHost>)
     : identity.role === 'worker_disabled'
       ? <WorkerDisabledView key={'disabled:' + identity.user?.id + ':' + identity.profile?.state}
           profile={identity.profile} onLogout={logout}/>

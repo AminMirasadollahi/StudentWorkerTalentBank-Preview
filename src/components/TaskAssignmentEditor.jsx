@@ -375,7 +375,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
       onClick={onCancel||onClose}>انصراف</button>}
     <button type="submit" className="report-btn report-btn--primary"
       disabled={receiptBlocked||busy||cancelBusy||committed||!Object.hasOwn(unitNames,taskUnit)||!selected.length||selected.length!==workerIds.length||date<localToday()||!routineGroupOk||!estimateValid||!deskCanSubmit}>
-      {busy?'در حال ثبت…':selected.length>1?'واگذاری گروهی':'واگذاری کار'}
+      {busy?(assignmentReceiptPort?.version===2?'در حال بررسی…':'در حال ثبت…'):assignmentReceiptPort?.version===2?'آماده‌سازی واگذاری':selected.length>1?'واگذاری گروهی':'واگذاری کار'}
     </button>
   </div>
  </form>
