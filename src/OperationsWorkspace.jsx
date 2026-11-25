@@ -182,7 +182,7 @@ function readableError(e) {
     worker_not_active:'این دانشجوکار هنوز فعال نیست.',
     worker_access_denied:'شما مجوز انجام این عملیات را ندارید.',
     task_access_denied:'این کار در فهرست وظایف شما نیست.',
-    invalid_time_submission:'تاریخ یا مدت اجرای واردشده معتبر نیست.',
+    invalid_time_submission:'تاریخ یا مدت اجرای واردشده معتبر نیست. تاریخ واقعی انجام، محدوده مجاز این کار و زمان گزارش را بررسی کنید.',
     invalid_task_transition:'وضعیت فعلی این کار اجازه شروع مجدد نمی‌دهد.',
     already_reviewed:'این گزارش قبلاً بررسی شده است.',
     review_reason_required:'برای اختلاف زمان یا تأیید زمان اضافه، توضیح تصمیم لازم است.',
@@ -2011,9 +2011,10 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
         'report')
     }}>
       <div className="ow-fields ow-fields--two">
-        <label className="report-field"><span>تاریخ انجام کار (شمسی)</span>
+        <label className="report-field"><span>تاریخ واقعی انجام کار (شمسی)</span>
           <JalaliDatePicker value={date} max={today()} min={shift(today(),-90)}
             onChange={setDate} ariaLabel="تاریخ انجام کار"/>
+          <small className="ow-muted">تاریخ برنامه‌ریزی: {pretty(task.planned_date)}. روزی را که واقعاً کار انجام شده وارد کنید؛ ضوابط زمانی نوع کار در سرور بررسی می‌شود.</small>
         </label>
         <div className="ow-standard-credit">
           <span>زمان استاندارد این کار</span><b>{minutes(standard)}</b>
@@ -2892,7 +2893,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           {' · '}{pretty(inspectedTask.planned_date)}{' · '}
           زمان استاندارد: {minutes(inspectedTask.estimate_minutes)}</p>
         {inspectedTask.instructions
-          ?<section><strong>شرح وظیفه</strong><p>{inspectedTask.instructions}</p></section>
+          ?<section><strong>شرح وظیفه</strong><p className="ow-task-full-description">{inspectedTask.instructions}</p></section>
           :<p className="ow-muted">توضیح دیگری برای این کار ثبت نشده است.</p>}
         {inspectedReport&&<section aria-label="زمان‌های گزارش مرتبط با کار">
           <strong>زمان گزارش‌شده</strong>
