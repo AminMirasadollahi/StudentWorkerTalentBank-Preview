@@ -111,3 +111,23 @@ test('missing slot after observed reservation is inconsistent and stays blocked'
  const f=fixture(),s=f.make();await s.discover();await s.reserve(draft);f.setView(envelope())
  assert.equal(await s.discover(),'unknown');assert.equal(s.snapshot().canStart,false)
 })
+
+test('late reserve response after identity change cannot permit commit or reveal draft',async()=>{
+ let finish
+ const calls=[]
+ const s=createAssignmentRecoverySession({makeId:()=>K,control:async()=>envelope(),write:p=>{calls.push(p);return new Promise(r=>{finish=r})}})
+ s.setAccess({status:'verified',actorId:A});await s.discover()
+ const p=s.reserve(draft)
+ s.setAccess({status:'verified',actorId:B})
+ finish(envelope(0,reserved()))
+ assert.equal(await p,'stale')
+ assert.equal(s.snapshot().payload,null);assert.equal(await s.commit(),'blocked')
+ assert.equal(calls.length,1)
+})
+test('malformed commit receipt requires discovery before any new action',async()=>{
+ const f=fixture(),s=f.make();await s.discover();await s.reserve(draft)
+ f.setView(envelope(0,{...terminal(),receipt:{ok:true}}))
+ assert.equal(await s.discover(),'unknown')
+ assert.equal(await s.acknowledge(),'blocked')
+ assert.equal(await s.reserve(draft),'blocked')
+})

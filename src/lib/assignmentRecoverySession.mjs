@@ -70,14 +70,14 @@ export function createAssignmentRecoverySession({write,control,makeId}){
    const next=accept(raw)
    if(!next){state='unknown';return state}
    view=next
-   state=next.active?.status??'idle'
+   state=next.active?.status??(local?'reserve_unknown':'idle')
    return state
   }catch{if(g!==generation||!allowed())return 'stale';state='unknown';return state}
   finally{if(g===generation)busy=false}
  }
  const discover=async()=>{
   if(!allowed()||busy)return 'blocked'
-  const result=await invoke('discovering',control,Object.freeze({p_action:'discover',p_epoch:null,p_request_id:null}),raw=>{
+  return invoke('discovering',control,Object.freeze({p_action:'discover',p_epoch:null,p_request_id:null}),raw=>{
    const n=parseRecoveryView(raw)
    if(!n)return null
    if(local){
@@ -99,8 +99,6 @@ export function createAssignmentRecoverySession({write,control,makeId}){
    }
    return n
   })
-  if(result==='idle'&&local){state='reserve_unknown';return state}
-  return result
  }
  const send=async(action)=>{
   const p=local
