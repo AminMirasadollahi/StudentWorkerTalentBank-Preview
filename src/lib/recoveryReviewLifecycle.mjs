@@ -1,15 +1,21 @@
-// Explicit non-production review build configuration and fail-closed access lifecycle.
+// Explicit review or operational candidate configuration. Both opt-ins default OFF.
+const PRODUCTION_REF='pmwxryavkrjcdobwkryw'
 export function resolveRecoveryReviewConfig(env){
- if(env?.VITE_SWTB22_RECOVERY_REVIEW_UI!=='true')return Object.freeze({mode:'off'})
- const expected=env.VITE_SWTB22_RECOVERY_REVIEW_PROJECT_REF
- const url=env.VITE_SUPABASE_URL
- const key=env.VITE_SUPABASE_PUBLISHABLE_KEY
- // This review candidate must NEVER target the current operational project.
- // Require explicit build configuration; no SDK/default/URL-query fallback.
- if(typeof expected!=='string'||! /^[a-z0-9]{20}$/.test(expected)||expected==='pmwxryavkrjcdobwkryw'||
+ const review=env?.VITE_SWTB22_RECOVERY_REVIEW_UI==='true'
+ const release=env?.VITE_SWTB22_RECOVERY_RELEASE_UI==='true'
+ if(!review&&!release)return Object.freeze({mode:'off'})
+ const blocked=()=>Object.freeze({mode:'blocked'})
+ if(review&&release)return blocked()
+ const expected=review?env.VITE_SWTB22_RECOVERY_REVIEW_PROJECT_REF:env.VITE_SWTB22_RECOVERY_RELEASE_PROJECT_REF
+ const url=env.VITE_SUPABASE_URL,key=env.VITE_SUPABASE_PUBLISHABLE_KEY
+ if(typeof expected!=='string'||! /^[a-z0-9]{20}$/.test(expected)||
+  (review?expected===PRODUCTION_REF:expected!==PRODUCTION_REF)||
   url!=='https://'+expected+'.supabase.co'||typeof key!=='string'||!/^sb_publishable_[A-Za-z0-9_-]+$/.test(key))
-  return Object.freeze({mode:'blocked'})
- return Object.freeze({mode:'review',projectUrl:url,publishableKey:key})
+  return blocked()
+ return Object.freeze({mode:review?'review':'release',projectUrl:url,publishableKey:key})
+}
+export function assertLegacyAssignmentAllowed(env){
+ if(resolveRecoveryReviewConfig(env).mode!=='off')throw Error('SWTB22_LEGACY_ASSIGNMENT_BLOCKED')
 }
 export async function verifyRecoveryReviewAdmin({projectUrl,publishableKey,auth,fetchImpl,actorId,isCurrent}){
  const denied=()=>Error('RECOVERY_REVIEW_ADMIN_UNVERIFIED')
