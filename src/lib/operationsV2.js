@@ -1,12 +1,14 @@
 // Isolated versioned operations API, intentionally not wired into public applicant intake.
 // Requires independently reviewed private Supabase v2 migrations before deployment.
 import {opsClient} from './operations'
+import {assertLegacyAssignmentAllowed} from './recoveryReviewLifecycle.mjs'
 function dataOrThrow({data,error}) {
  if(error)throw error
  if(data?.error)throw new Error(data.error)
  return data
 }
 const rpc=(name,args)=>opsClient.rpc(name,args).then(dataOrThrow)
+const legacyAssignmentRpc=async(name,args)=>{assertLegacyAssignmentAllowed(import.meta.env);return rpc(name,args)}
 export const getAdminWorkV2=()=>rpc('ops_get_operations_v3')
 export const getMyWorkV2=()=>rpc('ops_get_my_work_v2')
 export const getMyWorkerProfileV2=()=>rpc('ops_get_my_worker_profile_v2')
@@ -20,7 +22,7 @@ export const reviewProfileChange=({requestId,decision,note})=>rpc('ops_review_pr
 // Unit belongs to the assigned work, NEVER inferred from the worker's enrollment unit.
 // New RPC preserves atomic group assignment and manager-only authorization.
 export const assignGroupTask=({workerIds,unit,title,instructions,date,minutes,shortNoticeReason})=>
- rpc('ops_assign_group_task_for_unit',{
+ legacyAssignmentRpc('ops_assign_group_task_for_unit',{
   p_worker_ids:workerIds,p_unit_code:unit,p_title:title,p_instructions:instructions,
   p_planned_date:date,p_estimate_minutes:Number(minutes),
   p_short_notice_reason:shortNoticeReason||null,
@@ -34,7 +36,7 @@ export const getLibraryDeskShifts=({from,to})=>rpc('ops_get_library_desk_shifts'
  p_from:from,p_to:to,
 })
 export const assignLibraryDeskShift=({workerIds,date,startMinute,endMinute,title,instructions,shortNoticeReason})=>
- rpc('ops_assign_library_desk_shift',{
+ legacyAssignmentRpc('ops_assign_library_desk_shift',{
   p_worker_ids:workerIds,p_shift_date:date,
   p_start_minute:startMinute,p_end_minute:endMinute,
   p_title:title,p_instructions:instructions,
