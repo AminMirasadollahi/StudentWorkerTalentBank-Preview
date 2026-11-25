@@ -21,6 +21,8 @@ import ManagerWorkHubTabs from './components/ManagerWorkHubTabs'
 import {createWorkPoolRouteFence} from './lib/workPoolRouteFence.mjs'
 import DirectAssignmentFixtureHost from './components/DirectAssignmentFixtureHost'
 import AssignmentRecoveryFixtureHost from './components/AssignmentRecoveryFixtureHost'
+import AssignmentRecoveryReviewHost from './components/AssignmentRecoveryReviewHost'
+import {resolveRecoveryReviewConfig} from './lib/recoveryReviewLifecycle.mjs'
 import ManagerCandidatesWorkspace from './components/ManagerCandidatesWorkspace'
 import {candidateOnboardingLabel,candidateAuthSignInLabel,candidateDisplayName,candidateDisplayMajor} from './lib/managerCandidateView.mjs'
 import {fetchCandidatesWithAuthorizedWorkerIdentity} from './lib/managerCandidateWorkerOverlay.mjs'
@@ -41,6 +43,7 @@ import './manager-shell.css'
 const emailInvitesAvailable = import.meta.env.VITE_OPS_EMAIL_INVITES_AVAILABLE === 'true'
 // Rollback-safe preview: preserve the current manager UI until the new shell is accepted.
 const managerShellEnabled=import.meta.env.VITE_SWTB22_MANAGER_SHELL_UI==='true'
+const recoveryReviewConfig=resolveRecoveryReviewConfig(import.meta.env)
 const managerNavFlags={
  workPoolEnabled:import.meta.env.VITE_SWTB21_WORK_POOL_UI!=='false',
  termMembershipEnabled:import.meta.env.VITE_SWTB21_TERM_MEMBERSHIP_UI!=='false',
@@ -1144,7 +1147,14 @@ export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, 
   // permission is being checked. Identity/role/revocation changes remount.
   const ReceiptHost=assignmentReceiptFixture?.version===2?AssignmentRecoveryFixtureHost:DirectAssignmentFixtureHost
   const authorizedView = identity.role === 'admin'
-    ? (assignmentReceiptFixture===null
+    ? (assignmentReceiptFixture===null&&recoveryReviewConfig.mode!=='off'
+      ? <AssignmentRecoveryReviewHost key={'review-admin:' + identity.user?.id}
+         config={recoveryReviewConfig} auth={opsClient.auth} actorId={identity.user?.id}
+         checking={recheckingAccess||busy} onLogout={logout}>
+         {port=><AdminView onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
+          refreshRevision={dataRefreshRevision} assignmentReceiptPort={port} workHubFixture={workHubFixture}/>}
+        </AssignmentRecoveryReviewHost>
+      : assignmentReceiptFixture===null
       ? <AdminView key={'admin:' + identity.user?.id}
         onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
         refreshRevision={dataRefreshRevision} workHubFixture={workHubFixture}/>
