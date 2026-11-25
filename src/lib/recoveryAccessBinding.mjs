@@ -27,7 +27,7 @@ export function createRecoveryAccessBinding({projectUrl,publishableKey,auth,fetc
     return result
    }catch{throw denied()}
   }
-  s.fixture=Object.freeze({version:2,manualReserve:false,write:args=>call('write',args),control:args=>call('control',args),makeId:()=>{if(!active(s,generation))throw denied();return makeId()}})
+  s.fixture=Object.freeze({version:2,manualReserve:false,write:args=>call('write',args),control:args=>call('control',args),cancelExistingShift:args=>call('cancelExistingShift',args),makeId:()=>{if(!active(s,generation))throw denied();return makeId()}})
   return s
  }
  const accept=(proof,identity)=>{
