@@ -1,5 +1,6 @@
 import test from 'node:test'
-import {resolveRecoveryReviewConfig,verifyRecoveryReviewAdmin,createRecoveryReviewLifecycle} from '../src/lib/recoveryReviewLifecycle.mjs'
+import assert from 'node:assert/strict'
+import {resolveRecoveryReviewConfig,verifyRecoveryReviewAdmin,createRecoveryReviewLifecycle,assertLegacyAssignmentAllowed} from '../src/lib/recoveryReviewLifecycle.mjs'
 async function reviewChecks(resolveConfig,verifyAdmin,createLifecycle){
  const A='00000000-0000-4000-8000-000000000101',B='00000000-0000-4000-8000-000000000102',P='aaaaaaaaaaaaaaaaaaaa'
  const env={VITE_SWTB22_RECOVERY_REVIEW_UI:'true',VITE_SWTB22_RECOVERY_REVIEW_PROJECT_REF:P,VITE_SUPABASE_URL:'https://'+P+'.supabase.co',VITE_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_test'}
@@ -33,3 +34,16 @@ async function reviewChecks(resolveConfig,verifyAdmin,createLifecycle){
  return count
 }
 test('review target, fixed token role proof and auth lifecycle',async()=>{if(await reviewChecks(resolveRecoveryReviewConfig,verifyRecoveryReviewAdmin,createRecoveryReviewLifecycle)!==24)throw Error('ASSERTION_COUNT')})
+
+test('release opt-in pinned to exact production target; mutually exclusive; no legacy fallback',()=>{
+ const P='pmwxryavkrjcdobwkryw'
+ const env={VITE_SWTB22_RECOVERY_RELEASE_UI:'true',VITE_SWTB22_RECOVERY_RELEASE_PROJECT_REF:P,VITE_SUPABASE_URL:'https://'+P+'.supabase.co',VITE_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_build_only'}
+ assert.equal(resolveRecoveryReviewConfig(env).mode,'release')
+ assert.doesNotThrow(()=>assertLegacyAssignmentAllowed({}))
+ assert.throws(()=>assertLegacyAssignmentAllowed(env),/SWTB22_LEGACY_ASSIGNMENT_BLOCKED/)
+ for(const e of [{...env,VITE_SWTB22_RECOVERY_REVIEW_UI:'true'},{...env,VITE_SWTB22_RECOVERY_RELEASE_PROJECT_REF:undefined},{...env,VITE_SUPABASE_URL:undefined},{...env,VITE_SUPABASE_PUBLISHABLE_KEY:undefined},{...env,VITE_SUPABASE_PUBLISHABLE_KEY:'sb_secret_test'},{...env,VITE_SUPABASE_URL:'https://other.supabase.co'},{...env,VITE_SWTB22_RECOVERY_RELEASE_PROJECT_REF:'aaaaaaaaaaaaaaaaaaaa',VITE_SUPABASE_URL:'https://aaaaaaaaaaaaaaaaaaaa.supabase.co'}]){
+  assert.equal(resolveRecoveryReviewConfig(e).mode,'blocked')
+  assert.throws(()=>assertLegacyAssignmentAllowed(e),/SWTB22_LEGACY_ASSIGNMENT_BLOCKED/)
+ }
+ assert.equal(resolveRecoveryReviewConfig({...env,VITE_SWTB22_RECOVERY_RELEASE_UI:'false'}).mode,'off')
+})
