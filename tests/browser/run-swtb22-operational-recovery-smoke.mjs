@@ -53,7 +53,7 @@ try{
   if(rpc==='ops_is_admin')return respond(200,true)
   if(rpc==='ops_list_candidates')return respond(200,[])
   if(rpc==='ops_get_operations_v3')return respond(200,work)
-  if(releasedUi&&rpc==='ops_list_presence_changes')return respond(200,{ok:true,items:[],requests:[]})
+  if(releasedUi&&rpc==='ops_list_presence_changes')return respond(200,{ok:true,scope:'manager',items:[]})
   if(rpc==='ops_get_admin_student_worker_report')return respond(200,{rows:[],summary:{},filters:{}})
   if(rpc==='ops_assignment_recovery_control_v2'||rpc==='ops_assignment_recovery_write_v2'){
    const args=req.postDataJSON()
