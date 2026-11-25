@@ -131,3 +131,39 @@ test('malformed commit receipt requires discovery before any new action',async()
  assert.equal(await s.acknowledge(),'blocked')
  assert.equal(await s.reserve(draft),'blocked')
 })
+
+test('one explicit submit performs exact reserve then commit once',async()=>{
+ const f=fixture(),s=f.make();await s.discover()
+ const p=s.submit(draft)
+ assert.equal(await s.submit(draft),'blocked')
+ assert.equal(await p,'committed')
+ assert.deepEqual(f.calls.filter(x=>x.p_action!=='discover').map(x=>x.p_action),['reserve','commit'])
+ assert.deepEqual({...f.calls[1],p_action:'commit'},f.calls[2])
+})
+test('lost reserve response stops one-click chain; discovery does not commit',async()=>{
+ const f=fixture(),s=f.make();await s.discover();f.setMode('lost-after')
+ assert.equal(await s.submit(draft),'unknown');f.setMode('')
+ assert.equal(await s.discover(),'reserved')
+ assert.equal(f.calls.filter(x=>x.p_action==='commit').length,0)
+ assert.equal(await s.commit(),'committed')
+})
+test('same actor verification change while reserve pending never auto-commits',async()=>{
+ let finish
+ const calls=[]
+ // First discovery must be idle, subsequent discovery sees the reservation.
+ let first=true
+ const t=createAssignmentRecoverySession({makeId:()=>K,control:async()=>{if(first){first=false;return envelope()}return envelope(0,reserved())},write:p=>{calls.push(p);return new Promise(r=>{finish=r})}})
+ t.setAccess({status:'verified',actorId:A});await t.discover()
+ const pending=t.submit(draft)
+ t.setAccess({status:'checking'});t.setAccess({status:'verified',actorId:A})
+ await t.discover();finish(envelope(0,reserved()))
+ assert.equal(await pending,'stale');assert.equal(calls.length,1)
+ assert.equal(t.snapshot().state,'reserved');assert.equal(t.snapshot().canCommit,true)
+ t.dispose()
+})
+test('malformed reservation response does not trigger commit',async()=>{
+ const calls=[]
+ const s=createAssignmentRecoverySession({makeId:()=>K,control:async()=>envelope(),write:async p=>{calls.push(p);return envelope(0,reserved(id(999)))}})
+ s.setAccess({status:'verified',actorId:A});await s.discover()
+ assert.equal(await s.submit(draft),'unknown');assert.equal(calls.length,1);assert.equal(s.snapshot().canStart,false)
+})

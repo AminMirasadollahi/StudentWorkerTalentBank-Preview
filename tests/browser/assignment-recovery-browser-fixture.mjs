@@ -3,7 +3,7 @@
 // Route is intercepted by Playwright only. Retains opaque request/receipt state
 // across reload, no browser storage, no raw draft in server view.
 export function createRecoveryBrowserFixture(){
- let epoch=0,active=null,loseCommit=false
+ let epoch=0,active=null,loseCommit=false,loseReserve=false
  const calls=[]
  const view=()=>({ok:true,epoch,active})
  const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0')
@@ -17,6 +17,7 @@ export function createRecoveryBrowserFixture(){
   if(p.p_action==='reserve'){
    if(active&&!same(p))return {status:409,body:{}}
    if(!active)active={request_id:p.p_request_id,kind:p.p_kind,status:'reserved'}
+   if(loseReserve){loseReserve=false;return {status:503,body:{}}}
   }else if(p.p_action==='commit'){
    if(!same(p)||active.status==='cancelled')return {status:409,body:{}}
    if(active.status==='reserved')active={...active,status:'committed',receipt:{ok:true,request_id:p.p_request_id,kind:p.p_kind,result:{id:id(201),state:'assigned',short_notice:true}}}
@@ -30,5 +31,5 @@ export function createRecoveryBrowserFixture(){
   }else return {status:400,body:{}}
   return {status:200,body:view()}
  }
- return {handle,calls,view,loseNextCommitResponse:()=>{loseCommit=true}}
+ return {handle,calls,view,loseNextCommitResponse:()=>{loseCommit=true},loseNextReserveResponse:()=>{loseReserve=true}}
 }

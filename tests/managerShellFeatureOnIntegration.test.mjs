@@ -272,7 +272,7 @@ test('real manager route setter blocks hub tab and sidebar exits until simulated
 test('combined real OpsApp keeps V2 receipt owner across hub and candidate routes while pool fence guards its own exits',async()=>{
  let server={ok:true,epoch:0,active:null}
  const calls=[]
- const fixture=Object.freeze({version:2,makeId:()=> '00000000-0000-4000-8000-000000000100',
+ const fixture=Object.freeze({version:2,manualReserve:true,makeId:()=> '00000000-0000-4000-8000-000000000100',
   write:async p=>{
    calls.push(p.p_action)
    const a={request_id:p.p_request_id,kind:p.p_kind,status:'reserved'}

@@ -15,10 +15,10 @@ after(async()=>{await vite?.close();dom?.window.close();for(const k of ['window'
 const h=React.createElement,id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0'),A=id(1),K=id(100)
 const draft={kind:'direct',workerIds:[id(10)],unit:'library',title:'Synthetic private title',instructions:'Synthetic private instructions',date:'2026-12-01',minutes:60,startMinute:null,endMinute:null,reason:null}
 const envelope=(epoch=0,active=null)=>({ok:true,epoch,active})
-function fixture(){
+function fixture(manualReserve=true){
  let server=envelope(),mode='',n=100
  const calls=[]
- const transport=Object.freeze({version:2,makeId:()=>id(n++),
+ const transport=Object.freeze({version:2,manualReserve,makeId:()=>id(n++),
   write:async p=>{
    calls.push(p)
    if(p.p_epoch!==server.epoch)throw Error('stale')
@@ -95,5 +95,19 @@ test('scoped read failure and recheck suppress projection and actions until fres
   await m.paint(false)
   assert.equal(m.port().snapshot.state,'reserved')
   assert.equal(f.calls.filter(x=>x.p_action==='commit').length,0)
+ }finally{await m.cleanup()}
+})
+
+test('normal V2 host submits in one action; receipt still requires explicit acknowledgment',async()=>{
+ const f=fixture(false),m=await mount(f)
+ try{
+  await m.click('آماده‌سازی نمونه')
+  assert.match(m.host.textContent,/ثبت واگذاری تأیید شد/)
+  assert.doesNotMatch(m.host.textContent,/ثبت نهایی واگذاری/)
+  assert.equal(f.calls.filter(x=>x.p_action==='reserve').length,1)
+  assert.equal(f.calls.filter(x=>x.p_action==='commit').length,1)
+  assert.equal(m.port().committedRevision,0)
+  await m.click('تأیید و بستن رسید')
+  assert.equal(m.port().committedRevision,1)
  }finally{await m.cleanup()}
 })

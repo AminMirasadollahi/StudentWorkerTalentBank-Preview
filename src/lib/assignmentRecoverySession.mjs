@@ -122,6 +122,19 @@ export function createAssignmentRecoverySession({write,control,makeId}){
  }
  const retryReserve=()=>allowed()&&!busy&&state==='reserve_unknown'&&local?send('reserve'):Promise.resolve('blocked')
  const commit=()=>snapshot().canCommit?send('commit'):Promise.resolve('blocked')
+ // One explicit user action authorizes the initial two phases, not a retry.
+ // Only this exact reserve response in the same verification generation can
+ // initiate commit. Any intervening discovery/access change stops the chain.
+ const submit=async draft=>{
+  const before=generation
+  const pending=reserve(draft)
+  const expected=generation
+  const p=local
+  const outcome=await pending
+  if(outcome!=='reserved')return outcome
+  if(!allowed()||generation!==expected||expected!==before+1||local!==p||!snapshot().canCommit)return 'stale'
+  return commit()
+ }
  const cancel=()=>{
   if(!snapshot().canCancel)return Promise.resolve('blocked')
   const old=view
@@ -140,5 +153,5 @@ export function createAssignmentRecoverySession({write,control,makeId}){
   })
  }
  const dispose=()=>{reset();local=null;actor=null;access='denied';used.clear();disposed=true}
- return Object.freeze({setAccess,snapshot,discover,reserve,retryReserve,commit,cancel,acknowledge,dispose})
+ return Object.freeze({setAccess,snapshot,discover,reserve,submit,retryReserve,commit,cancel,acknowledge,dispose})
 }

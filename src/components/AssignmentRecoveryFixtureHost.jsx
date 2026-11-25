@@ -60,7 +60,8 @@ export default function AssignmentRecoveryFixtureHost({actorId,checking,fixture,
  const panel=<AssignmentRecoveryPanel snapshot={snapshot} onDiscover={()=>void run(i,i.session.discover)}
   onRetryReserve={()=>void run(i,i.session.retryReserve)} onCommit={()=>void run(i,i.session.commit)}
   onCancel={()=>void run(i,i.session.cancel)} onAcknowledge={acknowledge}/>
- const port={version:2,snapshot,submit:d=>run(i,i.session.reserve,d),setReadState,panel,
+ const manualReserve=fixture.manualReserve===true // focused review tests only
+ const port={version:2,manualReserve,snapshot,submit:d=>run(i,manualReserve?i.session.reserve:i.session.submit,d),setReadState,panel,
   editorRevision:editor.revision,initialPayload:usable(i)?snapshot.payload:null,committedRevision:editor.committedRevision}
  return children(port)
 }
