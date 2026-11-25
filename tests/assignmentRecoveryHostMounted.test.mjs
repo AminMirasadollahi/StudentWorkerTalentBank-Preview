@@ -157,3 +157,53 @@ test('existing shift response from before access recheck is unconfirmed, not rep
   assert.equal(m.port().committedRevision,0)
  }finally{await m.cleanup()}
 })
+
+test('scoped manager reads reject out-of-order cross-route and same-route completions',async()=>{
+ const f=fixture(false),m=await mount(f)
+ try{
+  let oldCandidate,oldWork,newCandidate,newWork
+  await act(async()=>{m.port().setReadScope('candidates');oldCandidate=m.port().beginScopedRead('candidates')})
+  assert.equal(m.port().snapshot.state,'checking')
+  await act(async()=>{m.port().setReadScope('work');oldWork=m.port().beginScopedRead('work')})
+  assert.equal(oldCandidate('ready'),false)
+  assert.equal(m.port().snapshot.state,'checking')
+  assert.equal(await m.port().submit(draft),'blocked')
+  await act(async()=>{m.port().setReadScope('candidates');newCandidate=m.port().beginScopedRead('candidates')})
+  assert.equal(oldCandidate('failed'),false);assert.equal(oldWork('ready'),false)
+  await act(async()=>{assert.equal(newCandidate('ready'),true)})
+  assert.equal(m.port().snapshot.state,'idle')
+  assert.equal(await m.port().submit(draft),'blocked')
+  await act(async()=>{m.port().setReadScope('work');newWork=m.port().beginScopedRead('work');m.port().setReadState('ready')})
+  assert.equal(m.port().snapshot.state,'checking')
+  let latest
+  await act(async()=>{latest=m.port().beginScopedRead('work')})
+  assert.equal(newWork('ready'),false)
+  await act(async()=>{assert.equal(latest('failed'),true)})
+  assert.equal(m.port().snapshot.state,'checking')
+  let fresh
+  await act(async()=>{fresh=m.port().beginScopedRead('work');assert.equal(fresh('ready'),true)})
+  assert.equal(m.port().snapshot.state,'idle');assert.equal(latest('ready'),false)
+  await act(async()=>{assert.equal(await m.port().submit(draft),'committed')})
+  assert.equal(f.calls.filter(x=>x.p_action==='commit').length,1)
+ }finally{await m.cleanup()}
+})
+test('report route keeps verified receipt recovery without starting a new assignment',async()=>{
+ const base=fixture(false),cancelCalls=[]
+ const f={...base,transport:{...base.transport,cancelExistingShift:async args=>{cancelCalls.push(args);return {ok:true,shift_id:args.shiftId,state:'cancelled'}}}}
+ const m=await mount(f)
+ try{
+  let settle
+  await act(async()=>{m.port().setReadScope('work');settle=m.port().beginScopedRead('work');settle('ready')})
+  await act(async()=>{assert.equal(await m.port().submit(draft),'committed')})
+  await act(async()=>{m.port().setReadScope('report')})
+  assert.equal(m.port().snapshot.state,'committed')
+  assert.equal(settle('failed'),false)
+  assert.equal(await m.port().submit(draft),'blocked')
+  await assert.rejects(m.port().cancelExistingShift({shiftId:id(301),reason:'synthetic cancellation'}),/SHIFT_CANCEL_BLOCKED/)
+  await m.click('تأیید و بستن رسید')
+  assert.equal(m.port().snapshot.state,'idle')
+  assert.equal(await m.port().submit(draft),'blocked')
+  assert.equal(cancelCalls.length,0)
+  assert.equal(base.calls.filter(x=>x.p_action==='commit').length,1)
+ }finally{await m.cleanup()}
+})
