@@ -51,3 +51,10 @@ jobs:
           fi
           grep -q SWTB22_REVIEW_CONFIG_BLOCKED /tmp/swtb22-invalid.log
           echo SWTB22_INVALID_TARGET_REJECTED
+      - name: Compile explicit operational candidate without deploy or network calls
+        env:
+          VITE_SWTB22_RECOVERY_RELEASE_UI: 'true'
+          VITE_SWTB22_RECOVERY_RELEASE_PROJECT_REF: pmwxryavkrjcdobwkryw
+          VITE_SUPABASE_URL: https://pmwxryavkrjcdobwkryw.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
+        run: npm run build -- --outDir /tmp/swtb22-operational-candidate
