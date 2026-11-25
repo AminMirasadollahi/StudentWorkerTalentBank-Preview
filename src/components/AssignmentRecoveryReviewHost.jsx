@@ -4,7 +4,7 @@ import {createRecoveryAccessBinding} from '../lib/recoveryAccessBinding.mjs'
 import {createScopedRecoveryHttpTransport} from '../lib/scopedRecoveryHttpTransport.mjs'
 import {createRecoveryReviewLifecycle,verifyRecoveryReviewAdmin} from '../lib/recoveryReviewLifecycle.mjs'
 
-// Review build only. No default production target, and no legacy fallback.
+// Explicit review or release candidate; no legacy fallback.
 export default function AssignmentRecoveryReviewHost({config,auth,actorId,checking,onLogout,children}){
  const owner=useRef(null)
  const parentChecking=useRef(checking)
@@ -28,7 +28,7 @@ export default function AssignmentRecoveryReviewHost({config,auth,actorId,checki
   }
   setState({status:'checking',fixture:null,terminal:false})
   try{
-   if(config.mode!=='review'||typeof globalThis.crypto?.randomUUID!=='function')throw Error('REVIEW_UNAVAILABLE')
+   if(!['review','release'].includes(config.mode)||typeof globalThis.crypto?.randomUUID!=='function')throw Error('REVIEW_UNAVAILABLE')
    const fetchImpl=(...args)=>globalThis.fetch(...args)
    const common={projectUrl:config.projectUrl,publishableKey:config.publishableKey,auth,fetchImpl}
    const binding=createRecoveryAccessBinding({...common,makeId:()=>globalThis.crypto.randomUUID(),isVisible,createTransport:createScopedRecoveryHttpTransport})
@@ -59,7 +59,7 @@ export default function AssignmentRecoveryReviewHost({config,auth,actorId,checki
  const ready=!checking&&state.status==='ready'&&state.fixture!==null
  return <>
   {!ready&&<section className="ops-root" dir="rtl" role="status">
-   <p>{state.status==='blocked'?'مسیر آزمایشی واگذاری در دسترس نیست؛ هیچ ثبت جایگزینی انجام نمی‌شود.':'در حال تأیید دسترسی مسیر جدید واگذاری…'}</p>
+   <p>{state.status==='blocked'?(config.mode==='release'?'مسیر جدید واگذاری در دسترس نیست؛ هیچ ثبت جایگزینی انجام نمی‌شود.':'مسیر آزمایشی واگذاری در دسترس نیست؛ هیچ ثبت جایگزینی انجام نمی‌شود.'):'در حال تأیید دسترسی مسیر جدید واگذاری…'}</p>
    {state.status==='blocked'&&!state.terminal&&<button type="button" className="report-btn report-btn--light" onClick={()=>owner.current?.schedule()}>بررسی مجدد دسترسی</button>}
    <button type="button" className="report-btn report-btn--light" onClick={guardedLogout}>خروج از حساب</button>
   </section>}
