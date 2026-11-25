@@ -57,11 +57,9 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci --no-audit --no-fund
-          else
-            npm install --no-audit --no-fund
-          fi
+          test -f package-lock.json
+          npm ci --no-audit --no-fund
+          git diff --exit-code -- package.json package-lock.json
       - name: Build explicit production recovery mode
         env:
           VITE_SWTB22_RECOVERY_REVIEW_UI: 'false'
