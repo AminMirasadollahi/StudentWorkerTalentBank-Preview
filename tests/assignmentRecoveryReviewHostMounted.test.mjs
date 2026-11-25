@@ -137,3 +137,15 @@ test('invalid review configuration never mounts legacy manager or performs netwo
   assert.equal(m.calls.length,0)
  }finally{await m.cleanup()}
 })
+
+test('operational candidate mounts same scoped host without legacy fallback (synthetic transport only)',async()=>{
+ const m=await mount({selectedConfig:Object.freeze({...config,mode:'release'})})
+ try{
+  await waitFor(()=>m.port()?.snapshot.state==='idle')
+  assert.ok(m.node.querySelector('[data-review-admin]'))
+  assert.ok(m.calls.some(x=>x.rpc==='ops_assignment_recovery_control_v2'))
+  await m.emit('SIGNED_OUT',null)
+  assert.equal(m.node.querySelector('[data-review-admin]'),null)
+  assert.ok(m.node.textContent.includes('مسیر جدید واگذاری در دسترس نیست'))
+ }finally{await m.cleanup()}
+})
