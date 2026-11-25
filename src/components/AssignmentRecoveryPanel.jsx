@@ -4,7 +4,7 @@ export default function AssignmentRecoveryPanel({snapshot,onDiscover,onRetryRese
  const s=snapshot??{state:'blocked'}
  if(s.state==='idle'||s.state==='unavailable')return null
  const button=(label,fn,primary=false)=><button type="button" className={'report-btn '+(primary?'report-btn--primary':'report-btn--light')} onClick={fn}>{label}</button>
- const progress={checking:'در حال بررسی دسترسی…',discovering:'در حال بازیابی وضعیت درخواست…',reserving:'در حال آماده‌سازی درخواست…',committing:'در حال ثبت واگذاری…',cancelling:'در حال تعیین تکلیف لغو…',acknowledging:'در حال بستن رسید…'}
+ const progress={checking:'در حال بررسی دسترسی…',discovering:'در حال بازیابی وضعیت درخواست…',reserving:'در حال آماده‌سازی درخواست…',committing:'در حال ثبت واگذاری…',cancelling:'در حال تعیین تکلیف لغو…',cancelling_shift:'در حال لغو نوبت ثبت‌شده…',acknowledging:'در حال بستن رسید…'}
  if(Object.hasOwn(progress,s.state))return <p role="status">{progress[s.state]}</p>
  return <section aria-label="بازیابی واگذاری" dir="rtl" className="ow-assignment-recovery">
   {s.state==='reserved'?<>
