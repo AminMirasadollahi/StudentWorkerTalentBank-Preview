@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { classifyOperationsIdentity } from './workerAccess.mjs'
+import {resolveRecoveryReviewConfig} from './recoveryReviewLifecycle.mjs'
+const reviewConfig=resolveRecoveryReviewConfig(import.meta.env)
+if(reviewConfig.mode==='blocked')throw Error('SWTB22_REVIEW_CONFIG_BLOCKED')
 
 // Separate identity/session from the public, intentionally sessionless intake client.
 // Only the publishable key enters the browser. Never use the service-role key here.
@@ -12,7 +15,7 @@ export const opsClient = createClient(url, key, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storageKey: 'student-worker-operations-auth-v1',
+    storageKey: reviewConfig.mode==='review'?'student-worker-operations-review-'+import.meta.env.VITE_SWTB22_RECOVERY_REVIEW_PROJECT_REF:'student-worker-operations-auth-v1',
   },
 })
 
