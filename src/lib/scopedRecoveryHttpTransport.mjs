@@ -26,15 +26,17 @@ export function createScopedRecoveryHttpTransport({projectUrl,publishableKey,aut
    const action=args?.p_action
    if(kind==='control'){
     if(!exact(args,controlKeys)||!['discover','cancel','acknowledge'].includes(action)||(action==='discover'?(args.p_epoch!==null||args.p_request_id!==null):(!epoch(args.p_epoch)||!uuid(args.p_request_id))))throw error()
+   }else if(kind==='cancelExistingShift'){
+    if(!exact(args,['shiftId','reason'])||!uuid(args.shiftId)||typeof args.reason!=='string'||args.reason!==args.reason.trim()||Array.from(args.reason).length<5||Array.from(args.reason).length>500)throw error()
    }else if(!exact(args,writeKeys)||!['reserve','commit'].includes(action)||!epoch(args.p_epoch)||!uuid(args.p_request_id)||!['direct','desk'].includes(args.p_kind))throw error()
-   const body=JSON.stringify(args)
+   const body=JSON.stringify(kind==='cancelExistingShift'?{p_shift_id:args.shiftId,p_reason:args.reason}:args)
    const token=await sessionToken()
    const verified=await auth.getUser(token)
    current()
    if(verified?.error||verified?.data?.user?.id!==actorId||verified.data.user.is_anonymous===true)throw error()
    if(await sessionToken()!==token)throw error()
    current()
-   const rpc=kind==='control'?'ops_assignment_recovery_control_v2':'ops_assignment_recovery_write_v2'
+   const rpc=kind==='control'?'ops_assignment_recovery_control_v2':kind==='cancelExistingShift'?'ops_cancel_library_desk_shift':'ops_assignment_recovery_write_v2'
    const response=await fetchImpl(origin+'/rest/v1/rpc/'+rpc,{
     method:'POST',headers:{apikey:publishableKey,Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json','Content-Profile':'public'},
     body,credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer'
@@ -43,9 +45,14 @@ export function createScopedRecoveryHttpTransport({projectUrl,publishableKey,aut
    if(response?.ok!==true)throw error()
    const result=await response.json()
    current()
+   // Existing shift cancellation has a separate exact server contract.
+   if(kind==='cancelExistingShift'){
+    if(!exact(result,['ok','shift_id','state'])||result.ok!==true||result.shift_id!==args.shiftId||result.state!=='cancelled')throw error()
+    return Object.freeze({ok:true,shift_id:args.shiftId,state:'cancelled'})
+   }
    // Server verifies admin access and scope; core verifies receipt projection.
    return result
   }catch{throw error()}
  }
- return Object.freeze({write:args=>call('write',args),control:args=>call('control',args)})
+ return Object.freeze({write:args=>call('write',args),control:args=>call('control',args),cancelExistingShift:args=>call('cancelExistingShift',args)})
 }
