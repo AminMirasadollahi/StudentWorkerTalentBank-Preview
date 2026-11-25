@@ -140,6 +140,10 @@ try{
  assert.equal(count('reserve'),2);assert.equal(count('commit'),2);assert.equal(count('acknowledge'),2)
  assert.ok(calls.includes('ops_get_admin_student_worker_report'))
  assert.ok(calls.includes('ops_list_candidates'));assert.ok(calls.includes('ops_get_operations_v3'))
+ if(releasedUi){
+  await page.getByRole('button',{name:'بستن و حفظ پیش‌نویس'}).click()
+  await page.locator('#swtb22-task-assign-dialog[open]').waitFor({state:'detached'})
+ }
  await page.getByRole('button',{name:'خروج',exact:true}).click()
  await page.waitForFunction(()=>!document.querySelector('form.ow-assignment-form')&&!document.querySelector('nav[aria-label="بخش‌های مدیریت دانشجوکار"]')&&!document.querySelector('.swtb22-manager-sidebar'))
  assert.deepEqual(unexpected,[],'only explicitly intercepted synthetic endpoints')
