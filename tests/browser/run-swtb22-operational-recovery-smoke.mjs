@@ -98,8 +98,15 @@ try{
  await page.getByText(/ثبت واگذاری تأیید شد/).waitFor()
  assert.equal(await page.getByRole('button',{name:'ثبت نهایی واگذاری'}).count(),0)
  assert.equal(await page.evaluate(t=>[localStorage,sessionStorage].some(s=>Object.values(s).some(x=>String(x).includes(t))),title),false)
+ // The panel disappears during acknowledging, before the async RPC reaches
+ // the intercepted server. Wait for the actual successful response, not just
+ // disappearance of the receipt section.
+ const ackResponse=page.waitForResponse(r=>r.url()===origin+'/rest/v1/rpc/ops_assignment_recovery_control_v2'&&r.request().method()==='POST'&&r.request().postDataJSON()?.p_action==='acknowledge')
  await page.getByRole('button',{name:'تأیید و بستن رسید'}).click()
- await page.waitForFunction(()=>!document.querySelector('.ow-assignment-recovery'))
+ const ack=await ackResponse
+ assert.equal(ack.status(),200)
+ assert.equal((await ack.json()).epoch,1)
+ await page.waitForFunction(()=>!document.querySelector('.ow-assignment-recovery')&&!document.body.textContent.includes('در حال بستن رسید'))
  assert.equal(fixture.view().epoch,1);assert.equal(fixture.view().active,null)
  await page.getByRole('button',{name:'برنامه و کارها',exact:true}).click()
  await page.waitForFunction(()=>document.querySelector('form.ow-assignment-form fieldset')?.disabled===false&&document.querySelector('.ow-worker-option-list input[type="checkbox"]'))
