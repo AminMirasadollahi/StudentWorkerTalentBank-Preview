@@ -60,3 +60,11 @@ jobs:
           VITE_SUPABASE_URL: https://pmwxryavkrjcdobwkryw.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
         run: npm run build -- --outDir /tmp/swtb22-operational-candidate
+      - name: Native Chrome actual manager entry with synthetic intercepted API
+        run: |
+          set -euo pipefail
+          google-chrome --version
+          export SWTB22_BROWSER_TOOL_DIR="$RUNNER_TEMP/swtb22-browser-tool"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "$SWTB22_BROWSER_TOOL_DIR" --ignore-scripts --no-audit --no-fund playwright@1.56.1
+          node tests/browser/run-swtb22-operational-recovery-smoke.mjs
+          git diff --exit-code -- package.json package-lock.json
