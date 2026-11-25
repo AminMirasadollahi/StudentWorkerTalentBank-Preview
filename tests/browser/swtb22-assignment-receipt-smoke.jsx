@@ -4,6 +4,7 @@ import React,{StrictMode,useState} from 'react'
 import {createRoot} from 'react-dom/client'
 import {AdminOperations} from '../../src/OperationsWorkspace.jsx'
 import DirectAssignmentFixtureHost from '../../src/components/DirectAssignmentFixtureHost.jsx'
+import AssignmentRecoveryFixtureHost from '../../src/components/AssignmentRecoveryFixtureHost.jsx'
 import {fixtureVerifiedRollback} from '../../src/lib/directAssignmentSession.mjs'
 import '../../src/typography.css'
 import '../../src/styles.css'
@@ -31,16 +32,26 @@ const fixture=Object.freeze({
  },
  read:async k=>{reads.push(k);return {found:false}}
 })
+// Playwright intercepts this exact localhost URL. State survives real page reload
+// in the test process, never in browser storage or the Vite/Supabase backend.
+const v2=new URLSearchParams(location.search).get('fixture')==='v2'
+const recoveryCall=async args=>{
+ const response=await fetch('/__swtb22_synthetic_recovery_v2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(args)})
+ if(!response.ok)throw Error('SYNTHETIC_RESPONSE_LOST')
+ return response.json()
+}
+const recoveryFixture=Object.freeze({version:2,makeId:()=>crypto.randomUUID(),write:recoveryCall,control:recoveryCall})
+const Host=v2?AssignmentRecoveryFixtureHost:DirectAssignmentFixtureHost
 function Stage(){
  const [navigation,setNavigation]=useState({section:'work',workView:'tasks',workerId:''})
  const [checking,setChecking]=useState(false)
- return <DirectAssignmentFixtureHost actorId={id(1)} checking={checking} fixture={fixture}>{port=><main dir="rtl" className="report-shell report-shell--dashboard ops-root">
+ return <Host actorId={id(1)} checking={checking} fixture={v2?recoveryFixture:fixture}>{port=><main dir="rtl" className="report-shell report-shell--dashboard ops-root">
   <nav aria-label="مسیرهای آزمایشی">
    <button type="button" onClick={()=>setNavigation(v=>({...v,workView:'tasks',workerId:''}))}>وظایف آزمایشی</button>
    <button type="button" onClick={()=>setNavigation(v=>({...v,workView:'availability',workerId:''}))}>تقویم آزمایشی</button>
    <button type="button" onClick={()=>setChecking(v=>!v)}>بررسی مجوز آزمایشی</button>
   </nav>
   <AdminOperations navigation={navigation} setNavigation={setNavigation} hideSectionTabs assignmentReceiptPort={port}/>
- </main>}</DirectAssignmentFixtureHost>
+ </main>}</Host>
 }
 createRoot(document.getElementById('app')).render(<StrictMode><Stage/></StrictMode>)

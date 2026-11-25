@@ -4,6 +4,7 @@ import {mkdir} from 'node:fs/promises'
 import {resolve} from 'node:path'
 import {createServer} from 'vite'
 import {chromium} from 'playwright'
+import {createRecoveryBrowserFixture} from './assignment-recovery-browser-fixture.mjs'
 
 process.env.VITE_SWTB22_WORK_POOL_FOCUS_UI='true'
 process.env.VITE_SWTB22_TASKS_FOCUS_UI='true'
@@ -481,6 +482,57 @@ try{
  await page.screenshot({path:resolve(output,'33-u01-rejected-draft-restored.png')})
  process.stdout.write('PASS U01-B4 native receipt modal/calendar/refresh/revise fixture; zero legacy writes\n')
 
+ // V2 actual browser reload, with synthetic state held outside the browser.
+ const v2server=createRecoveryBrowserFixture()
+ await page.route('http://127.0.0.1:4179/__swtb22_synthetic_recovery_v2',async route=>{
+  if(route.request().method()!=='POST'){await route.fulfill({status:405,body:''});return}
+  const result=v2server.handle(route.request().postDataJSON())
+  await route.fulfill({status:result.status,contentType:'application/json',body:JSON.stringify(result.body)})
+ })
+ const v2url='http://127.0.0.1:4179/tests/browser/swtb22-assignment-receipt-smoke.html?fixture=v2'
+ const openNew=async()=>{
+  await page.getByRole('button',{name:'واگذاری کار جدید'}).click()
+  await taskDialog.locator('input[maxlength="160"]').waitFor()
+  await page.waitForFunction(()=>{const d=document.querySelector('#swtb22-task-assign-dialog');return d?.querySelector('fieldset')?.disabled===false})
+ }
+ await page.goto(v2url,{waitUntil:'domcontentloaded'})
+ await openNew()
+ const lostDraft='عنوان کاملاً ساختگی آزمون بازیابی'
+ await fillAssignment(taskDialog,lostDraft)
+ await taskDialog.getByText(/هنوز کاری ثبت نشده است/).waitFor()
+ assert.equal(v2server.calls.filter(x=>x.action==='commit').length,0)
+ assert.equal(await taskDialog.locator('button[type="submit"]').isDisabled(),true)
+ await page.screenshot({path:resolve(output,'34-v2-reserved-native-dialog.png')})
+ await page.reload({waitUntil:'domcontentloaded'})
+ await page.getByText(/متن اصلی در این نشست در دسترس نیست/).waitFor()
+ assert.equal(await page.getByRole('button',{name:'ثبت نهایی واگذاری'}).count(),0)
+ assert.equal(await page.evaluate(t=>[localStorage,sessionStorage].some(s=>Object.values(s).some(x=>String(x).includes(t))),lostDraft),false)
+ await page.screenshot({path:resolve(output,'35-v2-reload-reserved.png')})
+ await page.getByRole('button',{name:'لغو ایمن درخواست'}).click()
+ await page.getByText(/لغو درخواست تأیید شد/).waitFor()
+ await page.getByRole('button',{name:'بستن نتیجه لغو'}).click()
+ await openNew()
+ await fillAssignment(taskDialog,'عنوان ساختگی ثبت موفق')
+ await taskDialog.getByRole('button',{name:'ثبت نهایی واگذاری'}).waitFor()
+ v2server.loseNextCommitResponse()
+ await taskDialog.getByRole('button',{name:'ثبت نهایی واگذاری'}).click()
+ await taskDialog.getByText(/وضعیت درخواست هنوز تأیید نشده است/).waitFor()
+ assert.equal(v2server.view().active.status,'committed')
+ await page.reload({waitUntil:'domcontentloaded'})
+ await page.getByText(/ثبت واگذاری تأیید شد/).waitFor()
+ assert.equal(await page.getByRole('button',{name:'ثبت نهایی واگذاری'}).count(),0)
+ await page.screenshot({path:resolve(output,'36-v2-reload-committed.png')})
+ await page.getByRole('button',{name:'تأیید و بستن رسید'}).click()
+ await openNew()
+ assert.equal(await taskDialog.locator('input[maxlength="160"]').inputValue(),'')
+ assert.equal(v2server.view().epoch,2)
+ assert.equal(v2server.view().active,null)
+ assert.equal(v2server.calls.filter(x=>x.action==='reserve').length,2)
+ assert.equal(v2server.calls.filter(x=>x.action==='commit').length,1)
+ assert.equal(v2server.calls.filter(x=>x.action==='cancel').length,1)
+ assert.equal(v2server.calls.filter(x=>x.action==='acknowledge').length,2)
+ assert.equal(await page.evaluate(()=>globalThis.__qaWriteAttempts),0)
+ process.stdout.write('PASS U01 V2 native browser reload: reserved cancellation, lost commit recovery, no duplicate writes\\n')
  assert.equal(blocked,0,'no external requests should occur')
  assert.deepEqual(errors,[],'no browser JavaScript errors')
  process.stdout.write('PASS SWTB22 synthetic Chrome: one grouped nav, full-width list, focused D1/D2 editors, no external calls/writes or viewport overflow\n')
