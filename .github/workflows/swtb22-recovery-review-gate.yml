@@ -25,13 +25,9 @@ jobs:
       - name: Install exact application and test dependencies
         run: |
           set -euo pipefail
-          if [ ! -f package-lock.json ]; then
-            npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-            echo "SWTB22_LOCK_SHA256 $(sha256sum package-lock.json | cut -d' ' -f1)"
-            base64 -w 120 package-lock.json | sed 's/^/SWTB22_LOCK_B64 /'
-            echo 'SWTB22_LOCK_END'
-          fi
+          test -f package-lock.json
           npm ci --no-audit --no-fund
+          git diff --exit-code -- package.json package-lock.json
       - name: Focused pure and mounted tests for changed modules
         run: |
           node --test tests/recoveryAccessBinding.test.mjs tests/scopedRecoveryHttpTransport.test.mjs tests/scopedExistingShiftCancellation.test.mjs tests/recoveryReviewLifecycle.test.mjs tests/assignmentCapacityUi.test.mjs tests/assignmentRecoveryHostMounted.test.mjs tests/assignmentRecoveryReviewHostMounted.test.mjs
