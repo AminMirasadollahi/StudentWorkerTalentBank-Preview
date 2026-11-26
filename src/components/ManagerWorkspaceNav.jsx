@@ -4,10 +4,10 @@ import {currentManagerDestination,visibleManagerGroups} from '../lib/managerWork
 // The whole manager navigation is one landmark. Buttons only select an
 // already-authorized view; authorization remains inside OpsApp and the RPCs.
 export default function ManagerWorkspaceNav({
- navigation,onNavigate,workPoolEnabled=true,termMembershipEnabled=true,workHubFixture=false,
+ navigation,onNavigate,workPoolEnabled=true,termMembershipEnabled=true,workHubFixture=false,r5IaFixture=false,
 }){
  const [collapsed,setCollapsed]=useState(false)
- const flags={workPoolEnabled,termMembershipEnabled,workHubFixture}
+ const flags={workPoolEnabled,termMembershipEnabled,workHubFixture,r5IaFixture}
  const groups=visibleManagerGroups(flags)
  const current=currentManagerDestination(navigation,flags)
  return <aside className={'swtb22-manager-sidebar'+(collapsed?' is-collapsed':'')}

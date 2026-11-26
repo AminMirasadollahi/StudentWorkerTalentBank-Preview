@@ -1,0 +1,34 @@
+name: SWTB24 R5 manager IA review (NO DEPLOY)
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+concurrency:
+  group: swtb24-r5-ia-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  focused:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'review/swtb24-r5-manager-ia-20261126'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - name: R5 grouped navigation, mounted shell and receipt boundary
+        run: node --test tests/swtb24R5ManagerIa.test.mjs tests/managerWorkspaceNavUi.test.mjs tests/managerShellFeatureOnIntegration.test.mjs tests/workPoolRouteFence.test.mjs tests/releaseBoundary.test.mjs
+      - name: Build strict release candidate (synthetic configuration)
+        env:
+          VITE_SWTB23_WORKER_POLICY_RELEASE: 'true'
+          VITE_SWTB22_RECOVERY_REVIEW_UI: 'true'
+          VITE_SWTB22_RECOVERY_REVIEW_PROJECT_REF: aaaaaaaaaaaaaaaaaaaa
+          VITE_SUPABASE_URL: https://aaaaaaaaaaaaaaaaaaaa.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
+        run: npm run build -- --outDir /tmp/swtb23-integrated-build

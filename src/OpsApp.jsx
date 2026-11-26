@@ -570,10 +570,10 @@ function CandidateCard({
   )
 }
 
-function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refreshRevision = 0, workHubFixture=false, assignmentReceiptPort=null }) {
+function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refreshRevision = 0, workHubFixture=false, r5IaFixture=false, assignmentReceiptPort=null }) {
   const [fence]=useState(createWorkPoolRouteFence)
   const [routeNotice,setRouteNotice]=useState('')
-  const routeFence=managerShellEnabled&&workHubFixture===true&&managerNavFlags.workPoolEnabled?fence:null
+  const routeFence=managerShellEnabled&&(workHubFixture===true||r5IaFixture===true)&&managerNavFlags.workPoolEnabled?fence:null
   const setNavigation=change=>{
    if(!routeFence){commitNavigation(change);return}
    const next=typeof change==='function'?change(navigation):change
@@ -747,7 +747,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   const activeCount = rows.filter(row => Boolean(row.worker_id)).length
   const readyCount = rows.filter(row => !row.worker_id
     && row.interview_status === 'approved' && row.clearance_status === 'cleared').length
-  const navFlags={...managerNavFlags,workHubFixture:managerShellEnabled&&workHubFixture===true}
+  const navFlags={...managerNavFlags,workHubFixture:managerShellEnabled&&workHubFixture===true,r5IaFixture:managerShellEnabled&&r5IaFixture===true}
   const currentDestination=currentManagerDestination(navigation,navFlags)
   const navigateManager=item=>setNavigation(previous=>nextManagerNavigation(previous,item))
 
@@ -769,6 +769,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
           <button type="button" className="report-btn report-btn--ghost" onClick={onLogout}>خروج</button>
         </div>
       </header>
+      {navFlags.r5IaFixture&&<ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>}
       {!managerShellEnabled&&<nav className="ow-tabs" aria-label="بخش‌های مدیریت دانشجوکار">
         <button type="button"
           className={adminSection === 'candidates' ? 'ow-tab is-selected' : 'ow-tab'}
@@ -849,7 +850,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
         </div>
        </section>}
       {routeFence&&routeNotice&&<p role="alert" className="report-alert report-alert--error">{routeNotice}</p>}
-      <ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>
+      {!navFlags.r5IaFixture&&<ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>}
       {adminSection !== 'work' && assignmentReceiptPort?.panel}
       {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation}
         assignmentReceiptPort={assignmentReceiptPort}
@@ -899,7 +900,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   )
 }
 
-export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, workHubFixture=false }) {
+export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, workHubFixture=false, r5IaFixture=false }) {
   // This does NOT trust a cached session for authorization. When the fresh
   // server identity check returns no user but a local Supabase session still
   // exists, we cannot distinguish temporary network failure from revoked
@@ -1156,16 +1157,16 @@ export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, 
          config={recoveryReviewConfig} auth={opsClient.auth} actorId={identity.user?.id}
          checking={recheckingAccess||busy} onLogout={logout}>
          {(port,guardedLogout)=><AdminView onLogout={guardedLogout} navigation={adminNavigation} setNavigation={setAdminNavigation}
-          refreshRevision={dataRefreshRevision} assignmentReceiptPort={port} workHubFixture={workHubFixture}/>}
+          refreshRevision={dataRefreshRevision} assignmentReceiptPort={port} workHubFixture={workHubFixture} r5IaFixture={r5IaFixture}/>}
         </AssignmentRecoveryReviewHost>
       : assignmentReceiptFixture===null
       ? <AdminView key={'admin:' + identity.user?.id}
         onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
-        refreshRevision={dataRefreshRevision} workHubFixture={workHubFixture}/>
+        refreshRevision={dataRefreshRevision} workHubFixture={workHubFixture} r5IaFixture={r5IaFixture}/>
       : <ReceiptHost key={'fixture-admin:' + identity.user?.id}
          actorId={identity.user?.id} checking={recheckingAccess} fixture={assignmentReceiptFixture}>
          {port=><AdminView onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
-          refreshRevision={dataRefreshRevision} assignmentReceiptPort={port} workHubFixture={workHubFixture}/>}
+          refreshRevision={dataRefreshRevision} assignmentReceiptPort={port} workHubFixture={workHubFixture} r5IaFixture={r5IaFixture}/>}
         </ReceiptHost>)
     : identity.role === 'worker_disabled'
       ? <WorkerDisabledView key={'disabled:' + identity.user?.id + ':' + identity.profile?.state}

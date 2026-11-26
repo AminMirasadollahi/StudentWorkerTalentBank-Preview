@@ -22,21 +22,63 @@ export const MANAGER_WORKSPACE_GROUPS = [
 // Review-only opt-in: a single parent maps to the existing internal views.
 export const workHubEnabled=flags=>flags?.workHubFixture===true&&flags.workPoolEnabled!==false
 export const isWorkHubView=view=>view==='tasks'||view==='workPool'
-export const visibleManagerGroups=(flags={})=>MANAGER_WORKSPACE_GROUPS.map(group=>({
+const legacyManagerGroups=(flags={})=>MANAGER_WORKSPACE_GROUPS.map(group=>({
  ...group,items:group.items.filter(item=>
   item.requires==='workPool'?flags.workPoolEnabled!==false:
   item.requires==='termMembership'?flags.termMembershipEnabled!==false:true)
   .filter(item=>!workHubEnabled(flags)||item.id!=='workPool')
   .map(item=>workHubEnabled(flags)&&item.id==='tasks'?{...item,hub:true,label:'مدیریت کارها',description:'پیگیری وظایف واگذارشده و تعریف فرصت‌های قابل انتخاب.'}:item),
 }))
+// R5 review only. Canonical route identity stays section+view; no new
+// authorization, data projection, or write operation is introduced.
+export const r5IaEnabled=flags=>flags?.r5IaFixture===true
+const r5Groups=[
+ {id:'daily',title:'عملیات روزانه',parents:[
+  ['inbox','کارتابل و رسیدگی','گزارش‌ها و درخواست‌های نیازمند تصمیم مدیر.',['inbox','approvals']],
+  ['tasks','مدیریت کارها','پیگیری وظایف و فرصت‌ها و تعریف کار جدید.',['tasks','workPool']],
+  ['availability','برنامه حضور','تقویم و ظرفیت حضور دانشجوکاران.',['availability']],
+ ]},
+ {id:'people',title:'افراد و همکاری',parents:[
+  ['applicants','افراد و همکاری','پذیرش، پرونده دانشجوکاران و مجوز همکاری.',['applicants','profiles','termMemberships']],
+ ]},
+ {id:'administration',title:'تنظیمات و گزارش‌ها',parents:[
+  ['terms','نیمسال و سهمیه‌ها','تنظیم دوره‌ها و سهمیه‌های همکاری.',['terms']],
+  ['history','گزارش‌ها و تحلیل','سوابق فعالیت و آمار پذیرش.',['history','candidateReport']],
+ ]},
+]
+function r5Children(ids,flags){
+ const items=legacyManagerGroups({...flags,workHubFixture:false}).flatMap(g=>g.items)
+ return ids.map(id=>items.find(item=>item.id===id)).filter(Boolean)
+}
+export function visibleManagerGroups(flags={}){
+ if(!r5IaEnabled(flags))return legacyManagerGroups(flags)
+ return r5Groups.map(g=>({id:g.id,title:g.title,items:g.parents.map(([id,label,description,ids])=>{
+  const children=r5Children(ids,flags)
+  return {...children[0],id,label,description,r5Parent:true,children}
+ })}))
+}
+const matchesRoute=(nav,item)=>item.section===nav?.section&&item.view===
+ (item.section==='work'?nav?.workView:nav?.candidateView)
+export function managerR5SubViews(nav,flags={}){
+ if(!r5IaEnabled(flags))return []
+ return currentManagerDestination(nav,flags)?.children??[]
+}
 export const currentManagerDestination=(nav,flags={})=>{
  const items=visibleManagerGroups(flags).flatMap(group=>group.items)
+ if(r5IaEnabled(flags))return items.find(item=>item.children.some(child=>matchesRoute(nav,child)))
+  ||items.find(item=>item.id==='inbox')
  const workView=workHubEnabled(flags)&&isWorkHubView(nav?.workView)?'tasks':nav?.workView
  return items.find(item=>item.section===nav?.section&&item.view===
   (item.section==='work'?workView:nav?.candidateView))
   ||items.find(item=>item.id===(nav?.section==='work'?'inbox':'applicants'))
 }
-export const nextManagerNavigation=(previous,item)=>({
- ...previous,section:item.section,
- ...(item.section==='work'?{workView:item.hub===true&&isWorkHubView(previous?.workView)?previous.workView:item.view}:{candidateView:item.view}),
-})
+export const nextManagerNavigation=(previous,item)=>{
+ if(item.r5Parent===true){
+  if(item.children.some(child=>matchesRoute(previous,child)))return previous
+  item=item.children[0]
+ }
+ return {
+  ...previous,section:item.section,
+  ...(item.section==='work'?{workView:item.hub===true&&isWorkHubView(previous?.workView)?previous.workView:item.view}:{candidateView:item.view}),
+ }
+}
