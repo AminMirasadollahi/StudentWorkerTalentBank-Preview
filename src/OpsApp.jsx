@@ -346,6 +346,7 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
         const status=await readOnboardingState()
         if(status==='ready'){
           setPasswordEstablished(true)
+          setSupportBlocked(false)
           setRecoveryOffered(false)
           setExplicitRetryAvailable(false)
           setSettingsOpen(false)
@@ -624,7 +625,8 @@ function CandidateCard({
         <p className="ops-worker-state">آخرین ورود در سرویس احراز هویت: {candidateAuthSignInLabel(candidate)}</p>
         <p className="ops-muted">این اطلاعات به‌تنهایی دریافت یا بازشدن ایمیل دعوت و ورود به محیط کاری دانشجوکار را ثابت نمی‌کنند.</p>
         <WorkerSecureLinkReissue
-          key={candidate.worker_id}
+          key={`${candidate.worker_id}:${candidate.worker_state}`}
+          supportRpc={(name,args)=>opsClient.rpc(name,args)}
           workerId={candidate.worker_id}
           workerState={candidate.worker_state}
           saving={saving}

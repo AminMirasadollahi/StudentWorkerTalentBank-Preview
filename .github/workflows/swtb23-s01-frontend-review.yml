@@ -1,0 +1,35 @@
+name: SWTB23 S01 frontend focused gate (NO DEPLOY)
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+concurrency:
+  group: swtb23-s01-front-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  focused:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'review/swtb23-s01-onboarding-recovery-20261126'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Focused native and mounted checks
+        env:
+          VITE_SUPABASE_URL: https://aaaaaaaaaaaaaaaaaaaa.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
+        run: node --test tests/workerOnboardingRecovery.test.mjs tests/workerSecureLinkReissueUi.test.mjs
+      - name: Compile only, never publish
+        env:
+          VITE_SUPABASE_URL: https://aaaaaaaaaaaaaaaaaaaa.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
+        run: npm run build -- --outDir /tmp/swtb23-s01-build

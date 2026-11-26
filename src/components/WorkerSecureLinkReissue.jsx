@@ -1,10 +1,13 @@
 import {useEffect,useRef,useState} from 'react'
-import {opsClient} from '../lib/operations'
 
 // Deliberate, in-context confirmation: issuing a fresh one-time link stages
 // password_required for an EXISTING worker account. Never do this accidentally.
-export default function WorkerSecureLinkReissue({
-  workerId,workerState,saving,onReissue,
+export default function WorkerSecureLinkReissue(props) {
+  return <WorkerSecureLinkControls key={`${props.workerId}:${props.workerState}`} {...props}/>
+}
+
+function WorkerSecureLinkControls({
+  workerId,workerState,saving,onReissue,supportRpc,
 }) {
   const [pendingWorkerId,setPendingWorkerId]=useState(null)
   const [support,setSupport]=useState(null)
@@ -12,13 +15,13 @@ export default function WorkerSecureLinkReissue({
   const [supportNotice,setSupportNotice]=useState('')
   const [cancelRef,setCancelRef]=useState(null)
   const supportFlight=useRef(false)
-  // Identity or role changes invalidate an unconsumed confirmation.
-  useEffect(()=>{setPendingWorkerId(null);setSupport(null);setSupportNotice('');setCancelRef(null)},[workerId,workerState])
+  // Keyed child isolates asynchronous results across identity/state changes.
+  useEffect(()=>()=>{supportFlight.current=false},[])
   const isActive=workerState==='active'
   const confirming=isActive&&pendingWorkerId===workerId
   const disabled=saving||supportBusy||!isActive||!workerId||Boolean(support&&support.phase!=='none')
   const readSupport=async()=>{
-    const {data,error}=await opsClient.rpc('ops_s01_support_status',{p_worker_id:workerId})
+    const {data,error}=await supportRpc('ops_s01_support_status',{p_worker_id:workerId})
     if(error||data?.ok!==true||!['none','reserved','dispatched'].includes(data.phase))throw Error('status_unknown')
     setSupport(data);setCancelRef(null)
   }
@@ -29,10 +32,10 @@ export default function WorkerSecureLinkReissue({
     finally{supportFlight.current=false;setSupportBusy(false)}
   }
   const cancelReserved=async()=>{
-    if(supportFlight.current||support?.phase!=='reserved'||!support.support_ref||cancelRef!==support.support_ref)return
+    if(saving||supportFlight.current||support?.phase!=='reserved'||!support.support_ref||cancelRef!==support.support_ref)return
     supportFlight.current=true;setSupportBusy(true);setCancelRef(null);setSupportNotice('')
     try{
-      const {data,error}=await opsClient.rpc('ops_s01_cancel_reserved',{p_worker_id:workerId,p_support_ref:support.support_ref})
+      const {data,error}=await supportRpc('ops_s01_cancel_reserved',{p_worker_id:workerId,p_support_ref:support.support_ref})
       if(error||data?.ok!==true)throw Error('cancel_unconfirmed')
       setSupportNotice('رزرو ارسال‌نشده لغو شد؛ هیچ رمز یا لینکی تغییر نکرد.')
       await readSupport()
@@ -63,7 +66,7 @@ export default function WorkerSecureLinkReissue({
             <button className="report-btn report-btn--primary ops-small-action"
               type="button" disabled={disabled}
               onClick={()=>{
-                const confirmed=pendingWorkerId===workerId&&isActive&&!saving
+                const confirmed=pendingWorkerId===workerId&&!disabled&&!supportFlight.current
                 setPendingWorkerId(null)
                 if(confirmed)onReissue(workerId)
               }}>
