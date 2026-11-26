@@ -15,6 +15,8 @@ function gitBlobSha(path){
 // regression tests. The intake and QA pins remain unchanged. SWTB22 PR103
 // explicitly authorized the scoped operations client, target guard and manual
 // publication workflow; PR104 restores the released manager flag contract.
+// SWTB24 draft PR108: explicit strict V3 activation on the protected manual
+// publication path only. Owner approval remains required before merge/deploy.
 // Pin only those reviewed deltas; all other protected hashes stay unchanged.
 const critical=Object.freeze({
   'src/App.jsx':'6b63bdda19f60bd06c48ef9e22374b077aa9f6df',
@@ -23,7 +25,7 @@ const critical=Object.freeze({
   'src/lib/operations.js':'353572294468eae93b9b88703101c33066377eaf',
   'src/components/WorkerLifecycleReadOnlyPreview.jsx':'c9125b5627bb509248a300cc023b83b779092946',
   'vite.config.js':'2553885f37533661066f19abfceb0fa5e81ab132',
-  '.github/workflows/pages.yml':'04364074d6b4f80fb450da9d717c1cdcbbd3df2e',
+  '.github/workflows/pages.yml':'34f3e4a5358976b4f8d6657e99798a8c9cb4bfb8',
 })
 test('reviewed intake and SWTB22 authorized API/auth/QA/deploy baselines are byte-identical',()=>{
   for(const [path,sha] of Object.entries(critical))
@@ -60,4 +62,19 @@ test('management-only release has no modifications to public operational API and
   assert.doesNotMatch(app,/operations-qa|lifecycle-qa|\/src\/qa\//i)
   assert.doesNotMatch(workspace,/__operationsQaData|QA_OFFLINE_NO_MUTATIONS|createClient\s*\(/)
   assert.match(read('vite.config.js').toString(),/\/StudentWorkerTalentBank-Preview\//)
+})
+
+test('SWTB24 release stays manual, SHA-authorized, backend-gated and strict V3',()=>{
+  const workflow=read('.github/workflows/pages.yml').toString()
+  assert.match(workflow,/\non:\n  workflow_dispatch:\n/)
+  assert.doesNotMatch(workflow,/\n  (push|pull_request|schedule):/)
+  assert.match(workflow,/VITE_SWTB23_WORKER_POLICY_RELEASE: 'true'/)
+  assert.match(workflow,/VITE_SWTB22_RECOVERY_RELEASE_UI: 'true'/)
+  assert.match(workflow,/VITE_SWTB22_RECOVERY_REVIEW_UI: 'false'/)
+  assert.match(workflow,/VITE_SWTB22_RECOVERY_RELEASE_PROJECT_REF: pmwxryavkrjcdobwkryw/)
+  assert.match(workflow,/\[\[ "\$EXPECTED_SHA" == "\$GITHUB_SHA" && "\$APPROVED_SHA" == "\$GITHUB_SHA" \]\]/)
+  assert.match(workflow,/\[\[ "\$CUTOVER_CONFIRMED" == true \]\]/)
+  assert.match(workflow,/c\.mode!=="release"\|\|c\.version!==3/)
+  assert.match(workflow,/inputs\.backend_cutover_verified == true && vars\.SWTB22_RELEASE_APPROVED_SHA == github\.sha/)
+  assert.match(workflow,/test "\$CURRENT_SHA" = "\$GITHUB_SHA"/)
 })

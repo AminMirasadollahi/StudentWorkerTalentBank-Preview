@@ -72,7 +72,8 @@ try{
  console.log('PASS R3_NATIVE_CORRECTION_DATE_AND_CANCELLED')
  // One focused narrow-view touch/keyboard delta, no write.
  await page.setViewportSize({width:390,height:844})
- await page.locator('.ow-b3-sidebar').getByRole('button',{name:'کارهای من',exact:true}).tap()
+ await page.locator('#ow-task-inspector').getByRole('button',{name:'بستن',exact:true}).tap()
+ await page.locator('#ow-task-inspector').waitFor({state:'detached'})
  await page.locator('.ow-worker-focus-switch button').filter({hasText:'نیازمند اقدام'}).tap()
  const narrowTrigger=card.locator('.ow-worker-report-trigger')
  await narrowTrigger.tap()
