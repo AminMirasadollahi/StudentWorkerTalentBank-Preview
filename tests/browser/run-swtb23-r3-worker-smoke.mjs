@@ -32,6 +32,9 @@ try{
   d.report_contract_version=1;d.server_today=today
   d.tasks=[{...t,id:'QA-CORRECTION',title:'اصلاح ساختگی خارج از تاریخچه',state:'needs_changes',planned_date:old,report_contract:{date_min:lo,date_max:old,window_empty:false,standard_minutes:60,minimum_minutes:1,maximum_minutes:1440,extra_reason_above_minutes:60},latest_report:{id:'QA-OLD-REPORT',work_date:old,review_state:'changes_requested',reported_minutes:30,worker_note:'متن قبلی ساختگی',review_note:'نظر مدیر ساختگی',extra_time_reason_code:null,extra_time_reason_text:null}},
   {...t,id:'QA-CANCELLED',title:'کار لغوشده ساختگی',state:'cancelled',report_contract:null,latest_report:null,desk_slot:{state:'cancelled',cancellation_reason:'دلیل لغو ساختگی'}}]
+  // Complete strict V3 fixture; legacy review accepts the same shape.
+  d.tasks=d.tasks.map(t=>({...t,prerequisites:{total:0,unresolved:0},latest_report:t.latest_report??null,desk_slot:t.desk_slot?{date:old,...t.desk_slot}:null}))
+  d.tasks.push({...d.tasks[0],id:'QA-BLOCKED',title:'وظیفه وابسته ساختگی',state:'assigned',latest_report:null,prerequisites:{total:2,unresolved:1}})
   d.time_entries=[];d.approved_minutes_total=0
   globalThis.__qaRefresh()
  })
@@ -56,6 +59,9 @@ try{
  assert.equal(await calendar.count(),0)
  assert.ok(await dialog.isVisible())
  await dialog.getByRole('button',{name:'بستن پنجره ثبت کار'}).click()
+ const blocked=list.locator('.ow-item').filter({hasText:'وظیفه وابسته ساختگی'})
+ assert.match(await blocked.innerText(),/در انتظار تکمیل ۲ پیش‌نیاز/)
+ assert.equal(await blocked.locator('.ow-worker-report-trigger').isDisabled(),true)
  await page.locator('.ow-worker-focus-switch button').filter({hasText:'پایان‌یافته'}).click()
  const cancelled=list.locator('.ow-item').filter({hasText:'کار لغوشده ساختگی'})
  await cancelled.waitFor()
@@ -86,6 +92,16 @@ try{
  const presence=page.locator('.ow-worker-availability-panel')
  await presence.locator('.ow-month-day.is-today').waitFor()
  assert.equal(await presence.locator('.ow-worker-unified-toggle input').isChecked(),false)
+ if(process.env.VITE_SWTB23_WORKER_POLICY_RELEASE==='true'){
+  assert.ok(await page.evaluate(()=>globalThis.__qaV3Reads>0))
+  assert.equal(await page.evaluate(()=>globalThis.__qaV2Reads||0),0)
+  await sidebar.getByRole('button',{name:'کارهای من',exact:true}).click()
+  await page.evaluate(()=>{delete globalThis.__qaWorkerData.tasks[0].prerequisites;globalThis.__qaRefresh()})
+  await page.getByText('دریافت اطلاعات معتبر کارها کامل نشد.',{exact:false}).waitFor()
+  assert.equal(await list.locator('.ow-item').count(),0)
+  assert.equal(await page.evaluate(()=>globalThis.__qaV2Reads||0),0)
+  console.log('PASS R3_STRICT_V3_NO_DOWNGRADE')
+ }
  assert.equal(await page.evaluate(()=>globalThis.__qaWriteAttempts),0)
  assert.deepEqual(errors,[]);assert.deepEqual(external,[])
  console.log('PASS R3_NATIVE_HISTORY_ACCOUNT_PRESENCE')
