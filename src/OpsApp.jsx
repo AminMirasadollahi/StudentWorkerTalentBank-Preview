@@ -1222,7 +1222,7 @@ export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, 
   // Keep same-account unsent form state through a role revalidation on
   // tab focus, but never present or accept input in privileged UI while
   // permission is being checked. Identity/role/revocation changes remount.
-  const ReceiptHost=assignmentReceiptFixture?.version===2?AssignmentRecoveryFixtureHost:DirectAssignmentFixtureHost
+  const ReceiptHost=[2,3].includes(assignmentReceiptFixture?.version)?AssignmentRecoveryFixtureHost:DirectAssignmentFixtureHost
   const authorizedView = identity.role === 'admin'
     ? (assignmentReceiptFixture===null&&recoveryReviewConfig.mode!=='off'
       ? <AssignmentRecoveryReviewHost key={'review-admin:' + identity.user?.id}

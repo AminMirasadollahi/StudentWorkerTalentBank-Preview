@@ -5,6 +5,7 @@ import {assignGroupTask,assignLibraryDeskShift,cancelLibraryDeskShift,getLibrary
 import {assessAssignmentCapacity} from '../lib/assignmentCapacity.mjs'
 import {LIBRARY_DESK_TEMPLATE,canDraftLibraryDeskGroup} from '../lib/libraryDeskTemplate.mjs'
 import {deskInterval,minuteClock,projectDeskCoverage,visibleDeskShifts} from '../lib/libraryDeskShifts.mjs'
+import {canonicalAssignmentPrerequisites} from '../lib/assignmentPrerequisites.mjs'
 
 const fa=new Intl.NumberFormat('fa-IR')
 const clockFa=minute=>minuteClock(minute).replace(/[0-9]/g,digit=>'۰۱۲۳۴۵۶۷۸۹'[Number(digit)])
@@ -19,17 +20,29 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  // Opt-in fixture-only seam. Production callers do not supply this port.
  // A missing/invalid snapshot in port mode is blocked, never a legacy fallback.
  const receiptMode=assignmentReceiptPort!==null
- const receiptBlocked=receiptMode&&assignmentReceiptPort?.snapshot?.state!=='idle'
+ const atomicMode=assignmentReceiptPort?.version===3
+ const policyRequiresAtomic=import.meta.env?.VITE_SWTB23_WORKER_POLICY_RELEASE==='true'
+ const receiptBlocked=(receiptMode&&assignmentReceiptPort?.snapshot?.state!=='idle')||(policyRequiresAtomic&&!atomicMode)
  // Existing-shift cancellation is distinct from cancelling a V2 intent.
  // Only an explicitly supplied, scoped V2 capability may perform it.
- const receiptCancelAllowed=assignmentReceiptPort?.version===2&&!receiptBlocked&&
+ const receiptCancelAllowed=[2,3].includes(assignmentReceiptPort?.version)&&!receiptBlocked&&
    typeof assignmentReceiptPort?.cancelExistingShift==='function'
- const deskCancelAllowed=!receiptMode||receiptCancelAllowed
+ const deskCancelAllowed=(!receiptMode&&!policyRequiresAtomic)||receiptCancelAllowed
  const Fields=receiptMode?'fieldset':Fragment
  const fieldProps=receiptMode?{disabled:receiptBlocked,style:{border:0,margin:0,padding:0,minWidth:0}}:{}
  const seed=assignmentReceiptPort?.initialPayload
  const [workerIds,setWorkerIds]=useState(seed?[...seed.p_worker_ids]:defaultWorkerId?[defaultWorkerId]:[])
  const [filter,setFilter]=useState('')
+ const [prerequisiteIds,setPrerequisiteIds]=useState(()=>seed?.p_prerequisites?[...seed.p_prerequisites]:[])
+ const [prerequisiteSearch,setPrerequisiteSearch]=useState('')
+ const prerequisiteTasks=useMemo(()=>{
+  const byId=new Map()
+  for(const task of data.tasks||[]){try{const [id]=canonicalAssignmentPrerequisites([task.id]);byId.set(id,task)}catch{/* malformed IDs are not selectable */}}
+  return byId
+ },[data.tasks])
+ const prerequisiteOptions=[...prerequisiteTasks.entries()].filter(([id,t])=>prerequisiteIds.includes(id)||String(t.title||'').toLocaleLowerCase('fa-IR').includes(prerequisiteSearch.trim().toLocaleLowerCase('fa-IR')))
+ const missingPrerequisites=prerequisiteIds.filter(id=>!prerequisiteTasks.has(id))
+ const togglePrerequisite=id=>setPrerequisiteIds(prev=>prev.includes(id)?prev.filter(x=>x!==id):prev.length<20?[...prev,id]:prev)
  const [date,setDate]=useState(seed?.p_planned_date||defaultDate||localToday())
  const [title,setTitle]=useState(seed?.p_title??'')
  const [instructions,setInstructions]=useState(seed?.p_instructions??'')
@@ -100,7 +113,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const toggle=id=>setWorkerIds(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id])
  const submit=async event=>{
   event.preventDefault()
-  if(receiptBlocked||submitLock.current||cancelLock.current||busy||committed||!Object.hasOwn(unitNames,taskUnit)||
+  if((!atomicMode&&prerequisiteIds.length>0)||receiptBlocked||submitLock.current||cancelLock.current||busy||committed||!Object.hasOwn(unitNames,taskUnit)||
     selected.length===0||selected.length!==workerIds.length||date<localToday()||
     !routineGroupOk||!estimateValid||!deskCanSubmit)return
   submitLock.current=true
@@ -120,6 +133,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
         startMinute:libraryTemplateSelected?interval.startMinute:null,
         endMinute:libraryTemplateSelected?interval.endMinute:null,
         reason:reason||null,
+        ...(atomicMode?{prerequisiteIds:canonicalAssignmentPrerequisites(prerequisiteIds)}:{}),
       })
       if(outcome==='invalid')setError('اطلاعات واگذاری معتبر نیست. پیش‌نویس حفظ شده است.')
       return
@@ -264,6 +278,18 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
       <input maxLength={3000} value={instructions} onChange={e=>setInstructions(e.target.value)}
         placeholder="خروجی مدنظر"/></label>
   </div>
+  {atomicMode&&<details className="ow-context-help">
+   <summary>پیش‌نیازها (اختیاری) · {fa.format(prerequisiteIds.length)}</summary>
+   <p className="ow-muted">همه وظایف انتخاب‌شده باید تکمیل و تأیید شوند. این مجموعه برای هر نفر از واگذاری گروهی یا نوبت مشترک یکسان است و همراه واگذاری ثبت می‌شود. فهرست به کارهای بارگذاری‌شده محدود است.</p>
+   <label className="report-field"><span>جست‌وجوی وظایف بارگذاری‌شده</span><input type="search" value={prerequisiteSearch} onChange={e=>setPrerequisiteSearch(e.target.value)} disabled={busy}/></label>
+   <fieldset className="ow-prerequisite-options" disabled={busy||committed||receiptBlocked}>
+    <legend>انتخاب پیش‌نیازها (حداکثر ۲۰)</legend>
+    {prerequisiteOptions.map(([id,t])=><label key={id}><input type="checkbox" checked={prerequisiteIds.includes(id)} disabled={!prerequisiteIds.includes(id)&&prerequisiteIds.length>=20} onChange={()=>togglePrerequisite(id)}/><span>{t.title} · {t.planned_date||'—'} · {workers.find(w=>w.id===t.worker_id)?.name||'دانشجوکار'}{t.state==='completed'?' · تکمیل‌شده':t.state==='cancelled'?' · لغوشده':''}</span></label>)}
+    {missingPrerequisites.map(id=><label key={id}><input type="checkbox" checked onChange={()=>togglePrerequisite(id)}/><span>پیش‌نیاز انتخاب‌شده خارج از فهرست فعلی · {id}</span></label>)}
+    {!prerequisiteOptions.length&&!missingPrerequisites.length&&<p>وظیفه‌ای در فهرست بارگذاری‌شده یافت نشد.</p>}
+   </fieldset>
+  </details>}
+  {policyRequiresAtomic&&!atomicMode&&<p role="alert">مسیر اتمیک واگذاری در دسترس نیست؛ ثبت جایگزین انجام نمی‌شود.</p>}
   {libraryTemplateSelected&&taskUnit==='library'&&<section className="ow-desk-shift-editor" aria-label="تعیین و بررسی نوبت کتابخانه">
     <div className="ow-desk-shift-heading">
       <strong>نوبت کاری مشخص</strong>
@@ -384,8 +410,8 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
     {(onClose||onCancel)&&<button type="button" className="report-btn report-btn--light"
       onClick={onCancel||onClose}>انصراف</button>}
     <button type="submit" className="report-btn report-btn--primary"
-      disabled={receiptBlocked||busy||cancelBusy||committed||!Object.hasOwn(unitNames,taskUnit)||!selected.length||selected.length!==workerIds.length||date<localToday()||!routineGroupOk||!estimateValid||!deskCanSubmit}>
-      {busy?(assignmentReceiptPort?.version===2?'در حال بررسی…':'در حال ثبت…'):assignmentReceiptPort?.version===2&&assignmentReceiptPort.manualReserve===true?'آماده‌سازی واگذاری':selected.length>1?'واگذاری گروهی':'واگذاری کار'}
+      disabled={(!atomicMode&&prerequisiteIds.length>0)||receiptBlocked||busy||cancelBusy||committed||!Object.hasOwn(unitNames,taskUnit)||!selected.length||selected.length!==workerIds.length||date<localToday()||!routineGroupOk||!estimateValid||!deskCanSubmit}>
+      {busy?([2,3].includes(assignmentReceiptPort?.version)?'در حال بررسی…':'در حال ثبت…'):[2,3].includes(assignmentReceiptPort?.version)&&assignmentReceiptPort.manualReserve===true?'آماده‌سازی واگذاری':selected.length>1?'واگذاری گروهی':'واگذاری کار'}
     </button>
   </div>
  </form>

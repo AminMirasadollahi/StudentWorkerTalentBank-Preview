@@ -1,6 +1,7 @@
 // Fixture-only V2 client protocol, pinned to PR60 tested SQL contract.
 // No network, storage, SDK, live transport, automatic retry or legacy fallback.
-import {buildDirectAssignmentPayload,validateDirectAssignmentReceipt} from './directAssignmentSession.mjs'
+import {validateDirectAssignmentReceipt} from './directAssignmentSession.mjs'
+import {buildAssignmentRecoveryPayload} from './assignmentPrerequisites.mjs'
 const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(x)&&x!=='00000000-0000-0000-0000-000000000000'
 const obj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x)
 const exact=(x,keys)=>obj(x)&&Object.keys(x).length===keys.length&&keys.every(k=>Object.hasOwn(x,k))
@@ -38,8 +39,8 @@ export function parseRecoveryView(raw,payload=null){
  }
  return Object.freeze({epoch:raw.epoch,active:Object.freeze({requestId:a.request_id,kind:a.kind,status:a.status,receipt})})
 }
-export function createAssignmentRecoverySession({write,control,makeId}){
- if([write,control,makeId].some(x=>typeof x!=='function'))throw Error('INVALID_FIXTURE_DEPENDENCIES')
+export function createAssignmentRecoverySession({write,control,makeId,version=2}){
+ if(![2,3].includes(version)||[write,control,makeId].some(x=>typeof x!=='function'))throw Error('INVALID_FIXTURE_DEPENDENCIES')
  let actor=null,access='denied',generation=0,disposed=false,busy=false,local=null,view=null,state='blocked',used=new Set()
  const allowed=()=>!disposed&&access==='verified'&&actor!==null
  const reset=()=>{generation++;busy=false;view=null;state='blocked'}
@@ -115,7 +116,7 @@ export function createAssignmentRecoverySession({write,control,makeId}){
  const reserve=async draft=>{
   if(!allowed()||busy||state!=='idle'||!view||local)return 'blocked'
   let payload
-  try{payload=buildDirectAssignmentPayload(draft,makeId());if(used.has(payload.p_request_id))return 'invalid'}catch{return 'invalid'}
+  try{payload=buildAssignmentRecoveryPayload(draft,makeId(),version);if(used.has(payload.p_request_id))return 'invalid'}catch{return 'invalid'}
   used.add(payload.p_request_id)
   local={epoch:view.epoch,payload,reserved:false}
   return send('reserve')
