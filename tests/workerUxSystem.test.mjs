@@ -26,7 +26,7 @@ test('Persian history filters share one compact toolbar and keep semantics',()=>
  const history=jsx.slice(jsx.indexOf('function WorkerReportHistory('),
   jsx.indexOf('function WorkerSelfProfile('))
  assert.match(history,/<UnitHourSummary scope="worker" approvedTotal=\{total\}/)
- assert.match(history,/const total=approvedMinutesTotal\?\?null/)
+ assert.match(history,/const total=Number\.isInteger\(approvedMinutesTotal\)&&approvedMinutesTotal>=0\?approvedMinutesTotal:null/)
  assert.match(history,/className="ow-history-query"/)
  assert.match(history,/className="ow-history-query-fields"/)
  assert.match(history,/className="ow-history-query-status"/)
@@ -74,7 +74,7 @@ test('SWTB22 chosen task keeps full paragraph layout and reports actual date sep
  const card=jsx.slice(jsx.indexOf('function WorkerTaskCard('),jsx.indexOf('function WorkerTaskCard(')+20000)
  assert.match(card,/تاریخ واقعی انجام کار \(شمسی\)/)
  assert.match(card,/تاریخ برنامه‌ریزی: \{pretty\(task.planned_date\)\}/)
- assert.match(card,/JalaliDatePicker value=\{date\} max=\{today\(\)\} min=\{shift\(today\(\),-90\)\}/)
+ assert.match(card,/JalaliDatePicker value=\{date\} max=\{v3\?contract\?\.date_max:today\(\)\} min=\{v3\?contract\?\.date_min:shift\(today\(\),-90\)\}/)
  assert.match(card,/task\.instructions\}/)
  assert.match(jsx,/className="ow-task-full-description"\>\{inspectedTask\.instructions\}/)
  assert.match(css,/\.ow-task-full-description\s*\{\s*white-space:pre-wrap; overflow-wrap:anywhere;/)

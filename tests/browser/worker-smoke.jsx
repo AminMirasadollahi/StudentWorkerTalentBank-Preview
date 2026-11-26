@@ -35,6 +35,14 @@ globalThis.__qaWorkerData={
    extra_time_reason_text:'دلیل ساختگی درخواست زمان اضافه'},
  ],approved_minutes_total:105,
 }
+// Only the explicit strict integrated smoke receives the complete release shape.
+if(import.meta.env.VITE_SWTB23_WORKER_POLICY_RELEASE==='true'){
+ const d=globalThis.__qaWorkerData
+ d.report_contract_version=1;d.server_today=today
+ d.tasks=d.tasks.map(t=>({...t,prerequisites:{total:0,unresolved:0},latest_report:null,desk_slot:null,
+  report_contract:['assigned','in_progress','needs_changes'].includes(t.state)?{
+   date_min:today,date_max:today,window_empty:false,standard_minutes:60,minimum_minutes:60,maximum_minutes:1440,extra_reason_above_minutes:60}:null}))
+}
 globalThis.__qaProfileRequests=[
  {id:'SYNTHETIC-REQUEST-1',field_code:'major',
   proposed_value:'رشتهٔ آزمایشی',review_state:'pending',

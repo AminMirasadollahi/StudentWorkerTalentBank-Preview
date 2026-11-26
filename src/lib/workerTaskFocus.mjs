@@ -23,7 +23,8 @@ export function selectWorkerTaskFocus(tasks=[],todayIso,view='action') {
    UPCOMING.has(task.state)&&hasPlannedDate(task.planned_date)
      &&task.planned_date>todayIso)
    .sort(asc)
- if(view==='completed')return source.filter(task=>task.state==='completed')
+ // Historical lane keeps completed AND cancelled tasks distinct by their canonical state.
+ if(view==='completed')return source.filter(task=>task.state==='completed'||task.state==='cancelled')
    .sort((a,b)=>safelyDated(b.planned_date).localeCompare(safelyDated(a.planned_date)))
  return []
 }
@@ -40,6 +41,9 @@ export function summarizeWorkerTaskFocus(tasks,todayIso) {
 // A receipt is not a task row: navigate only to an exact authorized match.
 export function locateClaimedWorkerTask(tasks,todayIso,taskId){
  if(typeof taskId!=='string'||!taskId||!Array.isArray(tasks))return null
+ // A cancelled task remains inspectable in the historical lane, but a
+ // confirmed claim must not navigate to it as though it were new work.
+ if(tasks.some(task=>task.id===taskId&&task.state==='cancelled'))return null
  for(const view of ['action','pending','upcoming','completed']){
   if(selectWorkerTaskFocus(tasks,todayIso,view).some(task=>task.id===taskId))return view
  }

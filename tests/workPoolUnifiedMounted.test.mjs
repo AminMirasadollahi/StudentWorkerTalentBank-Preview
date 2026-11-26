@@ -94,6 +94,10 @@ test('worker sees dated offer, commits one 120-minute share, never writes approv
  try{
   assert.match(m.host.textContent,/ثبت وضعیت قفسه/)
   assert.match(m.host.textContent,/۲ ساعت/)
+  assert.equal(m.host.querySelector('.swtb19-unified-work__two'),null,'no controls before selecting detail')
+  assert.equal([...m.host.querySelectorAll('button')].some(x=>x.textContent==='انتخاب این کار'),false)
+  await act(async()=>[...m.host.querySelectorAll('button')].find(x=>x.textContent==='مشاهده جزئیات').click())
+  assert.equal(globalThis.__v1Claims.length,0)
   const button=[...m.host.querySelectorAll('button')].find(x=>x.textContent.includes('انتخاب این کار'))
   assert.ok(button)
   await act(async()=>{button.click()})
@@ -155,7 +159,7 @@ test('worker preview stays compact; detailed Persian paragraphs render as plain 
   assert.ok(detail.querySelector('.swtb19-unified-work__full-description').textContent.includes('\n\n'))
   assert.match(detail.textContent,/بخش دومِ توضیحات/)
   assert.equal(m.host.querySelectorAll('script').length,0,'never parse server text as HTML')
-  assert.ok(m.host.querySelector('[class*="ow-work-pool-item"] button.report-btn--primary'),
+  assert.ok(detail.querySelector('button.report-btn--primary'),
     'claim remains an independent explicit action')
   await act(async()=>{
    detail.querySelector('.swtb19-unified-work__inspector-heading button').click()
@@ -251,6 +255,7 @@ test('SWTB21 unified claim keeps its identity after leaving the view and recheck
  const m=await mount(Worker,props)
  const button=label=>[...m.host.querySelectorAll('button')].find(x=>x.textContent.includes(label))
  try{
+  await act(async()=>button('مشاهده جزئیات').click())
   const first=button('انتخاب این کار');assert.ok(first)
   await act(async()=>first.click())
   assert.equal(globalThis.__v1Claims.length,1)

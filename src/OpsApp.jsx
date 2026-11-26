@@ -558,7 +558,7 @@ function CandidateCard({
         <p className="ops-worker-state">آخرین ورود در سرویس احراز هویت: {candidateAuthSignInLabel(candidate)}</p>
         <p className="ops-muted">این اطلاعات به‌تنهایی دریافت یا بازشدن ایمیل دعوت و ورود به محیط کاری دانشجوکار را ثابت نمی‌کنند.</p>
         <WorkerSecureLinkReissue
-          key={candidate.worker_id}
+          key={`${candidate.worker_id}:${candidate.worker_state}`}
           workerId={candidate.worker_id}
           workerState={candidate.worker_state}
           saving={saving}
@@ -1149,7 +1149,7 @@ export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, 
   // Keep same-account unsent form state through a role revalidation on
   // tab focus, but never present or accept input in privileged UI while
   // permission is being checked. Identity/role/revocation changes remount.
-  const ReceiptHost=assignmentReceiptFixture?.version===2?AssignmentRecoveryFixtureHost:DirectAssignmentFixtureHost
+  const ReceiptHost=[2,3].includes(assignmentReceiptFixture?.version)?AssignmentRecoveryFixtureHost:DirectAssignmentFixtureHost
   const authorizedView = identity.role === 'admin'
     ? (assignmentReceiptFixture===null&&recoveryReviewConfig.mode!=='off'
       ? <AssignmentRecoveryReviewHost key={'review-admin:' + identity.user?.id}

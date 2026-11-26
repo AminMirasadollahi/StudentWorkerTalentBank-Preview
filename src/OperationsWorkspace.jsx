@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState }
 import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
 import {workerGuideStorageKey,workerGuideSessionStorageKey,shouldAutoOfferWorkerGuide,suppressWorkerGuideAutoOffers} from './lib/workerGuide.mjs'
 import { trapModalTab } from './lib/dialogFocusTrap.mjs'
+import { readWorkerPolicySnapshot } from './lib/workerPolicySnapshot.mjs'
+import {workerReportContract,workerCorrection,initialWorkerReport,reportInputAllowed,reportDateAllowed,latestWorkerReport,workerPrerequisiteStatus} from './lib/workerReportContract.mjs'
 import {canonicalPresencePayload,createPresenceAttemptLedger,interpretPresenceReceipt,workerPresenceItems,managerPresenceItems} from './lib/presenceChanges.mjs'
 import {requestPresenceChange,listPresenceChanges} from './lib/presenceChangesApi.js'
 import {WorkerPresenceRequests,ManagerPresenceReviewQueue} from './components/PresenceChangePanels.jsx'
@@ -30,6 +32,7 @@ import {useUnifiedPeerCalendar} from './lib/useUnifiedPeerCalendar.js'
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 import {presenceReviewTiming} from './lib/presenceReviewTiming.mjs'
 import TaskAssignmentEditor from './components/TaskAssignmentEditor'
+import TaskPrerequisiteEditor from './components/TaskPrerequisiteEditor.jsx'
 import TeamScheduleOverview from './components/TeamScheduleOverview'
 import TermBudgetPanel from './components/TermBudgetPanel'
 import FocusedReviewQueue from './components/FocusedReviewQueue'
@@ -49,6 +52,8 @@ import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeReque
  requestProfileChange,reviewProfileChange,getUnitHourTotals,
  setWorkerState,getWorkerStateHistory } from './lib/operationsV2'
 
+// Explicit opt-in only after the matching backend is installed and accepted.
+const workerPolicyReleaseEnabled=import.meta.env?.VITE_SWTB23_WORKER_POLICY_RELEASE==='true'
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
   dateStyle:'medium', timeZone:'UTC',
@@ -1197,6 +1202,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const [assignmentDialogDate,setAssignmentDialogDate]=useState('')
   const focusedTasks=hideSectionTabs&&focusTaskUIEnabled
   const [taskEditorOpen,setTaskEditorOpen]=useState(false)
+  const [prerequisiteTaskId,setPrerequisiteTaskId]=useState(null)
   const [taskEditorRevision,setTaskEditorRevision]=useState(0)
   const taskEditorDialogRef=useRef(null)
   const taskEditorOpenerRef=useRef(null)
@@ -1522,6 +1528,11 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
                 <summary>جزئیات</summary>
                 <p className="ow-muted">{detail.step===null?'وضعیت لغوشده یا نامشخص':`مرحله ${n(detail.step)} از ۴ · ${detail.label}`}
                   {' · '}{n(detail.reportCount)} گزارش ثبت‌شده</p>
+                {workerPolicyReleaseEnabled&&<button type="button" className="report-btn report-btn--light" aria-expanded={prerequisiteTaskId===t.id}
+                  onClick={()=>setPrerequisiteTaskId(prev=>prev===t.id?null:t.id)}>پیش‌نیازهای این وظیفه</button>}
+                {workerPolicyReleaseEnabled&&prerequisiteTaskId===t.id&&<TaskPrerequisiteEditor key={t.id} task={t} tasks={allTasks}
+                  workerLabel={id=>label(id,workers)} formatDate={pretty}
+                  read={unifiedPeerApi.getTaskPrerequisites} write={unifiedPeerApi.setTaskPrerequisites}/>}
               </details>
               {t.short_notice&&<p className="ow-warning">واگذاری کوتاه‌مدت: {t.short_notice_reason}</p>}
             </article>
@@ -1837,22 +1848,27 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     </section>}
   </div>
 }
-function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false,actionLedger,reviewCycle}) {
+function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false,actionLedger,reviewCycle,contractVersion,serverToday}) {
   const acknowledged=actionLedger.get(task.id)
   const sameReviewCycle=acknowledged?.reviewCycle===reviewCycle
   // When tab navigation temporarily remounts an uncertain report, restore
   // the exact original payload paired with its existing idempotency key.
   const initialAttempt=sameReviewCycle?acknowledged?.submissionPayload:null
+  const v3=contractVersion===1
+  const contract=v3?workerReportContract(task):null
+  const dependency=v3?workerPrerequisiteStatus(task):{blocked:false,unresolved:0,valid:false}
+  const correction=v3?workerCorrection(task):null
+  const initial=v3?initialWorkerReport(task,serverToday,initialAttempt):null
   const [reportOpen,setReportOpen]=useState(false)
   const reportDialogRef=useRef(null)
   const reportTriggerRef=useRef(null)
-  const [date,setDate]=useState(initialAttempt?.date||today())
-  const [requestExtra,setRequestExtra]=useState(Boolean(initialAttempt?.extraReasonCode))
+  const [date,setDate]=useState(v3?initial.date:initialAttempt?.date||today())
+  const [requestExtra,setRequestExtra]=useState(v3?initial.custom:Boolean(initialAttempt?.extraReasonCode))
   const [extraHelpOpen,setExtraHelpOpen]=useState(false)
-  const [requested,setRequested]=useState(String(initialAttempt?.minutes??task.estimate_minutes))
-  const [reasonCode,setReasonCode]=useState(initialAttempt?.extraReasonCode||'')
-  const [reasonText,setReasonText]=useState(initialAttempt?.extraReasonText||'')
-  const [note,setNote]=useState(initialAttempt?.note||'')
+  const [requested,setRequested]=useState(String(v3?initial.minutes:initialAttempt?.minutes??task.estimate_minutes))
+  const [reasonCode,setReasonCode]=useState(v3?initial.reasonCode:initialAttempt?.extraReasonCode||'')
+  const [reasonText,setReasonText]=useState(v3?initial.reasonText:initialAttempt?.extraReasonText||'')
+  const [note,setNote]=useState(v3?initial.note:initialAttempt?.note||'')
   const [busy,setBusy]=useState(false)
   const [reportCommitted,setReportCommitted]=useState(Boolean(sameReviewCycle&&acknowledged.report))
   const [startCommitted,setStartCommitted]=useState(Boolean(sameReviewCycle&&acknowledged.start))
@@ -1884,18 +1900,30 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
     if(task.state==='needs_changes'&&priorReviewCycle.current!==reviewCycle){
       actionLedger.delete(task.id)
       setReportCommitted(false)
+      setStartCommitted(false)
       keyRef.current=crypto.randomUUID()
+      if(v3){
+        const fresh=initialWorkerReport(task,serverToday)
+        setDate(fresh.date);setRequested(String(fresh.minutes));setRequestExtra(fresh.custom)
+        setNote(fresh.note);setReasonCode(fresh.reasonCode);setReasonText(fresh.reasonText)
+      }
     }
     priorReviewCycle.current=reviewCycle
   },[reviewCycle,task.state,actionLedger])
   const ready=['assigned','in_progress','needs_changes'].includes(task.state)
   const standard=Number(task.estimate_minutes)
   const requestedMinutes=requestExtra?Number(requested):standard
-  const extraValid=!requestExtra || (
+  const requiresExtraReason=requestExtra&&requestedMinutes>standard
+  const customCreditAllowed=Boolean(contract&&contract.minimum_minutes<standard)
+  const priorPayload=sameReviewCycle&&!acknowledged?.report?acknowledged?.submissionPayload:null
+  const nextDraft=canonicalWorkerReportPayload({taskId:task.id,date,minutes:requestedMinutes,note,extraReasonCode:requiresExtraReason?reasonCode:null,extraReasonText:requiresExtraReason?reasonText.trim():null})
+  const exactRetry=Boolean(priorPayload&&sameWorkerReportPayload(priorPayload,nextDraft))
+  const extraValid=v3?(exactRetry||reportInputAllowed(task,date,requestedMinutes,reasonCode,reasonText)):!requestExtra || (
     Number.isInteger(requestedMinutes)&&requestedMinutes>standard&&requestedMinutes<=1440
     && Boolean(reasonCode)&&reasonText.trim().length>=10&&reasonText.trim().length<=600
   )
   const perform=async (fn,kind)=>{
+    if(dependency.blocked&&(kind==='start'||!exactRetry))return
     const previous=actionLedger.get(task.id)
     if(actionLock.current||(kind==='report'&&(reportCommitted||
        (previous?.reviewCycle===reviewCycle&&previous?.report)))
@@ -1953,12 +1981,13 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
     <button type="button" className="ow-b3-inspect-trigger"
       data-task-inspect={task.id} aria-expanded={inspected}
       onClick={onInspect}>مشاهدهٔ جزئیات</button>
+    {ready&&dependency.blocked&&<small role="status" className="ow-muted">{dependency.valid?`در انتظار تکمیل ${fa.format(dependency.unresolved)} پیش‌نیاز`:'وضعیت پیش‌نیازها نامشخص است؛ وضعیت را تازه‌سازی کنید.'}</small>}
     {ready&&<>
       <div className="ow-worker-action-launch">
         <button type="button" ref={reportTriggerRef}
           className="report-btn report-btn--light ow-worker-report-trigger"
           aria-haspopup="dialog" aria-controls={`ow-worker-report-dialog-${task.id}`}
-          disabled={busy||reportCommitted}
+          disabled={busy||reportCommitted||(dependency.blocked&&!priorPayload)}
           onClick={()=>setReportOpen(true)}>
           {task.state==='needs_changes'?'اصلاح و ارسال گزارش':'ثبت انجام کار'}
         </button>
@@ -1975,12 +2004,15 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
               id={`ow-worker-report-heading-${task.id}`}>
               {task.state==='needs_changes'?'اصلاح و ارسال گزارش':'ثبت انجام کار'}
             </h3>
-            <p className="ow-muted">{task.title} · {unitLabels[task.unit]||task.unit||'واحد کار نامشخص'} · {pretty(task.planned_date)}</p>
+            <p className="ow-muted">{task.title} · {unitLabels[task.unit]||task.unit||'واحد کار نامشخص'} · تاریخ برنامه‌ریزی: {pretty(task.planned_date)}</p>
           </div>
           <button type="button" className="ow-worker-report-dialog__close"
             disabled={busy} aria-label="بستن پنجره ثبت کار"
             onClick={()=>setReportOpen(false)}>بستن</button>
         </div>
+        {dependency.blocked&&!exactRetry&&<p role="status" className="ow-muted">تا رفع پیش‌نیازها نمی‌توانید کار را شروع کنید یا گزارش جدید بفرستید.</p>}
+        {correction&&<section className="ow-extra-panel" aria-label="نظر مدیر درباره گزارش قبلی"><strong>{correction.review_state==='rejected'?'گزارش قبلی تأیید نشد':'درخواست اصلاح گزارش'}</strong><p>{correction.review_note||'دلیلی ثبت نشده است.'}</p></section>}
+        {v3&&(!contract||contract.window_empty||task.state==='needs_changes'&&!correction)&&!exactRetry&&<p role="alert" className="report-alert report-alert--error">امکان ثبت گزارش جدید هنوز تأیید نشده است. وضعیت را بررسی کنید یا با مدیر هماهنگ کنید.</p>}
         {task.instructions&&<details className="ow-worker-task-instructions">
           <summary>شرح کار محول‌شده</summary><p>{task.instructions}</p>
         </details>}
@@ -1990,8 +2022,8 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
       // even when a later request contains changed fields.
       const nextPayload=canonicalWorkerReportPayload({
         taskId:task.id,date,minutes:requestedMinutes,note,
-        extraReasonCode:requestExtra?reasonCode:null,
-        extraReasonText:requestExtra?reasonText.trim():null,
+        extraReasonCode:requiresExtraReason?reasonCode:null,
+        extraReasonText:requiresExtraReason?reasonText.trim():null,
       })
       const prior=actionLedger.get(task.id)
       const previousPayload=prior?.reviewCycle===reviewCycle
@@ -2012,9 +2044,10 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
     }}>
       <div className="ow-fields ow-fields--two">
         <label className="report-field"><span>تاریخ واقعی انجام کار (شمسی)</span>
-          <JalaliDatePicker value={date} max={today()} min={shift(today(),-90)}
-            onChange={setDate} ariaLabel="تاریخ انجام کار"/>
-          <small className="ow-muted">تاریخ برنامه‌ریزی: {pretty(task.planned_date)}. روزی را که واقعاً کار انجام شده وارد کنید؛ ضوابط زمانی نوع کار در سرور بررسی می‌شود.</small>
+          <JalaliDatePicker value={date} max={v3?contract?.date_max:today()} min={v3?contract?.date_min:shift(today(),-90)}
+            disabled={busy||(v3&&(!contract||contract.window_empty))} onChange={setDate} ariaLabel="تاریخ انجام کار"/>
+          {v3&&contract&&date&&!reportDateAllowed(contract,date)&&!exactRetry&&<small className="ow-muted" role="status">تاریخ گزارش خارج از بازه مجاز است. فقط تاریخ واقعی را وارد کنید؛ اگر همان تاریخ درست است با مدیر هماهنگ کنید.</small>}
+          <small className="ow-muted">روز واقعی انجام کار را انتخاب کنید.</small>
         </label>
         <div className="ow-standard-credit">
           <span>زمان استاندارد این کار</span><b>{minutes(standard)}</b>
@@ -2032,41 +2065,40 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
             setRequestExtra(checked)
             if(!checked){setRequested(String(standard));setReasonCode('');setReasonText('')}
           }}/>
-          درخواست زمان بیشتر
+          {customCreditAllowed?'تغییر زمان درخواستی':'درخواست زمان بیشتر'}
         </label>
         <button type="button" className="ow-extra-help-trigger"
           aria-expanded={extraHelpOpen}
           aria-controls={`ow-extra-help-${task.id}`}
-          aria-label="چه زمانی درخواست زمان بیشتر لازم است؟"
+          aria-label={customCreditAllowed?'چه زمانی سهم درخواستی را تغییر دهم؟':'چه زمانی درخواست زمان بیشتر لازم است؟'}
           onClick={()=>setExtraHelpOpen(open=>!open)}>
           <span aria-hidden="true">ⓘ</span> چه زمانی؟
         </button>
         <p id={`ow-extra-help-${task.id}`} className="ow-extra-help-note" hidden={!extraHelpOpen}>
-          فقط وقتی زمان استاندارد برای انجام همین کار کافی نبوده است، این گزینه را انتخاب کنید؛
-          مثلاً حجم واقعی کار یا مانع پیش‌بینی‌نشده باعث طولانی‌شدن آن شده باشد.
+          {customCreditAllowed?'اگر سهم زمانی موردنیاز شما با زمان استاندارد متفاوت است، مقدار درخواستی را تغییر دهید. برای زمان بیشتر، دلیل لازم است.':'فقط وقتی زمان استاندارد برای انجام همین کار کافی نبوده است، این گزینه را انتخاب کنید؛ مثلاً حجم واقعی کار یا مانع پیش‌بینی‌نشده باعث طولانی‌شدن آن شده باشد.'}
           زمان کل موردنیاز و علت را وارد کنید. زمان اضافه صرفاً پس از بررسی و تأیید مدیر منظور می‌شود؛
           حضور در محل به‌تنهایی دلیل درخواست زمان بیشتر نیست.
         </p>
       </div>
       {requestExtra&&<div className="ow-extra-panel">
-        <p>مجموع زمان و علت افزایش را وارد کنید؛ تأیید نهایی با مدیر است.</p>
+        {!v3&&<p>مجموع زمان و علت افزایش را وارد کنید؛ تأیید نهایی با مدیر است.</p>}
         <div className="ow-fields ow-fields--two">
           <label className="report-field"><span>زمان درخواستی کل (دقیقه)</span>
-            <input type="number" min={standard+1} max="1440" required
+            <input type="number" min={exactRetry?undefined:customCreditAllowed?contract.minimum_minutes:standard+1} max={exactRetry?undefined:v3?contract?.maximum_minutes:1440} required
               value={requested} onChange={e=>setRequested(e.target.value)}/>
           </label>
-          <label className="report-field"><span>علت اصلی افزایش زمان</span>
+          {(!v3||requiresExtraReason)&&<label className="report-field"><span>علت اصلی افزایش زمان</span>
             <select required value={reasonCode} onChange={e=>setReasonCode(e.target.value)}>
               <option value="">انتخاب کنید</option>
               {Object.entries(extraTimeReasons).map(([code,title])=><option key={code} value={code}>{title}</option>)}
             </select>
-          </label>
+          </label>}
         </div>
-        <label className="report-field"><span>توضیح دلیل افزایش زمان (الزامی؛ حداقل ۱۰ نویسه)</span>
+        {(!v3||requiresExtraReason)&&<label className="report-field"><span>توضیح دلیل افزایش زمان (الزامی؛ حداقل ۱۰ نویسه)</span>
           <textarea required minLength={10} maxLength={600} rows={2}
             value={reasonText} onChange={e=>setReasonText(e.target.value)}
             placeholder="چه مشکلی رخ داد و چرا زمان استاندارد کافی نبود؟"/>
-        </label>
+        </label>}
         {Number.isFinite(requestedMinutes)&&requestedMinutes>standard&&<p className="ow-muted">
           زمان اضافه درخواستی: {minutes(requestedMinutes-standard)}
         </p>}
@@ -2074,10 +2106,10 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
       <div className="ow-actions ow-worker-submit-actions">
         <button type="submit" className="report-btn report-btn--primary"
           disabled={busy||reportCommitted||!extraValid}>
-          {requestExtra?'ارسال درخواست زمان بیشتر':'ارسال گزارش انجام کار'}
+          {requiresExtraReason?'ارسال درخواست زمان بیشتر':correction?'ارسال گزارش اصلاح‌شده':'ارسال گزارش انجام کار'}
         </button>
-        {task.state!=='in_progress'&&<button type="button" className="report-btn report-btn--light"
-          onClick={()=>{void perform(()=>startMyTask(task.id),'start')}} disabled={busy||startCommitted||reportCommitted}
+        {(!v3||task.state==='assigned')&&task.state!=='in_progress'&&<button type="button" className="report-btn report-btn--light"
+          onClick={()=>{void perform(()=>startMyTask(task.id),'start')}} disabled={busy||startCommitted||reportCommitted||dependency.blocked}
           title="اختیاری؛ برای اعلام وضعیت در حال انجام، بدون ثبت ساعت">شروع کار</button>}
       </div>
       <small className="ow-commit-disclosure">با ارسال این گزارش، انجام کار را اعلام می‌کنید؛ ساعت‌ها پس از تأیید مدیر منظور می‌شوند.</small>
@@ -2086,8 +2118,8 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
       {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
       </dialog>
     </>}
-    {notice&&<p className="ow-muted" role="status">{notice}</p>}
-    {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
+    {(!v3||!reportOpen)&&notice&&<p className="ow-muted" role="status">{notice}</p>}
+    {(!v3||!reportOpen)&&error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
   </article>
 }
 /**
@@ -2112,7 +2144,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
   ['all','همه'],['submitted','منتظر بررسی'],
   ['changes_requested','نیازمند اصلاح'],['rejected','ردشده'],['approved','تأییدشده']
  ]
- const total=approvedMinutesTotal??null
+ const total=Number.isInteger(approvedMinutesTotal)&&approvedMinutesTotal>=0?approvedMinutesTotal:null
  useLayoutEffect(()=>{
    if(detail)document.getElementById('ow-report-inspector')?.focus({preventScroll:true})
  },[detail?.id])
@@ -2155,6 +2187,8 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
          onClick={()=>{setUnitFilter('');setView('all');setDateFrom('');setDateTo('');setSelectedReportId(null)}}>
          پاک‌کردن فیلترها</button>}
      </div>
+     <details className="ow-history-advanced">
+       <summary>فیلتر واحد و تاریخ{unitFilter||dateFrom||dateTo?' · فعال':''}</summary>
      <div className="ow-history-query-fields">
        <label className="report-field ow-history-query-unit">
          <span>واحد انجام کار</span>
@@ -2175,6 +2209,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
            onChange={date=>{setDateTo(date);setSelectedReportId(null)}}/>
        </div>
      </div>
+     </details>
      <div className="ow-history-query-status">
        <strong>وضعیت بررسی</strong>
        <div className="ow-history-filter" role="group" aria-label="فیلتر وضعیت گزارش‌ها">
@@ -2191,8 +2226,9 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
      بازه تاریخ نامعتبر است؛ تاریخ شروع نباید پس از تاریخ پایان باشد.
    </p>}
    <div className="ow-history-results-heading">
-     <h3>دفتر گزارش‌ها</h3><span role="status">{n(entries.length)} گزارش در فیلتر فعلی</span>
+     <h3>دفتر گزارش‌ها</h3><span role="status">{n(entries.length)} گزارش از سوابق بارگذاری‌شده</span>
    </div>
+   {records.length>=1000&&<p className="ow-muted" role="status">فهرست به گزارش‌های بارگذاری‌شده محدود است؛ ممکن است سوابق قدیمی‌تر را شامل نشود. جمع قطعی ساعات در بالای صفحه مستقل است.</p>}
    <div className={`ow-b3-ledger-body ${detail?'ow-b3-ledger-body--detail':''}`}>
     <div className="ow-b3-ledger-list" role="list" aria-label="گزارش‌های ثبت‌شده">
      <div className="ow-b3-ledger-columns" aria-hidden="true">
@@ -2252,11 +2288,13 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
     </aside>}
    </div>
    </div>
-   {!dateResult.invalidRange&&<WorkerPerformancePanel rows={entries} tasks={tasks} units={unitLabels}/>}
+   {!dateResult.invalidRange&&<details className="ow-history-analysis"><summary>تحلیل و نمودارهای گزارش‌های بارگذاری‌شده</summary>
+     <WorkerPerformancePanel rows={entries} tasks={tasks} units={unitLabels}/>
+   </details>}
  </section>
 }
 
-function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal,onNavigate,onGuide,onIdentityLoaded,onIdentityInvalidated,refreshRevision=0}) {
+function WorkerSelfProfile({tasks,records,profile,loginEmail,requestLedger,approvedMinutesTotal,onNavigate,onGuide,onIdentityLoaded,onIdentityInvalidated,refreshRevision=0}) {
  const [identity,setIdentity]=useState(null)
  const [identityOwner,setIdentityOwner]=useState(null)
  const [requests,setRequests]=useState([])
@@ -2353,10 +2391,8 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
    }finally{submitLock.current=false;setSaving(false)}
  }
 
-  const approved=records.filter(e=>e.review_state==='approved')
-  // Lifetime server-approved credit may span more than the 1,000 visible records.
-  const approvedTime=approvedMinutesTotal??approved.reduce(
-    (sum,e)=>sum+Number(e.approved_minutes||0),0)
+  // Never substitute a capped historical sum for the authoritative lifetime total.
+  const approvedTime=Number.isInteger(approvedMinutesTotal)&&approvedMinutesTotal>=0?approvedMinutesTotal:null
   const openTasks=tasks.filter(t=>!['completed','cancelled'].includes(t.state)).length
   if(profileReadFailed)return <section className="report-panel ow-self-profile ow-profile-access-recheck" role="alert">
     <p>مشخصات شخصی در دسترس نیستند. اطلاعات قبلی تا تأیید دوبارهٔ دسترسی پنهان می‌مانند.</p>
@@ -2370,7 +2406,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
   </section>
   return <section className="report-panel ow-self-profile">
     <div className="ow-presence-section-title ow-b3-guide-heading--profile"><h2>حساب من</h2>
-      <span className="ow-status">زمان تأییدشده: {exactDuration(approvedTime)}</span>
+      <span className="ow-status">زمان تأییدشده: {approvedTime===null?'در دسترس نیست':exactDuration(approvedTime)}</span>
       <button type="button" className="swtb-guide-launch" data-swtb-guide="help-profile"
         onClick={()=>onGuide?.('profile')}>؟ راهنمای این بخش</button></div>
     <div className="ow-self-identity" data-swtb-guide="profile-details">
@@ -2378,6 +2414,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
       <div><small>رشته تحصیلی</small><strong>{identity?.major||'ثبت نشده'}</strong></div>
       <div><small>سال ورود</small><strong>{identity?.entry_year||'ثبت نشده'}</strong></div>
       <div><small>واحد اولیهٔ ثبت‌نام</small><strong>{unitLabels[identity?.unit]||identity?.unit||'نامشخص'}</strong></div>
+      {loginEmail&&<div><small>ایمیل ورود</small><strong><bdi dir="ltr">{loginEmail}</bdi></strong></div>}
     </div>
     <nav className="ow-self-profile-quicklinks" data-swtb-guide="profile-shortcuts"
       aria-label="پیگیری فعالیت دانشجوکار">
@@ -2572,7 +2609,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     const sequence=++readSequence.current
     setLoading(true);setError('')
     try{
-      const result=await getMyWorkV2()
+      const result=await readWorkerPolicySnapshot({enabled:workerPolicyReleaseEnabled,readV2:getMyWorkV2,readV3:unifiedPeerApi.getMyWorkV3,workerId:profile.worker_id})
       if(sequence!==readSequence.current||claimSession.current!==session)return
       const scoped=scopeSelfWorkRows(result,profile.worker_id)
       setWorkSnapshot({workerId:profile.worker_id,data:scoped})
@@ -2583,7 +2620,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       // Never retain a visible old work list after a failed authorization refresh.
       setWorkSnapshot({workerId:profile.worker_id,data:{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]}})
       setReadFailed(true)
-      setError(readableError(e))
+      setError(workerPolicyReleaseEnabled?'دریافت اطلاعات معتبر کارها کامل نشد. دوباره تازه‌سازی کنید؛ اگر مشکل ادامه داشت با مدیر هماهنگ کنید.':readableError(e))
     }finally{if(sequence===readSequence.current&&claimSession.current===session)setLoading(false)}
   }
   useEffect(()=>{void refresh()},[profile.worker_id,refreshRevision])
@@ -2621,13 +2658,12 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     ['action','نیازمند اقدام','اصلاح گزارش‌ها و انجام کارهای موعدرسیده'],
     ['pending','منتظر بررسی','گزارش‌های ارسالی که هنوز در انتظار مدیرند'],
     ['upcoming','پیش‌رو','کارهای برنامه‌ریزی‌شده برای روزهای بعد'],
-    ['completed','انجام‌شده','کارهای تکمیل‌شده'],
+    ['completed','پایان‌یافته','کارهای تکمیل‌شده و لغوشده'],
   ]
   const focusHeading=focusOptions.find(item=>item[0]===taskView)
   const inspectedTask=!settingsOpen&&section==='tasks'?visible.find(t=>t.id===selectedTaskId):undefined
   const inspectedReport=inspectedTask
-    ?records.filter(r=>r.task_id===inspectedTask.id).sort(
-      (a,b)=>(b.work_date||'').localeCompare(a.work_date||''))[0]:null
+    ?(data.report_contract_version===1?latestWorkerReport(inspectedTask,records,1):records.filter(r=>r.task_id===inspectedTask.id).sort((a,b)=>(b.work_date||'').localeCompare(a.work_date||''))[0]):null
   useLayoutEffect(()=>{
     if(inspectedTask)document.getElementById('ow-task-inspector')?.focus({preventScroll:true})
   },[inspectedTask?.id])
@@ -2699,7 +2735,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     action:'اکنون کاری که نیازمند اقدام شما باشد وجود ندارد.',
     pending:'گزارش منتظر بررسی در فهرست کارها وجود ندارد.',
     upcoming:'کار برنامه‌ریزی‌شده‌ای برای روزهای آینده ثبت نشده است.',
-    completed:'هنوز کاری با وضعیت تکمیل‌شده ثبت نشده است.',
+    completed:'هنوز کار تکمیل‌شده یا لغوشده‌ای در فهرست نیست.',
     calendar:'کاری برای این بازهٔ زمانی ثبت نشده است.',
   }
   return <div className={`ow-workspace ow-worker-workspace ${readFailed?'ow-access-recheck':`ow-b3-layout ${sidebarCollapsed?'ow-b3-is-collapsed':''}`}`}>
@@ -2717,11 +2753,11 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           <small>دانشکده علوم انسانی شهید رجایی بابل</small></div>}
       </div>
       {!sidebarCollapsed&&<p className="ow-b3-sidebar-caption">فضای کاری</p>}
-      <SectionTabs value={settingsOpen?null:section} onChange={next=>{
+      <SectionTabs value={settingsOpen?null:section==='workPool'?'tasks':section} onChange={next=>{
         if(settingsOpen)onToggleSettings?.()
         setSelectedTaskId(null);updateNavigation({section:next})
       }} options={[
-        ['tasks','کارهای من'],...(workPoolUIEnabled?[['workPool','فرصت‌های کاری']]:[]),
+        ['tasks','کارهای من'],
         ['availability','زمان حضور'],['history','سوابق گزارش‌ها'],['profile','حساب من'],
       ]}/>
       <div className="ow-b3-sidebar__footer">
@@ -2762,8 +2798,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         <div className="ow-b3-worker" title={visibleWorkerName}>
           <span className="ow-b3-worker__avatar" aria-hidden="true">{visibleWorkerName?.trim()?.[0]||'د'}</span>
           {!sidebarCollapsed&&<div><strong>{visibleWorkerName}</strong>
-            {loginEmail&&<small className="ow-b3-login-email">
-              ایمیل ورود: <bdi dir="ltr">{loginEmail}</bdi></small>}
+
           </div>}
         </div>
         <div className="ow-b3-worker-actions">
@@ -2799,7 +2834,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       <h1>کارهای من</h1>
       <div className="ow-range-switch" role="group" aria-label="نمای فضای کاری">
         {[['tasks','کارهای واگذارشده و انتخاب‌شده'],['workPool','فرصت‌های قابل انتخاب']].map(([id,title])=>
-          <button type="button" key={id} aria-current={section===id?'page':undefined} className={section===id?'is-selected':''}
+          <button type="button" key={id} data-swtb-guide={id==='workPool'?'nav-workPool':undefined} aria-current={section===id?'page':undefined} className={section===id?'is-selected':''}
             onClick={()=>{setSelectedTaskId(null);updateNavigation({section:id})}}>{title}</button>)}
       </div>
       {section==='workPool'&&<p className="ow-muted">انتخاب فرصت داوطلبانه و وابسته به مجوز، ظرفیت و مهلت است؛ انتخاب به‌معنای ساعت تأییدشده نیست.</p>}
@@ -2840,8 +2875,9 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
             <strong>{n(focusCounts[id])}</strong>
           </button>)}
       </div>
-      <div className="ow-worker-date-tools">
-        <span>برنامه بر اساس تاریخ</span>
+      <details className="ow-worker-date-disclosure" open={taskView==='calendar'?true:undefined}>
+        <summary>نمایش بر اساس تاریخ</summary>
+        <div className="ow-worker-date-tools">
         <div className="ow-range-switch" role="group" aria-label="بازه نمایش کارها">
           {[['today','امروز'],['week','این هفته'],['month','این ماه'],['upcoming','آینده']].map(([id,title])=>
             <button type="button" key={id}
@@ -2849,7 +2885,8 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
               className={taskView==='calendar'&&taskRange===id?'is-selected':''}
               onClick={()=>updateNavigation({taskView:'calendar',taskRange:id})}>{title}</button>)}
         </div>
-      </div>
+        </div>
+      </details>
       <div className="ow-worker-list-heading ow-worker-results-heading">
         <div>
           <h3>{focusHeading?.[1]||'برنامهٔ زمانی'}</h3>
@@ -2868,12 +2905,13 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           inspected={selectedTaskId===t.id}
           onReportAccepted={()=>setSubmissionReceipt({workerId:profile.worker_id,title:t.title})}
           actionLedger={acknowledgedActions.current.items}
-          reviewCycle={(data.time_entries||[]).filter(e=>e.task_id===t.id
+          contractVersion={data.report_contract_version} serverToday={data.server_today}
+          reviewCycle={data.report_contract_version===1&&workerCorrection(t)?workerCorrection(t).id:(data.time_entries||[]).filter(e=>e.task_id===t.id
             &&['changes_requested','rejected'].includes(e.review_state))
             .map(e=>e.id).sort().join('|')}/>)}
         {!visible.length&&<div className="ow-worker-empty" role="status">
           <strong>{emptyText[taskView]}</strong>
-          <p>برای بررسی وضعیت‌های دیگر، یکی از دسته‌های بالا را انتخاب کنید.</p>
+          {taskView!=='action'&&<p>برای بررسی وضعیت‌های دیگر، یکی از دسته‌های بالا را انتخاب کنید.</p>}
           {taskView==='action'&&focusCounts.upcoming>0&&<button type="button"
             className="report-btn report-btn--light"
             onClick={()=>updateNavigation({taskView:'upcoming'})}>
@@ -2909,6 +2947,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           <strong>نظر مدیر دربارهٔ گزارش مرتبط</strong>
           <p>{inspectedReport.review_note}</p>
         </section>}
+        {inspectedTask.desk_slot?.state==='cancelled'&&<section><strong>دلیل لغو نوبت</strong><p>{inspectedTask.desk_slot.cancellation_reason||'دلیلی ثبت نشده است.'}</p></section>}
         <p className="ow-muted">برای انجام یا اصلاح گزارش، از دکمهٔ همان ردیف استفاده کنید.</p>
       </aside>}
       </div>
@@ -2942,11 +2981,11 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           showPeers={showCoworkers} peerRefreshRevision={refreshRevision}/>
       </div>
     </section>}
-    {!settingsOpen&&section==='history'&&<WorkerReportHistory tasks={tasks} records={records}
+    {!settingsOpen&&section==='history'&&<WorkerReportHistory key={profile.worker_id} tasks={tasks} records={records}
       onGuide={openWorkerGuide} refreshRevision={refreshRevision} approvedMinutesTotal={data.approved_minutes_total}
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}/>}
-    {!settingsOpen&&section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}
+    {!settingsOpen&&section==='profile'&&<WorkerSelfProfile key={profile.worker_id} tasks={tasks} records={records} profile={profile} loginEmail={loginEmail}
       onGuide={openWorkerGuide} onIdentityLoaded={acceptCanonicalName}
       onIdentityInvalidated={invalidateCanonicalName}
       requestLedger={acknowledgedActions.current.profileRequests}

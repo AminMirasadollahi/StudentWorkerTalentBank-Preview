@@ -30,9 +30,9 @@ test('upcoming excludes sent, approved, cancelled, and correction-required work'
  assert.deepEqual(selectWorkerTaskFocus(sample,today,'upcoming').map(x=>x.id),['later'])
 })
 test('completion and unknown states are never counted as actionable',()=>{
- assert.deepEqual(selectWorkerTaskFocus(sample,today,'completed').map(x=>x.id),['done'])
+ assert.deepEqual(selectWorkerTaskFocus(sample,today,'completed').map(x=>x.id),['done','cancelled'])
  assert.deepEqual(summarizeWorkerTaskFocus(sample,today),
- {action:4,pending:1,upcoming:1,completed:1})
+ {action:4,pending:1,upcoming:1,completed:2})
 })
 test('empty, missing or malformed date data stays safe and never fabricates a due task',()=>{
  const odd=[task('unknown','not-a-real-state','2026-10-20'),

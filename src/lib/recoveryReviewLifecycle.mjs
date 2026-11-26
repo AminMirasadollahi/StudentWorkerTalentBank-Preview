@@ -3,7 +3,9 @@ const PRODUCTION_REF='pmwxryavkrjcdobwkryw'
 export function resolveRecoveryReviewConfig(env){
  const review=env?.VITE_SWTB22_RECOVERY_REVIEW_UI==='true'
  const release=env?.VITE_SWTB22_RECOVERY_RELEASE_UI==='true'
- if(!review&&!release)return Object.freeze({mode:'off'})
+ const atomic=env?.VITE_SWTB23_WORKER_POLICY_RELEASE==='true'
+ // The strict policy release must never expose a legacy assignment writer.
+ if(!review&&!release)return Object.freeze({mode:atomic?'blocked':'off'})
  const blocked=()=>Object.freeze({mode:'blocked'})
  if(review&&release)return blocked()
  const expected=review?env.VITE_SWTB22_RECOVERY_REVIEW_PROJECT_REF:env.VITE_SWTB22_RECOVERY_RELEASE_PROJECT_REF
@@ -12,7 +14,7 @@ export function resolveRecoveryReviewConfig(env){
   (review?expected===PRODUCTION_REF:expected!==PRODUCTION_REF)||
   url!=='https://'+expected+'.supabase.co'||typeof key!=='string'||!/^sb_publishable_[A-Za-z0-9_-]+$/.test(key))
   return blocked()
- return Object.freeze({mode:review?'review':'release',projectUrl:url,publishableKey:key})
+ return Object.freeze({mode:review?'review':'release',projectUrl:url,publishableKey:key,...(atomic?{version:3}:{})})
 }
 export function assertLegacyAssignmentAllowed(env){
  if(resolveRecoveryReviewConfig(env).mode!=='off')throw Error('SWTB22_LEGACY_ASSIGNMENT_BLOCKED')

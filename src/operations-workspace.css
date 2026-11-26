@@ -3775,3 +3775,20 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 .ow-worker-workspace-switch h1{font-size:1.25rem;margin:0}
 .ow-worker-workspace-switch .ow-range-switch{flex-wrap:wrap}
 .ow-worker-workspace-switch p{margin:0}
+
+/* R3: date browse is a secondary disclosure, not a competing primary nav. */
+.ow-worker-date-disclosure {margin-block:.5rem;color:var(--muted,#52616a)}
+.ow-worker-date-disclosure>summary {cursor:pointer;min-height:32px;padding:.35rem .5rem;font-size:.86rem;font-weight:600}
+.ow-worker-date-disclosure>summary:focus-visible {outline:2px solid currentColor;outline-offset:2px}
+
+/* R3 worker history: visible status filters, optional secondary detail. */
+.ow-worker-history-panel :is(.ow-history-advanced,.ow-history-analysis)>summary {cursor:pointer;min-height:32px;padding:.45rem .55rem;font-weight:600;color:inherit}
+.ow-worker-history-panel :is(.ow-history-advanced,.ow-history-analysis)>summary:focus-visible {outline:2px solid currentColor;outline-offset:2px}
+.ow-worker-history-panel .ow-history-analysis {margin-top:.75rem}
+.ow-self-profile .ow-self-identity bdi {overflow-wrap:anywhere}
+
+/* Minimal manager-only prerequisite editing; no new navigation or graph view. */
+.ow-prerequisite-editor{margin-block:.6rem;display:grid;gap:.55rem;min-width:0}
+.ow-prerequisite-options{display:grid;gap:.4rem;max-height:15rem;overflow:auto;min-width:0;margin:0;padding:.5rem;border:1px solid currentColor;border-radius:5px}
+.ow-prerequisite-options label{display:flex;gap:.5rem;align-items:flex-start;overflow-wrap:anywhere}
+.ow-prerequisite-editor button{justify-self:start}

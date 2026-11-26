@@ -31,7 +31,7 @@ export default function AssignmentRecoveryReviewHost({config,auth,actorId,checki
    if(!['review','release'].includes(config.mode)||typeof globalThis.crypto?.randomUUID!=='function')throw Error('REVIEW_UNAVAILABLE')
    const fetchImpl=(...args)=>globalThis.fetch(...args)
    const common={projectUrl:config.projectUrl,publishableKey:config.publishableKey,auth,fetchImpl}
-   const binding=createRecoveryAccessBinding({...common,makeId:()=>globalThis.crypto.randomUUID(),isVisible,createTransport:createScopedRecoveryHttpTransport})
+   const binding=createRecoveryAccessBinding({...common,makeId:()=>globalThis.crypto.randomUUID(),isVisible,createTransport:createScopedRecoveryHttpTransport,version:config.version??2})
    controller=createRecoveryReviewLifecycle({binding,actorId,isVisible,notify:s=>{if(alive)setState(s)},verify:proof=>verifyRecoveryReviewAdmin({...common,...proof})})
    owner.current={controller,pause,schedule}
    // No Supabase async method is called inside the auth callback.

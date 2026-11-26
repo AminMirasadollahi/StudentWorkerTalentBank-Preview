@@ -100,7 +100,7 @@ export default function AssignmentRecoveryFixtureHost({actorId,checking,fixture,
   onRetryReserve={()=>void run(i,i.session.retryReserve)} onCommit={()=>void run(i,i.session.commit)}
   onCancel={()=>void run(i,i.session.cancel)} onAcknowledge={acknowledge}/>
  const manualReserve=fixture.manualReserve===true // focused review tests only
- const port={version:2,manualReserve,snapshot,submit:d=>canStartFromRoute()?run(i,manualReserve?i.session.reserve:i.session.submit,d):Promise.resolve('blocked'),setReadState,setReadScope,beginScopedRead,readScopeOwner:i.readScopeOwner,panel,
+ const port={version:fixture.version===3?3:2,manualReserve,snapshot,submit:d=>canStartFromRoute()?run(i,manualReserve?i.session.reserve:i.session.submit,d):Promise.resolve('blocked'),setReadState,setReadScope,beginScopedRead,readScopeOwner:i.readScopeOwner,panel,
   ...(typeof fixture.cancelExistingShift==='function'?{cancelExistingShift}:{}),
   editorRevision:editor.revision,initialPayload:usable(i)?snapshot.payload:null,committedRevision:editor.committedRevision}
  return children(port)

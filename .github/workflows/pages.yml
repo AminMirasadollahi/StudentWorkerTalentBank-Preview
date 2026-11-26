@@ -10,7 +10,7 @@ on:
         required: true
         type: string
       backend_cutover_verified:
-        description: Operator confirms approved recovery scope and backend cutover gates
+        description: Operator confirms approved R2/R3 policy and atomic assignment backend gates (legacy Auth unchanged)
         required: true
         type: boolean
         default: false
@@ -60,10 +60,11 @@ jobs:
           test -f package-lock.json
           npm ci --no-audit --no-fund
           git diff --exit-code -- package.json package-lock.json
-      - name: Build explicit production recovery mode
+      - name: Build explicit production recovery and strict worker policy mode
         env:
           VITE_SWTB22_RECOVERY_REVIEW_UI: 'false'
           VITE_SWTB22_RECOVERY_RELEASE_UI: 'true'
+          VITE_SWTB23_WORKER_POLICY_RELEASE: 'true'
           VITE_SWTB22_RECOVERY_RELEASE_PROJECT_REF: pmwxryavkrjcdobwkryw
           VITE_SUPABASE_URL: https://pmwxryavkrjcdobwkryw.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SWTB22_PRODUCTION_PUBLISHABLE_KEY }}
@@ -72,6 +73,7 @@ jobs:
           set -euo pipefail
           [[ "$VITE_SUPABASE_PUBLISHABLE_KEY" =~ ^sb_publishable_[A-Za-z0-9_-]+$ ]]
           node --input-type=module -e 'import {loadEnv} from "vite"; const e=loadEnv("production",process.cwd(),"VITE_"); for(const k of ["VITE_SWTB22_MANAGER_SHELL_UI","VITE_SWTB22_WORK_POOL_FOCUS_UI","VITE_SWTB22_TASKS_FOCUS_UI","VITE_SWTB22_PRESENCE_FOCUS_UI","VITE_SWTB22_REVIEW_FOCUS_UI","VITE_SWTB22_HISTORY_FOCUS_UI","VITE_SWTB22_TERM_FOCUS_UI"]){if(e[k]!=="true")throw Error("SWTB22_RELEASED_UI_DISABLED:"+k)}; console.log("SWTB22_RELEASED_UI_FLAGS_PASS")'
+          node --input-type=module -e 'import {resolveRecoveryReviewConfig} from "./src/lib/recoveryReviewLifecycle.mjs"; const c=resolveRecoveryReviewConfig(process.env); if(c.mode!=="release"||c.version!==3)throw Error("SWTB24_STRICT_RELEASE_CONFIG_BLOCKED"); console.log("SWTB24_STRICT_RELEASE_CONFIG_PASS")'
           npm run build
           test -f dist/index.html
       - name: Record exact built output and resolved lockfile fingerprint
@@ -83,6 +85,7 @@ jobs:
           {
             echo "### SWTB22 release build receipt"
             echo "Source commit: $GITHUB_SHA"
+            echo "Worker policy contract: strict V3 (atomic assignment and worker read); legacy Auth unchanged"
             echo "Resolved lockfile SHA256: $LOCK_SHA"
             echo "Output file manifest SHA256: $DIST_SHA"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -232,6 +232,9 @@ try{
     'internal quota configuration must not appear in worker view')
   assert.ok((await panel.innerText()).includes('در انتظار بررسی'))
   assert.equal(await panel.locator('.ow-history-filter button').count(),5)
+  assert.equal(await panel.locator('.ow-history-advanced').evaluate(el=>el.open),false)
+  assert.equal(await panel.locator('.ow-history-analysis').evaluate(el=>el.open),false)
+  await panel.locator('.ow-history-advanced summary').click()
   await panel.locator('select[aria-label="فیلتر واحد گزارش‌های من"]').selectOption('research')
   assert.equal(await panel.locator('.ow-history-entry').count(),2,'two genuine research reports should remain')
   assert.ok((await panel.locator('.ow-history-entry').first().innerText()).includes('پژوهش'))
@@ -291,7 +294,9 @@ try{
  })
  await check('future tasks are findable and write/network counters remain zero',async()=>{
   await page.getByRole('button',{name:'کارهای من'}).click()
-  await page.getByRole('button',{name:'آینده'}).click()
+  const dates=page.locator('.ow-worker-date-disclosure')
+  if(!(await dates.evaluate(el=>el.open)))await dates.locator('summary').click()
+  await dates.getByRole('button',{name:'آینده'}).click()
   assert.ok((await page.locator('.ow-worker-tasks').innerText()).includes('سال آینده'))
   assert.equal(await page.evaluate(()=>window.__qaWriteAttempts),0,
     'browser fixture must never issue a write, even to mock storage')
