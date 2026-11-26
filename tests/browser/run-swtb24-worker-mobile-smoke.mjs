@@ -22,7 +22,7 @@ try{
   external.push(u.origin);return route.abort('blockedbyclient')
  })
  page=await context.newPage();page.on('pageerror',e=>errors.push(e.message))
- await page.goto('http://127.0.0.1:4177/tests/browser/worker-smoke.html')
+ await page.goto('http://127.0.0.1:4177/tests/browser/worker-mobile-smoke.html')
  const list=page.locator('.ow-worker-tasks')
  await list.locator('.ow-item').first().waitFor()
  await page.evaluate(()=>{
@@ -120,9 +120,10 @@ try{
  const viewportCheck=async(width,label)=>{
   const box=await page.locator('.ow-b3-stage').boundingBox()
   const nav=await sidebar.locator('.ow-tabs').boundingBox()
-  assert.ok(box&&box.width>=width-2,label+' full-width stage')
+  const sizes=await page.evaluate(()=>({inner:innerWidth,body:document.body.getBoundingClientRect().width,margin:getComputedStyle(document.body).margin,docWidth:document.documentElement.scrollWidth,layout:document.querySelector('.ow-b3-layout')?.getBoundingClientRect().width}))
+  assert.ok(box&&box.width>=width-2,label+' full-width stage '+JSON.stringify({box,nav,sizes}))
   assert.ok(nav&&nav.x>=-1&&nav.x+nav.width<=width+1&&nav.y+nav.height<=801&&nav.y>=720,label+' bottom nav')
-  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),label+' no page horizontal scroll')
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),label+' no page horizontal scroll '+JSON.stringify(sizes))
   for(const button of await sidebar.locator('.ow-tabs button').all()){
    const rect=await button.boundingBox();assert.ok(rect&&rect.height>=44,label+' touch nav')
   }
@@ -215,4 +216,4 @@ try{
  assert.deepEqual(errors,[]);assert.deepEqual(external,[])
  console.log('PASS R3_NATIVE_HISTORY_ACCOUNT_PRESENCE')
  console.log('SWTB24_WORKER_MOBILE_NATIVE_CHROME_PASS')
-}finally{await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}
+}catch(e){console.error('SWTB24_MOBILE_DIAGNOSTIC',JSON.stringify(await page?.evaluate(()=>({viewport:[innerWidth,innerHeight],bodyWidth:document.body.getBoundingClientRect().width,documentWidth:document.documentElement.scrollWidth,overflow:Array.from(document.querySelectorAll('.ow-b3-stage *')).filter(e=>{const b=e.getBoundingClientRect();return b.width>0&&(b.right>innerWidth+2||b.left< -2)}).slice(0,12).map(e=>({tag:e.tagName,cls:typeof e.className==='string'?e.className:'svg',width:Math.round(e.getBoundingClientRect().width)}))})).catch(()=>null)));throw e}finally{await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}
