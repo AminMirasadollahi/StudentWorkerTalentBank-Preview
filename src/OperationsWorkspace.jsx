@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState }
 import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
 import {workerGuideStorageKey,workerGuideSessionStorageKey,shouldAutoOfferWorkerGuide,suppressWorkerGuideAutoOffers} from './lib/workerGuide.mjs'
 import { trapModalTab } from './lib/dialogFocusTrap.mjs'
-import {workerReportContract,workerCorrection,initialWorkerReport,reportInputAllowed,reportDateAllowed,latestWorkerReport} from './lib/workerReportContract.mjs'
+import {workerReportContract,workerCorrection,initialWorkerReport,reportInputAllowed,reportDateAllowed,latestWorkerReport,workerPrerequisiteStatus} from './lib/workerReportContract.mjs'
 import {canonicalPresencePayload,createPresenceAttemptLedger,interpretPresenceReceipt,workerPresenceItems,managerPresenceItems} from './lib/presenceChanges.mjs'
 import {requestPresenceChange,listPresenceChanges} from './lib/presenceChangesApi.js'
 import {WorkerPresenceRequests,ManagerPresenceReviewQueue} from './components/PresenceChangePanels.jsx'
@@ -1846,6 +1846,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
   const initialAttempt=sameReviewCycle?acknowledged?.submissionPayload:null
   const v3=contractVersion===1
   const contract=v3?workerReportContract(task):null
+  const dependency=v3?workerPrerequisiteStatus(task):{blocked:false,unresolved:0,valid:false}
   const correction=v3?workerCorrection(task):null
   const initial=v3?initialWorkerReport(task,serverToday,initialAttempt):null
   const [reportOpen,setReportOpen]=useState(false)
@@ -1912,6 +1913,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
     && Boolean(reasonCode)&&reasonText.trim().length>=10&&reasonText.trim().length<=600
   )
   const perform=async (fn,kind)=>{
+    if(dependency.blocked&&(kind==='start'||!exactRetry))return
     const previous=actionLedger.get(task.id)
     if(actionLock.current||(kind==='report'&&(reportCommitted||
        (previous?.reviewCycle===reviewCycle&&previous?.report)))
@@ -1969,12 +1971,13 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
     <button type="button" className="ow-b3-inspect-trigger"
       data-task-inspect={task.id} aria-expanded={inspected}
       onClick={onInspect}>مشاهدهٔ جزئیات</button>
+    {ready&&dependency.blocked&&<small role="status" className="ow-muted">{dependency.valid?`در انتظار تکمیل ${fa.format(dependency.unresolved)} پیش‌نیاز`:'وضعیت پیش‌نیازها نامشخص است؛ وضعیت را تازه‌سازی کنید.'}</small>}
     {ready&&<>
       <div className="ow-worker-action-launch">
         <button type="button" ref={reportTriggerRef}
           className="report-btn report-btn--light ow-worker-report-trigger"
           aria-haspopup="dialog" aria-controls={`ow-worker-report-dialog-${task.id}`}
-          disabled={busy||reportCommitted}
+          disabled={busy||reportCommitted||(dependency.blocked&&!priorPayload)}
           onClick={()=>setReportOpen(true)}>
           {task.state==='needs_changes'?'اصلاح و ارسال گزارش':'ثبت انجام کار'}
         </button>
@@ -1997,6 +2000,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
             disabled={busy} aria-label="بستن پنجره ثبت کار"
             onClick={()=>setReportOpen(false)}>بستن</button>
         </div>
+        {dependency.blocked&&!exactRetry&&<p role="status" className="ow-muted">تا رفع پیش‌نیازها نمی‌توانید کار را شروع کنید یا گزارش جدید بفرستید.</p>}
         {correction&&<section className="ow-extra-panel" aria-label="نظر مدیر درباره گزارش قبلی"><strong>{correction.review_state==='rejected'?'گزارش قبلی تأیید نشد':'درخواست اصلاح گزارش'}</strong><p>{correction.review_note||'دلیلی ثبت نشده است.'}</p></section>}
         {v3&&(!contract||contract.window_empty||task.state==='needs_changes'&&!correction)&&!exactRetry&&<p role="alert" className="report-alert report-alert--error">امکان ثبت گزارش جدید هنوز تأیید نشده است. وضعیت را بررسی کنید یا با مدیر هماهنگ کنید.</p>}
         {task.instructions&&<details className="ow-worker-task-instructions">
@@ -2095,7 +2099,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
           {requiresExtraReason?'ارسال درخواست زمان بیشتر':correction?'ارسال گزارش اصلاح‌شده':'ارسال گزارش انجام کار'}
         </button>
         {(!v3||task.state==='assigned')&&task.state!=='in_progress'&&<button type="button" className="report-btn report-btn--light"
-          onClick={()=>{void perform(()=>startMyTask(task.id),'start')}} disabled={busy||startCommitted||reportCommitted}
+          onClick={()=>{void perform(()=>startMyTask(task.id),'start')}} disabled={busy||startCommitted||reportCommitted||dependency.blocked}
           title="اختیاری؛ برای اعلام وضعیت در حال انجام، بدون ثبت ساعت">شروع کار</button>}
       </div>
       <small className="ow-commit-disclosure">با ارسال این گزارش، انجام کار را اعلام می‌کنید؛ ساعت‌ها پس از تأیید مدیر منظور می‌شوند.</small>

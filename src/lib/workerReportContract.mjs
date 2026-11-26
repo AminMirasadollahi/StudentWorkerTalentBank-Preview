@@ -10,6 +10,15 @@ export function workerReportContract(task){
   ||c.extra_reason_above_minutes!==c.standard_minutes)return null
  return c
 }
+// No prerequisite IDs or other-worker metadata enter this projection.
+// Absence is retained only for the pre-policy V2/V3 review fixtures;
+// the eventual strict V3 read adapter must require counts on every task.
+export function workerPrerequisiteStatus(task){
+ const p=task?.prerequisites
+ if(p===undefined)return {blocked:false,unresolved:0,valid:false}
+ if(!p||!Number.isInteger(p.total)||!Number.isInteger(p.unresolved)||p.total<0||p.unresolved<0||p.unresolved>p.total||p.total>20)return {blocked:true,unresolved:0,valid:false}
+ return {blocked:p.unresolved>0,unresolved:p.unresolved,valid:true}
+}
 export function workerCorrection(task){
  const r=task?.latest_report
  return r&&typeof r.id==='string'&&r.id&&correctionStates.has(r.review_state)?r:null
@@ -19,10 +28,12 @@ export function initialWorkerReport(task,serverToday,attempt=null){
  const c=workerReportContract(task),prior=workerCorrection(task),standard=Number(task.estimate_minutes)
  if(attempt)return {date:attempt.date,minutes:attempt.minutes,note:attempt.note,reasonCode:attempt.extraReasonCode||'',reasonText:attempt.extraReasonText||'',custom:attempt.minutes!==standard}
  if(prior)return {date:iso(prior.work_date)?prior.work_date:'',minutes:prior.reported_minutes,note:prior.worker_note||'',reasonCode:prior.extra_time_reason_code||'',reasonText:prior.extra_time_reason_text||'',custom:prior.reported_minutes!==standard}
- return {date:reportDateAllowed(c,serverToday)?serverToday:'',minutes:standard,note:'',reasonCode:'',reasonText:'',custom:false}
+ const fixed=task?.desk_slot?.state==='scheduled'&&c?.date_min===c?.date_max&&task.desk_slot.date===c.date_min&&reportDateAllowed(c,c.date_min)
+ return {date:fixed?c.date_min:reportDateAllowed(c,serverToday)?serverToday:'',minutes:standard,note:'',reasonCode:'',reasonText:'',custom:false}
 }
 export function reportInputAllowed(task,date,minutes,reasonCode,reasonText){
  const c=workerReportContract(task)
+ if(workerPrerequisiteStatus(task).blocked)return false
  if(!reportDateAllowed(c,date)||!Number.isInteger(minutes)||minutes<c.minimum_minutes||minutes>c.maximum_minutes)return false
  if(task.state==='needs_changes'&&!workerCorrection(task))return false
  return minutes<=c.standard_minutes||Boolean(reasonCode&&String(reasonText??'').trim().length>=10&&String(reasonText??'').trim().length<=600)

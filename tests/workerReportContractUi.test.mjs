@@ -51,3 +51,12 @@ test('new manager correction replaces stale draft with new revision',async()=>{
  const ui=await mount({...base,state:'needs_changes',latest_report:prior},prior.id)
  try{await ui.open();await ui.render({task:{...base,state:'needs_changes',latest_report:{...prior,id:'revision-2',worker_note:'new note',review_note:'new reason'}},reviewCycle:'revision-2'});assert.equal(ui.form().querySelector('textarea').value,'new note');assert.match(ui.host.textContent,/new reason/)}finally{await ui.cleanup()}
 })
+
+test('unresolved prerequisite blocks new report, but exact uncertain receipt retry remains possible',async()=>{
+ const task={...base,prerequisites:{total:2,unresolved:1}}
+ const blocked=await mount(task)
+ try{assert.equal(blocked.host.querySelector('.ow-worker-report-trigger').disabled,true);assert.equal(calls.length,0)}finally{await blocked.cleanup()}
+ const payload={taskId:base.id,date:'2026-11-25',minutes:30,note:'original',extraReasonCode:null,extraReasonText:null},key='synthetic-blocked-replay'
+ const retry=await mount(task,'',new Map([[base.id,{reviewCycle:'',clientSubmissionId:key,submissionPayload:payload}]]))
+ try{await retry.open();assert.equal(retry.submit().disabled,false);await retry.send();assert.deepEqual(calls,[{...payload,clientSubmissionId:key}])}finally{await retry.cleanup()}
+})
