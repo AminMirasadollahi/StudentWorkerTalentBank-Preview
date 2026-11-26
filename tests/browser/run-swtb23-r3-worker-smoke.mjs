@@ -60,7 +60,7 @@ try{
  assert.ok(await dialog.isVisible())
  await dialog.getByRole('button',{name:'بستن پنجره ثبت کار'}).click()
  const blocked=list.locator('.ow-item').filter({hasText:'وظیفه وابسته ساختگی'})
- assert.match(await blocked.innerText(),/در انتظار تکمیل ۲ پیش‌نیاز/)
+ assert.match(await blocked.innerText(),/در انتظار تکمیل ۱ پیش‌نیاز/)
  assert.equal(await blocked.locator('.ow-worker-report-trigger').isDisabled(),true)
  await page.locator('.ow-worker-focus-switch button').filter({hasText:'پایان‌یافته'}).click()
  const cancelled=list.locator('.ow-item').filter({hasText:'کار لغوشده ساختگی'})
