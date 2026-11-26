@@ -294,13 +294,18 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
   const passwordFlight=useRef(false)
   const [recoveryOffered,setRecoveryOffered]=useState(false)
   const [explicitRetryAvailable,setExplicitRetryAvailable]=useState(false)
+  const [supportBlocked,setSupportBlocked]=useState(false)
 
   const readOnboardingState = async () => {
     try {
       const current=await currentOperationsIdentity()
       if(current?.role!=='worker'||current.profile?.worker_id!==profile.worker_id||current.profile?.state!=='active')return 'unknown'
-      if(current.profile.onboarding_state==='ready')return 'ready'
-      if(current.profile.onboarding_state==='password_required')return 'pending'
+      const {data,error}=await opsClient.rpc('ops_s01_support_status',{p_worker_id:profile.worker_id})
+      if(error||data?.ok!==true||data.worker_state!=='active')return 'unknown'
+      if(data.phase==='reserved'||data.phase==='dispatched')return 'held'
+      if(data.phase!=='none')return 'unknown'
+      if(data.onboarding_state==='ready')return 'ready'
+      if(data.onboarding_state==='password_required')return 'pending'
     }catch{}
     return 'unknown'
   }
@@ -320,7 +325,7 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
     setSaving(true)
     try {
       if (!passwordEstablished) {
-        if(mode==='retry'&&await readOnboardingState()!=='pending')throw Error('retry_identity_not_pending')
+        if(await readOnboardingState()!=='pending')throw Error('onboarding_not_clear')
         const {data,error}=await opsClient.functions.invoke('ops-complete-worker-onboarding',
           {body:proof?{password,mode:'confirm_existing_password'}:{password}})
         if(error||data?.ok!==true)throw error||Error('password_setup_failed')
@@ -332,6 +337,7 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
       setPasswordEstablished(true)
       setRecoveryOffered(false)
       setExplicitRetryAvailable(false)
+      setSupportBlocked(false)
       setSettingsOpen(false)
       setPassword('')
       setConfirmation('')
@@ -350,12 +356,36 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
         }
         setRecoveryOffered(true)
         setExplicitRetryAvailable(status==='pending')
+        setSupportBlocked(status!=='pending')
+        if(status!=='pending'){
+          setPassword('');setConfirmation('')
+          setPasswordError('وضعیت عملیات حساب هنوز قطعی نیست. رمز را دوباره وارد نکنید؛ وضعیت را بررسی کنید و در صورت تداوم با مسئول سامانه هماهنگ کنید.')
+          return
+        }
       }
       setPasswordError(workerPasswordChangeErrorCopy({initialSetup: !passwordEstablished}))
     }finally{
       passwordFlight.current=false
       setSaving(false)
     }
+  }
+
+  const refreshOnboardingSupport = async () => {
+    if(passwordFlight.current)return
+    passwordFlight.current=true
+    setSaving(true)
+    try{
+      const status=await readOnboardingState()
+      if(status==='ready'){
+        setPasswordEstablished(true);setSupportBlocked(false);setRecoveryOffered(false);setExplicitRetryAvailable(false)
+        setPasswordError('');setPassword('');setConfirmation('');setMessage('حساب طبق وضعیت سرور آماده استفاده است.')
+      }else if(status==='pending'){
+        setSupportBlocked(false);setRecoveryOffered(true);setExplicitRetryAvailable(true);setPasswordError('')
+      }else{
+        setSupportBlocked(true);setExplicitRetryAvailable(false)
+        setPasswordError('عملیات قبلی یا وضعیت ارتباط هنوز تعیین‌تکلیف نشده است. با مسئول سامانه هماهنگ کنید.')
+      }
+    }finally{passwordFlight.current=false;setSaving(false)}
   }
 
   const accountSettingsPanel=(
@@ -382,14 +412,15 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
           </label>
           {passwordError && <p className="report-alert report-alert--error" role="alert">{passwordError}</p>}
           {message && <p className="ops-alert-success" role="status">{message}</p>}
+          {!passwordEstablished&&supportBlocked&&<button type="button" className="report-btn report-btn--light" disabled={saving} onClick={()=>{void refreshOnboardingSupport()}}>بررسی مجدد وضعیت حساب (بدون تغییر رمز)</button>}
           <button className="report-btn report-btn--primary" type="submit"
-            disabled={saving || !password || !confirmation}>
+            disabled={saving || (!passwordEstablished&&supportBlocked) || !password || !confirmation}>
             {saving ? 'در حال بررسی…' : passwordEstablished?'تغییر رمز':recoveryOffered?'تکمیل با همین رمز (بدون تغییر رمز)':'ثبت رمز اختصاصی'}
           </button>
-          {!passwordEstablished&&!recoveryOffered&&<button type="button" className="ops-recovery-toggle" disabled={saving||!password||!confirmation} onClick={event=>{void changePassword(event,'proof')}}>قبلاً رمز را تعیین کرده‌ام؛ تکمیل بدون تغییر رمز</button>}
+          {!passwordEstablished&&!recoveryOffered&&<button type="button" className="ops-recovery-toggle" disabled={saving||supportBlocked||!password||!confirmation} onClick={event=>{void changePassword(event,'proof')}}>قبلاً رمز را تعیین کرده‌ام؛ تکمیل بدون تغییر رمز</button>}
           {!passwordEstablished&&recoveryOffered&&explicitRetryAvailable&&<div className="ops-worker-recovery-existing" role="note">
             <p className="ow-muted">نتیجه ثبت قبلی قطعی نیست. ابتدا تکمیل با همین رمز را امتحان کنید. تعیین مجدد ممکن است رمز قبلی را تغییر دهد.</p>
-            <button type="button" className="ops-recovery-toggle" disabled={saving||!password||!confirmation} onClick={event=>{void changePassword(event,'retry')}}>با آگاهی از احتمال تغییر رمز قبلی، دوباره رمز تعیین می‌کنم</button>
+            <button type="button" className="ops-recovery-toggle" disabled={saving||supportBlocked||!password||!confirmation} onClick={event=>{void changePassword(event,'retry')}}>با آگاهی از احتمال تغییر رمز قبلی، دوباره رمز تعیین می‌کنم</button>
           </div>}
         </form>
       </section>
@@ -759,6 +790,11 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   const reissueLink = async (workerId) => {
     setBusyId(workerId); setError(''); setFlash('')
     try {
+      const status=await opsClient.rpc('ops_s01_support_status',{p_worker_id:workerId})
+      if(status.error||status.data?.ok!==true||status.data.worker_state!=='active'||status.data.phase!=='none'){
+        setError('صدور لینک مجاز نیست یا وضعیت عملیات قبلی نامشخص است. ابتدا وضعیت راه‌اندازی را بررسی کنید.')
+        return
+      }
       const { data, error } = await opsClient.functions.invoke('ops-issue-worker-link', {
         body: { worker_id: workerId },
       })
