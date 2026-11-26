@@ -18,7 +18,7 @@ before(async()=>{
  const from=source.indexOf('function WorkerTaskCard('),to=source.indexOf('/**\n * Each timeline item',from)
  assert.ok(from>=0&&to>from)
  const {code}=await transformWithEsbuild(source.slice(from,to),'WorkerTaskCard.jsx',{loader:'jsx',jsx:'transform',jsxFactory:'React.createElement'})
- const ports={React,useState,useRef,useEffect,useLayoutEffect,...contract,...retry,today:()=> '2026-11-26',shift:()=> '2026-08-28',pretty:x=>x,minutes:x=>String(x),unitLabels:{library:'library'},stateLabels:{},extraTimeReasons:{other:'other'},trapModalTab:()=>{},readableError:e=>e.message,submitMyTime:async x=>{calls.push(x);return {id:'synthetic-receipt'}},startMyTask:async()=>{throw Error('START_NOT_ALLOWED')},JalaliDatePicker:({value,min,max,disabled})=>React.createElement('input',{'data-testid':'date',value,min,max,disabled,readOnly:true})}
+ const ports={React,useState,useRef,useEffect,useLayoutEffect,fa:new Intl.NumberFormat('fa-IR'),...contract,...retry,today:()=> '2026-11-26',shift:()=> '2026-08-28',pretty:x=>x,minutes:x=>String(x),unitLabels:{library:'library'},stateLabels:{},extraTimeReasons:{other:'other'},trapModalTab:()=>{},readableError:e=>e.message,submitMyTime:async x=>{calls.push(x);return {id:'synthetic-receipt'}},startMyTask:async()=>{throw Error('START_NOT_ALLOWED')},JalaliDatePicker:({value,min,max,disabled})=>React.createElement('input',{'data-testid':'date',value,min,max,disabled,readOnly:true})}
  Card=new Function(...Object.keys(ports),code+'\nreturn WorkerTaskCard;')(...Object.values(ports))
 })
 after(()=>{dom?.window.close();for(const k of ['window','document','HTMLElement','HTMLDialogElement','IS_REACT_ACT_ENVIRONMENT'])delete globalThis[k]})

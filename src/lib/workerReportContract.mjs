@@ -28,7 +28,7 @@ export function initialWorkerReport(task,serverToday,attempt=null){
  const c=workerReportContract(task),prior=workerCorrection(task),standard=Number(task.estimate_minutes)
  if(attempt)return {date:attempt.date,minutes:attempt.minutes,note:attempt.note,reasonCode:attempt.extraReasonCode||'',reasonText:attempt.extraReasonText||'',custom:attempt.minutes!==standard}
  if(prior)return {date:iso(prior.work_date)?prior.work_date:'',minutes:prior.reported_minutes,note:prior.worker_note||'',reasonCode:prior.extra_time_reason_code||'',reasonText:prior.extra_time_reason_text||'',custom:prior.reported_minutes!==standard}
- const fixed=task?.desk_slot?.state==='scheduled'&&c?.date_min===c?.date_max&&task.desk_slot.date===c.date_min&&reportDateAllowed(c,c.date_min)
+ const fixed=Boolean(c)&&task?.desk_slot?.state==='scheduled'&&c.date_min===c.date_max&&task.desk_slot.date===c.date_min&&reportDateAllowed(c,c.date_min)
  return {date:fixed?c.date_min:reportDateAllowed(c,serverToday)?serverToday:'',minutes:standard,note:'',reasonCode:'',reasonText:'',custom:false}
 }
 export function reportInputAllowed(task,date,minutes,reasonCode,reasonText){
