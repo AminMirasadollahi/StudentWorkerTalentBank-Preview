@@ -23,10 +23,12 @@ jobs:
           node-version: '22'
       - run: npm ci --no-audit --no-fund
       - name: Integrated new contract and mounted delta
-        run: node --test tests/assignmentPrerequisitesV3.test.mjs tests/workerPolicySnapshot.test.mjs tests/taskPrerequisiteEditor.test.mjs tests/workerReportContract.test.mjs tests/workerReportContractUi.test.mjs tests/workerReportRetry.test.mjs tests/workerTaskFocus.test.mjs tests/swtb21WorkerWorkWorkspace.test.mjs
+        run: node --test tests/assignmentPrerequisitesV3.test.mjs tests/assignmentPrerequisitesV3Mounted.test.mjs tests/assignmentRecoverySession.test.mjs tests/recoveryAccessBinding.test.mjs tests/recoveryReviewLifecycle.test.mjs tests/scopedRecoveryHttpTransport.test.mjs tests/assignmentRecoveryHostMounted.test.mjs tests/workerPolicySnapshot.test.mjs tests/taskPrerequisiteEditor.test.mjs tests/workerReportContract.test.mjs tests/workerReportContractUi.test.mjs tests/workerReportRetry.test.mjs tests/workerTaskFocus.test.mjs tests/swtb21WorkerWorkWorkspace.test.mjs
       - name: Build strict release candidate (synthetic configuration)
         env:
           VITE_SWTB23_WORKER_POLICY_RELEASE: 'true'
+          VITE_SWTB22_RECOVERY_REVIEW_UI: 'true'
+          VITE_SWTB22_RECOVERY_REVIEW_PROJECT_REF: aaaaaaaaaaaaaaaaaaaa
           VITE_SUPABASE_URL: https://aaaaaaaaaaaaaaaaaaaa.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
         run: npm run build -- --outDir /tmp/swtb23-integrated-build
