@@ -25,7 +25,7 @@ try{
   if(location.origin==='http://127.0.0.1:4189'&&!sessionStorage.getItem('s01-seeded')){
    localStorage.setItem(storageKey,JSON.stringify(session));sessionStorage.setItem('s01-seeded','1')
   }
- },{storageKey:'student-worker-operations-auth-v1',session})
+ },{storageKey:'student-worker-operations-review-'+project,session})
  const cors={'access-control-allow-origin':local,'access-control-allow-methods':'GET, POST, OPTIONS','access-control-allow-headers':'*'}
  await context.route('**/*',async route=>{
   const req=route.request(),url=new URL(req.url())
@@ -66,7 +66,9 @@ try{
  console.log('PASS LEGACY_AUTH_UNCERTAIN_NO_AUTOMATIC_RETRY')
  responseMode='accept'
  await fill()
+ const strictRead=page.waitForResponse(r=>new URL(r.url()).pathname==='/rest/v1/rpc/ops_get_my_work_v3'&&r.ok())
  await panel.locator('button[type=submit]').click()
+ await strictRead
  await page.locator('.ops-worker-b3-view').waitFor()
  await page.locator('.ow-worker-task-workspace').waitFor()
  assert.deepEqual(mutations,[{mode:'initial',keys:['password']},{mode:'initial',keys:['password']}])
@@ -74,4 +76,4 @@ try{
  assert.deepEqual(unexpected,[]);assert.deepEqual(errors,[])
  console.log('PASS LEGACY_AUTH_INITIAL_TO_STRICT_V3')
  console.log('SWTB24_LEGACY_AUTH_NATIVE_CHROME_PASS')
-}finally{await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}
+}catch(e){console.error('SWTB24_BROWSER_DIAGNOSTIC',JSON.stringify({unexpected,errors,reads,mutationCount:mutations.length}));throw e}finally{await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}
