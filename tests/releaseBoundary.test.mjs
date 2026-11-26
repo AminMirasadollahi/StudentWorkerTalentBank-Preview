@@ -25,7 +25,7 @@ const critical=Object.freeze({
   'src/lib/operations.js':'353572294468eae93b9b88703101c33066377eaf',
   'src/components/WorkerLifecycleReadOnlyPreview.jsx':'c9125b5627bb509248a300cc023b83b779092946',
   'vite.config.js':'2553885f37533661066f19abfceb0fa5e81ab132',
-  '.github/workflows/pages.yml':'34f3e4a5358976b4f8d6657e99798a8c9cb4bfb8',
+  '.github/workflows/pages.yml':'a902fcd7e3a421a2a760704b16300cbe3e46730f',
 })
 test('reviewed intake and SWTB22 authorized API/auth/QA/deploy baselines are byte-identical',()=>{
   for(const [path,sha] of Object.entries(critical))

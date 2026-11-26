@@ -10,7 +10,7 @@ on:
         required: true
         type: string
       backend_cutover_verified:
-        description: Operator confirms approved R1-R3 recovery, policy and atomic assignment backend gates
+        description: Operator confirms approved R2/R3 policy and atomic assignment backend gates (legacy Auth unchanged)
         required: true
         type: boolean
         default: false
@@ -85,7 +85,7 @@ jobs:
           {
             echo "### SWTB22 release build receipt"
             echo "Source commit: $GITHUB_SHA"
-            echo "Worker policy contract: strict V3 (atomic assignment and worker read)"
+            echo "Worker policy contract: strict V3 (atomic assignment and worker read); legacy Auth unchanged"
             echo "Resolved lockfile SHA256: $LOCK_SHA"
             echo "Output file manifest SHA256: $DIST_SHA"
           } >> "$GITHUB_STEP_SUMMARY"
