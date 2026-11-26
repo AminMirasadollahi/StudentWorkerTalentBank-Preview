@@ -291,41 +291,102 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
   const [passwordEstablished, setPasswordEstablished] = useState(!initialPasswordRequired)
   const [settingsOpen,setSettingsOpen] = useState(false)
   const [manualRefreshRevision,setManualRefreshRevision] = useState(0)
+  const passwordFlight=useRef(false)
+  const [recoveryOffered,setRecoveryOffered]=useState(false)
+  const [explicitRetryAvailable,setExplicitRetryAvailable]=useState(false)
+  const [supportBlocked,setSupportBlocked]=useState(false)
 
-  const changePassword = async event => {
+  const readOnboardingState = async () => {
+    try {
+      const current=await currentOperationsIdentity()
+      if(current?.role!=='worker'||current.profile?.worker_id!==profile.worker_id||current.profile?.state!=='active')return 'unknown'
+      const {data,error}=await opsClient.rpc('ops_s01_support_status',{p_worker_id:profile.worker_id})
+      if(error||data?.ok!==true||data.worker_state!=='active')return 'unknown'
+      if(data.phase==='reserved'||data.phase==='dispatched')return 'held'
+      if(data.phase!=='none')return 'unknown'
+      if(data.onboarding_state==='ready')return 'ready'
+      if(data.onboarding_state==='password_required')return 'pending'
+    }catch{}
+    return 'unknown'
+  }
+
+  const changePassword = async (event, mode='default') => {
     event.preventDefault()
+    if(passwordFlight.current)return
     setMessage('')
     setPasswordError('')
     if (!validWorkerPasswordPair(password, confirmation)) {
-      setPasswordError('رمز جدید باید ۸ تا ۱۲۸ نویسه، غیرخالی و با تکرار یکسان باشد.')
+      setPasswordError('رمز باید ۸ تا ۱۲۸ نویسه، غیرخالی و با تکرار یکسان باشد.')
       return
     }
+    const proof=!passwordEstablished&&(mode==='proof'||(recoveryOffered&&mode!=='retry'))
+    if(mode==='retry'&&(passwordEstablished||!explicitRetryAvailable))return
+    passwordFlight.current=true
     setSaving(true)
     try {
       if (!passwordEstablished) {
-        const { data, error } = await opsClient.functions.invoke(
-          'ops-complete-worker-onboarding',
-          { body: { password } },
-        )
-        if (error || data?.ok !== true) throw error || new Error(data?.error || 'password_setup_failed')
-      } else {
-        const { error } = await opsClient.auth.updateUser({ password })
-        if (error) throw error
+        if(await readOnboardingState()!=='pending')throw Error('onboarding_not_clear')
+        const {data,error}=await opsClient.functions.invoke('ops-complete-worker-onboarding',
+          {body:proof?{password,mode:'confirm_existing_password'}:{password}})
+        if(error||data?.ok!==true)throw error||Error('password_setup_failed')
+      }else{
+        const {error}=await opsClient.auth.updateUser({password})
+        if(error)throw error
       }
-    } catch {
-      setSaving(false)
-      // In a partial failure Auth may already have updated the password while
-      // the server's onboarding finalization failed. Never promise failure or
-      // instruct a different password without checking account/session state.
+      setMessage(proof?'تکمیل فعال‌سازی حساب تأیید شد.':'رمز اختصاصی حساب شما ثبت شد.')
+      setPasswordEstablished(true)
+      setRecoveryOffered(false)
+      setExplicitRetryAvailable(false)
+      setSupportBlocked(false)
+      setSettingsOpen(false)
+      setPassword('')
+      setConfirmation('')
+    }catch{
+      if(!passwordEstablished){
+        const status=await readOnboardingState()
+        if(status==='ready'){
+          setPasswordEstablished(true)
+          setSupportBlocked(false)
+          setRecoveryOffered(false)
+          setExplicitRetryAvailable(false)
+          setSettingsOpen(false)
+          setMessage('حساب شما طبق وضعیت سرور آماده استفاده است.')
+          setPassword('')
+          setConfirmation('')
+          return
+        }
+        setRecoveryOffered(true)
+        setExplicitRetryAvailable(status==='pending')
+        setSupportBlocked(status!=='pending')
+        if(status!=='pending'){
+          setPassword('');setConfirmation('')
+          setPasswordError('وضعیت عملیات حساب هنوز قطعی نیست. رمز را دوباره وارد نکنید؛ وضعیت را بررسی کنید و در صورت تداوم با مسئول سامانه هماهنگ کنید.')
+          return
+        }
+      }
       setPasswordError(workerPasswordChangeErrorCopy({initialSetup: !passwordEstablished}))
-      return
+    }finally{
+      passwordFlight.current=false
+      setSaving(false)
     }
-    setSaving(false)
-    setMessage('رمز اختصاصی حساب شما ثبت شد.')
-    setPasswordEstablished(true)
-    setSettingsOpen(false)
-    setPassword('')
-    setConfirmation('')
+  }
+
+  const refreshOnboardingSupport = async () => {
+    if(passwordFlight.current)return
+    passwordFlight.current=true
+    setSaving(true)
+    try{
+      const status=await readOnboardingState()
+      if(status==='ready'){
+        setPasswordEstablished(true);setSupportBlocked(false);setRecoveryOffered(false);setExplicitRetryAvailable(false)
+        setPasswordError('');setPassword('');setConfirmation('');setMessage('حساب طبق وضعیت سرور آماده استفاده است.')
+      }else if(status==='pending'){
+        setSupportBlocked(false);setRecoveryOffered(true);setExplicitRetryAvailable(true);setPasswordError('')
+      }else{
+        setSupportBlocked(true);setExplicitRetryAvailable(false)
+        setPasswordError('عملیات قبلی یا وضعیت ارتباط هنوز تعیین‌تکلیف نشده است. با مسئول سامانه هماهنگ کنید.')
+      }
+    }finally{passwordFlight.current=false;setSaving(false)}
   }
 
   const accountSettingsPanel=(
@@ -337,25 +398,31 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
               onClick={()=>setSettingsOpen(false)}>بستن</button></div>
           : <><h2>در اولین ورود، رمز اختصاصی خودتان را تعیین کنید</h2>
               <p>حساب شما با لینک اختصاصی باز شده است. برای ادامه، یک رمز جدید حداقل ۸ نویسه‌ای تعیین کنید.</p></>}
-        <form onSubmit={changePassword}>
+        <form onSubmit={event=>{void changePassword(event)}}>
           <label className="report-field">
-            <span>رمز جدید (حداقل ۸ نویسه)</span>
+            <span>{!passwordEstablished&&recoveryOffered?'رمز موجود برای تأیید (حداقل ۸ نویسه)':'رمز جدید (حداقل ۸ نویسه)'}</span>
             <input type="password" minLength={8} maxLength={128} required
-              autoComplete="new-password" dir="ltr"
+              autoComplete={!passwordEstablished&&recoveryOffered?'current-password':'new-password'} dir="ltr"
               value={password} onChange={event => setPassword(event.target.value)}/>
           </label>
           <label className="report-field">
-            <span>تکرار رمز جدید</span>
+            <span>{!passwordEstablished&&recoveryOffered?'تکرار همین رمز':'تکرار رمز جدید'}</span>
             <input type="password" minLength={8} maxLength={128} required
-              autoComplete="new-password" dir="ltr"
+              autoComplete={!passwordEstablished&&recoveryOffered?'current-password':'new-password'} dir="ltr"
               value={confirmation} onChange={event => setConfirmation(event.target.value)}/>
           </label>
           {passwordError && <p className="report-alert report-alert--error" role="alert">{passwordError}</p>}
           {message && <p className="ops-alert-success" role="status">{message}</p>}
+          {!passwordEstablished&&supportBlocked&&<button type="button" className="report-btn report-btn--light" disabled={saving} onClick={()=>{void refreshOnboardingSupport()}}>بررسی مجدد وضعیت حساب (بدون تغییر رمز)</button>}
           <button className="report-btn report-btn--primary" type="submit"
-            disabled={saving || !password || !confirmation}>
-            {saving ? 'در حال ذخیره…' : 'تغییر رمز'}
+            disabled={saving || (!passwordEstablished&&supportBlocked) || !password || !confirmation}>
+            {saving ? 'در حال بررسی…' : passwordEstablished?'تغییر رمز':recoveryOffered?'تکمیل با همین رمز (بدون تغییر رمز)':'ثبت رمز اختصاصی'}
           </button>
+          {!passwordEstablished&&!recoveryOffered&&<button type="button" className="ops-recovery-toggle" disabled={saving||supportBlocked||!password||!confirmation} onClick={event=>{void changePassword(event,'proof')}}>قبلاً رمز را تعیین کرده‌ام؛ تکمیل بدون تغییر رمز</button>}
+          {!passwordEstablished&&recoveryOffered&&explicitRetryAvailable&&<div className="ops-worker-recovery-existing" role="note">
+            <p className="ow-muted">نتیجه ثبت قبلی قطعی نیست. ابتدا تکمیل با همین رمز را امتحان کنید. تعیین مجدد ممکن است رمز قبلی را تغییر دهد.</p>
+            <button type="button" className="ops-recovery-toggle" disabled={saving||supportBlocked||!password||!confirmation} onClick={event=>{void changePassword(event,'retry')}}>با آگاهی از احتمال تغییر رمز قبلی، دوباره رمز تعیین می‌کنم</button>
+          </div>}
         </form>
       </section>
   )
@@ -558,7 +625,8 @@ function CandidateCard({
         <p className="ops-worker-state">آخرین ورود در سرویس احراز هویت: {candidateAuthSignInLabel(candidate)}</p>
         <p className="ops-muted">این اطلاعات به‌تنهایی دریافت یا بازشدن ایمیل دعوت و ورود به محیط کاری دانشجوکار را ثابت نمی‌کنند.</p>
         <WorkerSecureLinkReissue
-          key={candidate.worker_id}
+          key={`${candidate.worker_id}:${candidate.worker_state}`}
+          supportRpc={(name,args)=>opsClient.rpc(name,args)}
           workerId={candidate.worker_id}
           workerState={candidate.worker_state}
           saving={saving}
@@ -724,6 +792,11 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   const reissueLink = async (workerId) => {
     setBusyId(workerId); setError(''); setFlash('')
     try {
+      const status=await opsClient.rpc('ops_s01_support_status',{p_worker_id:workerId})
+      if(status.error||status.data?.ok!==true||status.data.worker_state!=='active'||status.data.phase!=='none'){
+        setError('صدور لینک مجاز نیست یا وضعیت عملیات قبلی نامشخص است. ابتدا وضعیت راه‌اندازی را بررسی کنید.')
+        return
+      }
       const { data, error } = await opsClient.functions.invoke('ops-issue-worker-link', {
         body: { worker_id: workerId },
       })
