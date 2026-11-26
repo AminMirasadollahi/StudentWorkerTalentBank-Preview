@@ -11,6 +11,8 @@ const rpc=(name,args)=>opsClient.rpc(name,args).then(dataOrThrow)
 const legacyAssignmentRpc=async(name,args)=>{assertLegacyAssignmentAllowed(import.meta.env);return rpc(name,args)}
 export const getAdminWorkV2=()=>rpc('ops_get_operations_v3')
 export const getMyWorkV2=()=>rpc('ops_get_my_work_v2')
+// Review only: activation follows independently approved R2 SQL deployment.
+export const getMyWorkV3=()=>rpc('ops_get_my_work_v3')
 export const getMyWorkerProfileV2=()=>rpc('ops_get_my_worker_profile_v2')
 export const getMyProfileChangeRequests=()=>rpc('ops_get_my_profile_change_requests')
 export const requestProfileChange=({field,value,reason})=>rpc('ops_request_profile_change',{

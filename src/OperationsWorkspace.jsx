@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState }
 import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
 import {workerGuideStorageKey,workerGuideSessionStorageKey,shouldAutoOfferWorkerGuide,suppressWorkerGuideAutoOffers} from './lib/workerGuide.mjs'
 import { trapModalTab } from './lib/dialogFocusTrap.mjs'
+import {workerReportContract,workerCorrection,initialWorkerReport,reportInputAllowed,latestWorkerReport} from './lib/workerReportContract.mjs'
 import {canonicalPresencePayload,createPresenceAttemptLedger,interpretPresenceReceipt,workerPresenceItems,managerPresenceItems} from './lib/presenceChanges.mjs'
 import {requestPresenceChange,listPresenceChanges} from './lib/presenceChangesApi.js'
 import {WorkerPresenceRequests,ManagerPresenceReviewQueue} from './components/PresenceChangePanels.jsx'
@@ -1837,22 +1838,26 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     </section>}
   </div>
 }
-function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false,actionLedger,reviewCycle}) {
+function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false,actionLedger,reviewCycle,contractVersion,serverToday}) {
   const acknowledged=actionLedger.get(task.id)
   const sameReviewCycle=acknowledged?.reviewCycle===reviewCycle
   // When tab navigation temporarily remounts an uncertain report, restore
   // the exact original payload paired with its existing idempotency key.
   const initialAttempt=sameReviewCycle?acknowledged?.submissionPayload:null
+  const v3=contractVersion===1
+  const contract=v3?workerReportContract(task):null
+  const correction=v3?workerCorrection(task):null
+  const initial=v3?initialWorkerReport(task,serverToday,initialAttempt):null
   const [reportOpen,setReportOpen]=useState(false)
   const reportDialogRef=useRef(null)
   const reportTriggerRef=useRef(null)
-  const [date,setDate]=useState(initialAttempt?.date||today())
-  const [requestExtra,setRequestExtra]=useState(Boolean(initialAttempt?.extraReasonCode))
+  const [date,setDate]=useState(v3?initial.date:initialAttempt?.date||today())
+  const [requestExtra,setRequestExtra]=useState(v3?initial.custom:Boolean(initialAttempt?.extraReasonCode))
   const [extraHelpOpen,setExtraHelpOpen]=useState(false)
-  const [requested,setRequested]=useState(String(initialAttempt?.minutes??task.estimate_minutes))
-  const [reasonCode,setReasonCode]=useState(initialAttempt?.extraReasonCode||'')
-  const [reasonText,setReasonText]=useState(initialAttempt?.extraReasonText||'')
-  const [note,setNote]=useState(initialAttempt?.note||'')
+  const [requested,setRequested]=useState(String(v3?initial.minutes:initialAttempt?.minutes??task.estimate_minutes))
+  const [reasonCode,setReasonCode]=useState(v3?initial.reasonCode:initialAttempt?.extraReasonCode||'')
+  const [reasonText,setReasonText]=useState(v3?initial.reasonText:initialAttempt?.extraReasonText||'')
+  const [note,setNote]=useState(v3?initial.note:initialAttempt?.note||'')
   const [busy,setBusy]=useState(false)
   const [reportCommitted,setReportCommitted]=useState(Boolean(sameReviewCycle&&acknowledged.report))
   const [startCommitted,setStartCommitted]=useState(Boolean(sameReviewCycle&&acknowledged.start))
@@ -1884,14 +1889,25 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
     if(task.state==='needs_changes'&&priorReviewCycle.current!==reviewCycle){
       actionLedger.delete(task.id)
       setReportCommitted(false)
+      setStartCommitted(false)
       keyRef.current=crypto.randomUUID()
+      if(v3){
+        const fresh=initialWorkerReport(task,serverToday)
+        setDate(fresh.date);setRequested(String(fresh.minutes));setRequestExtra(fresh.custom)
+        setNote(fresh.note);setReasonCode(fresh.reasonCode);setReasonText(fresh.reasonText)
+      }
     }
     priorReviewCycle.current=reviewCycle
   },[reviewCycle,task.state,actionLedger])
   const ready=['assigned','in_progress','needs_changes'].includes(task.state)
   const standard=Number(task.estimate_minutes)
   const requestedMinutes=requestExtra?Number(requested):standard
-  const extraValid=!requestExtra || (
+  const requiresExtraReason=requestExtra&&requestedMinutes>standard
+  const customCreditAllowed=Boolean(contract&&contract.minimum_minutes<standard)
+  const priorPayload=sameReviewCycle&&!acknowledged?.report?acknowledged?.submissionPayload:null
+  const nextDraft=canonicalWorkerReportPayload({taskId:task.id,date,minutes:requestedMinutes,note,extraReasonCode:requiresExtraReason?reasonCode:null,extraReasonText:requiresExtraReason?reasonText.trim():null})
+  const exactRetry=Boolean(priorPayload&&sameWorkerReportPayload(priorPayload,nextDraft))
+  const extraValid=v3?(exactRetry||reportInputAllowed(task,date,requestedMinutes,reasonCode,reasonText)):!requestExtra || (
     Number.isInteger(requestedMinutes)&&requestedMinutes>standard&&requestedMinutes<=1440
     && Boolean(reasonCode)&&reasonText.trim().length>=10&&reasonText.trim().length<=600
   )
@@ -1981,6 +1997,8 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
             disabled={busy} aria-label="بستن پنجره ثبت کار"
             onClick={()=>setReportOpen(false)}>بستن</button>
         </div>
+        {correction&&<section className="ow-extra-panel" aria-label="نظر مدیر درباره گزارش قبلی"><strong>{correction.review_state==='rejected'?'گزارش قبلی تأیید نشد':'درخواست اصلاح گزارش'}</strong><p>{correction.review_note||'دلیلی ثبت نشده است.'}</p></section>}
+        {v3&&(!contract||contract.window_empty||task.state==='needs_changes'&&!correction)&&!exactRetry&&<p role="alert" className="report-alert report-alert--error">امکان ثبت گزارش جدید هنوز تأیید نشده است. وضعیت را بررسی کنید یا با مدیر هماهنگ کنید.</p>}
         {task.instructions&&<details className="ow-worker-task-instructions">
           <summary>شرح کار محول‌شده</summary><p>{task.instructions}</p>
         </details>}
@@ -1990,8 +2008,8 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
       // even when a later request contains changed fields.
       const nextPayload=canonicalWorkerReportPayload({
         taskId:task.id,date,minutes:requestedMinutes,note,
-        extraReasonCode:requestExtra?reasonCode:null,
-        extraReasonText:requestExtra?reasonText.trim():null,
+        extraReasonCode:requiresExtraReason?reasonCode:null,
+        extraReasonText:requiresExtraReason?reasonText.trim():null,
       })
       const prior=actionLedger.get(task.id)
       const previousPayload=prior?.reviewCycle===reviewCycle
@@ -2012,9 +2030,9 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
     }}>
       <div className="ow-fields ow-fields--two">
         <label className="report-field"><span>تاریخ واقعی انجام کار (شمسی)</span>
-          <JalaliDatePicker value={date} max={today()} min={shift(today(),-90)}
-            onChange={setDate} ariaLabel="تاریخ انجام کار"/>
-          <small className="ow-muted">تاریخ برنامه‌ریزی: {pretty(task.planned_date)}. روزی را که واقعاً کار انجام شده وارد کنید؛ ضوابط زمانی نوع کار در سرور بررسی می‌شود.</small>
+          <JalaliDatePicker value={date} max={v3?contract?.date_max:today()} min={v3?contract?.date_min:shift(today(),-90)}
+            disabled={busy||(v3&&(!contract||contract.window_empty))} onChange={setDate} ariaLabel="تاریخ انجام کار"/>
+          <small className="ow-muted">{v3?'روز واقعی انجام کار را انتخاب کنید.':`تاریخ برنامه‌ریزی: ${pretty(task.planned_date)}. روزی را که واقعاً کار انجام شده وارد کنید؛ ضوابط زمانی نوع کار در سرور بررسی می‌شود.`}</small>
         </label>
         <div className="ow-standard-credit">
           <span>زمان استاندارد این کار</span><b>{minutes(standard)}</b>
@@ -2032,7 +2050,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
             setRequestExtra(checked)
             if(!checked){setRequested(String(standard));setReasonCode('');setReasonText('')}
           }}/>
-          درخواست زمان بیشتر
+          {customCreditAllowed?'تغییر زمان درخواستی':'درخواست زمان بیشتر'}
         </label>
         <button type="button" className="ow-extra-help-trigger"
           aria-expanded={extraHelpOpen}
@@ -2049,24 +2067,24 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
         </p>
       </div>
       {requestExtra&&<div className="ow-extra-panel">
-        <p>مجموع زمان و علت افزایش را وارد کنید؛ تأیید نهایی با مدیر است.</p>
+        {!v3&&<p>مجموع زمان و علت افزایش را وارد کنید؛ تأیید نهایی با مدیر است.</p>}
         <div className="ow-fields ow-fields--two">
           <label className="report-field"><span>زمان درخواستی کل (دقیقه)</span>
-            <input type="number" min={standard+1} max="1440" required
+            <input type="number" min={customCreditAllowed?contract.minimum_minutes:standard+1} max={v3?contract?.maximum_minutes:1440} required
               value={requested} onChange={e=>setRequested(e.target.value)}/>
           </label>
-          <label className="report-field"><span>علت اصلی افزایش زمان</span>
+          {(!v3||requiresExtraReason)&&<label className="report-field"><span>علت اصلی افزایش زمان</span>
             <select required value={reasonCode} onChange={e=>setReasonCode(e.target.value)}>
               <option value="">انتخاب کنید</option>
               {Object.entries(extraTimeReasons).map(([code,title])=><option key={code} value={code}>{title}</option>)}
             </select>
-          </label>
+          </label>}
         </div>
-        <label className="report-field"><span>توضیح دلیل افزایش زمان (الزامی؛ حداقل ۱۰ نویسه)</span>
+        {(!v3||requiresExtraReason)&&<label className="report-field"><span>توضیح دلیل افزایش زمان (الزامی؛ حداقل ۱۰ نویسه)</span>
           <textarea required minLength={10} maxLength={600} rows={2}
             value={reasonText} onChange={e=>setReasonText(e.target.value)}
             placeholder="چه مشکلی رخ داد و چرا زمان استاندارد کافی نبود؟"/>
-        </label>
+        </label>}
         {Number.isFinite(requestedMinutes)&&requestedMinutes>standard&&<p className="ow-muted">
           زمان اضافه درخواستی: {minutes(requestedMinutes-standard)}
         </p>}
@@ -2074,9 +2092,9 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
       <div className="ow-actions ow-worker-submit-actions">
         <button type="submit" className="report-btn report-btn--primary"
           disabled={busy||reportCommitted||!extraValid}>
-          {requestExtra?'ارسال درخواست زمان بیشتر':'ارسال گزارش انجام کار'}
+          {requiresExtraReason?'ارسال درخواست زمان بیشتر':correction?'ارسال گزارش اصلاح‌شده':'ارسال گزارش انجام کار'}
         </button>
-        {task.state!=='in_progress'&&<button type="button" className="report-btn report-btn--light"
+        {(!v3||task.state==='assigned')&&task.state!=='in_progress'&&<button type="button" className="report-btn report-btn--light"
           onClick={()=>{void perform(()=>startMyTask(task.id),'start')}} disabled={busy||startCommitted||reportCommitted}
           title="اختیاری؛ برای اعلام وضعیت در حال انجام، بدون ثبت ساعت">شروع کار</button>}
       </div>
@@ -2086,8 +2104,8 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
       {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
       </dialog>
     </>}
-    {notice&&<p className="ow-muted" role="status">{notice}</p>}
-    {error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
+    {(!v3||!reportOpen)&&notice&&<p className="ow-muted" role="status">{notice}</p>}
+    {(!v3||!reportOpen)&&error&&<div className="report-alert report-alert--error" role="alert">{error}</div>}
   </article>
 }
 /**
@@ -2626,8 +2644,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const focusHeading=focusOptions.find(item=>item[0]===taskView)
   const inspectedTask=!settingsOpen&&section==='tasks'?visible.find(t=>t.id===selectedTaskId):undefined
   const inspectedReport=inspectedTask
-    ?records.filter(r=>r.task_id===inspectedTask.id).sort(
-      (a,b)=>(b.work_date||'').localeCompare(a.work_date||''))[0]:null
+    ?latestWorkerReport(inspectedTask,records,data.report_contract_version):null
   useLayoutEffect(()=>{
     if(inspectedTask)document.getElementById('ow-task-inspector')?.focus({preventScroll:true})
   },[inspectedTask?.id])
@@ -2868,7 +2885,8 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           inspected={selectedTaskId===t.id}
           onReportAccepted={()=>setSubmissionReceipt({workerId:profile.worker_id,title:t.title})}
           actionLedger={acknowledgedActions.current.items}
-          reviewCycle={(data.time_entries||[]).filter(e=>e.task_id===t.id
+          contractVersion={data.report_contract_version} serverToday={data.server_today}
+          reviewCycle={data.report_contract_version===1&&workerCorrection(t)?workerCorrection(t).id:(data.time_entries||[]).filter(e=>e.task_id===t.id
             &&['changes_requested','rejected'].includes(e.review_state))
             .map(e=>e.id).sort().join('|')}/>)}
         {!visible.length&&<div className="ow-worker-empty" role="status">
@@ -2909,6 +2927,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           <strong>نظر مدیر دربارهٔ گزارش مرتبط</strong>
           <p>{inspectedReport.review_note}</p>
         </section>}
+        {inspectedTask.desk_slot?.state==='cancelled'&&<section><strong>دلیل لغو نوبت</strong><p>{inspectedTask.desk_slot.cancellation_reason||'دلیلی ثبت نشده است.'}</p></section>}
         <p className="ow-muted">برای انجام یا اصلاح گزارش، از دکمهٔ همان ردیف استفاده کنید.</p>
       </aside>}
       </div>
