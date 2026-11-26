@@ -2573,6 +2573,9 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     claimSession.current={workerId:profile.worker_id}
   const session=claimSession.current
   const [sidebarCollapsed,setSidebarCollapsed]=useState(false)
+  const [mobileMenuOpen,setMobileMenuOpen]=useState(false)
+  const mobileMenuButtonRef=useRef(null)
+  useEffect(()=>setMobileMenuOpen(false),[profile.worker_id])
   const [charterInfoOpen,setCharterInfoOpen]=useState(false)
   const charterInfoTriggerRef=useRef(null)
   useEffect(()=>setCharterInfoOpen(false),[profile.worker_id])
@@ -2746,21 +2749,28 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       onClick={()=>{void refresh()}}>تلاش مجدد برای دریافت اطلاعات</button>
   </div>:<>
     <a className="ow-b3-skip" href="#ow-b3-main">رفتن به محتوای اصلی</a>
-    <aside className="ow-b3-sidebar" aria-label="ناوبری اصلی دانشجوکار">
+    <aside className={`ow-b3-sidebar${mobileMenuOpen?' ow-b3-mobile-menu-open':''}`} aria-label="ناوبری اصلی دانشجوکار"
+      onKeyDown={event=>{if(mobileMenuOpen&&event.key==='Escape'){event.preventDefault();setMobileMenuOpen(false);mobileMenuButtonRef.current?.focus()}}}>
       <div className="ow-b3-brand" title="پنل دانشجوکار · دانشکده علوم انسانی شهید رجایی بابل">
         <span className="ow-b3-brand__icon" aria-hidden="true">▤</span>
         {!sidebarCollapsed&&<div><strong>پنل دانشجوکار</strong>
           <small>دانشکده علوم انسانی شهید رجایی بابل</small></div>}
+        <span className="ow-b3-mobile-title">پنل دانشجوکار</span>
+        <button type="button" className="ow-b3-mobile-menu" ref={mobileMenuButtonRef}
+          aria-expanded={mobileMenuOpen} aria-controls="ow-b3-account-actions"
+          onClick={()=>setMobileMenuOpen(value=>!value)}>{mobileMenuOpen?'بستن منو':'بیشتر'}</button>
       </div>
       {!sidebarCollapsed&&<p className="ow-b3-sidebar-caption">فضای کاری</p>}
       <SectionTabs value={settingsOpen?null:section==='workPool'?'tasks':section} onChange={next=>{
         if(settingsOpen)onToggleSettings?.()
+        setMobileMenuOpen(false)
         setSelectedTaskId(null);updateNavigation({section:next})
+        if(window.matchMedia('(max-width:700px)').matches)requestAnimationFrame(()=>window.scrollTo(0,0))
       }} options={[
         ['tasks','کارهای من'],
         ['availability','زمان حضور'],['history','سوابق گزارش‌ها'],['profile','حساب من'],
       ]}/>
-      <div className="ow-b3-sidebar__footer">
+      <div className="ow-b3-sidebar__footer" id="ow-b3-account-actions">
         <div className="swtb-policy-sidebar-actions">
           <button type="button" className="swtb-guide-launch swtb-policy-sidebar-action"
             data-swtb-guide="help-global"
@@ -2773,7 +2783,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
               <path d="M9.4 9a2.8 2.8 0 0 1 5.3 1c0 1.9-2.7 2.4-2.7 4"/>
               <path d="M12 17.5h.01"/>
             </svg>
-            {!sidebarCollapsed&&<span className="swtb-policy-action-label">راهنمای سامانه</span>}
+            {!sidebarCollapsed?<span className="swtb-policy-action-label">راهنمای سامانه</span>:<span className="ow-b3-mobile-only-label">راهنمای سامانه</span>}
           </button>
           {workerCharterInfoEnabled&&<button type="button"
             className="swtb-policy-sidebar-action"
@@ -2792,7 +2802,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <path d="M14 2v6h6M8 13h8M8 17h8"/>
             </svg>
-            {!sidebarCollapsed&&<span className="swtb-policy-action-label">چارچوب همکاری</span>}
+            {!sidebarCollapsed?<span className="swtb-policy-action-label">چارچوب همکاری</span>:<span className="ow-b3-mobile-only-label">چارچوب همکاری</span>}
           </button>}
         </div>
         <div className="ow-b3-worker" title={visibleWorkerName}>
@@ -2803,12 +2813,12 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         </div>
         <div className="ow-b3-worker-actions">
           <button type="button" onClick={onRefresh} title="به‌روزرسانی" aria-label="به‌روزرسانی">
-            <span aria-hidden="true">↻</span>{!sidebarCollapsed&&' به‌روزرسانی'}</button>
-          <button type="button" onClick={onToggleSettings} aria-expanded={settingsOpen}
+            <span aria-hidden="true">↻</span>{!sidebarCollapsed?' به‌روزرسانی':<span className="ow-b3-mobile-only-label"> به‌روزرسانی</span>}</button>
+          <button type="button" onClick={()=>{if(mobileMenuOpen){setMobileMenuOpen(false);mobileMenuButtonRef.current?.focus()}onToggleSettings?.();if(window.matchMedia('(max-width:700px)').matches)requestAnimationFrame(()=>window.scrollTo(0,0))}} aria-expanded={settingsOpen}
             title="تنظیمات حساب" aria-label="تنظیمات حساب">
-            <span aria-hidden="true">⚙</span>{!sidebarCollapsed&&' تنظیمات'}</button>
+            <span aria-hidden="true">⚙</span>{!sidebarCollapsed?' تنظیمات':<span className="ow-b3-mobile-only-label"> تنظیمات</span>}</button>
           <button type="button" onClick={onLogout} title="خروج" aria-label="خروج">
-            <span aria-hidden="true">⇥</span>{!sidebarCollapsed&&' خروج'}</button>
+            <span aria-hidden="true">⇥</span>{!sidebarCollapsed?' خروج':<span className="ow-b3-mobile-only-label"> خروج</span>}</button>
         </div>
         <button type="button" className="ow-b3-collapse"
           onClick={()=>setSidebarCollapsed(value=>!value)}
