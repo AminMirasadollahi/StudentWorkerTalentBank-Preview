@@ -3775,3 +3775,8 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 .ow-worker-workspace-switch h1{font-size:1.25rem;margin:0}
 .ow-worker-workspace-switch .ow-range-switch{flex-wrap:wrap}
 .ow-worker-workspace-switch p{margin:0}
+
+/* R3: date browse is a secondary disclosure, not a competing primary nav. */
+.ow-worker-date-disclosure {margin-block:.5rem;color:var(--muted,#52616a)}
+.ow-worker-date-disclosure>summary {cursor:pointer;min-height:32px;padding:.35rem .5rem;font-size:.86rem;font-weight:600}
+.ow-worker-date-disclosure>summary:focus-visible {outline:2px solid currentColor;outline-offset:2px}

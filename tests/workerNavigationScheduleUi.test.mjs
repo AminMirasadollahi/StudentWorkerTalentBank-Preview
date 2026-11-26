@@ -205,8 +205,10 @@ test('one worker tasks tab, range choices and safely preserved selection after u
  const ui=await setup()
  try{
   assert.deepEqual([...ui.host.querySelectorAll('.ow-tabs button')].map(b=>b.textContent.trim()),
-    ['کارهای من','فرصت‌های کاری','زمان حضور','سوابق گزارش‌ها','حساب من'])
+    ['کارهای من','زمان حضور','سوابق گزارش‌ها','حساب من'])
   assert.ok(ui.host.querySelector('.ow-range-switch'))
+  assert.equal(ui.host.querySelector('.ow-worker-date-disclosure').open,false)
+  assert.equal(ui.host.querySelectorAll('[data-swtb-guide="nav-workPool"]').length,1)
   assert.equal(ui.host.querySelectorAll('.ow-worker-tasks .ow-item').length,1)
   const reports=ui.host.querySelector('.ow-worker-action-detail')
   assert.ok(reports)
@@ -218,7 +220,7 @@ test('one worker tasks tab, range choices and safely preserved selection after u
   await ui.click('[data-testid="resume"]')
   assert.equal(ui.host.querySelector('[aria-pressed="true"]').textContent,'این هفته')
   assert.deepEqual([...ui.host.querySelectorAll('.ow-tabs button')].map(b=>b.textContent.trim()),
-    ['کارهای من','فرصت‌های کاری','زمان حضور','سوابق گزارش‌ها','حساب من'])
+    ['کارهای من','زمان حضور','سوابق گزارش‌ها','حساب من'])
  }finally{await ui.dispose()}
 })
 test('unified presence defaults to self only and overlays role-scoped peer hours on demand',async()=>{
@@ -372,7 +374,7 @@ test('worker exposes This Month and personal profile without permanent password 
   assert.ok(ui.host.querySelector('.ow-self-profile'))
   assert.ok(ui.host.textContent.includes('سوابق گزارش‌ها'))
   assert.deepEqual([...ui.host.querySelectorAll('.ow-tabs button')].map(b=>b.textContent.trim()),
-    ['کارهای من','فرصت‌های کاری','زمان حضور','سوابق گزارش‌ها','حساب من'])
+    ['کارهای من','زمان حضور','سوابق گزارش‌ها','حساب من'])
  }finally{await ui.dispose()}
 })
 test('monthly presence highlights Tehran today without opening or editing a day',async()=>{
@@ -1204,7 +1206,7 @@ test('profile contains identity and one correction entry; canonical task/history
   await ui.clickText('سوابق گزارش‌ها')
   assert.ok(ui.host.querySelector('.ow-worker-history-panel'))
   assert.deepEqual([...ui.host.querySelectorAll('.ow-tabs button')].map(b=>b.textContent.trim()),
-    ['کارهای من','فرصت‌های کاری','زمان حضور','سوابق گزارش‌ها','حساب من'])
+    ['کارهای من','زمان حضور','سوابق گزارش‌ها','حساب من'])
  }finally{await ui.dispose()}
 })
 test('worker homepage is action-first and preserves the familiar date drilldown',async()=>{
@@ -1455,7 +1457,7 @@ test('SWTB21 workspace routes an exact receipt, retains one pool, and hides it o
   assert.ok(ui.host.querySelector('#ow-task-inspector'))
   assert.equal(ui.host.querySelector(selector).dataset.active,'false')
   assert.ok(ui.host.querySelector(selector).closest('[hidden]'))
-  await ui.clickText('فرصت‌های کاری')
+  await ui.clickText('فرصت‌های قابل انتخاب')
   assert.equal(ui.host.querySelector(selector).dataset.active,'true')
   assert.equal(globalThis.__qaPoolMounts,1)
   globalThis.__qaReceiptTaskId='MISSING-FAKE-TASK'

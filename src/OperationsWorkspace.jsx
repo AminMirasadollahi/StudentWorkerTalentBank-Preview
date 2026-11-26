@@ -1991,7 +1991,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
               id={`ow-worker-report-heading-${task.id}`}>
               {task.state==='needs_changes'?'اصلاح و ارسال گزارش':'ثبت انجام کار'}
             </h3>
-            <p className="ow-muted">{task.title} · {unitLabels[task.unit]||task.unit||'واحد کار نامشخص'} · {pretty(task.planned_date)}</p>
+            <p className="ow-muted">{task.title} · {unitLabels[task.unit]||task.unit||'واحد کار نامشخص'} · تاریخ برنامه‌ریزی: {pretty(task.planned_date)}</p>
           </div>
           <button type="button" className="ow-worker-report-dialog__close"
             disabled={busy} aria-label="بستن پنجره ثبت کار"
@@ -2033,7 +2033,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
           <JalaliDatePicker value={date} max={v3?contract?.date_max:today()} min={v3?contract?.date_min:shift(today(),-90)}
             disabled={busy||(v3&&(!contract||contract.window_empty))} onChange={setDate} ariaLabel="تاریخ انجام کار"/>
           {v3&&contract&&date&&!reportDateAllowed(contract,date)&&!exactRetry&&<small className="ow-muted" role="status">تاریخ گزارش خارج از بازه مجاز است. فقط تاریخ واقعی را وارد کنید؛ اگر همان تاریخ درست است با مدیر هماهنگ کنید.</small>}
-          <small className="ow-muted">{v3?'روز واقعی انجام کار را انتخاب کنید.':`تاریخ برنامه‌ریزی: ${pretty(task.planned_date)}. روزی را که واقعاً کار انجام شده وارد کنید؛ ضوابط زمانی نوع کار در سرور بررسی می‌شود.`}</small>
+          <small className="ow-muted">روز واقعی انجام کار را انتخاب کنید.</small>
         </label>
         <div className="ow-standard-credit">
           <span>زمان استاندارد این کار</span><b>{minutes(standard)}</b>
@@ -2735,11 +2735,11 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           <small>دانشکده علوم انسانی شهید رجایی بابل</small></div>}
       </div>
       {!sidebarCollapsed&&<p className="ow-b3-sidebar-caption">فضای کاری</p>}
-      <SectionTabs value={settingsOpen?null:section} onChange={next=>{
+      <SectionTabs value={settingsOpen?null:section==='workPool'?'tasks':section} onChange={next=>{
         if(settingsOpen)onToggleSettings?.()
         setSelectedTaskId(null);updateNavigation({section:next})
       }} options={[
-        ['tasks','کارهای من'],...(workPoolUIEnabled?[['workPool','فرصت‌های کاری']]:[]),
+        ['tasks','کارهای من'],
         ['availability','زمان حضور'],['history','سوابق گزارش‌ها'],['profile','حساب من'],
       ]}/>
       <div className="ow-b3-sidebar__footer">
@@ -2817,7 +2817,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       <h1>کارهای من</h1>
       <div className="ow-range-switch" role="group" aria-label="نمای فضای کاری">
         {[['tasks','کارهای واگذارشده و انتخاب‌شده'],['workPool','فرصت‌های قابل انتخاب']].map(([id,title])=>
-          <button type="button" key={id} aria-current={section===id?'page':undefined} className={section===id?'is-selected':''}
+          <button type="button" key={id} data-swtb-guide={id==='workPool'?'nav-workPool':undefined} aria-current={section===id?'page':undefined} className={section===id?'is-selected':''}
             onClick={()=>{setSelectedTaskId(null);updateNavigation({section:id})}}>{title}</button>)}
       </div>
       {section==='workPool'&&<p className="ow-muted">انتخاب فرصت داوطلبانه و وابسته به مجوز، ظرفیت و مهلت است؛ انتخاب به‌معنای ساعت تأییدشده نیست.</p>}
@@ -2858,8 +2858,9 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
             <strong>{n(focusCounts[id])}</strong>
           </button>)}
       </div>
-      <div className="ow-worker-date-tools">
-        <span>برنامه بر اساس تاریخ</span>
+      <details className="ow-worker-date-disclosure" open={taskView==='calendar'?true:undefined}>
+        <summary>نمایش بر اساس تاریخ</summary>
+        <div className="ow-worker-date-tools">
         <div className="ow-range-switch" role="group" aria-label="بازه نمایش کارها">
           {[['today','امروز'],['week','این هفته'],['month','این ماه'],['upcoming','آینده']].map(([id,title])=>
             <button type="button" key={id}
@@ -2867,7 +2868,8 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
               className={taskView==='calendar'&&taskRange===id?'is-selected':''}
               onClick={()=>updateNavigation({taskView:'calendar',taskRange:id})}>{title}</button>)}
         </div>
-      </div>
+        </div>
+      </details>
       <div className="ow-worker-list-heading ow-worker-results-heading">
         <div>
           <h3>{focusHeading?.[1]||'برنامهٔ زمانی'}</h3>
@@ -2892,7 +2894,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
             .map(e=>e.id).sort().join('|')}/>)}
         {!visible.length&&<div className="ow-worker-empty" role="status">
           <strong>{emptyText[taskView]}</strong>
-          <p>برای بررسی وضعیت‌های دیگر، یکی از دسته‌های بالا را انتخاب کنید.</p>
+          {taskView!=='action'&&<p>برای بررسی وضعیت‌های دیگر، یکی از دسته‌های بالا را انتخاب کنید.</p>}
           {taskView==='action'&&focusCounts.upcoming>0&&<button type="button"
             className="report-btn report-btn--light"
             onClick={()=>updateNavigation({taskView:'upcoming'})}>

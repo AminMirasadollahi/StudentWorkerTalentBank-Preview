@@ -291,7 +291,9 @@ try{
  })
  await check('future tasks are findable and write/network counters remain zero',async()=>{
   await page.getByRole('button',{name:'کارهای من'}).click()
-  await page.getByRole('button',{name:'آینده'}).click()
+  const dates=page.locator('.ow-worker-date-disclosure')
+  if(!(await dates.evaluate(el=>el.open)))await dates.locator('summary').click()
+  await dates.getByRole('button',{name:'آینده'}).click()
   assert.ok((await page.locator('.ow-worker-tasks').innerText()).includes('سال آینده'))
   assert.equal(await page.evaluate(()=>window.__qaWriteAttempts),0,
     'browser fixture must never issue a write, even to mock storage')
