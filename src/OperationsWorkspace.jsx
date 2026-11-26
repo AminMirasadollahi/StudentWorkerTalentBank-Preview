@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState }
 import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
 import {workerGuideStorageKey,workerGuideSessionStorageKey,shouldAutoOfferWorkerGuide,suppressWorkerGuideAutoOffers} from './lib/workerGuide.mjs'
 import { trapModalTab } from './lib/dialogFocusTrap.mjs'
-import {workerReportContract,workerCorrection,initialWorkerReport,reportInputAllowed,latestWorkerReport} from './lib/workerReportContract.mjs'
+import {workerReportContract,workerCorrection,initialWorkerReport,reportInputAllowed,reportDateAllowed,latestWorkerReport} from './lib/workerReportContract.mjs'
 import {canonicalPresencePayload,createPresenceAttemptLedger,interpretPresenceReceipt,workerPresenceItems,managerPresenceItems} from './lib/presenceChanges.mjs'
 import {requestPresenceChange,listPresenceChanges} from './lib/presenceChangesApi.js'
 import {WorkerPresenceRequests,ManagerPresenceReviewQueue} from './components/PresenceChangePanels.jsx'
@@ -2032,6 +2032,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
         <label className="report-field"><span>تاریخ واقعی انجام کار (شمسی)</span>
           <JalaliDatePicker value={date} max={v3?contract?.date_max:today()} min={v3?contract?.date_min:shift(today(),-90)}
             disabled={busy||(v3&&(!contract||contract.window_empty))} onChange={setDate} ariaLabel="تاریخ انجام کار"/>
+          {v3&&contract&&date&&!reportDateAllowed(contract,date)&&!exactRetry&&<small className="ow-muted" role="status">تاریخ گزارش خارج از بازه مجاز است. فقط تاریخ واقعی را وارد کنید؛ اگر همان تاریخ درست است با مدیر هماهنگ کنید.</small>}
           <small className="ow-muted">{v3?'روز واقعی انجام کار را انتخاب کنید.':`تاریخ برنامه‌ریزی: ${pretty(task.planned_date)}. روزی را که واقعاً کار انجام شده وارد کنید؛ ضوابط زمانی نوع کار در سرور بررسی می‌شود.`}</small>
         </label>
         <div className="ow-standard-credit">
@@ -2070,7 +2071,7 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
         {!v3&&<p>مجموع زمان و علت افزایش را وارد کنید؛ تأیید نهایی با مدیر است.</p>}
         <div className="ow-fields ow-fields--two">
           <label className="report-field"><span>زمان درخواستی کل (دقیقه)</span>
-            <input type="number" min={customCreditAllowed?contract.minimum_minutes:standard+1} max={v3?contract?.maximum_minutes:1440} required
+            <input type="number" min={exactRetry?undefined:customCreditAllowed?contract.minimum_minutes:standard+1} max={exactRetry?undefined:v3?contract?.maximum_minutes:1440} required
               value={requested} onChange={e=>setRequested(e.target.value)}/>
           </label>
           {(!v3||requiresExtraReason)&&<label className="report-field"><span>علت اصلی افزایش زمان</span>
@@ -2644,7 +2645,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   const focusHeading=focusOptions.find(item=>item[0]===taskView)
   const inspectedTask=!settingsOpen&&section==='tasks'?visible.find(t=>t.id===selectedTaskId):undefined
   const inspectedReport=inspectedTask
-    ?latestWorkerReport(inspectedTask,records,data.report_contract_version):null
+    ?(data.report_contract_version===1?latestWorkerReport(inspectedTask,records,1):records.filter(r=>r.task_id===inspectedTask.id).sort((a,b)=>(b.work_date||'').localeCompare(a.work_date||''))[0]):null
   useLayoutEffect(()=>{
     if(inspectedTask)document.getElementById('ow-task-inspector')?.focus({preventScroll:true})
   },[inspectedTask?.id])

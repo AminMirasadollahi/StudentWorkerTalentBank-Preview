@@ -1,0 +1,26 @@
+name: SWTB23 R3 worker report review (NO DEPLOY)
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  focused:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'review/swtb23-r3-worker-report-contract-20261126'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - run: node --test tests/workerReportContract.test.mjs tests/workerReportContractUi.test.mjs tests/workerReportRetry.test.mjs tests/workerTaskFocus.test.mjs
+      - run: npm run build -- --outDir /tmp/swtb23-r3-build
+        env:
+          VITE_SUPABASE_URL: https://aaaaaaaaaaaaaaaaaaaa.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
