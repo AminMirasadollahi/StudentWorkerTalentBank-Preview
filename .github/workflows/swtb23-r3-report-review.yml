@@ -24,3 +24,9 @@ jobs:
         env:
           VITE_SUPABASE_URL: https://aaaaaaaaaaaaaaaaaaaa.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
+      - name: Native Chrome worker-first delta (synthetic, no deployment)
+        run: |
+          google-chrome --version
+          export SWTB23_BROWSER_TOOL_DIR="$RUNNER_TEMP/swtb23-r3-browser"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "$SWTB23_BROWSER_TOOL_DIR" --ignore-scripts --no-audit --no-fund playwright@1.56.1
+          node tests/browser/run-swtb23-r3-worker-smoke.mjs

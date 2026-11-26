@@ -26,7 +26,7 @@ test('Persian history filters share one compact toolbar and keep semantics',()=>
  const history=jsx.slice(jsx.indexOf('function WorkerReportHistory('),
   jsx.indexOf('function WorkerSelfProfile('))
  assert.match(history,/<UnitHourSummary scope="worker" approvedTotal=\{total\}/)
- assert.match(history,/const total=approvedMinutesTotal\?\?null/)
+ assert.match(history,/const total=Number\.isInteger\(approvedMinutesTotal\)&&approvedMinutesTotal>=0\?approvedMinutesTotal:null/)
  assert.match(history,/className="ow-history-query"/)
  assert.match(history,/className="ow-history-query-fields"/)
  assert.match(history,/className="ow-history-query-status"/)

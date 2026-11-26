@@ -2056,13 +2056,12 @@ function WorkerTaskCard({task,onSaved,onReportAccepted,onInspect,inspected=false
         <button type="button" className="ow-extra-help-trigger"
           aria-expanded={extraHelpOpen}
           aria-controls={`ow-extra-help-${task.id}`}
-          aria-label="چه زمانی درخواست زمان بیشتر لازم است؟"
+          aria-label={customCreditAllowed?'چه زمانی سهم درخواستی را تغییر دهم؟':'چه زمانی درخواست زمان بیشتر لازم است؟'}
           onClick={()=>setExtraHelpOpen(open=>!open)}>
           <span aria-hidden="true">ⓘ</span> چه زمانی؟
         </button>
         <p id={`ow-extra-help-${task.id}`} className="ow-extra-help-note" hidden={!extraHelpOpen}>
-          فقط وقتی زمان استاندارد برای انجام همین کار کافی نبوده است، این گزینه را انتخاب کنید؛
-          مثلاً حجم واقعی کار یا مانع پیش‌بینی‌نشده باعث طولانی‌شدن آن شده باشد.
+          {customCreditAllowed?'اگر سهم زمانی موردنیاز شما با زمان استاندارد متفاوت است، مقدار درخواستی را تغییر دهید. برای زمان بیشتر، دلیل لازم است.':'فقط وقتی زمان استاندارد برای انجام همین کار کافی نبوده است، این گزینه را انتخاب کنید؛ مثلاً حجم واقعی کار یا مانع پیش‌بینی‌نشده باعث طولانی‌شدن آن شده باشد.'}
           زمان کل موردنیاز و علت را وارد کنید. زمان اضافه صرفاً پس از بررسی و تأیید مدیر منظور می‌شود؛
           حضور در محل به‌تنهایی دلیل درخواست زمان بیشتر نیست.
         </p>
@@ -2131,7 +2130,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
   ['all','همه'],['submitted','منتظر بررسی'],
   ['changes_requested','نیازمند اصلاح'],['rejected','ردشده'],['approved','تأییدشده']
  ]
- const total=approvedMinutesTotal??null
+ const total=Number.isInteger(approvedMinutesTotal)&&approvedMinutesTotal>=0?approvedMinutesTotal:null
  useLayoutEffect(()=>{
    if(detail)document.getElementById('ow-report-inspector')?.focus({preventScroll:true})
  },[detail?.id])
@@ -2174,7 +2173,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
          onClick={()=>{setUnitFilter('');setView('all');setDateFrom('');setDateTo('');setSelectedReportId(null)}}>
          پاک‌کردن فیلترها</button>}
      </div>
-     <details className="ow-history-advanced" open={unitFilter||dateFrom||dateTo?true:undefined}>
+     <details className="ow-history-advanced">
        <summary>فیلتر واحد و تاریخ{unitFilter||dateFrom||dateTo?' · فعال':''}</summary>
      <div className="ow-history-query-fields">
        <label className="report-field ow-history-query-unit">

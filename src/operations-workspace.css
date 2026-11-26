@@ -3780,3 +3780,9 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
 .ow-worker-date-disclosure {margin-block:.5rem;color:var(--muted,#52616a)}
 .ow-worker-date-disclosure>summary {cursor:pointer;min-height:32px;padding:.35rem .5rem;font-size:.86rem;font-weight:600}
 .ow-worker-date-disclosure>summary:focus-visible {outline:2px solid currentColor;outline-offset:2px}
+
+/* R3 worker history: visible status filters, optional secondary detail. */
+.ow-worker-history-panel :is(.ow-history-advanced,.ow-history-analysis)>summary {cursor:pointer;min-height:32px;padding:.45rem .55rem;font-weight:600;color:inherit}
+.ow-worker-history-panel :is(.ow-history-advanced,.ow-history-analysis)>summary:focus-visible {outline:2px solid currentColor;outline-offset:2px}
+.ow-worker-history-panel .ow-history-analysis {margin-top:.75rem}
+.ow-self-profile .ow-self-identity bdi {overflow-wrap:anywhere}
