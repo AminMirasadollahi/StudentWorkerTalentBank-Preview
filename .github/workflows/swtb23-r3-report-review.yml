@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --no-audit --no-fund
-      - run: node --test tests/workerReportContract.test.mjs tests/workerReportContractUi.test.mjs tests/workerReportRetry.test.mjs tests/workerTaskFocus.test.mjs
+      - run: node --test tests/workerReportContract.test.mjs tests/workerReportContractUi.test.mjs tests/workerReportRetry.test.mjs tests/workerTaskFocus.test.mjs tests/workerUxSystem.test.mjs tests/workerNavigationScheduleUi.test.mjs tests/workPoolUnifiedMounted.test.mjs
       - run: npm run build -- --outDir /tmp/swtb23-r3-build
         env:
           VITE_SUPABASE_URL: https://aaaaaaaaaaaaaaaaaaaa.supabase.co

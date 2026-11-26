@@ -77,7 +77,12 @@ try{
     assert.ok(await pool.isVisible())
     assert.equal((await calls()).length,0)
     await page.evaluate(()=>globalThis.__qaClaimMode='reject')
-    await card('فرصت ساختگی الف').getByRole('button',{name:'انتخاب این کار'}).click()
+    if(mode==='unified'){
+     await card('فرصت ساختگی الف').getByRole('button',{name:'مشاهده جزئیات'}).click()
+     await page.locator('#swtb19-worker-inspector').getByRole('button',{name:'انتخاب این کار',exact:true}).click()
+    }else{
+     await card('فرصت ساختگی الف').getByRole('button',{name:'انتخاب این کار'}).click()
+    }
     const retry=()=>card('فرصت ساختگی الف').getByRole('button',{name:'تلاش مجدد با همان شناسه'})
     await retry().waitFor()
     assert.ok(await retry().isDisabled())
@@ -118,7 +123,12 @@ try{
     await opportunities().click()
     await card('فرصت پاسخ دیرهنگام').waitFor()
     await page.evaluate(()=>globalThis.__qaClaimMode='defer')
-    await card('فرصت پاسخ دیرهنگام').getByRole('button',{name:'انتخاب این کار'}).click()
+    if(mode==='unified'){
+     await card('فرصت پاسخ دیرهنگام').getByRole('button',{name:'مشاهده جزئیات'}).click()
+     await page.locator('#swtb19-worker-inspector').getByRole('button',{name:'انتخاب این کار',exact:true}).click()
+    }else{
+     await card('فرصت پاسخ دیرهنگام').getByRole('button',{name:'انتخاب این کار'}).click()
+    }
     await page.waitForFunction(()=>typeof globalThis.__qaFinishClaim==='function')
     await page.evaluate(B=>globalThis.__qaSetWorker(B,{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]}),B)
     await card('فرصت ساختگی ب').waitFor()

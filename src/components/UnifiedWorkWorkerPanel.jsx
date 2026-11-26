@@ -148,6 +148,10 @@ export default function UnifiedWorkWorkerPanel({
  const ordered=view.offers.slice().sort((a,b)=>
   String(a.date).localeCompare(String(b.date))||Number(a.priority)-Number(b.priority))
  const inspected=authorized&&active&&view.status==='ready'?ordered.find(item=>item.id===inspectedId):null
+ const detailOptions=inspected?shareOptions(inspected):[]
+ const detailDate=inspected?(dates[inspected.id]||pickDate(inspected)):''
+ const detailShare=inspected?.allocation_mode==='fixed'?detailOptions[0]:Number(shares[inspected?.id]||detailOptions[0])
+ const detailBlocked=busyId!==''||Boolean(uncertainId)||inspected?.claimable!==true
  useEffect(()=>{
   if(inspected)inspectorRef.current?.focus({preventScroll:true})
  },[inspected?.id,view.status])
@@ -185,11 +189,7 @@ export default function UnifiedWorkWorkerPanel({
    {!ordered.length&&<p className="ow-work-pool-empty">در حال حاضر فرصتی برای انتخاب منتشر نشده است.</p>}
    {ordered.map(item=>{
     const legacy=item.allocation_mode==='legacy'
-    const date=legacy?item.date:(dates[item.id]||pickDate(item))
     const options=shareOptions(item)
-    const share=item.allocation_mode==='fixed'?options[0]
-      :Number(shares[item.id]||options[0])
-    const blocked=busyId!==''||uncertainId===item.id||item.claimable!==true
     return <article key={item.id} className="ow-work-pool-item">
      <div className="ow-work-pool-item__top">
       <h3>{item.title}</h3>
@@ -202,27 +202,9 @@ export default function UnifiedWorkWorkerPanel({
       <span>{legacy?'زمان هر نفر: '+durationFa(item.estimated_minutes)
        :'حجم باقی‌مانده: '+durationFa(item.remaining_minutes)}</span>
       <span>مهلت انتخاب: {faDate(item.claim_deadline)}</span>
+      {!legacy&&options.length>0&&<span>سهم: {durationFa(options[0])}{options.length>1?' تا '+durationFa(options.at(-1)):''}</span>}
       {legacy&&<span>جای خالی: {nf.format(item.remaining)} نفر</span>}
      </div>
-     {!legacy&&!item.my_task_id&&<div className="swtb19-unified-work__two">
-      {item.end_date&&item.end_date!==item.date&&<div className="report-field">
-       <span>روز انجام سهم شما</span>
-       <JalaliDatePicker value={date} disabled={blocked}
-        min={pickDate(item)} max={item.end_date}
-        allowedDates={item.available_dates}
-        onChange={x=>{setDates(p=>({...p,[item.id]:x}));
-         requests.current.items.delete(item.id)}}
-        ariaLabel="انتخاب روز انجام سهم"/></div>}
-      <div className="report-field"><span>سهم زمانی شما</span>
-       {item.allocation_mode==='choice'
-        ?<select value={options.includes(share)?share:''} disabled={blocked}
-          onChange={e=>{setShares(p=>({...p,[item.id]:e.target.value}));
-           requests.current.items.delete(item.id)}}>
-          {options.map(n=><option value={n} key={n}>{durationFa(n)}</option>)}
-         </select>
-        :<strong className="swtb19-unified-work__share">{durationFa(options[0])}</strong>}
-      </div>
-     </div>}
      <div className="ow-work-pool-item__actions">
       <button type="button" className="ow-mini-btn swtb19-unified-work__inspect"
        aria-expanded={inspectedId===item.id} aria-controls="swtb19-worker-inspector"
@@ -232,11 +214,8 @@ export default function UnifiedWorkWorkerPanel({
         setInspectedId(item.id)
        }}>مشاهده جزئیات</button>
       {item.my_task_id?<span className="ow-work-pool-claimed">این کار قبلاً توسط شما انتخاب شده است.</span>
-      :item.claimable===true?<button type="button"
-       className="report-btn report-btn--primary" disabled={blocked}
-       onClick={()=>void claim(item)}>
-       {busyId===item.id?'در حال ثبت…':'انتخاب این کار'}</button>
-      :<span className="ow-muted">فعلاً قابل انتخاب نیست؛ مهلت، ظرفیت یا مجوز نیمسال را بررسی کنید.</span>}
+      :item.claimable===true?<span className="ow-muted">آماده انتخاب</span>
+      :<span className="ow-muted">فعلاً قابل انتخاب نیست.</span>}
      </div>
      {uncertainId===item.id&&<div className="ow-work-pool-uncertain">
       <p>ممکن است انتخاب در سرور ثبت شده باشد. ابتدا وضعیت را بررسی کنید.</p>
@@ -272,8 +251,32 @@ export default function UnifiedWorkWorkerPanel({
      {inspected.allocation_mode==='legacy'&&
       <div><dt>جای خالی</dt><dd>{nf.format(inspected.remaining)} نفر</dd></div>}
     </dl>
+    {inspected.allocation_mode!=='legacy'&&!inspected.my_task_id&&inspected.claimable===true&&<div className="swtb19-unified-work__two">
+      {inspected.end_date&&inspected.end_date!==inspected.date&&<div className="report-field">
+       <span>روز انجام سهم شما</span>
+       <JalaliDatePicker value={detailDate} disabled={detailBlocked}
+        min={pickDate(inspected)} max={inspected.end_date}
+        allowedDates={inspected.available_dates}
+        onChange={x=>{setDates(p=>({...p,[inspected.id]:x}));
+         requests.current.items.delete(inspected.id)}}
+        ariaLabel="انتخاب روز انجام سهم"/></div>}
+      <div className="report-field"><span>سهم زمانی شما</span>
+       {inspected.allocation_mode==='choice'
+        ?<select value={detailOptions.includes(detailShare)?detailShare:''} disabled={detailBlocked}
+          onChange={e=>{setShares(p=>({...p,[inspected.id]:e.target.value}));
+           requests.current.items.delete(inspected.id)}}>
+          {detailOptions.map(n=><option value={n} key={n}>{durationFa(n)}</option>)}
+         </select>
+        :<strong className="swtb19-unified-work__share">{durationFa(detailOptions[0])}</strong>}
+      </div>
+     </div>}
+
+    {inspected.claimable===true&&!inspected.my_task_id&&<div className="ow-work-pool-item__actions">
+      <button type="button" className="report-btn report-btn--primary" disabled={detailBlocked}
+        onClick={()=>void claim(inspected)}>{busyId===inspected.id?'در حال ثبت…':'انتخاب این کار'}</button>
+    </div>}
     <p className="ow-muted swtb19-unified-work__detail-note">
-     برای انتخاب روز و سهم زمانی، از همان کارت فرصت استفاده کنید. سهم انتخابی تخمینی است؛ ساعت واقعی پس از گزارش و تأیید مدیر منظور می‌شود.
+     سهم انتخابی تخمینی است؛ ساعت‌ها پس از گزارش و تأیید مدیر منظور می‌شوند.
     </p>
    </aside>}
   </div>}
