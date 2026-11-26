@@ -291,41 +291,71 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
   const [passwordEstablished, setPasswordEstablished] = useState(!initialPasswordRequired)
   const [settingsOpen,setSettingsOpen] = useState(false)
   const [manualRefreshRevision,setManualRefreshRevision] = useState(0)
+  const passwordFlight=useRef(false)
+  const [recoveryOffered,setRecoveryOffered]=useState(false)
+  const [explicitRetryAvailable,setExplicitRetryAvailable]=useState(false)
 
-  const changePassword = async event => {
+  const readOnboardingState = async () => {
+    try {
+      const current=await currentOperationsIdentity()
+      if(current?.role!=='worker'||current.profile?.worker_id!==profile.worker_id||current.profile?.state!=='active')return 'unknown'
+      if(current.profile.onboarding_state==='ready')return 'ready'
+      if(current.profile.onboarding_state==='password_required')return 'pending'
+    }catch{}
+    return 'unknown'
+  }
+
+  const changePassword = async (event, mode='default') => {
     event.preventDefault()
+    if(passwordFlight.current)return
     setMessage('')
     setPasswordError('')
     if (!validWorkerPasswordPair(password, confirmation)) {
-      setPasswordError('رمز جدید باید ۸ تا ۱۲۸ نویسه، غیرخالی و با تکرار یکسان باشد.')
+      setPasswordError('رمز باید ۸ تا ۱۲۸ نویسه، غیرخالی و با تکرار یکسان باشد.')
       return
     }
+    const proof=!passwordEstablished&&(mode==='proof'||(recoveryOffered&&mode!=='retry'))
+    if(mode==='retry'&&(passwordEstablished||!explicitRetryAvailable))return
+    passwordFlight.current=true
     setSaving(true)
     try {
       if (!passwordEstablished) {
-        const { data, error } = await opsClient.functions.invoke(
-          'ops-complete-worker-onboarding',
-          { body: { password } },
-        )
-        if (error || data?.ok !== true) throw error || new Error(data?.error || 'password_setup_failed')
-      } else {
-        const { error } = await opsClient.auth.updateUser({ password })
-        if (error) throw error
+        if(mode==='retry'&&await readOnboardingState()!=='pending')throw Error('retry_identity_not_pending')
+        const {data,error}=await opsClient.functions.invoke('ops-complete-worker-onboarding',
+          {body:proof?{password,mode:'confirm_existing_password'}:{password}})
+        if(error||data?.ok!==true)throw error||Error('password_setup_failed')
+      }else{
+        const {error}=await opsClient.auth.updateUser({password})
+        if(error)throw error
       }
-    } catch {
-      setSaving(false)
-      // In a partial failure Auth may already have updated the password while
-      // the server's onboarding finalization failed. Never promise failure or
-      // instruct a different password without checking account/session state.
+      setMessage(proof?'تکمیل فعال‌سازی حساب تأیید شد.':'رمز اختصاصی حساب شما ثبت شد.')
+      setPasswordEstablished(true)
+      setRecoveryOffered(false)
+      setExplicitRetryAvailable(false)
+      setSettingsOpen(false)
+      setPassword('')
+      setConfirmation('')
+    }catch{
+      if(!passwordEstablished){
+        const status=await readOnboardingState()
+        if(status==='ready'){
+          setPasswordEstablished(true)
+          setRecoveryOffered(false)
+          setExplicitRetryAvailable(false)
+          setSettingsOpen(false)
+          setMessage('حساب شما طبق وضعیت سرور آماده استفاده است.')
+          setPassword('')
+          setConfirmation('')
+          return
+        }
+        setRecoveryOffered(true)
+        setExplicitRetryAvailable(status==='pending')
+      }
       setPasswordError(workerPasswordChangeErrorCopy({initialSetup: !passwordEstablished}))
-      return
+    }finally{
+      passwordFlight.current=false
+      setSaving(false)
     }
-    setSaving(false)
-    setMessage('رمز اختصاصی حساب شما ثبت شد.')
-    setPasswordEstablished(true)
-    setSettingsOpen(false)
-    setPassword('')
-    setConfirmation('')
   }
 
   const accountSettingsPanel=(
@@ -337,25 +367,30 @@ function WorkerView({ profile, loginEmail, onLogout, initialPasswordRequired = f
               onClick={()=>setSettingsOpen(false)}>بستن</button></div>
           : <><h2>در اولین ورود، رمز اختصاصی خودتان را تعیین کنید</h2>
               <p>حساب شما با لینک اختصاصی باز شده است. برای ادامه، یک رمز جدید حداقل ۸ نویسه‌ای تعیین کنید.</p></>}
-        <form onSubmit={changePassword}>
+        <form onSubmit={event=>{void changePassword(event)}}>
           <label className="report-field">
-            <span>رمز جدید (حداقل ۸ نویسه)</span>
+            <span>{!passwordEstablished&&recoveryOffered?'رمز موجود برای تأیید (حداقل ۸ نویسه)':'رمز جدید (حداقل ۸ نویسه)'}</span>
             <input type="password" minLength={8} maxLength={128} required
-              autoComplete="new-password" dir="ltr"
+              autoComplete={!passwordEstablished&&recoveryOffered?'current-password':'new-password'} dir="ltr"
               value={password} onChange={event => setPassword(event.target.value)}/>
           </label>
           <label className="report-field">
-            <span>تکرار رمز جدید</span>
+            <span>{!passwordEstablished&&recoveryOffered?'تکرار همین رمز':'تکرار رمز جدید'}</span>
             <input type="password" minLength={8} maxLength={128} required
-              autoComplete="new-password" dir="ltr"
+              autoComplete={!passwordEstablished&&recoveryOffered?'current-password':'new-password'} dir="ltr"
               value={confirmation} onChange={event => setConfirmation(event.target.value)}/>
           </label>
           {passwordError && <p className="report-alert report-alert--error" role="alert">{passwordError}</p>}
           {message && <p className="ops-alert-success" role="status">{message}</p>}
           <button className="report-btn report-btn--primary" type="submit"
             disabled={saving || !password || !confirmation}>
-            {saving ? 'در حال ذخیره…' : 'تغییر رمز'}
+            {saving ? 'در حال بررسی…' : passwordEstablished?'تغییر رمز':recoveryOffered?'تکمیل با همین رمز (بدون تغییر رمز)':'ثبت رمز اختصاصی'}
           </button>
+          {!passwordEstablished&&!recoveryOffered&&<button type="button" className="ops-recovery-toggle" disabled={saving||!password||!confirmation} onClick={event=>{void changePassword(event,'proof')}}>قبلاً رمز را تعیین کرده‌ام؛ تکمیل بدون تغییر رمز</button>}
+          {!passwordEstablished&&recoveryOffered&&explicitRetryAvailable&&<div className="ops-worker-recovery-existing" role="note">
+            <p className="ow-muted">نتیجه ثبت قبلی قطعی نیست. ابتدا تکمیل با همین رمز را امتحان کنید. تعیین مجدد ممکن است رمز قبلی را تغییر دهد.</p>
+            <button type="button" className="ops-recovery-toggle" disabled={saving||!password||!confirmation} onClick={event=>{void changePassword(event,'retry')}}>با آگاهی از احتمال تغییر رمز قبلی، دوباره رمز تعیین می‌کنم</button>
+          </div>}
         </form>
       </section>
   )
