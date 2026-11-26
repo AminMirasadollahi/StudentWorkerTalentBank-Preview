@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState }
 import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
 import {workerGuideStorageKey,workerGuideSessionStorageKey,shouldAutoOfferWorkerGuide,suppressWorkerGuideAutoOffers} from './lib/workerGuide.mjs'
 import { trapModalTab } from './lib/dialogFocusTrap.mjs'
+import { readWorkerPolicySnapshot } from './lib/workerPolicySnapshot.mjs'
 import {workerReportContract,workerCorrection,initialWorkerReport,reportInputAllowed,reportDateAllowed,latestWorkerReport,workerPrerequisiteStatus} from './lib/workerReportContract.mjs'
 import {canonicalPresencePayload,createPresenceAttemptLedger,interpretPresenceReceipt,workerPresenceItems,managerPresenceItems} from './lib/presenceChanges.mjs'
 import {requestPresenceChange,listPresenceChanges} from './lib/presenceChangesApi.js'
@@ -50,6 +51,8 @@ import { getAdminWorkV2,getMyWorkV2,getMyWorkerProfileV2,getMyProfileChangeReque
  requestProfileChange,reviewProfileChange,getUnitHourTotals,
  setWorkerState,getWorkerStateHistory } from './lib/operationsV2'
 
+// Explicit opt-in only after the matching backend is installed and accepted.
+const workerPolicyReleaseEnabled=import.meta.env?.VITE_SWTB23_WORKER_POLICY_RELEASE==='true'
 const fa = new Intl.NumberFormat('fa-IR')
 const dLabel = new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
   dateStyle:'medium', timeZone:'UTC',
@@ -2599,7 +2602,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     const sequence=++readSequence.current
     setLoading(true);setError('')
     try{
-      const result=await getMyWorkV2()
+      const result=await readWorkerPolicySnapshot({enabled:workerPolicyReleaseEnabled,readV2:getMyWorkV2,readV3:unifiedPeerApi.getMyWorkV3,workerId:profile.worker_id})
       if(sequence!==readSequence.current||claimSession.current!==session)return
       const scoped=scopeSelfWorkRows(result,profile.worker_id)
       setWorkSnapshot({workerId:profile.worker_id,data:scoped})
@@ -2610,7 +2613,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       // Never retain a visible old work list after a failed authorization refresh.
       setWorkSnapshot({workerId:profile.worker_id,data:{tasks:[],weekly_slots:[],exceptions:[],time_entries:[]}})
       setReadFailed(true)
-      setError(readableError(e))
+      setError(workerPolicyReleaseEnabled?'دریافت اطلاعات معتبر کارها کامل نشد. دوباره تازه‌سازی کنید؛ اگر مشکل ادامه داشت با مدیر هماهنگ کنید.':readableError(e))
     }finally{if(sequence===readSequence.current&&claimSession.current===session)setLoading(false)}
   }
   useEffect(()=>{void refresh()},[profile.worker_id,refreshRevision])
