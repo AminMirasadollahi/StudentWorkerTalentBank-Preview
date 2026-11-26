@@ -75,7 +75,7 @@ try{
  const unit=history.locator('select[aria-label="فیلتر واحد گزارش‌های من"]')
  await unit.selectOption('library');await unit.selectOption('')
  assert.equal(await history.locator('.ow-history-advanced').evaluate(el=>el.open),true)
- await history.locator('.ow-history-analysis summary').click()
+ await history.locator('.ow-history-analysis > summary').click()
  assert.ok(await history.locator('.ow-worker-performance').isVisible())
  assert.match(await history.locator('.ow-unit-hours__total').innerText(),/۰ دقیقه/)
  await sidebar.getByRole('button',{name:'حساب من',exact:true}).click()
