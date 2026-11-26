@@ -2174,6 +2174,8 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
          onClick={()=>{setUnitFilter('');setView('all');setDateFrom('');setDateTo('');setSelectedReportId(null)}}>
          پاک‌کردن فیلترها</button>}
      </div>
+     <details className="ow-history-advanced" open={unitFilter||dateFrom||dateTo?true:undefined}>
+       <summary>فیلتر واحد و تاریخ{unitFilter||dateFrom||dateTo?' · فعال':''}</summary>
      <div className="ow-history-query-fields">
        <label className="report-field ow-history-query-unit">
          <span>واحد انجام کار</span>
@@ -2194,6 +2196,7 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
            onChange={date=>{setDateTo(date);setSelectedReportId(null)}}/>
        </div>
      </div>
+     </details>
      <div className="ow-history-query-status">
        <strong>وضعیت بررسی</strong>
        <div className="ow-history-filter" role="group" aria-label="فیلتر وضعیت گزارش‌ها">
@@ -2210,8 +2213,9 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
      بازه تاریخ نامعتبر است؛ تاریخ شروع نباید پس از تاریخ پایان باشد.
    </p>}
    <div className="ow-history-results-heading">
-     <h3>دفتر گزارش‌ها</h3><span role="status">{n(entries.length)} گزارش در فیلتر فعلی</span>
+     <h3>دفتر گزارش‌ها</h3><span role="status">{n(entries.length)} گزارش از سوابق بارگذاری‌شده</span>
    </div>
+   {records.length>=1000&&<p className="ow-muted" role="status">فهرست به گزارش‌های بارگذاری‌شده محدود است؛ ممکن است سوابق قدیمی‌تر را شامل نشود. جمع قطعی ساعات در بالای صفحه مستقل است.</p>}
    <div className={`ow-b3-ledger-body ${detail?'ow-b3-ledger-body--detail':''}`}>
     <div className="ow-b3-ledger-list" role="list" aria-label="گزارش‌های ثبت‌شده">
      <div className="ow-b3-ledger-columns" aria-hidden="true">
@@ -2271,11 +2275,13 @@ function WorkerReportHistory({tasks,records,approvedMinutesTotal,onNavigate,onGu
     </aside>}
    </div>
    </div>
-   {!dateResult.invalidRange&&<WorkerPerformancePanel rows={entries} tasks={tasks} units={unitLabels}/>}
+   {!dateResult.invalidRange&&<details className="ow-history-analysis"><summary>تحلیل و نمودارهای گزارش‌های بارگذاری‌شده</summary>
+     <WorkerPerformancePanel rows={entries} tasks={tasks} units={unitLabels}/>
+   </details>}
  </section>
 }
 
-function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesTotal,onNavigate,onGuide,onIdentityLoaded,onIdentityInvalidated,refreshRevision=0}) {
+function WorkerSelfProfile({tasks,records,profile,loginEmail,requestLedger,approvedMinutesTotal,onNavigate,onGuide,onIdentityLoaded,onIdentityInvalidated,refreshRevision=0}) {
  const [identity,setIdentity]=useState(null)
  const [identityOwner,setIdentityOwner]=useState(null)
  const [requests,setRequests]=useState([])
@@ -2372,10 +2378,8 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
    }finally{submitLock.current=false;setSaving(false)}
  }
 
-  const approved=records.filter(e=>e.review_state==='approved')
-  // Lifetime server-approved credit may span more than the 1,000 visible records.
-  const approvedTime=approvedMinutesTotal??approved.reduce(
-    (sum,e)=>sum+Number(e.approved_minutes||0),0)
+  // Never substitute a capped historical sum for the authoritative lifetime total.
+  const approvedTime=Number.isInteger(approvedMinutesTotal)&&approvedMinutesTotal>=0?approvedMinutesTotal:null
   const openTasks=tasks.filter(t=>!['completed','cancelled'].includes(t.state)).length
   if(profileReadFailed)return <section className="report-panel ow-self-profile ow-profile-access-recheck" role="alert">
     <p>مشخصات شخصی در دسترس نیستند. اطلاعات قبلی تا تأیید دوبارهٔ دسترسی پنهان می‌مانند.</p>
@@ -2389,7 +2393,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
   </section>
   return <section className="report-panel ow-self-profile">
     <div className="ow-presence-section-title ow-b3-guide-heading--profile"><h2>حساب من</h2>
-      <span className="ow-status">زمان تأییدشده: {exactDuration(approvedTime)}</span>
+      <span className="ow-status">زمان تأییدشده: {approvedTime===null?'در دسترس نیست':exactDuration(approvedTime)}</span>
       <button type="button" className="swtb-guide-launch" data-swtb-guide="help-profile"
         onClick={()=>onGuide?.('profile')}>؟ راهنمای این بخش</button></div>
     <div className="ow-self-identity" data-swtb-guide="profile-details">
@@ -2397,6 +2401,7 @@ function WorkerSelfProfile({tasks,records,profile,requestLedger,approvedMinutesT
       <div><small>رشته تحصیلی</small><strong>{identity?.major||'ثبت نشده'}</strong></div>
       <div><small>سال ورود</small><strong>{identity?.entry_year||'ثبت نشده'}</strong></div>
       <div><small>واحد اولیهٔ ثبت‌نام</small><strong>{unitLabels[identity?.unit]||identity?.unit||'نامشخص'}</strong></div>
+      {loginEmail&&<div><small>ایمیل ورود</small><strong><bdi dir="ltr">{loginEmail}</bdi></strong></div>}
     </div>
     <nav className="ow-self-profile-quicklinks" data-swtb-guide="profile-shortcuts"
       aria-label="پیگیری فعالیت دانشجوکار">
@@ -2640,7 +2645,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     ['action','نیازمند اقدام','اصلاح گزارش‌ها و انجام کارهای موعدرسیده'],
     ['pending','منتظر بررسی','گزارش‌های ارسالی که هنوز در انتظار مدیرند'],
     ['upcoming','پیش‌رو','کارهای برنامه‌ریزی‌شده برای روزهای بعد'],
-    ['completed','انجام‌شده','کارهای تکمیل‌شده'],
+    ['completed','پایان‌یافته','کارهای تکمیل‌شده و لغوشده'],
   ]
   const focusHeading=focusOptions.find(item=>item[0]===taskView)
   const inspectedTask=!settingsOpen&&section==='tasks'?visible.find(t=>t.id===selectedTaskId):undefined
@@ -2717,7 +2722,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     action:'اکنون کاری که نیازمند اقدام شما باشد وجود ندارد.',
     pending:'گزارش منتظر بررسی در فهرست کارها وجود ندارد.',
     upcoming:'کار برنامه‌ریزی‌شده‌ای برای روزهای آینده ثبت نشده است.',
-    completed:'هنوز کاری با وضعیت تکمیل‌شده ثبت نشده است.',
+    completed:'هنوز کار تکمیل‌شده یا لغوشده‌ای در فهرست نیست.',
     calendar:'کاری برای این بازهٔ زمانی ثبت نشده است.',
   }
   return <div className={`ow-workspace ow-worker-workspace ${readFailed?'ow-access-recheck':`ow-b3-layout ${sidebarCollapsed?'ow-b3-is-collapsed':''}`}`}>
@@ -2780,8 +2785,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         <div className="ow-b3-worker" title={visibleWorkerName}>
           <span className="ow-b3-worker__avatar" aria-hidden="true">{visibleWorkerName?.trim()?.[0]||'د'}</span>
           {!sidebarCollapsed&&<div><strong>{visibleWorkerName}</strong>
-            {loginEmail&&<small className="ow-b3-login-email">
-              ایمیل ورود: <bdi dir="ltr">{loginEmail}</bdi></small>}
+
           </div>}
         </div>
         <div className="ow-b3-worker-actions">
@@ -2964,11 +2968,11 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           showPeers={showCoworkers} peerRefreshRevision={refreshRevision}/>
       </div>
     </section>}
-    {!settingsOpen&&section==='history'&&<WorkerReportHistory tasks={tasks} records={records}
+    {!settingsOpen&&section==='history'&&<WorkerReportHistory key={profile.worker_id} tasks={tasks} records={records}
       onGuide={openWorkerGuide} refreshRevision={refreshRevision} approvedMinutesTotal={data.approved_minutes_total}
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}/>}
-    {!settingsOpen&&section==='profile'&&<WorkerSelfProfile tasks={tasks} records={records} profile={profile}
+    {!settingsOpen&&section==='profile'&&<WorkerSelfProfile key={profile.worker_id} tasks={tasks} records={records} profile={profile} loginEmail={loginEmail}
       onGuide={openWorkerGuide} onIdentityLoaded={acceptCanonicalName}
       onIdentityInvalidated={invalidateCanonicalName}
       requestLedger={acknowledgedActions.current.profileRequests}

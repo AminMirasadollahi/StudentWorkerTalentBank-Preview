@@ -1240,6 +1240,8 @@ test('worker homepage is action-first and preserves the familiar date drilldown'
   assert.match(ui.host.querySelector('.ow-worker-tasks').textContent,/وظیفه آینده در ماه بعد/)
   await act(async()=>switches[3].click())
   assert.match(ui.host.querySelector('.ow-worker-tasks').textContent,/وظیفه تکمیل‌شده دیگر/)
+  assert.match(ui.host.querySelector('.ow-worker-tasks').textContent,/کار لغوشده دیگر/)
+  assert.equal(ui.host.querySelectorAll('.ow-worker-tasks .ow-worker-report-trigger').length,0)
   await ui.clickText('این ماه')
   assert.equal(ui.host.querySelector('.ow-range-switch button[aria-pressed="true"]').textContent,'این ماه')
   await ui.clickText('حساب من')
@@ -1420,8 +1422,11 @@ test('zero-credit worker history renders an accessible donut and monthly baselin
   await ui.clickText('سوابق گزارش‌ها')
   const area=ui.host.querySelector('.ow-worker-performance')
   assert.ok(area)
-  assert.equal(area.querySelector('.ow-worker-performance-chart-disclosure summary'),null,
-    'charts are not hidden behind a disclosure')
+  assert.equal(area.closest('.ow-history-analysis').open,false,'analysis is optional')
+  assert.equal(ui.host.querySelector('.ow-history-advanced').open,false,'advanced filters are optional')
+  assert.equal(ui.host.querySelectorAll('.ow-history-filter button').length,5,'status filter is direct')
+  await act(async()=>area.closest('.ow-history-analysis').querySelector('summary').click())
+  assert.equal(area.closest('.ow-history-analysis').open,true)
   const donut=area.querySelector('.ow-worker-unit-donut')
   assert.ok(donut)
   assert.match(donut.textContent,/۰ دقیقه/)
@@ -1474,4 +1479,12 @@ test('SWTB21 workspace routes an exact receipt, retains one pool, and hides it o
   await waitForPool()
   assert.equal(globalThis.__qaPoolMounts,1,'same scoped pool persists through denied read')
  }finally{globalThis.__workerReadDenied=false;await ui.dispose()}
+})
+
+
+test('missing authoritative total never becomes zero or a capped partial sum in account',async()=>{
+ const data=fixture();data.time_entries=[{id:'SYNTHETIC-APPROVED',task_id:'FAKE-TASK',worker_id:worker,work_date:day(),review_state:'approved',reported_minutes:60,approved_minutes:60}]
+ globalThis.__workerFocusFixture=data
+ const ui=await setup()
+ try{await ui.clickText('حساب من');assert.match(ui.host.querySelector('.ow-self-profile').textContent,/زمان تأییدشده: در دسترس نیست/);await ui.clickText('سوابق گزارش‌ها');assert.equal(ui.host.querySelector('.ow-unit-hours__total').textContent,'—')}finally{globalThis.__workerFocusFixture=fixture();await ui.dispose()}
 })

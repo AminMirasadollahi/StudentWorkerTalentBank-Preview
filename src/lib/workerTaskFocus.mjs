@@ -23,7 +23,8 @@ export function selectWorkerTaskFocus(tasks=[],todayIso,view='action') {
    UPCOMING.has(task.state)&&hasPlannedDate(task.planned_date)
      &&task.planned_date>todayIso)
    .sort(asc)
- if(view==='completed')return source.filter(task=>task.state==='completed')
+ // Historical lane keeps completed AND cancelled tasks distinct by their canonical state.
+ if(view==='completed')return source.filter(task=>task.state==='completed'||task.state==='cancelled')
    .sort((a,b)=>safelyDated(b.planned_date).localeCompare(safelyDated(a.planned_date)))
  return []
 }
