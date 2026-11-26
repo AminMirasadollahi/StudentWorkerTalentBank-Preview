@@ -32,6 +32,7 @@ import {useUnifiedPeerCalendar} from './lib/useUnifiedPeerCalendar.js'
 import { projectDayPresence } from './lib/presenceDayProjection.mjs'
 import {presenceReviewTiming} from './lib/presenceReviewTiming.mjs'
 import TaskAssignmentEditor from './components/TaskAssignmentEditor'
+import TaskPrerequisiteEditor from './components/TaskPrerequisiteEditor.jsx'
 import TeamScheduleOverview from './components/TeamScheduleOverview'
 import TermBudgetPanel from './components/TermBudgetPanel'
 import FocusedReviewQueue from './components/FocusedReviewQueue'
@@ -1201,6 +1202,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const [assignmentDialogDate,setAssignmentDialogDate]=useState('')
   const focusedTasks=hideSectionTabs&&focusTaskUIEnabled
   const [taskEditorOpen,setTaskEditorOpen]=useState(false)
+  const [prerequisiteTaskId,setPrerequisiteTaskId]=useState(null)
   const [taskEditorRevision,setTaskEditorRevision]=useState(0)
   const taskEditorDialogRef=useRef(null)
   const taskEditorOpenerRef=useRef(null)
@@ -1526,6 +1528,11 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
                 <summary>جزئیات</summary>
                 <p className="ow-muted">{detail.step===null?'وضعیت لغوشده یا نامشخص':`مرحله ${n(detail.step)} از ۴ · ${detail.label}`}
                   {' · '}{n(detail.reportCount)} گزارش ثبت‌شده</p>
+                {workerPolicyReleaseEnabled&&<button type="button" className="report-btn report-btn--light" aria-expanded={prerequisiteTaskId===t.id}
+                  onClick={()=>setPrerequisiteTaskId(prev=>prev===t.id?null:t.id)}>پیش‌نیازهای این وظیفه</button>}
+                {workerPolicyReleaseEnabled&&prerequisiteTaskId===t.id&&<TaskPrerequisiteEditor key={t.id} task={t} tasks={allTasks}
+                  workerLabel={id=>label(id,workers)} formatDate={pretty}
+                  read={unifiedPeerApi.getTaskPrerequisites} write={unifiedPeerApi.setTaskPrerequisites}/>}
               </details>
               {t.short_notice&&<p className="ow-warning">واگذاری کوتاه‌مدت: {t.short_notice_reason}</p>}
             </article>
