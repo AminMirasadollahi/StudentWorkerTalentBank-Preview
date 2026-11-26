@@ -15,7 +15,7 @@ const token=encode({alg:'HS256',typ:'JWT'})+'.'+encode({sub:user.id,aud:'authent
 const session={access_token:token,refresh_token:'synthetic-refresh-not-a-real-credential',token_type:'bearer',expires_at:now+3600,expires_in:3600,user}
 const profile={worker_id:id(2),name:'دانشجوکار ساختگی',state:'active',unit:'library',onboarding_state:'password_required'}
 let responseMode='reject',server,browser,context,page,reads=0
-const mutations=[],unexpected=[],errors=[]
+const mutations=[],unexpected=[],errors=[],observed=[]
 try{
  server=await createServer({configFile:resolve('vite.config.js'),mode:'production',base:'/',server:{host:'127.0.0.1',port:4189,strictPort:true},logLevel:'error'})
  await server.listen()
@@ -23,7 +23,7 @@ try{
  context=await browser.newContext({viewport:{width:1440,height:900},locale:'fa-IR',serviceWorkers:'block'})
  await context.addInitScript(({storageKey,session})=>{
   if(location.origin==='http://127.0.0.1:4189'&&!sessionStorage.getItem('s01-seeded')){
-   localStorage.setItem(storageKey,JSON.stringify(session));sessionStorage.setItem('s01-seeded','1')
+   localStorage.setItem(storageKey,JSON.stringify(session));localStorage.setItem('swtb-worker-guide:v1:00000000-0000-4000-8000-000000000002','suppressed');sessionStorage.setItem('s01-seeded','1')
   }
  },{storageKey:'student-worker-operations-review-'+project,session})
  const cors={'access-control-allow-origin':local,'access-control-allow-methods':'GET, POST, OPTIONS','access-control-allow-headers':'*'}
@@ -32,6 +32,7 @@ try{
   if(url.origin===local)return route.continue()
   const respond=(status,body)=>route.fulfill({status,headers:cors,contentType:'application/json',body:JSON.stringify(body)})
   if(url.origin!==origin){unexpected.push('external origin');return route.abort('blockedbyclient')}
+  observed.push(req.method()+' '+url.pathname)
   if(req.method()==='OPTIONS')return route.fulfill({status:204,headers:cors,body:''})
   const headers=req.headers()
   if(headers.apikey!==key||headers.authorization!=='Bearer '+token){unexpected.push('authorization');return respond(401,{message:'SYNTHETIC_DENIED'})}
@@ -53,7 +54,8 @@ try{
   unexpected.push(rpc);return respond(403,{message:'SYNTHETIC_DENIED'})
  })
  page=await context.newPage();page.on('pageerror',e=>errors.push(e.message))
- await page.goto(local+'/?page=worker')
+ // The actual review entry deliberately blocks ?page=worker; the server-verified worker role selects WorkerView from ?page=operations.
+ await page.goto(local+'/?page=operations')
  const panel=page.locator('#ops-worker-account-settings')
  await panel.getByRole('heading',{name:/در اولین ورود/}).waitFor()
  const fill=async()=>{await panel.locator('input[type=password]').nth(0).fill('Synthetic-password-42');await panel.locator('input[type=password]').nth(1).fill('Synthetic-password-42')}
@@ -76,4 +78,4 @@ try{
  assert.deepEqual(unexpected,[]);assert.deepEqual(errors,[])
  console.log('PASS LEGACY_AUTH_INITIAL_TO_STRICT_V3')
  console.log('SWTB24_LEGACY_AUTH_NATIVE_CHROME_PASS')
-}catch(e){console.error('SWTB24_BROWSER_DIAGNOSTIC',JSON.stringify({unexpected,errors,reads,mutationCount:mutations.length}));throw e}finally{await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}
+}catch(e){console.error('SWTB24_BROWSER_DIAGNOSTIC',JSON.stringify({unexpected,errors,reads,mutationCount:mutations.length,observed,headings:await page?.locator('h1,h2').allTextContents().catch(()=>[])}));throw e}finally{await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}
