@@ -98,7 +98,10 @@ test('actual worker component pins payload and idempotency key BEFORE any RPC ca
  assert.ok(part.includes('()=>submitMyTime({...savedPayload,clientSubmissionId:keyRef.current})'))
  assert.ok(part.indexOf('submissionPayload:savedPayload')<part.indexOf('()=>submitMyTime({...savedPayload'))
  assert.ok(part.includes('const initialAttempt=sameReviewCycle?acknowledged?.submissionPayload:null'))
- assert.ok(part.includes('setDate]=useState(initialAttempt?.date||today())'))
+ assert.ok(part.includes('initialWorkerReport(task,serverToday,initialAttempt)'))
+ assert.ok(part.includes('setDate]=useState(v3?initial.date:initialAttempt?.date||today())'))
+ const helper=readFileSync(new URL('../src/lib/workerReportContract.mjs',import.meta.url),'utf8')
+ assert.ok(helper.indexOf('if(attempt)return')>=0&&helper.indexOf('if(attempt)return')<helper.indexOf('if(prior)return'))
 })
 
 test('actual worker component retains uncertain result but clears keys after explicit DB rejection',()=>{
