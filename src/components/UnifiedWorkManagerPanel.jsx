@@ -555,14 +555,16 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
      <div><dt>زمان انجام</dt><dd>{faDate(inspected.date)}
       {inspected.end_date&&inspected.end_date!==inspected.date?' تا '+faDate(inspected.end_date):''}</dd></div>
      <div><dt>مهلت انتخاب</dt><dd>{faDate(inspected.claim_deadline)}</dd></div>
-     <div><dt>تعداد انتخاب‌شده</dt><dd>{nf.format(inspected.claimed_count||0)} از {nf.format(inspected.capacity||0)} نفر</dd></div>
+     <div><dt>تعداد انتخاب‌شده</dt><dd>{nf.format(inspected.claimed_count||0)}{inspected.effort_budget_minutes==null?' از '+nf.format(inspected.capacity||0):''} نفر</dd></div>
      {inspected.effort_budget_minutes!=null&&<>
+      <div><dt>سقف تعداد افراد</dt><dd>{nf.format(inspected.capacity||0)} نفر</dd></div>
       <div><dt>حجم کل تخمینی</dt><dd>{durationFa(inspected.effort_budget_minutes)}</dd></div>
       <div><dt>سهم رزروشده</dt><dd>{durationFa(inspected.reserved_minutes||0)}</dd></div>
       <div><dt>حجم باقی‌مانده</dt><dd>{durationFa(inspected.effort_budget_minutes-(inspected.reserved_minutes||0))}</dd></div>
      </>}
      {inspectedTemplate?.priority!=null&&<div><dt>اولویت</dt><dd>{nf.format(inspectedTemplate.priority)}</dd></div>}
     </dl>
+    {inspected.effort_budget_minutes!=null&&<p className="ow-muted swtb19-unified-work__detail-note">سقف تعداد افراد، تعداد نفرات موردنیاز نیست؛ تعداد واقعی به سهم انتخابی افراد و حجم باقی‌مانده بستگی دارد.</p>}
     <p className="ow-muted swtb19-unified-work__detail-note">تغییر وضعیت فرصت از کارت آن انجام می‌شود. ویرایش شرح فقط پیش از اولین انتخاب دانشجو و هنگام توقف انتخاب مجاز است؛ سایر مشخصات در این مرحله قابل ویرایش نیستند.</p>
    </aside>}
   </div>}
