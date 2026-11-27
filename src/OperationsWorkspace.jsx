@@ -1,3 +1,4 @@
+import WindowReadReviewSlot from './components/WindowReadReviewSlot.jsx'
 import {useManagerDraftScope} from './lib/managerDraftGuard.mjs'
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
@@ -1158,7 +1159,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
   </section>
 }
 export function AdminOperations({ navigation, setNavigation, refreshRevision = 0,
-  hideSectionTabs = false, loadOriginalCandidates, assignmentReceiptPort=null, workPoolRouteFence=null }) {
+  hideSectionTabs = false, loadOriginalCandidates, assignmentReceiptPort=null, workPoolRouteFence=null, windowReadReview=null }) {
   const draftScope=useManagerDraftScope()
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const view=navigation.workView
@@ -1270,6 +1271,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   },[historyUnit,historyReview,historyFrom,historyTo])
 
   const refresh=async ()=>{
+    if(windowReadReview!==null)return false // fixture must never call a legacy data route
     // Ignore older in-flight responses after a newer role check has completed.
     const sequence=++readSequence.current
     const settleRead=assignmentReceiptPort?.beginScopedRead?.('work')
@@ -1401,6 +1403,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     finally{setBusy(false)}
   }
 
+  if(windowReadReview!==null)return <div className="ow-workspace">{view==='history'?<WindowReadReviewSlot request={windowReadReview} role="manager" section="history" refreshRevision={refreshRevision}/>:<p role="status">این مسیر در نمای خواندنی آزمایشی فعال نیست.</p>}</div>
   if(readFailed)return <div className="ow-workspace ow-access-recheck" role="alert">
     <p>اطلاعات مدیریتی در دسترس نیست. تا بررسی دوبارهٔ مجوز، داده‌های قبلی نمایش داده نمی‌شوند.</p>
     {assignmentReceiptPort?.committedRevision>0&&<p role="status">ثبت آخرین واگذاری تأیید شده بود؛ خطای بازخوانی به معنای لغو آن نیست. برای تازه‌سازی فقط اطلاعات را دوباره دریافت کنید.</p>}
@@ -2574,7 +2577,7 @@ function WorkerSelfProfile({tasks,records,profile,loginEmail,requestLedger,appro
   </section>
 }
 export function WorkerOperations({profile,navigation,setNavigation,refreshRevision=0,
-  workerName='',loginEmail='',settingsPanel=null,settingsNotice='',onLogout,onRefresh,onToggleSettings,settingsOpen=false}) {
+  workerName='',loginEmail='',settingsPanel=null,settingsNotice='',onLogout,onRefresh,onToggleSettings,settingsOpen=false,windowReadReview=null}) {
   // The protected worker projection must never be rendered for a new principal
   // while its new server read is pending. Same-component account replacement
   // may otherwise expose the previous worker for one React paint.
@@ -2600,6 +2603,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
     setNameSnapshot({workerId:null,name:''})
   }
   useEffect(()=>{
+    if(windowReadReview!==null)return
     const workerId=profile.worker_id
     const version=++nameReadVersion.current
     let cancelled=false
@@ -2666,6 +2670,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
   },[session,section,settingsOpen,readFailed,guideScope,poolAuthorized])
   const readSequence=useRef(0)
   const refresh=async()=>{
+    if(windowReadReview!==null)return
     const sequence=++readSequence.current
     setLoading(true);setError('')
     try{
@@ -2828,7 +2833,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
         ['availability','زمان حضور'],['history','سوابق گزارش‌ها'],['profile','حساب من'],
       ]}/>
       <div className="ow-b3-sidebar__footer" id="ow-b3-account-actions">
-        <div className="swtb-policy-sidebar-actions">
+        <div className="swtb-policy-sidebar-actions" hidden={windowReadReview!==null} inert={windowReadReview!==null}>
           <button type="button" className="swtb-guide-launch swtb-policy-sidebar-action"
             data-swtb-guide="help-global"
             title="راهنمای تصویری سامانه" aria-label="راهنمای سامانه"
@@ -2893,6 +2898,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           <strong>{settingsOpen?'تنظیمات حساب':sectionNames[section]}</strong></span>
         <span className="ow-b3-online">حساب فعال · اطلاعات عملیاتی</span>
       </header>
+      {windowReadReview!==null?<>{!settingsOpen&&['tasks','history'].includes(section)?<WindowReadReviewSlot request={windowReadReview} role="worker" workerId={profile.worker_id} section={section} refreshRevision={refreshRevision}/>:<p role="status">این مسیر در نمای خواندنی آزمایشی فعال نیست.</p>}</>:<>
       {settingsNotice&&<p className="ops-alert-success" role="status">{settingsNotice}</p>}
       {settingsOpen&&settingsPanel}
       {loading&&<p className="ow-muted" role="status">در حال دریافت برنامه…</p>}
@@ -3059,7 +3065,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
       onNavigate={(nextSection,nextView)=>updateNavigation({section:nextSection,
         ...(nextView?{taskView:nextView}:{})})}
       approvedMinutesTotal={data.approved_minutes_total} refreshRevision={refreshRevision}/>}
-    </>}
+    </>}</>}
     </div>
     {!readFailed&&workerCharterInfoEnabled&&charterInfoOpen&&<Suspense
       fallback={<p role="status">در حال بارگذاری متن چارچوب همکاری…</p>}>

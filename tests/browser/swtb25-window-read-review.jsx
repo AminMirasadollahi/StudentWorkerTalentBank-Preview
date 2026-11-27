@@ -3,13 +3,6 @@ import {createRoot} from 'react-dom/client'
 import WindowReadReview from '../../src/components/WindowReadReview.jsx'
 import '../../src/typography.css'
 import '../../src/styles.css'
-const id=n=>'20000000-0000-4000-8000-'+String(n).padStart(12,'0')
-const worker=id(1),today='2026-11-27'
-const common={worker_id:worker,unit:'research',estimate_minutes:120,instructions:'شرح نمونه؛ فقط برای بررسی رابط کاربری.',state:'assigned',planned_date:null,schedule_kind:'single_report_window',window_start:'2026-11-26',window_end:'2026-11-30',window_revision:1,window_term_id:id(10),daily_allocated_minutes:null,allocation_code:'UNALLOCATED_WINDOW',has_any_report:false}
-const tasks=[{...common,id:id(2),title:'آماده‌سازی گزارش پژوهشی'},{...common,id:id(3),title:'تنظیم فهرست کارگاه‌ها',window_start:'2026-12-02',window_end:'2026-12-05'},{...common,id:id(4),title:'گزارش فعالیت پژوهشی',state:'completed',has_any_report:true},{...common,id:id(5),title:'کار دارای گزارش خارج از فهرست',state:'completed',has_any_report:true},{id:id(6),worker_id:worker,unit:'library',title:'مرتب‌سازی کتاب‌ها',instructions:'نمونه روزانه',planned_date:today,schedule_kind:'legacy_day',state:'assigned',estimate_minutes:45,has_any_report:false}]
-const report={id:id(7),task_id:id(4),worker_id:worker,work_date:today,reported_minutes:120,approved_minutes:120,review_state:'approved',worker_note:'یادداشت نمونه'}
-const manager={schedule_contract_version:2,review_only:true,workers:[{id:worker,name:'دانشجوکار نمونه'}],tasks,time_entries:[report]}
-const ownTasks=tasks.map(t=>{if(t.schedule_kind==='legacy_day')return t;const future=t.window_start>today,done=t.state==='completed';return {...t,window_actions:{review_only:true,date_min:t.window_start,date_max:future?today:today,window_empty:future,standard_minutes:120,minimum_minutes:120,maximum_minutes:1440,extra_reason_above_minutes:120,can_start:!future&&!done,can_submit:!future&&!done,hold_reason:done?'TASK_STATE':future?'WINDOW_NOT_STARTED':null}}})
-const self={report_contract_version:2,window_contract_review_only:true,server_today:today,tasks:ownTasks,time_entries:[report],approved_minutes_total:240}
+import {worker,manager,self} from './windowReadReviewFixtureData.mjs'
 function App(){const [role,setRole]=useState('manager');return <><div dir="rtl" style={{padding:12,display:'flex',gap:8}}><button type="button" onClick={()=>setRole('manager')}>نمای مدیر</button><button type="button" onClick={()=>setRole('worker')}>نمای دانشجوکار</button></div><WindowReadReview key={role} role={role} snapshot={role==='manager'?manager:self} workerId={worker} syntheticReviewOnly/></>}
 createRoot(document.getElementById('root')).render(<App/>)
