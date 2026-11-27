@@ -1,0 +1,18 @@
+/* Review-only composer; no existing shell selectors changed. */
+.swtb24-batch-preview{display:grid;gap:14px;max-width:1100px;margin-inline:auto}
+.swtb24-batch-preview fieldset{min-width:0;border:1px solid #ccd9dc;border-radius:8px;padding:12px}
+.swtb24-batch-preview legend{font-weight:600;padding-inline:6px}
+.swtb24-batch-defaults,.swtb24-batch-title{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px}
+.swtb24-batch-rows{display:grid;gap:12px}
+.swtb24-batch-row{display:grid;gap:10px}
+.swtb24-batch-row details{padding:8px;border:1px solid #e1e7e9;border-radius:6px}
+.swtb24-batch-row details summary{cursor:pointer}
+.swtb24-batch-row details fieldset,.swtb24-batch-people{display:flex;flex-wrap:wrap;gap:12px}
+.swtb24-batch-people label,.swtb24-batch-row details fieldset label{display:flex;align-items:center;gap:6px;min-height:44px}
+.swtb24-batch-matrix-scroll{overflow-x:auto;max-width:100%}
+.swtb24-batch-preview table{width:100%;border-collapse:collapse}
+.swtb24-batch-preview th,.swtb24-batch-preview td{padding:10px;border-bottom:1px solid #dbe3e5;text-align:start}
+.swtb24-batch-preview td:has(input),.swtb24-batch-preview thead th{text-align:center}
+.swtb24-batch-preview input[type=checkbox]{width:20px;height:20px;accent-color:#176d76}
+.swtb24-batch-preview input:focus-visible,.swtb24-batch-preview button:focus-visible,.swtb24-batch-preview select:focus-visible,.swtb24-batch-preview summary:focus-visible{outline:2px solid #176d76;outline-offset:2px}
+.swtb24-batch-result{padding:12px;background:#f2f8f7;border-radius:8px}
