@@ -2,11 +2,13 @@ import {useEffect,useState,useSyncExternalStore} from 'react'
 import {windowReadReviewScope} from '../lib/windowReadReviewPort.mjs'
 import WindowReadReview from './WindowReadReview.jsx'
 import WindowEditorReview from './WindowEditorReview.jsx'
+import WindowTermReview from './WindowTermReview.jsx'
+import {buildReviewAssignmentScope} from '../lib/windowTermReview.mjs'
 import {managerWindowHistoryV2} from '../lib/managerWindowReadV2.mjs'
 import {workerWindowReviewModel} from '../lib/windowReviewPresentation.mjs'
 const noSubscribe=()=>()=>{}
 const zero=()=>0
-function Editors({scope,section,snapshot,editor}){
+function Editors({scope,section,snapshot,editor,assignmentScope}){
  const session=editor.session
  useSyncExternalStore(session.subscribe,session.getVersion,session.getVersion)
  const ss=session.state(),role=scope.context.role
@@ -15,10 +17,8 @@ function Editors({scope,section,snapshot,editor}){
  const common={session,role,newId:editor.newId,syntheticReviewOnly:true}
  const matches=ss.pendingTarget||ss.receiptTarget
  if(role==='manager'&&section==='tasks'){
-  const term=editor.assignmentScope?.term
-  const given=editor.assignmentScope
-  if(!term||!Array.isArray(given.workers)||!Array.isArray(given.prerequisites))return <p role="alert">دامنه واگذاری آزمایشی معتبر نیست.</p>
-  const assignmentScope={...given,workers:given.workers.filter(w=>snapshot.workers.some(x=>x.id===w.id)),prerequisites:given.prerequisites.filter(t=>snapshot.tasks.some(x=>x.id===t.id))}
+  const term=assignmentScope?.term
+  if(!term)return <p role="alert">دامنه واگذاری آزمایشی معتبر نیست.</p>
   return <WindowEditorReview key={'assignment:'+term.id} {...common} mode="assignment" scope={assignmentScope}/>
  }
  if(role==='manager'&&['inbox','approvals'].includes(section)){
@@ -40,16 +40,22 @@ function ScopedRead({scope,section,editor}){
  const [retry,setRetry]=useState(0)
  useEffect(()=>{
   let active=true
-  scope.port.read(scope.context).then(snapshot=>{
+  scope.port.read(scope.context).then(async snapshot=>{
    if(scope.context.role==='manager')managerWindowHistoryV2(snapshot,{},{})
    else workerWindowReviewModel(snapshot,scope.context.workerId)
-   if(active)setResult({state:'ready',snapshot})
+   let termRead=null,assignmentScope=null
+   if(scope.context.role==='manager'&&(['terms','termMemberships'].includes(section)||section==='tasks'&&editor)){
+    termRead=await scope.port.term(scope.context)
+    if(section==='tasks'&&editor&&termRead.term){const access=await scope.port.access(scope.context,termRead.term);assignmentScope=buildReviewAssignmentScope({snapshot,termRead,access,fixtureReadiness:editor.fixtureReadiness})}
+   }
+   if(active)setResult({state:'ready',snapshot,termRead,assignmentScope})
   }).catch(()=>{if(active)setResult({state:'denied'})})
   return()=>{active=false}
  },[scope.port,scope.key,retry])
  if(result.state==='loading')return <p role="status">در حال دریافت اطلاعات معتبر آزمایشی…</p>
  if(result.state!=='ready')return <><p role="alert">دریافت قرارداد معتبر ممکن نشد؛ اطلاعات قبلی نمایش داده نمی‌شود.</p><button type="button" onClick={()=>{setResult({state:'loading'});setRetry(x=>x+1)}}>تلاش مجدد برای دریافت اطلاعات</button></>
- if(editor&&((scope.context.role==='manager'&&['tasks','inbox','approvals'].includes(section))||(scope.context.role==='worker'&&section==='tasks')))return <Editors scope={scope} section={section} snapshot={result.snapshot} editor={editor}/>
+ if(scope.context.role==='manager'&&['terms','termMemberships'].includes(section))return <WindowTermReview scope={scope} section={section} snapshot={result.snapshot} initial={result.termRead}/>
+ if(editor&&((scope.context.role==='manager'&&['tasks','inbox','approvals'].includes(section))||(scope.context.role==='worker'&&section==='tasks')))return <Editors scope={scope} section={section} snapshot={result.snapshot} editor={editor} assignmentScope={result.assignmentScope}/>
  return <WindowReadReview role={scope.context.role} workerId={scope.context.workerId} snapshot={result.snapshot} syntheticReviewOnly section={section} embedded/>
 }
 export default function WindowReadReviewSlot({request,role,workerId=null,refreshRevision=0,section}){
