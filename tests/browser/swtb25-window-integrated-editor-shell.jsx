@@ -7,7 +7,7 @@ import {nextManagerNavigation} from '../../src/lib/managerWorkspaceNav.mjs'
 import {createWindowReadReviewPort} from '../../src/lib/windowReadReviewPort.mjs'
 import {createWindowEditorSession} from '../../src/lib/windowEditorSession.mjs'
 import {id,worker,manager,self} from './windowReadReviewFixtureData.mjs'
-import {termFixture,accessFixture,fixtureReadiness} from './windowTermFixtureData.mjs'
+import {termFixture,accessFixture,assignmentScopeFixture} from './windowTermFixtureData.mjs'
 import '../../src/typography.css'
 import '../../src/styles.css'
 import '../../src/production-polish.css'
@@ -50,6 +50,7 @@ function currentTerm(a){
 }
 const transport=c=>async(n,a)=>{
  if(n.endsWith('capabilities_v1'))return cap(c)
+ if(n.endsWith('assignment_scope_v1')){if(failRead)throw Error('QA_SCOPE_READ_FAIL');return structuredClone(assignmentScopeFixture)}
  if(n.endsWith('term_read_v1')){if(failRead)throw Error('QA_TERM_READ_FAIL');return currentTerm(a)}
  if(n.endsWith('term_access_v1')){if(failRead)throw Error('QA_ACCESS_READ_FAIL');return structuredClone(accessFixture)}
  if(n.endsWith('_read_v1')){metrics.reads++;if(failRead)throw Error('QA_REFRESH_FAIL');return structuredClone(c.role==='manager'?db:workerSnapshot())}
@@ -84,7 +85,7 @@ function Stage(){
  const [role,setRole]=useState('manager'),[status,setStatus]=useState('verified'),[rev,setRev]=useState(0)
  const [nav,setNav]=useState({section:'work',workView:'tasks',candidateView:'applicants',candidateFilter:'all'}),[wn,setWn]=useState({section:'tasks',taskRange:'today'})
  const current=role==='manager'?m:w,c=role==='manager'?mc:wc
- const req={port:current.port,context:{...c,status},editor:{session:current.session,fixtureReadiness,newId}}
+ const req={port:current.port,context:{...c,status},editor:{session:current.session,newId}}
  const flags={r5IaFixture:true}
  return <><div dir="rtl" aria-label="کنترل آزمایش" style={{display:'flex',flexWrap:'wrap',gap:8,padding:8}}>
  <button onClick={()=>{setRole('manager');m.session.setAuthority(mc);setStatus('verified')}}>مدیر نمونه</button>

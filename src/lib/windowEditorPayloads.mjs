@@ -11,7 +11,7 @@ const units=['library','research','public_relations']
 export const extraReasons=Object.freeze({equipment_issue:'مشکل تجهیزات',unexpected_complexity:'پیچیدگی پیش‌بینی‌نشده',instructions_changed:'تغییر دستور کار',skill_gap:'نیاز به یادگیری بیشتر',other:'سایر'})
 export function assignmentWindowPayload(d,scope,key,epoch){
  if(!uuid(key)||!Number.isSafeInteger(epoch)||epoch<0||!day(scope?.serverToday)||!scope.term||!uuid(scope.term.id)||scope.term.state!=='active'||!day(scope.term.start_date)||!day(scope.term.end_date)||!Array.isArray(scope.workers)||!Array.isArray(scope.prerequisites))return deny('SCOPE')
- if(!scope.workers.some(w=>w.id===d.workerId&&w.state==='active'&&w.onboarding_state==='ready'&&w.eligibility==='eligible')||!uuid(d.workerId)||!units.includes(d.unit))return deny('WORKER')
+ if(!scope.workers.some(w=>w.id===d.workerId&&w.state==='active'&&w.onboarding_state==='ready'&&w.eligibility==='eligible')||!uuid(d.workerId)||!units.includes(d.unit)||(scope.activeUnits!==undefined&&(!Array.isArray(scope.activeUnits)||!scope.activeUnits.includes(d.unit))))return deny('WORKER')
  if(!day(d.start)||!day(d.end)||d.start<scope.serverToday||d.start<scope.term.start_date||d.end>scope.term.end_date||d.start>d.end)return deny('DATE')
  if(len(d.title)>160||len(pgTrim(d.title))<3||len(d.instructions)>3000)return deny('TEXT')
  if(!integer(d.minutes,1,1440))return deny('MINUTES')

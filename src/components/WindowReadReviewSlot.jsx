@@ -44,9 +44,10 @@ function ScopedRead({scope,section,editor}){
    if(scope.context.role==='manager')managerWindowHistoryV2(snapshot,{},{})
    else workerWindowReviewModel(snapshot,scope.context.workerId)
    let termRead=null,assignmentScope=null
-   if(scope.context.role==='manager'&&(['terms','termMemberships'].includes(section)||section==='tasks'&&editor)){
-    termRead=await scope.port.term(scope.context)
-    if(section==='tasks'&&editor&&termRead.term){const access=await scope.port.access(scope.context,termRead.term);assignmentScope=buildReviewAssignmentScope({snapshot,termRead,access,fixtureReadiness:editor.fixtureReadiness})}
+   if(scope.context.role==='manager'&&['terms','termMemberships'].includes(section))termRead=await scope.port.term(scope.context)
+   if(scope.context.role==='manager'&&section==='tasks'&&editor){
+    const metadata=await scope.port.assignmentScope(scope.context)
+    assignmentScope=buildReviewAssignmentScope({snapshot,assignmentScope:metadata,actorId:scope.context.actorId})
    }
    if(active)setResult({state:'ready',snapshot,termRead,assignmentScope})
   }).catch(()=>{if(active)setResult({state:'denied'})})

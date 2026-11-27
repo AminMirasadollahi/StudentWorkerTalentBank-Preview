@@ -42,19 +42,21 @@ export function validateWindowTermAccess(raw,t){
  if(raw.active_workers!==active.length||raw.active_without_decision!==active.filter(x=>x.eligibility==='unknown').length||raw.active_not_eligible!==active.filter(x=>x.eligibility==='not_eligible').length||raw.window_noneligible_open_tasks>raw.window_noneligible_tasks)fail()
  return raw
 }
-export function buildReviewAssignmentScope({snapshot,termRead,access,fixtureReadiness}){
- validateWindowTermRead(termRead)
- const t=termRead.term
- if(!t||t.state!=='active')return null
- validateWindowTermAccess(access,t)
- // These two fields are NOT provided by the current manager/term API.
- // Explicit synthetic injection only, never infer them from membership.
- if(fixtureReadiness?.syntheticReviewOnly!==true||!day(fixtureReadiness.serverToday)||!Array.isArray(fixtureReadiness.workers))return null
+export function validateAssignmentScope(raw,actorId){
+ if(!uuid(actorId)||raw?.ok!==true||raw.scope_contract_version!==1||raw.schedule_contract_version!==2||raw.review_only!==true||raw.actor_id!==actorId||!day(raw.server_today)||raw.server_today<'2000-01-01'||raw.server_today>'2100-12-31')fail()
+ if(!Array.isArray(raw.active_units)||raw.active_units.some(x=>!string(x))||new Set(raw.active_units).size!==raw.active_units.length)fail()
+ if(raw.term===null){if(raw.enforcement_mode!==null||!Array.isArray(raw.workers)||raw.workers.length)fail();return raw}
+ if(!term(raw.term)||raw.term.state!=='active'||!['observe','enforced'].includes(raw.enforcement_mode))fail()
+ list(raw.workers,x=>x.worker_id,x=>uuid(x.worker_id)&&['active','paused','inactive'].includes(x.global_state)&&['ready','password_required'].includes(x.onboarding_state)&&['unknown','eligible','not_eligible'].includes(x.eligibility)&&Object.keys(x).length===4)
+ return raw
+}
+export function buildReviewAssignmentScope({snapshot,assignmentScope,actorId}){
+ const a=validateAssignmentScope(assignmentScope,actorId)
+ if(!a.term||a.server_today>a.term.end_date)return null
  const roster=list(snapshot.workers,w=>w.id,w=>uuid(w.id)&&string(w.state))
- const readiness=list(fixtureReadiness.workers,w=>w.id,w=>uuid(w.id)&&string(w.onboarding_state))
- const byId=new Map(access.workers.map(w=>[w.worker_id,w]))
+ const byId=new Map(a.workers.map(w=>[w.worker_id,w]))
  if(roster.length!==byId.size||roster.some(w=>byId.get(w.id)?.global_state!==w.state))fail()
- const workers=roster.map(w=>({...w,eligibility:byId.get(w.id).eligibility,onboarding_state:readiness.find(x=>x.id===w.id)?.onboarding_state??'unknown'}))
- // Deliberately conservative fixture: explicitly eligible only, even observe.
- return {term:t,serverToday:fixtureReadiness.serverToday,workers,prerequisites:snapshot.tasks.filter(x=>uuid(x.id)).map(x=>({id:x.id,title:x.title}))}
+ const workers=roster.map(w=>({...w,eligibility:byId.get(w.id).eligibility,onboarding_state:byId.get(w.id).onboarding_state}))
+ const activeUnits=a.active_units.filter(x=>['library','research','public_relations'].includes(x))
+ return {term:a.term,serverToday:a.server_today,workers,activeUnits,prerequisites:snapshot.tasks.filter(x=>uuid(x.id)).map(x=>({id:x.id,title:x.title}))}
 }

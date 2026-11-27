@@ -19,6 +19,7 @@ try{
  const met=()=>page.evaluate(()=>globalThis.__qaIntegratedMetrics())
  const snap=async n=>{assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,n);await page.screenshot({path:resolve(out,n+'.png'),fullPage:true})}
  await btn('رزرو درخواست واگذاری').waitFor()
+ assert.equal(await page.locator('select option[value="public_relations"]').count(),0)
  await page.getByLabel('دانشجوکار واگذاری').selectOption({label:'دانشجوکار نمونه'})
  await page.getByLabel('عنوان کار',{exact:true}).fill('وظیفه یکپارچه نمونه')
  await page.getByLabel('شرح کار',{exact:true}).fill('پیش نویس محفوظ')

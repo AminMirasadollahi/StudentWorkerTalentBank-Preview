@@ -28,7 +28,9 @@ function useSessionDraft(session,key,initial){
  return [d,set]
 }
 function Assignment({scope,s,session,run,setMessage,newId}){
- const initial=()=>({workerId:'',unit:'research',title:'',instructions:'',start:scope.serverToday,end:scope.serverToday,minutes:'60',reason:'',prerequisites:[]})
+ const activeUnits=scope.activeUnits??Object.keys(units)
+ const initialDay=scope.serverToday>scope.term.start_date?scope.serverToday:scope.term.start_date
+ const initial=()=>({workerId:'',unit:activeUnits.includes('research')?'research':activeUnits[0]||'',title:'',instructions:'',start:initialDay,end:initialDay,minutes:'60',reason:'',prerequisites:[]})
  const [d,set]=useSessionDraft(session,'assignment:'+scope.term.id,initial)
  const hadDraft=useRef(false)
  useEffect(()=>{if(hadDraft.current&&!s.frozenDraft&&!s.slot?.active&&s.slot){set(initial())}hadDraft.current=!!s.frozenDraft},[s.frozenDraft,s.slot])
@@ -37,7 +39,7 @@ function Assignment({scope,s,session,run,setMessage,newId}){
  return <><h2>واگذاری کار بازه‌ای</h2><p>یک وظیفه، یک برآورد کل، یک گزارش. زمان بین روزهای بازه تقسیم نمی‌شود.</p>
  <form onSubmit={reserve}><fieldset disabled={frozen}><div className="we-grid">
  <label>دانشجوکار<select aria-label="دانشجوکار واگذاری" {...field(d,set,'workerId')}><option value="">انتخاب کنید</option>{scope.workers.filter(w=>w.state==='active'&&w.onboarding_state==='ready'&&w.eligibility==='eligible').map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label>
- <label>واحد کار<select {...field(d,set,'unit')}>{Object.entries(units).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
+ <label>واحد کار<select {...field(d,set,'unit')}>{Object.entries(units).filter(([k])=>activeUnits.includes(k)).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
  <DateField label="آغاز بازه" value={d.start} onChange={v=>set(x=>({...x,start:v,end:x.end<v?v:x.end}))} min={scope.serverToday>scope.term.start_date?scope.serverToday:scope.term.start_date} max={scope.term.end_date} disabled={frozen}/>
  <DateField label="پایان بازه" value={d.end} onChange={v=>set(x=>({...x,end:v}))} min={d.start} max={scope.term.end_date} disabled={frozen}/>
  <label>زمان استاندارد کل (دقیقه)<input type="number" min="1" max="1440" {...field(d,set,'minutes')}/></label>
@@ -45,7 +47,7 @@ function Assignment({scope,s,session,run,setMessage,newId}){
  <label className="we-wide">شرح کار<textarea aria-label="شرح کار" rows={4} maxLength={3000} {...field(d,set,'instructions')}/></label>
  <label className="we-wide">دلیل واگذاری نزدیک به موعد<textarea aria-label="دلیل واگذاری نزدیک به موعد" rows={2} maxLength={300} {...field(d,set,'reason')}/></label>
  </div><details><summary>پیش‌نیازهای کار (اختیاری)</summary>{scope.prerequisites.map(t=><label className="we-check" key={t.id}><input type="checkbox" checked={d.prerequisites.includes(t.id)} onChange={e=>set(x=>({...x,prerequisites:e.target.checked?[...x.prerequisites,t.id]:x.prerequisites.filter(id=>id!==t.id)}))}/>{t.title}</label>)}</details>
- <button type="submit">رزرو درخواست واگذاری</button></fieldset></form>
+ <button type="submit" disabled={!activeUnits.length}>رزرو درخواست واگذاری</button></fieldset></form>
  {s.frozenDraft&&<p className="wr-held">پیش‌نویس رزروشده تا تعیین تکلیف درخواست قفل است.</p>}
  <Recovery s={s} run={run} session={session}/></>
 }

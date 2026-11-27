@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {validateWindowTermRead as read,validateWindowTermAccess as access,buildReviewAssignmentScope as scope} from '../src/lib/windowTermReview.mjs'
-import {term,termFixture as fixture,accessFixture,fixtureReadiness} from './browser/windowTermFixtureData.mjs'
+import {validateWindowTermRead as read,validateWindowTermAccess as access,validateAssignmentScope as metadata,buildReviewAssignmentScope as scope} from '../src/lib/windowTermReview.mjs'
+import {term,termFixture as fixture,accessFixture,assignmentScopeFixture} from './browser/windowTermFixtureData.mjs'
 import {manager,worker,id} from './browser/windowReadReviewFixtureData.mjs'
 const f=()=>fixture()
 const snapshot={...manager,workers:[{...manager.workers[0],state:'active'}]}
@@ -10,5 +10,9 @@ test('invalid scope, remaining and worker totals rejected',()=>{for(const x of [
 test('weekly and unreported pools must reconcile',()=>{assert.throws(()=>read({...f(),weeks:[]}));assert.throws(()=>read({...f(),pools:[{...f().pools[0],unreported_estimate_minutes:121}]}))})
 test('no active term has no invented totals',()=>{const x={...f(),term:null,terms:[{...term,state:'closed'}],units:[],workers:[],weeks:[],pools:[]};assert.equal(read(x).term,null);assert.throws(()=>read({...x,units:f().units}))})
 test('access validates counts, term identity and duplicate workers',()=>{assert.equal(access(accessFixture,term).active_workers,1);for(const x of [{...accessFixture,active_workers:2},{...accessFixture,term_id:id(99)},{...accessFixture,workers:[...accessFixture.workers,...accessFixture.workers]}])assert.throws(()=>access(x,term))})
-test('assignment scope uses membership response, not injected eligibility',()=>{const x=scope({snapshot,termRead:f(),access:accessFixture,fixtureReadiness});assert.equal(x.workers[0].eligibility,'eligible');const a={...accessFixture,active_not_eligible:1,workers:[{...accessFixture.workers[0],eligibility:'not_eligible'}]};assert.equal(scope({snapshot,termRead:f(),access:a,fixtureReadiness}).workers[0].eligibility,'not_eligible')})
-test('missing synthetic readiness or mismatched roster fail closed',()=>{assert.equal(scope({snapshot,termRead:f(),access:accessFixture}),null);assert.throws(()=>scope({snapshot:{...snapshot,workers:[]},termRead:f(),access:accessFixture,fixtureReadiness}))})
+const actor=id(98)
+const makeScope=(a=assignmentScopeFixture,s=snapshot)=>scope({snapshot:s,assignmentScope:a,actorId:actor})
+test('assignment scope consumes contract clock, readiness, units and membership',()=>{const x=makeScope();assert.equal(x.workers[0].eligibility,'eligible');assert.equal(x.workers[0].onboarding_state,'ready');assert.equal(x.serverToday,'2026-11-27');assert.deepEqual(x.activeUnits,['library','research']);const a={...assignmentScopeFixture,workers:[{...assignmentScopeFixture.workers[0],eligibility:'not_eligible',onboarding_state:'password_required'}]};assert.equal(makeScope(a).workers[0].eligibility,'not_eligible');assert.equal(makeScope(a).workers[0].onboarding_state,'password_required')})
+test('missing, wrong actor, invalid readiness or roster mismatch fail closed',()=>{for(const a of [null,{...assignmentScopeFixture,actor_id:id(99)},{...assignmentScopeFixture,server_today:'2026-02-30'},{...assignmentScopeFixture,workers:[{...assignmentScopeFixture.workers[0],onboarding_state:'unknown'}]}])assert.throws(()=>makeScope(a));assert.throws(()=>makeScope(assignmentScopeFixture,{...snapshot,workers:[]}))})
+test('no active or expired term cannot open assignment form',()=>{assert.equal(makeScope({...assignmentScopeFixture,term:null,enforcement_mode:null,workers:[]}),null);assert.equal(makeScope({...assignmentScopeFixture,server_today:'2027-02-10'}),null)})
+test('duplicate worker or unit and extra identity fields denied',()=>{for(const a of [{...assignmentScopeFixture,workers:[...assignmentScopeFixture.workers,...assignmentScopeFixture.workers]},{...assignmentScopeFixture,active_units:['library','library']},{...assignmentScopeFixture,workers:[{...assignmentScopeFixture.workers[0],auth_user_id:id(99)}]}])assert.throws(()=>metadata(a,actor))})

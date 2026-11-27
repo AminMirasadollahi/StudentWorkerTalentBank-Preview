@@ -19,6 +19,7 @@ const METHODS=Object.freeze({
       "manager"
     ]
   },
+  "assignment_scope": {"name":"qa_window_api_assignment_scope_v1","keys":[],"roles":["manager"]},
   "term_read": {
     "name": "qa_window_api_term_read_v1",
     "keys": [
@@ -227,6 +228,8 @@ function validateResponse(m,raw,args,context){
  if(m==='worker_read')return validateWindowWorkerSnapshotV1(raw,context.workerId)
  if(m==='manager_read'){
   if(!obj(raw)||raw.schedule_contract_version!==2||raw.review_only!==true||!Array.isArray(raw.tasks)||!Array.isArray(raw.workers)||!Array.isArray(raw.time_entries))fail('WINDOW_MANAGER_SNAPSHOT_INVALID')
+ }else if(m==='assignment_scope'){
+  if(!obj(raw)||raw.ok!==true||raw.scope_contract_version!==1||raw.schedule_contract_version!==2||raw.review_only!==true||raw.actor_id!==context.actorId||!day(raw.server_today))fail('WINDOW_ASSIGNMENT_SCOPE_INVALID')
  }else if(m==='term_read'||m==='term_access'){
   if(!obj(raw)||raw.schedule_contract_version!==2||raw.review_only!==true)fail('WINDOW_TERM_SNAPSHOT_INVALID')
   if(m==='term_access'&&(raw.term_id!==args.p_term_id||!int(raw.window_noneligible_tasks,0)||!int(raw.window_noneligible_open_tasks,0)||raw.window_noneligible_open_tasks>raw.window_noneligible_tasks))fail('WINDOW_TERM_ACCESS_INVALID')
