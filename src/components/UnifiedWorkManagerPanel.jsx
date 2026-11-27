@@ -1,4 +1,4 @@
-import {useManagerDraftWarning,useManagerRetainedState} from '../lib/managerDraftGuard.mjs'
+import {useManagerDraftWarning,useManagerRetainedState,useManagerDraftScope} from '../lib/managerDraftGuard.mjs'
 import {lazy,Suspense,useCallback,useEffect,useMemo,useRef,useState} from 'react'
 const DeskWorkPoolManagerSection=lazy(()=>import('./DeskWorkPoolManagerSection'))
 import JalaliDatePicker from './JalaliDatePicker'
@@ -33,6 +33,7 @@ const faDate=x=>x?new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
 
 export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=null}){
  const {owner,lock,blockedByOther}=useWorkPoolFence(routeFence)
+ const draftScope=useManagerDraftScope()
  const retained=useManagerRetainedState('general-pool',0,()=>({form:initial(),termId:''}))
  const {form,termId:termSelection}=retained.value
  const setForm=next=>retained.change(p=>({...p,form:typeof next==='function'?next(p.form):next,termId:retained.retained?(p.termId||term?.id||''):p.termId}))
@@ -77,7 +78,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
    setView(snapshot)
    return snapshot
   }catch{
-   if(serial===requestSerial.current){if(retained.retained){if(pending.current||inFlight.current||routeFence?.getSnapshot())retained.clear();else retained.reset()}setView(v=>routeFence?{status:'error',terms:[],templates:[],offers:[]}:{...v,status:'error'})}
+   if(serial===requestSerial.current){if(retained.retained){draftScope?.clearDraft('direct-task');if(pending.current||inFlight.current||routeFence?.getSnapshot())retained.clear();else retained.reset()}setView(v=>routeFence?{status:'error',terms:[],templates:[],offers:[]}:{...v,status:'error'})}
    return null
   }
  },[routeFence,owner])

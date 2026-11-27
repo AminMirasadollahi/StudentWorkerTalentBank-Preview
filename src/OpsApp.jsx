@@ -668,6 +668,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
       // explicit candidate selection, even if the same row is returned.
       setRows([])
       setCandidateDrafts({})
+      activeDraftGuard?.clearRetained()
       setSelectedCandidateId('')
       setError(getMessage(e))
       if(settleRead)settleRead('failed');else assignmentReceiptPort?.setReadState?.('failed')

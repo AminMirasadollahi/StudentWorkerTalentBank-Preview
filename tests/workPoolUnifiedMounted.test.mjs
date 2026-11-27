@@ -22,7 +22,7 @@ const fake={
   if(id==='\0swtb19-desk-manager-stub')return 'import React from "react";export default function DeskManagerStub(){return React.createElement("p",null,"SWTB19_DESK_MANAGER_FAKE")}'
   if(id==='\0swtb19-manager-api')return [
    'export const getOperationsTermDashboard=async()=>({ok:true,terms:[',
-   '{id:"term",label:"نیمسال جاری",state:"active",start_date:"2026-09-23",end_date:"2027-02-09"}]});',
+   '{id:globalThis.__r5TermId||"term",label:"نیمسال جاری",state:"active",start_date:"2026-09-23",end_date:"2027-02-09"}]});',
    "export const getManagerUnifiedWorkPool=async()=>{const p={\"ok\":true,\"templates\":[{\"id\":\"tpl-a\",\"kind\":\"general\",\"state\":\"active\",\"unit\":\"library\",\"title\":\"کار اصلی قفسه\",\"description\":\"شرح نخست مدیریت\\n\\nبخش دوم با جزئیاتِ <script>غیرقابل اجرا</script>\",\"priority\":3}],\"opportunities\":[{\"id\":\"mgr-offer\",\"template_id\":\"tpl-a\",\"state\":\"published\",\"date\":\"2026-12-01\",\"end_date\":\"2026-12-03\",\"claim_deadline\":\"2026-11-29\",\"claimed_count\":0,\"capacity\":3,\"effort_budget_minutes\":240,\"reserved_minutes\":0}]};p.templates[0].description=globalThis.__v1ManagerDescription??p.templates[0].description;p.opportunities[0].state=globalThis.__v1ManagerState||p.opportunities[0].state;p.opportunities[0].claimed_count=globalThis.__v1ManagerClaims??0;return p;}",
    'export const createUnifiedWorkPackage=async()=>{globalThis.__v1Writes++;return {ok:true,id:"op"};};',
    "export const setWorkOpportunityState=async({opportunityId,state})=>{globalThis.__v1ManagerState=state;return{id:opportunityId};};",
@@ -46,7 +46,7 @@ const fake={
   return null
  }
 }
-let server,dom,createRoot,Manager,Worker
+let server,dom,createRoot,Manager,Worker,scopeModule
 before(async()=>{
  dom=new JSDOM('<!doctype html><html><body></body></html>',{
   url:'https://fake.invalid',pretendToBeVisual:true})
@@ -57,6 +57,7 @@ before(async()=>{
  ;({createRoot}=await import('react-dom/client'))
  server=await createServer({plugins:[fake],server:{middlewareMode:true},
   appType:'custom',logLevel:'error'})
+ scopeModule=await server.ssrLoadModule('/src/lib/managerDraftGuard.mjs')
  Manager=(await server.ssrLoadModule('/src/components/UnifiedWorkManagerPanel.jsx')).default
  Worker=(await server.ssrLoadModule('/src/components/UnifiedWorkWorkerPanel.jsx')).default
 })
@@ -309,4 +310,26 @@ test('unified description lost response holds fence through explicit read-back, 
   assert.equal(globalThis.__v1EditCalls.length,1)
   assert.equal(globalThis.__v1Writes,0)
  }finally{await m.cleanup();globalThis.__v1ManagerState='published';globalThis.__v1ManagerDescription=undefined;globalThis.__v1EditDropResponse=false}
+})
+
+test('R5 retained opportunity stays pinned to original term and cannot publish into replacement term',async()=>{
+ globalThis.__r5TermId='term-original';globalThis.__v1Writes=0
+ const {ManagerDraftContext,createManagerDraftGuard}=scopeModule
+ const guard=createManagerDraftGuard()
+ function Wrapper(props){return createElement(ManagerDraftContext.Provider,{value:guard},props.show?createElement(Manager,{refreshRevision:props.revision}):null)}
+ const m=await mount(Wrapper,{show:true,revision:0})
+ const button=label=>[...m.host.querySelectorAll('button')].find(x=>x.textContent.trim()===label)
+ const title=()=>m.host.querySelector('input[placeholder*="قفسه"]')
+ try{
+  await act(async()=>button('تعریف کار جدید').click())
+  await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(title(),'فرصت آزمایشی');title().dispatchEvent(new window.Event('input',{bubbles:true}))})
+  assert.equal(guard.readDraft('general-pool',0)?.termId,'term-original')
+  await m.rerender({show:false,revision:0});globalThis.__r5TermId='term-new'
+  await m.rerender({show:true,revision:1});await act(async()=>button('تعریف کار جدید').click())
+  assert.equal(title().value,'فرصت آزمایشی')
+  assert.match(m.host.textContent,/نیمسال پیش‌نویس دیگر فعال نیست/)
+  assert.equal(button('ثبت و انتشار کار').disabled,true)
+  assert.equal(button('ذخیره پیش‌نویس').disabled,true)
+  assert.equal(globalThis.__v1Writes,0)
+ }finally{delete globalThis.__r5TermId;await m.cleanup()}
 })

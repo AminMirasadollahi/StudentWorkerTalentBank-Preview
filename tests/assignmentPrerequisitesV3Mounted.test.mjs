@@ -4,7 +4,7 @@ import {JSDOM} from 'jsdom'
 import React,{act} from 'react'
 import {createServer} from 'vite'
 import react from '@vitejs/plugin-react'
-let dom,vite,Editor,ExistingEditor,createRoot,legacyCalls=0
+let dom,vite,Editor,ExistingEditor,createRoot,scopeModule,legacyCalls=0
 const previousFlag=process.env.VITE_SWTB23_WORKER_POLICY_RELEASE
 const h=React.createElement,id=n=>'10000000-0000-4000-8000-'+String(n).padStart(12,'0')
 const worker={id:id(1),name:'کاربر مصنوعی',state:'active'},a={id:id(2),title:'پیش‌نیاز نخست',worker_id:worker.id,planned_date:'2099-01-01',state:'assigned'},b={id:id(3),title:'پیش‌نیاز دوم',worker_id:worker.id,planned_date:'2099-01-01',state:'completed'}
@@ -24,6 +24,7 @@ before(async()=>{
   if(x==='\0swtb24-v2')return 'export const assignGroupTask=async()=>globalThis.__swtb24Legacy();export const assignLibraryDeskShift=assignGroupTask;export const cancelLibraryDeskShift=assignGroupTask;export const getLibraryDeskShifts=async()=>({ok:true,shifts:[]})'
  }}
  vite=await createServer({configFile:false,plugins:[isolation,react()],server:{middlewareMode:true},appType:'custom',logLevel:'error'})
+ scopeModule=await vite.ssrLoadModule('/src/lib/managerDraftGuard.mjs')
  Editor=(await vite.ssrLoadModule('/src/components/TaskAssignmentEditor.jsx')).default
  ExistingEditor=(await vite.ssrLoadModule('/src/components/TaskPrerequisiteEditor.jsx')).default
 })
@@ -35,7 +36,7 @@ after(async()=>{
 async function mount(element){
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host)
  await act(async()=>root.render(element))
- return {host,cleanup:async()=>{await act(async()=>root.unmount());host.remove()}}
+ return {host,rerender:async element=>{await act(async()=>root.render(element))},cleanup:async()=>{await act(async()=>root.unmount());host.remove()}}
 }
 test('actual assignment editor selects concrete prerequisites and submits exactly one complete draft',async()=>{
  const writes=[]
@@ -74,5 +75,27 @@ test('existing-task editor uses expected set and reads authoritative state after
   assert.equal(save.disabled,false);await act(async()=>save.click())
   assert.deepEqual(writes,[{taskId:target.id,expected:[],prerequisites:[a.id],reason:null}])
   assert.equal(reads,2);assert.match(m.host.textContent,/تغییر پیش‌نیازها ثبت شد/)
+ }finally{await m.cleanup()}
+})
+
+test('R5 actual direct editor never carries old owner values or cached draft into receipt seed/revision',async()=>{
+ const {ManagerDraftContext,createManagerDraftGuard}=scopeModule
+ const one=createManagerDraftGuard(),two=createManagerDraftGuard(),writes=[]
+ const port={version:3,snapshot:{state:'idle'},editorRevision:1,submit:async d=>{writes.push(d);return 'committed'}}
+ const element=(guard,p=port)=>h(ManagerDraftContext.Provider,{value:guard},h(Editor,{workers:[worker],data:{tasks:[a]},defaultDate:'2099-01-02',assignmentReceiptPort:p,retentionKey:'direct-task'}))
+ const m=await mount(element(one))
+ const title=()=>m.host.querySelector('input[maxlength="160"]')
+ const fill=async value=>{await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(title(),value);title().dispatchEvent(new window.Event('input',{bubbles:true}))})}
+ try{
+  await fill('old-owner-local');assert.equal(one.readDraft('direct-task',1)?.title,'old-owner-local')
+  await m.rerender(element(two));assert.equal(title().value,'');assert.equal(two.readDraft('direct-task',1),undefined)
+  await fill('new-owner-local');assert.equal(two.readDraft('direct-task',1)?.title,'new-owner-local')
+  await m.rerender(element(two,{...port,editorRevision:2,initialPayload:seed,snapshot:{state:'reserved'}}))
+  assert.equal(title().value,seed.p_title);assert.equal(m.host.querySelector('button[type=submit]').disabled,true)
+  assert.equal(two.readDraft('direct-task',2),undefined)
+  await m.rerender(element(two,{...port,editorRevision:3}));assert.equal(title().value,'')
+  await fill('unsent-after-ack');assert.equal(two.readDraft('direct-task',3)?.title,'unsent-after-ack')
+  two.clearRetained();await m.rerender(element(two,{...port,editorRevision:3}));assert.equal(title().value,'')
+  assert.equal(two.readDraft('direct-task',3),undefined);assert.equal(writes.length,0);assert.equal(legacyCalls,0)
  }finally{await m.cleanup()}
 })

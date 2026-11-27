@@ -29,3 +29,10 @@ test('retained drafts are cloned, revision scoped and clearable without affectin
  assert.equal(createManagerDraftGuard().readDraft('direct',1),undefined);assert.equal(g.hasDraft(),false)
  g.clearDraft('direct');assert.equal(g.readDraft('direct',1),undefined);g.writeDraft('pool',0,v);g.clearRetained();assert.equal(g.readDraft('pool',0),undefined)
 })
+
+test('invalidated generations cannot revive cleared drafts and stale receipt clears cannot erase new drafts',()=>{
+ const g=createManagerDraftGuard(),old=g.generation();g.writeDraft('direct',1,{title:'old'},old)
+ g.clearRetained();assert.equal(g.readDraft('direct',1),undefined);assert.equal(g.writeDraft('direct',1,{title:'stale'},old),false)
+ g.writeDraft('direct',2,{title:'new'});g.clearDraft('direct',1);assert.deepEqual(g.readDraft('direct',2),{title:'new'})
+ assert.equal(g.clearDraft('direct',2,old),false);assert.deepEqual(g.readDraft('direct',2),{title:'new'})
+})

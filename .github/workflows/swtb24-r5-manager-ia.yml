@@ -23,7 +23,7 @@ jobs:
           node-version: '22'
       - run: npm ci --no-audit --no-fund
       - name: R5 grouped navigation, mounted shell and receipt boundary
-        run: node --test tests/swtb24R5DraftGuard.test.mjs tests/swtb24R5ManagerIa.test.mjs tests/managerWorkspaceNavUi.test.mjs tests/managerShellFeatureOnIntegration.test.mjs tests/workPoolRouteFence.test.mjs tests/releaseBoundary.test.mjs
+        run: node --test tests/swtb24R5DraftGuard.test.mjs tests/assignmentPrerequisitesV3Mounted.test.mjs tests/workPoolUnifiedMounted.test.mjs tests/assignmentRecoveryHostMounted.test.mjs tests/swtb24R5ManagerIa.test.mjs tests/managerWorkspaceNavUi.test.mjs tests/managerShellFeatureOnIntegration.test.mjs tests/workPoolRouteFence.test.mjs tests/releaseBoundary.test.mjs
       - name: Build strict release candidate (synthetic configuration)
         env:
           VITE_SWTB23_WORKER_POLICY_RELEASE: 'true'
