@@ -83,4 +83,4 @@ try{
  assert.equal(await page.evaluate(()=>globalThis.__qaLegacyReads),0);assert.equal(await page.evaluate(()=>globalThis.__qaWriteAttempts),0)
  assert.equal(blocked,0);assert.deepEqual(errors,[])
  console.log('PASS SWTB25_WINDOW_WORKSPACE_EDITOR_LIFETIME_REFRESH')
-}finally{await writeFile(resolve(out,'observations.json'),JSON.stringify({blocked,errors},null,2));await ctx?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}
+}catch(e){if(page){await page.screenshot({path:resolve(out,'failure.png'),fullPage:true}).catch(()=>{});const body=await page.locator('body').innerText().catch(()=>'<unavailable>');console.error('SYNTHETIC_FAILURE_PAGE',body.slice(0,6000),JSON.stringify(errors));await writeFile(resolve(out,'failure.txt'),body)}throw e}finally{await writeFile(resolve(out,'observations.json'),JSON.stringify({blocked,errors},null,2));await ctx?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}

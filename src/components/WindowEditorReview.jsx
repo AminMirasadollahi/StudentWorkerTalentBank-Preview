@@ -40,9 +40,9 @@ function Assignment({scope,s,session,run,setMessage,newId}){
  <DateField label="آغاز بازه" value={d.start} onChange={v=>set(x=>({...x,start:v,end:x.end<v?v:x.end}))} min={scope.serverToday>scope.term.start_date?scope.serverToday:scope.term.start_date} max={scope.term.end_date} disabled={frozen}/>
  <DateField label="پایان بازه" value={d.end} onChange={v=>set(x=>({...x,end:v}))} min={d.start} max={scope.term.end_date} disabled={frozen}/>
  <label>زمان استاندارد کل (دقیقه)<input type="number" min="1" max="1440" {...field(d,set,'minutes')}/></label>
- <label className="we-wide">عنوان کار<input maxLength={160} {...field(d,set,'title')}/></label>
- <label className="we-wide">شرح کار<textarea rows={4} maxLength={3000} {...field(d,set,'instructions')}/></label>
- <label className="we-wide">دلیل واگذاری نزدیک به موعد<textarea rows={2} maxLength={300} {...field(d,set,'reason')}/></label>
+ <label className="we-wide">عنوان کار<input aria-label="عنوان کار" maxLength={160} {...field(d,set,'title')}/></label>
+ <label className="we-wide">شرح کار<textarea aria-label="شرح کار" rows={4} maxLength={3000} {...field(d,set,'instructions')}/></label>
+ <label className="we-wide">دلیل واگذاری نزدیک به موعد<textarea aria-label="دلیل واگذاری نزدیک به موعد" rows={2} maxLength={300} {...field(d,set,'reason')}/></label>
  </div><details><summary>پیش‌نیازهای کار (اختیاری)</summary>{scope.prerequisites.map(t=><label className="we-check" key={t.id}><input type="checkbox" checked={d.prerequisites.includes(t.id)} onChange={e=>set(x=>({...x,prerequisites:e.target.checked?[...x.prerequisites,t.id]:x.prerequisites.filter(id=>id!==t.id)}))}/>{t.title}</label>)}</details>
  <button type="submit">رزرو درخواست واگذاری</button></fieldset></form>
  {s.frozenDraft&&<p className="wr-held">پیش‌نویس رزروشده تا تعیین تکلیف درخواست قفل است.</p>}
@@ -59,8 +59,8 @@ function Report({task,s,session,run,setMessage,newId}){
  {!a.can_submit?<p role="status">ثبت گزارش در وضعیت فعلی مجاز نیست.</p>:<form onSubmit={send}><fieldset disabled={disabled}><div className="we-grid">
  <DateField label="تاریخ واقعی فعالیت" value={d.date} onChange={v=>set(x=>({...x,date:v}))} min={a.date_min} max={a.date_max} disabled={disabled}/>
  <label>زمان انجام کار (دقیقه)<input type="number" min={a.minimum_minutes} max={a.maximum_minutes} {...field(d,set,'minutes')}/></label>
- <label className="we-wide">شرح فعالیت<textarea maxLength={2000} rows={4} {...field(d,set,'note')}/></label>
- {Number(d.minutes)>task.estimate_minutes&&<><label>علت زمان اضافه<select {...field(d,set,'reasonCode')}><option value="">انتخاب کنید</option>{Object.entries(extraReasons).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><label className="we-wide">توضیح زمان اضافه<textarea maxLength={600} rows={3} {...field(d,set,'reasonText')}/></label></>}
+ <label className="we-wide">شرح فعالیت<textarea aria-label="شرح فعالیت" maxLength={2000} rows={4} {...field(d,set,'note')}/></label>
+ {Number(d.minutes)>task.estimate_minutes&&<><label>علت زمان اضافه<select {...field(d,set,'reasonCode')}><option value="">انتخاب کنید</option>{Object.entries(extraReasons).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><label className="we-wide">توضیح زمان اضافه<textarea aria-label="توضیح زمان اضافه" maxLength={600} rows={3} {...field(d,set,'reasonText')}/></label></>}
  </div><button type="submit">ارسال گزارش آزمایشی</button></fieldset></form>}
  {s.receipt?.status&&<p role="status">رسید گزارش: {s.receipt.status==='approved'?'تأییدشده':s.receipt.status==='submitted'?'دریافت شد؛ در انتظار بررسی':'وضعیت ثبت‌شده در سرور'}؛ ثبت گزارش به‌معنای اعتبار قطعی نیست.</p>}</>
 }
@@ -68,7 +68,7 @@ function Approval({task,entry,s,session,run,setMessage}){
  const [d,set]=useSessionDraft(session,'review:'+entry.id+':'+task.window_revision,()=>({minutes:String(entry.reported_minutes),note:''}))
  const disabled=s.busy||s.uncertain||!s.ready||!!s.slot?.active||s.receipt?.review_state==='approved'
  const send=e=>{e.preventDefault();if(disabled)return;const v=reviewWindowPayload(task,entry,d);if(!v.ok){setMessage(errors[v.code]);return}void run(()=>session.perform('review',v.args))}
- return <><h2>تأیید گزارش بازه‌ای</h2><h3>{task.title}</h3><p>تاریخ واقعی: {jalaliWindowDay(entry.work_date)} · استاندارد {task.estimate_minutes} · درخواستی {entry.reported_minutes} دقیقه</p><form onSubmit={send}><fieldset disabled={disabled}><div className="we-grid"><label>زمان تأییدشده (دقیقه)<input type="number" min="0" max={entry.reported_minutes} {...field(d,set,'minutes')}/></label><label className="we-wide">توضیح مدیر<textarea maxLength={1000} rows={3} {...field(d,set,'note')}/></label></div><button type="submit">تأیید گزارش آزمایشی</button></fieldset></form><p className="wr-meta">رد گزارش، درخواست اصلاح و تمدید بازه هنوز فعال نیستند.</p>{s.receipt?.review_state==='approved'&&<p role="status">تأیید آزمایشی: {s.receipt.approved_minutes} دقیقه</p>}</>
+ return <><h2>تأیید گزارش بازه‌ای</h2><h3>{task.title}</h3><p>تاریخ واقعی: {jalaliWindowDay(entry.work_date)} · استاندارد {task.estimate_minutes} · درخواستی {entry.reported_minutes} دقیقه</p><form onSubmit={send}><fieldset disabled={disabled}><div className="we-grid"><label>زمان تأییدشده (دقیقه)<input type="number" min="0" max={entry.reported_minutes} {...field(d,set,'minutes')}/></label><label className="we-wide">توضیح مدیر<textarea aria-label="توضیح مدیر" maxLength={1000} rows={3} {...field(d,set,'note')}/></label></div><button type="submit">تأیید گزارش آزمایشی</button></fieldset></form><p className="wr-meta">رد گزارش، درخواست اصلاح و تمدید بازه هنوز فعال نیستند.</p>{s.receipt?.review_state==='approved'&&<p role="status">تأیید آزمایشی: {s.receipt.approved_minutes} دقیقه</p>}</>
 }
 // Mounted only by a synthetic fixture. Session retained by caller across tabs.
 export default function WindowEditorReview({session,role,scope,task,entry,mode,newId,syntheticReviewOnly,onConfirmed}){
