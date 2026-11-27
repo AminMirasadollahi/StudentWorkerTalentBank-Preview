@@ -17,7 +17,6 @@ import '../../src/manager-shell.css'
 globalThis.__qaLegacyReads=0;globalThis.__qaWriteAttempts=0
 const holds=['window_extension','late_submission','correction','term_closure_policy','post_assignment_eligibility_policy','window_prerequisite_edit','nonapproval_review','batch_write']
 const mc={status:'verified',role:'manager',actorId:id(98)},wc={status:'verified',role:'worker',actorId:id(99),workerId:worker,ready:true}
-const scope={serverToday:self.server_today,term:{id:id(10),state:'active',start_date:'2026-09-23',end_date:'2027-02-09'},workers:[{id:worker,name:'دانشجوکار نمونه',state:'active',onboarding_state:'ready',eligibility:'eligible'}],prerequisites:[{id:id(6),title:'مرتب‌سازی کتاب‌ها'}]}
 const db=structuredClone(manager);db.workers[0].state='active'
 let epoch=0,active=null,reserved=null,reportArgs=null,loseReport=true,serial=200,failRead=false
 const metrics={reads:0,commits:0,reports:0,approvals:0,submitCalls:[]}
@@ -31,10 +30,28 @@ function workerSnapshot(){
  })
  return {...self,tasks,time_entries:db.time_entries.filter(e=>e.worker_id===worker),approved_minutes_total:db.time_entries.filter(e=>e.worker_id===worker&&e.review_state==='approved').reduce((n,e)=>n+e.approved_minutes,0)}
 }
+// Fixture-only independent aggregate over the mutable synthetic rows.
+function currentTerm(a){
+ const v=termFixture(a),all=termFixture({...a,p_unit_code:null}),entries=db.time_entries.filter(e=>!a.p_worker_id||e.worker_id===a.p_worker_id)
+ const rows=all.units.map(u=>{
+  const tasks=db.tasks.filter(t=>t.unit===u.unit&&(!a.p_worker_id||t.worker_id===a.p_worker_id))
+  const es=entries.filter(e=>tasks.some(t=>t.id===e.task_id))
+  const pending=es.filter(e=>e.review_state==='submitted'),approved=es.filter(e=>e.review_state==='approved')
+  const unreported=tasks.filter(t=>['assigned','in_progress'].includes(t.state)&&!t.has_any_report)
+  return {...u,approved_minutes:approved.reduce((n,e)=>n+e.approved_minutes,0),pending_minutes:pending.reduce((n,e)=>n+e.reported_minutes,0),pending_reports:pending.length,unreported_tasks:unreported.length,unreported_estimate_minutes:unreported.reduce((n,t)=>n+t.estimate_minutes,0)}
+ })
+ v.units=rows.filter(u=>!a.p_unit_code||u.unit===a.p_unit_code)
+ v.workers=v.units.filter(u=>u.approved_minutes||u.pending_minutes).map(u=>({worker_id:worker,unit:u.unit,approved_minutes:u.approved_minutes,pending_minutes:u.pending_minutes}))
+ v.weeks=v.units.filter(u=>u.approved_minutes).map(u=>({week_start:'2026-11-21',unit:u.unit,approved_minutes:u.approved_minutes}))
+ const pool=v.pools[0]
+ for(const k of ['approved_minutes','pending_minutes','pending_reports','unreported_tasks','unreported_estimate_minutes'])pool[k]=rows.reduce((n,u)=>n+u[k],0)
+ pool.remaining_minutes=a.p_worker_id?null:pool.allocated_minutes-pool.approved_minutes
+ return v
+}
 const transport=c=>async(n,a)=>{
  if(n.endsWith('capabilities_v1'))return cap(c)
- if(n.endsWith('term_read_v1'))return termFixture(a)
- if(n.endsWith('term_access_v1'))return structuredClone(accessFixture)
+ if(n.endsWith('term_read_v1')){if(failRead)throw Error('QA_TERM_READ_FAIL');return currentTerm(a)}
+ if(n.endsWith('term_access_v1')){if(failRead)throw Error('QA_ACCESS_READ_FAIL');return structuredClone(accessFixture)}
  if(n.endsWith('_read_v1')){metrics.reads++;if(failRead)throw Error('QA_REFRESH_FAIL');return structuredClone(c.role==='manager'?db:workerSnapshot())}
  if(n.endsWith('recovery_v1')){
   if(a.p_action==='cancel')active={...active,status:'cancelled'}
