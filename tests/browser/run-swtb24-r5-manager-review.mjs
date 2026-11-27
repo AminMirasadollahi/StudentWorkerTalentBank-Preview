@@ -57,15 +57,17 @@ try{
  await sub('وظایف واگذارشده').click()
  await openDirect.click()
  observations.directDraftSurvivesRoute=await title.inputValue()==='پیش‌نویس ساختگی واگذاری'
+ console.log('SWTB24_R5_DRAFT_EARLY_OBSERVATIONS='+JSON.stringify(observations))
  await dialog.getByRole('button',{name:'بستن و حفظ پیش‌نویس'}).click()
  await parent('applicants').click()
  await page.locator('.swtb22-candidate-row').first().click()
  await snap('05-people-applicants')
  await sub('پرونده دانشجوکاران').click()
- await page.getByRole('heading',{name:/پرونده دانشجوکار/}).last().waitFor({timeout:10000})
+ await page.getByRole('heading',{name:'پروفایل دانشجوکارها',exact:true}).waitFor({timeout:10000})
+ await page.locator('.ow-people-directory button').first().click()
  await snap('06-people-profiles')
  await sub('مجوز همکاری نیمسال').click()
- await page.getByText('نیمسال نمونه نمایشی',{exact:false}).first().waitFor()
+ await page.getByRole('heading',{name:'مجوز همکاری در نیمسال',exact:true}).waitFor()
  await snap('07-people-term')
  await parent('inbox').click()
  await sub('تأیید ساعات').click()
@@ -80,7 +82,7 @@ try{
  console.log('SWTB24_R5_NATIVE_REVIEW_DRAFT_OBSERVATIONS='+JSON.stringify(observations))
  console.log('PASS R5_SYNTHETIC_VISUAL_NAVIGATION_NO_WRITES')
  console.log(observations.poolDraftSurvivesRoute&&observations.directDraftSurvivesRoute?'DRAFT_LIFETIME_REVIEW_PASS':'R5_A2_DRAFT_LIFETIME_RELEASE_HOLD')
-}finally{
+}catch(e){console.error('R5_SYNTHETIC_DIAGNOSTIC',JSON.stringify({observations,blocked,errors,headings:await page?.locator('h1,h2,h3').allTextContents().catch(()=>[])}));throw e}finally{
  await writeFile(resolve(out,'observations.json'),JSON.stringify({observations,blocked,errors},null,2))
  await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})
 }
