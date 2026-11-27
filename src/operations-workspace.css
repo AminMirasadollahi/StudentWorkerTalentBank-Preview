@@ -3917,3 +3917,12 @@ dialog.ow-profile-requests-dialog::backdrop {background:rgba(8,35,53,.58)}
   min-width:0;max-width:100%;box-sizing:border-box;font-size:16px;
  }
 }
+
+/* R5 review-only common work entry. Existing forms and writers are unchanged. */
+.swtb24-work-entry .report-panel-heading p{margin:4px 0 0}
+.swtb24-create-choices{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;margin-top:12px}
+.swtb24-create-choices>button:not(.report-btn){display:flex;flex:1 1 220px;flex-direction:column;align-items:flex-start;gap:5px;min-height:64px;padding:12px;text-align:start;font:inherit;background:#f7fbfb;color:#173f47;border:1px solid #9ebfbe;border-radius:8px;cursor:pointer}
+.swtb24-create-choices>button:not(.report-btn):hover:not(:disabled){background:#e6f4f1;border-color:#176d76}
+.swtb24-create-choices>button:focus-visible{outline:2px solid #176d76;outline-offset:3px}
+.swtb24-create-choices>button:disabled{opacity:.55;cursor:not-allowed}
+.swtb24-create-choices small{line-height:1.7;font-size:12px}

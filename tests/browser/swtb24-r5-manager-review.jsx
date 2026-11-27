@@ -153,8 +153,9 @@ function Stage(){
  })
  const setNavigation=change=>{
   const next=typeof change==='function'?change(navigation):change
-  if(!fence.permitsNavigation(navigation,next)||!draftGuard.permitsNavigation(navigation,next,()=>window.confirm(DISCARD_DRAFT_MESSAGE)))return
+  if(!fence.permitsNavigation(navigation,next)||!draftGuard.permitsNavigation(navigation,next,()=>window.confirm(DISCARD_DRAFT_MESSAGE)))return false
   commitNavigation(prev=>{const candidate=typeof change==='function'?change(prev):change;return fence.permitsNavigation(prev,candidate)&&sameManagerRoute(next,candidate)?candidate:prev})
+  return true
  }
  const navigate=item=>setNavigation(prev=>nextManagerNavigation(prev,item))
  const title=currentManagerDestination(navigation,flags)?.label||'مدیریت'

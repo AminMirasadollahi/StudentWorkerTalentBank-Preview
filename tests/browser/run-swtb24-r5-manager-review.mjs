@@ -29,8 +29,13 @@ try{
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,name+' horizontal overflow')
   await page.screenshot({path:resolve(out,name+'.png')})
  }
- const poolOpen=page.getByRole('button',{name:'تعریف کار جدید',exact:true})
- await poolOpen.waitFor()
+ const common=page.getByRole('button',{name:'+ تعریف کار',exact:true})
+ const choose=async label=>{await common.click();await page.getByRole('button',{name:label}).click()}
+ const poolOpen={click:()=>choose(/انتشار فرصت کاری/)}
+ await common.waitFor()
+ assert.equal(await page.getByRole('button',{name:'تعریف کار جدید',exact:true}).count(),0)
+ await common.click();await snap('00-common-create-options');await page.keyboard.press('Escape')
+ assert.equal(await common.getAttribute('aria-expanded'),'false')
  assert.equal(await page.locator('[data-swtb22-route]').count(),6)
  assert.equal(await parent('tasks').getAttribute('aria-current'),'page')
  await snap('01-work-hub-pool')
@@ -41,7 +46,12 @@ try{
  await sub('وظایف واگذارشده').click()
  await page.locator('.swtb22-task-directory').waitFor()
  await snap('03-direct-tasks')
- const openDirect=page.getByRole('button',{name:'واگذاری کار جدید'})
+ // Cross-route common launch must actually navigate and open the existing form.
+ await poolOpen.click()
+ await poolInput.waitFor()
+ assert.equal(await poolInput.inputValue(),'پیش‌نویس ساختگی فرصت')
+ const openDirect={click:()=>choose(/واگذاری مستقیم/)}
+ assert.equal(await page.getByRole('button',{name:'+ واگذاری کار جدید',exact:true}).count(),0)
  await openDirect.click()
  const dialog=page.locator('#swtb22-task-assign-dialog[open]')
  const title=dialog.locator('input[maxlength="160"]')
@@ -51,10 +61,9 @@ try{
  await openDirect.click()
  assert.equal(await title.inputValue(),'پیش‌نویس ساختگی واگذاری')
  await dialog.getByRole('button',{name:'بستن و حفظ پیش‌نویس'}).click()
- await sub('فرصت‌های قابل انتخاب').click()
  await poolOpen.click()
+ await poolInput.waitFor()
  observations.poolDraftSurvivesRoute=await poolInput.inputValue()==='پیش‌نویس ساختگی فرصت'
- await sub('وظایف واگذارشده').click()
  await openDirect.click()
  observations.directDraftSurvivesRoute=await title.inputValue()==='پیش‌نویس ساختگی واگذاری'
  console.log('SWTB24_R5_DRAFT_EARLY_OBSERVATIONS='+JSON.stringify(observations))
@@ -97,6 +106,7 @@ try{
  assert.equal(await page.evaluate(()=>[localStorage,sessionStorage].some(s=>Object.values(s).some(v=>String(v).includes('پیش‌نویس ساختگی')))),false)
  assert.equal(await page.evaluate(()=>globalThis.__qaWriteAttempts),0)
  console.log('PASS R5_SESSION_DRAFT_RETENTION_AND_DISCARD')
+ console.log('PASS R5_COMMON_CREATE_ENTRY_BOTH_EXISTING_EDITORS')
 }catch(e){console.error('R5_SYNTHETIC_DIAGNOSTIC',JSON.stringify({observations,blocked,errors,headings:await page?.locator('h1,h2,h3').allTextContents().catch(()=>[])}));throw e}finally{
  await writeFile(resolve(out,'observations.json'),JSON.stringify({observations,blocked,errors},null,2))
  await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})

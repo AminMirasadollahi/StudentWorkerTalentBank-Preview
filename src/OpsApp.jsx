@@ -578,13 +578,13 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   const [routeNotice,setRouteNotice]=useState('')
   const routeFence=managerShellEnabled&&(workHubFixture===true||r5IaFixture===true)&&managerNavFlags.workPoolEnabled?fence:null
   const setNavigation=change=>{
-   if(!routeFence&&!activeDraftGuard){commitNavigation(change);return}
+   if(!routeFence&&!activeDraftGuard){commitNavigation(change);return true}
    const next=typeof change==='function'?change(navigation):change
    if(routeFence&&!routeFence.permitsNavigation(navigation,next)){
     setRouteNotice('ابتدا نتیجه درخواست فرصت کاری را تعیین‌تکلیف کنید؛ جابه‌جایی فعلاً ممکن نیست.')
-    return
+    return false
    }
-   if(activeDraftGuard&&!activeDraftGuard.permitsNavigation(navigation,next,()=>window.confirm(DISCARD_DRAFT_MESSAGE)))return
+   if(activeDraftGuard&&!activeDraftGuard.permitsNavigation(navigation,next,()=>window.confirm(DISCARD_DRAFT_MESSAGE)))return false
    setRouteNotice('')
    commitNavigation(prev=>{
     const candidate=typeof change==='function'?change(prev):change
@@ -592,6 +592,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
     if(activeDraftGuard&&!sameManagerRoute(next,candidate))return prev
     return candidate
    })
+   return true
   }
   const [rows, setRows] = useState([])
   const [busyId, setBusyId] = useState('')

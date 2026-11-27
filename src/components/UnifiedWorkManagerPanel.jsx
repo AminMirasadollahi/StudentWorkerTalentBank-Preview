@@ -31,7 +31,7 @@ const initial=()=>({
 const faDate=x=>x?new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
  dateStyle:'medium',timeZone:'UTC'}).format(new Date(x+'T12:00:00Z')):'—'
 
-export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=null}){
+export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=null,commonEntry=false,createIntent=null,onCreateHandled}){
  const {owner,lock,blockedByOther}=useWorkPoolFence(routeFence)
  const draftScope=useManagerDraftScope()
  const retained=useManagerRetainedState('general-pool',0,()=>({form:initial(),termId:''}))
@@ -39,6 +39,8 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
  const setForm=next=>retained.change(p=>({...p,form:typeof next==='function'?next(p.form):next,termId:retained.retained?(p.termId||term?.id||''):p.termId}))
  const [view,setView]=useState({status:'loading',terms:[],templates:[],offers:[]})
  const [open,setOpen]=useState(false)
+ const launchFocus=useRef(false)
+ const createFormRef=useRef(null)
  const [deskMode,setDeskMode]=useState(false)
  const [deskVisited,setDeskVisited]=useState(false)
  const [notice,setNotice]=useState('')
@@ -93,6 +95,16 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
  },[form,term])
  const hasUnresolved=uncertain||retryReady||['uncertain','retry'].includes(edit.status)
  const disabled=busy||hasUnresolved||blockedByOther||view.status!=='ready'
+ useEffect(()=>{
+  if(!commonEntry||!createIntent||view.status==='loading')return
+  if(createIntent.scope===draftScope&&createIntent.generation===draftScope?.generation()&&!disabled&&!routeFence?.getSnapshot()&&!draftScope?.hasDraft()){
+   launchFocus.current=true;setDeskMode(false);setOpen(true)
+  }else setNotice('فرم جدید باز نشد؛ ابتدا وضعیت اطلاعات و عملیات قبلی را بررسی کنید.')
+  onCreateHandled?.(createIntent)
+ },[commonEntry,createIntent,view.status,disabled,routeFence,draftScope,onCreateHandled])
+ useEffect(()=>{
+  if(open&&!deskMode&&launchFocus.current){launchFocus.current=false;createFormRef.current?.querySelector('input')?.focus()}
+ },[open,deskMode,createIntent])
  const create=async(publish,retry=false)=>{
   if(inFlight.current||blockedByOther||view.status!=='ready'||uncertain||!globalThis.crypto?.randomUUID||(routeFence&&['saving','uncertain','retry'].includes(edit.status)))return
   let resolved
@@ -307,8 +319,8 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
       else if(hasUnresolved)void verify()
       else setRevision(n=>n+1)
      }}>بازخوانی فهرست</button>
-    <button type="button" className="report-btn report-btn--primary"
-     disabled={disabled} onClick={()=>setOpen(v=>!v)}>{open?'بستن فرم':'تعریف کار جدید'}</button>
+    {(!commonEntry||open)&&<button type="button" className={'report-btn '+(commonEntry?'report-btn--light':'report-btn--primary')}
+     disabled={disabled} onClick={()=>{setOpen(v=>!v);if(commonEntry)document.querySelector('.swtb24-work-entry button')?.focus()}}>{open?'بستن فرم':'تعریف کار جدید'}</button>}
    </div>
   </div>
   {notice&&<div role={hasUnresolved?'alert':'status'}
@@ -324,7 +336,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
   {view.status==='error'&&<p role="alert">اطلاعات مدیر دریافت نشد؛ ساخت کار تا بازخوانی موفق غیرفعال است.</p>}
   {view.status==='loading'&&<p role="status">در حال دریافت کارها و نیمسال فعال…</p>}
   {retained.retained&&retained.dirty&&!hasUnresolved&&!busy&&view.status==='ready'&&<button type="button" className="report-btn report-btn--light" onClick={()=>{if(window.confirm('پیش‌نویس ثبت‌نشده حذف شود؟'))retained.reset()}}>حذف پیش‌نویس محلی</button>}
-  {open&&view.status==='ready'&&<form className="swtb19-unified-work__form"
+  {open&&view.status==='ready'&&<form ref={createFormRef} className="swtb19-unified-work__form"
     onSubmit={e=>{e.preventDefault();void create(true)}}>
     <h4>تعریف کار جدید</h4>
     <label className="report-field"><span>عنوان کار</span>
@@ -447,7 +459,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
    <div className="swtb19-unified-work__list">
    <h4>کارهای تعریف‌شده ({nf.format(offers.length)})</h4>
    {offers.length===0&&<p className="ow-work-pool-empty">
-    هنوز فرصت منتشرشده‌ای وجود ندارد. برای شروع، «تعریف کار جدید» را انتخاب کنید.</p>}
+    هنوز فرصت منتشرشده‌ای وجود ندارد. برای شروع، {commonEntry?'«تعریف کار»':'«تعریف کار جدید»'} را انتخاب کنید.</p>}
    {offers.map(o=>{
     const t=view.templates.find(x=>x.id===o.template_id)
     return <article key={o.id} className="ow-work-pool-item">
