@@ -573,7 +573,7 @@ function CandidateCard({
 
 function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refreshRevision = 0, workHubFixture=false, r5IaFixture=false, assignmentReceiptPort=null }) {
   const [fence]=useState(createWorkPoolRouteFence)
-  const [draftGuard]=useState(createManagerDraftGuard)
+  const draftGuard=useMemo(createManagerDraftGuard,[assignmentReceiptPort?.readScopeOwner])
   const activeDraftGuard=managerShellEnabled&&r5IaFixture===true?draftGuard:null
   const [routeNotice,setRouteNotice]=useState('')
   const routeFence=managerShellEnabled&&(workHubFixture===true||r5IaFixture===true)&&managerNavFlags.workPoolEnabled?fence:null

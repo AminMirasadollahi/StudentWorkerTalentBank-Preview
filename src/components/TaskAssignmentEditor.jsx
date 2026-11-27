@@ -1,4 +1,4 @@
-import {useManagerDraftWarning} from '../lib/managerDraftGuard.mjs'
+import {useManagerDraftWarning,useManagerRetainedState} from '../lib/managerDraftGuard.mjs'
 import {Fragment,useEffect,useMemo,useRef,useState} from 'react'
 import JalaliDatePicker from './JalaliDatePicker'
 import {assignWorkerTask} from '../lib/operations'
@@ -17,7 +17,7 @@ const localToday=()=>{
 }
 const dayAfter=(date,increment)=>{const d=new Date(date+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+increment);return d.toISOString().slice(0,10)}
 const unitNames={library:'کتابخانه',research:'پژوهش',public_relations:'روابط عمومی'}
-export default function TaskAssignmentEditor({workers=[],data={},defaultDate,defaultWorkerId='',onSaved,onClose,onCancel,assignmentReceiptPort=null}) {
+export default function TaskAssignmentEditor({workers=[],data={},defaultDate,defaultWorkerId='',onSaved,onClose,onCancel,assignmentReceiptPort=null,retentionKey=null}) {
  // Opt-in fixture-only seam. Production callers do not supply this port.
  // A missing/invalid snapshot in port mode is blocked, never a legacy fallback.
  const receiptMode=assignmentReceiptPort!==null
@@ -32,9 +32,11 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const Fields=receiptMode?'fieldset':Fragment
  const fieldProps=receiptMode?{disabled:receiptBlocked,style:{border:0,margin:0,padding:0,minWidth:0}}:{}
  const seed=assignmentReceiptPort?.initialPayload
- const [workerIds,setWorkerIds]=useState(seed?[...seed.p_worker_ids]:defaultWorkerId?[defaultWorkerId]:[])
+ const draft=useManagerRetainedState(seed?null:retentionKey,assignmentReceiptPort?.editorRevision??0,()=>({workerIds:seed?[...seed.p_worker_ids]:defaultWorkerId?[defaultWorkerId]:[],prerequisiteIds:seed?.p_prerequisites?[...seed.p_prerequisites]:[],date:seed?.p_planned_date||defaultDate||localToday(),title:seed?.p_title??'',instructions:seed?.p_instructions??'',estimate:seed?.p_estimate_minutes==null?'60':String(seed.p_estimate_minutes),taskUnit:seed?.p_unit_code??'',libraryTemplateSelected:seed?.p_kind==='desk',deskStart:seed?.p_start_minute==null?'':minuteClock(seed.p_start_minute),deskEnd:seed?.p_end_minute==null?'':minuteClock(seed.p_end_minute),reason:seed?.p_short_notice_reason??''}),!receiptMode||['idle','checking'].includes(assignmentReceiptPort?.snapshot?.state))
+ const {workerIds,prerequisiteIds,date,title,instructions,estimate,taskUnit,libraryTemplateSelected,deskStart,deskEnd,reason}=draft.value
+ const field=name=>next=>draft.change(previous=>({...previous,[name]:typeof next==='function'?next(previous[name]):next}))
+ const [setWorkerIds,setPrerequisiteIds,setDate,setTitle,setInstructions,setEstimate,setTaskUnit,setLibraryTemplateSelected,setDeskStart,setDeskEnd,setReason]=['workerIds','prerequisiteIds','date','title','instructions','estimate','taskUnit','libraryTemplateSelected','deskStart','deskEnd','reason'].map(field)
  const [filter,setFilter]=useState('')
- const [prerequisiteIds,setPrerequisiteIds]=useState(()=>seed?.p_prerequisites?[...seed.p_prerequisites]:[])
  const [prerequisiteSearch,setPrerequisiteSearch]=useState('')
  const prerequisiteTasks=useMemo(()=>{
   const byId=new Map()
@@ -44,14 +46,6 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const prerequisiteOptions=[...prerequisiteTasks.entries()].filter(([id,t])=>prerequisiteIds.includes(id)||String(t.title||'').toLocaleLowerCase('fa-IR').includes(prerequisiteSearch.trim().toLocaleLowerCase('fa-IR')))
  const missingPrerequisites=prerequisiteIds.filter(id=>!prerequisiteTasks.has(id))
  const togglePrerequisite=id=>setPrerequisiteIds(prev=>prev.includes(id)?prev.filter(x=>x!==id):prev.length<20?[...prev,id]:prev)
- const [date,setDate]=useState(seed?.p_planned_date||defaultDate||localToday())
- const [title,setTitle]=useState(seed?.p_title??'')
- const [instructions,setInstructions]=useState(seed?.p_instructions??'')
- const [estimate,setEstimate]=useState(seed?.p_estimate_minutes==null?'60':String(seed.p_estimate_minutes))
- const [taskUnit,setTaskUnit]=useState(seed?.p_unit_code??'')
- const [libraryTemplateSelected,setLibraryTemplateSelected]=useState(seed?.p_kind==='desk')
- const [deskStart,setDeskStart]=useState(seed?.p_start_minute==null?'':minuteClock(seed.p_start_minute))
- const [deskEnd,setDeskEnd]=useState(seed?.p_end_minute==null?'':minuteClock(seed.p_end_minute))
  const [deskRevision,setDeskRevision]=useState(0)
  const [deskRead,setDeskRead]=useState({date:'',state:'idle',shifts:[]})
  const [cancelDraft,setCancelDraft]=useState(null)
@@ -59,12 +53,11 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const [cancelError,setCancelError]=useState('')
  const cancelLock=useRef(false)
  const submitLock=useRef(false)
- const [reason,setReason]=useState(seed?.p_short_notice_reason??'')
  const [busy,setBusy]=useState(false)
  const [committed,setCommitted]=useState(false)
  const [error,setError]=useState('')
  const [notice,setNotice]=useState('')
- useManagerDraftWarning({workerIds,date,title,instructions,estimate,taskUnit,libraryTemplateSelected,deskStart,deskEnd,reason,prerequisiteIds},!committed,Boolean(cancelDraft))
+ useManagerDraftWarning({workerIds,date,title,instructions,estimate,taskUnit,libraryTemplateSelected,deskStart,deskEnd,reason,prerequisiteIds},!committed&&(!draft.retained||Boolean(cancelDraft)||busy||cancelBusy),Boolean(cancelDraft)||busy||cancelBusy)
  const selected=workers.filter(w=>workerIds.includes(w.id)&&w.state==='active')
  const shortNotice=date<dayAfter(localToday(),2)
  const routineGroupOk=canDraftLibraryDeskGroup(taskUnit,libraryTemplateSelected,selected.length)
@@ -118,6 +111,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
   if((!atomicMode&&prerequisiteIds.length>0)||receiptBlocked||submitLock.current||cancelLock.current||busy||committed||!Object.hasOwn(unitNames,taskUnit)||
     selected.length===0||selected.length!==workerIds.length||date<localToday()||
     !routineGroupOk||!estimateValid||!deskCanSubmit)return
+  draft.clear()
   submitLock.current=true
   setBusy(true);setError('');setNotice('')
   try {
@@ -159,6 +153,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
     // as a failed assignment (or allow a second, duplicate submission).
     setCommitted(true)
     setTitle('');setInstructions('');setReason('')
+    draft.clear()
     setNotice(libraryTemplateSelected?
       `نوبت ${deskStart} تا ${deskEnd} برای ${fa.format(selected.length)} نفر ثبت شد؛ ساعات پس از بررسی گزارش محاسبه می‌شوند.`:
       selected.length===1?`کار در حوزهٔ ${unitNames[taskUnit]} واگذار شد.`:
@@ -409,6 +404,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
   {error&&<p role="alert" className="report-alert report-alert--error">{error}</p>}
   {notice&&<p role="status" className="ops-alert-success">{notice}</p>}
   <div className="ow-actions">
+    {draft.retained&&draft.dirty&&!receiptBlocked&&!busy&&!cancelBusy&&<button type="button" className="report-btn report-btn--light" onClick={()=>{if(window.confirm('پیش‌نویس ثبت‌نشده حذف شود؟'))draft.reset()}}>حذف پیش‌نویس محلی</button>}
     {(onClose||onCancel)&&<button type="button" className="report-btn report-btn--light"
       onClick={onCancel||onClose}>انصراف</button>}
     <button type="submit" className="report-btn report-btn--primary"

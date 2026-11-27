@@ -21,3 +21,11 @@ test('multiple registered editors stay guarded until all unmount; new scope is e
  a();assert.ok(guard.hasDraft());assert.ok(!guard.permitsNavigation(pool,{...pool,workPoolKind:'desk'},()=>false))
  b();assert.ok(!guard.hasDraft());assert.ok(!createManagerDraftGuard().hasDraft())
 })
+
+test('retained drafts are cloned, revision scoped and clearable without affecting route locks',()=>{
+ const g=createManagerDraftGuard(),v={title:'synthetic',ids:['a']};g.writeDraft('direct',1,v);v.ids.push('b')
+ assert.deepEqual(g.readDraft('direct',1),{title:'synthetic',ids:['a']});assert.equal(g.readDraft('direct',2),undefined)
+ const read=g.readDraft('direct',1);read.ids.push('c');assert.deepEqual(g.readDraft('direct',1).ids,['a'])
+ assert.equal(createManagerDraftGuard().readDraft('direct',1),undefined);assert.equal(g.hasDraft(),false)
+ g.clearDraft('direct');assert.equal(g.readDraft('direct',1),undefined);g.writeDraft('pool',0,v);g.clearRetained();assert.equal(g.readDraft('pool',0),undefined)
+})

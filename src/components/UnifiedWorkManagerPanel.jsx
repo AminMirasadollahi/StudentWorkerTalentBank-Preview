@@ -1,4 +1,4 @@
-import {useManagerDraftWarning} from '../lib/managerDraftGuard.mjs'
+import {useManagerDraftWarning,useManagerRetainedState} from '../lib/managerDraftGuard.mjs'
 import {lazy,Suspense,useCallback,useEffect,useMemo,useRef,useState} from 'react'
 const DeskWorkPoolManagerSection=lazy(()=>import('./DeskWorkPoolManagerSection'))
 import JalaliDatePicker from './JalaliDatePicker'
@@ -33,9 +33,10 @@ const faDate=x=>x?new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
 
 export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=null}){
  const {owner,lock,blockedByOther}=useWorkPoolFence(routeFence)
- const [form,setForm]=useState(initial)
+ const retained=useManagerRetainedState('general-pool',0,()=>({form:initial(),termId:''}))
+ const {form,termId:termSelection}=retained.value
+ const setForm=next=>retained.change(p=>({...p,form:typeof next==='function'?next(p.form):next,termId:p.termId||term?.id||''}))
  const [view,setView]=useState({status:'loading',terms:[],templates:[],offers:[]})
- const [termSelection,setTermSelection]=useState('')
  const [open,setOpen]=useState(false)
  const [deskMode,setDeskMode]=useState(false)
  const [deskVisited,setDeskVisited]=useState(false)
@@ -48,7 +49,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
  const [closeReason,setCloseReason]=useState('')
  const [descriptionWarning,setDescriptionWarning]=useState('')
  const [edit,setEdit]=useState({id:'',previous:'',text:'',status:'idle',message:''})
- useManagerDraftWarning({form,termSelection},true,Boolean(closeId)||Boolean(edit.id&&edit.text!==edit.previous))
+ useManagerDraftWarning({form,termSelection},!retained.retained||Boolean(closeId)||Boolean(edit.id&&edit.text!==edit.previous),Boolean(closeId)||Boolean(edit.id&&edit.text!==edit.previous))
  const editRequest=useRef(null)
  const editInputRef=useRef(null)
  const [inspectedId,setInspectedId]=useState('')
@@ -76,16 +77,16 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
    setView(snapshot)
    return snapshot
   }catch{
-   if(serial===requestSerial.current)setView(v=>routeFence?{status:'error',terms:[],templates:[],offers:[]}:{...v,status:'error'})
+   if(serial===requestSerial.current){if(retained.retained)retained.reset();setView(v=>routeFence?{status:'error',terms:[],templates:[],offers:[]}:{...v,status:'error'})}
    return null
   }
  },[routeFence,owner])
  useEffect(()=>{void load();return()=>{requestSerial.current+=1}},[load,revision,refreshRevision])
  const activeTerms=view.terms.filter(x=>x.state==='active')
- const term=activeTerms.find(x=>x.id===termSelection)||activeTerms[0]
+ const term=activeTerms.find(x=>x.id===termSelection)||(!retained.retained||!termSelection?activeTerms[0]:undefined)
  const setField=(name,value)=>setForm(p=>({...p,[name]:value}))
  const preview=useMemo(()=>{
-  if(!term)return {error:'هیچ نیمسال فعالی برای انتشار وجود ندارد.'}
+  if(!term)return {error:termSelection?'نیمسال پیش‌نویس دیگر فعال نیست؛ پیش‌نویس محلی را حذف کنید و کار جدید تعریف کنید.':'هیچ نیمسال فعالی برای انتشار وجود ندارد.'}
   try{return workPackagePayload(form,term.id,todayTehran(),term)}
   catch(e){return {error:e.message}}
  },[form,term])
@@ -123,7 +124,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
   // A confirmed server receipt stays confirmed even if the read/navigation fails.
   routeFence?.confirmed(owner)
   pending.current=null;setUncertain(false);setRetryReady(false)
-  setForm(initial());setOpen(false)
+  retained.reset();setOpen(false)
   setNotice(publish?'کار ثبت و منتشر شد. فقط دانشجوی واجد شرایط می‌تواند آن را انتخاب کند.'
    :'پیش‌نویس کار ثبت شد؛ از فهرست می‌توانید آن را منتشر کنید.')
   inFlight.current=false;setBusy(false)
@@ -139,7 +140,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
    if(found){
     routeFence?.confirmed(owner)
     pending.current=null;setUncertain(false);setRetryReady(false)
-    setForm(initial());setOpen(false)
+    retained.reset();setOpen(false)
     setNotice('ثبت قبلی در سرور تأیید شد؛ هیچ کار تکراری ساخته نشد.')
    }else{
     setUncertain(false);setRetryReady(true)
@@ -320,6 +321,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
   {lock?.owner===owner&&lock.kind==='transition'&&lock.status==='reviewed'&&<button type="button" className="ow-mini-btn" disabled={busy||view.status!=='ready'} onClick={()=>{if(routeFence.acknowledgeReview(owner)){setUncertain(false);setNotice('بررسی فهرست تأیید شد؛ این تأیید، رسید تراکنش نیست.')}}}>تأیید بررسی وضعیت فرصت</button>}
   {view.status==='error'&&<p role="alert">اطلاعات مدیر دریافت نشد؛ ساخت کار تا بازخوانی موفق غیرفعال است.</p>}
   {view.status==='loading'&&<p role="status">در حال دریافت کارها و نیمسال فعال…</p>}
+  {retained.retained&&retained.dirty&&!hasUnresolved&&!busy&&view.status==='ready'&&<button type="button" className="report-btn report-btn--light" onClick={()=>{if(window.confirm('پیش‌نویس ثبت‌نشده حذف شود؟'))retained.reset()}}>حذف پیش‌نویس محلی</button>}
   {open&&view.status==='ready'&&<form className="swtb19-unified-work__form"
     onSubmit={e=>{e.preventDefault();void create(true)}}>
     <h4>تعریف کار جدید</h4>

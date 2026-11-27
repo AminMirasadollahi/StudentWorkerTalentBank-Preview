@@ -1,3 +1,4 @@
+import {useManagerDraftScope} from './lib/managerDraftGuard.mjs'
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
 import {workerGuideStorageKey,workerGuideSessionStorageKey,shouldAutoOfferWorkerGuide,suppressWorkerGuideAutoOffers} from './lib/workerGuide.mjs'
@@ -1158,6 +1159,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
 }
 export function AdminOperations({ navigation, setNavigation, refreshRevision = 0,
   hideSectionTabs = false, loadOriginalCandidates, assignmentReceiptPort=null, workPoolRouteFence=null }) {
+  const draftScope=useManagerDraftScope()
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const view=navigation.workView
   const profileWorkerId=navigation.profileWorkerId||''
@@ -1279,6 +1281,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       if(sequence!==readSequence.current)return false
       // A previous successful read is not proof of CURRENT authorization.
       setData({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+      draftScope?.clearRetained()
       setReadFailed(true)
       setAssignmentDialogDate('')
       // Drop any stale privileged draft after authorization/read rejection.
@@ -1560,7 +1563,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
        </div>
        {taskEditorOpen&&!assignmentDialogDate&&assignmentReceiptPort?.panel}
        <TaskAssignmentEditor key={assignmentReceiptPort?taskEditorRevision+':'+assignmentReceiptPort.editorRevision:taskEditorRevision}
-        assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
+        retentionKey="direct-task" assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
         onSaved={refresh} onCancel={()=>closeTaskEditor()}
         onClose={()=>closeTaskEditor(true)}/>
       </dialog>}
