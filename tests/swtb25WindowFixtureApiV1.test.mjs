@@ -33,3 +33,6 @@ test('term access mismatched scope rejected',async()=>{const {a}=await make(mana
 test('dispose invalidates data and further calls',async()=>{const {a}=await make(manager,()=>empty);a.dispose();assert.equal((await a.call('manager_read')).status,'blocked');assert.equal(a.state().ready,false)})
 
 test('checking cannot renegotiate until external authorization is verified',async()=>{const {a,calls}=await make(student,()=>snapshot);a.setContext({status:'checking'});assert.equal((await a.negotiate()).status,'blocked');assert.equal((await a.call('worker_read')).status,'blocked');assert.equal(calls.length,1);a.setContext(student);assert.equal((await a.negotiate()).status,'ready')})
+
+test('start accepts exact native response without invented id',async()=>{const {a}=await make(student,()=>({ok:true,state:'in_progress'}));assert.equal((await a.call('start',{p_task_id:id(6),p_expected_revision:1})).status,'ok')})
+test('malformed start result remains uncertain',async()=>{const {a}=await make(student,()=>({id:id(6),state:'in_progress'}));assert.equal((await a.call('start',{p_task_id:id(6),p_expected_revision:1})).status,'uncertain')})

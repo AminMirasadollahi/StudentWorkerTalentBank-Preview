@@ -231,7 +231,7 @@ function validateResponse(m,raw,args,context){
   if(!obj(raw)||raw.schedule_contract_version!==2||raw.review_only!==true)fail('WINDOW_TERM_SNAPSHOT_INVALID')
   if(m==='term_access'&&(raw.term_id!==args.p_term_id||!int(raw.window_noneligible_tasks,0)||!int(raw.window_noneligible_open_tasks,0)||raw.window_noneligible_open_tasks>raw.window_noneligible_tasks))fail('WINDOW_TERM_ACCESS_INVALID')
  }else if(m==='start'){
-  if(!obj(raw)||raw.id!==args.p_task_id||raw.state!=='in_progress')fail('WINDOW_START_NOT_CONFIRMED')
+  if(!exact(raw,['ok','state'])||raw.ok!==true||raw.state!=='in_progress')fail('WINDOW_START_NOT_CONFIRMED')
  }else if(m==='submit'){
   if(!exact(raw,['id','status','replayed'])||!uuid(raw.id)||!statusSet.has(raw.status)||typeof raw.replayed!=='boolean'||(!raw.replayed&&raw.status!=='submitted'))fail('WINDOW_REPORT_NOT_CONFIRMED')
  }else if(m==='review'){
