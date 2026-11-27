@@ -32,3 +32,15 @@ jobs:
           VITE_SUPABASE_URL: https://aaaaaaaaaaaaaaaaaaaa.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
         run: npm run build -- --outDir /tmp/swtb23-integrated-build
+      - name: Native Chrome six-space visual review (synthetic only)
+        run: |
+          google-chrome --version
+          export SWTB23_BROWSER_TOOL_DIR="$RUNNER_TEMP/swtb24-r5-browser"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "$SWTB23_BROWSER_TOOL_DIR" --ignore-scripts --no-audit --no-fund playwright@1.56.1
+          node tests/browser/run-swtb24-r5-manager-review.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swtb24-r5-manager-synthetic-review
+          path: test-results/swtb24-r5-ia-synthetic
+          retention-days: 7

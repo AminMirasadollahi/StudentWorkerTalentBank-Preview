@@ -1,0 +1,86 @@
+// Real manager components in an isolated synthetic shell, not an authenticated production test.
+import assert from 'node:assert/strict'
+import {mkdir,writeFile} from 'node:fs/promises'
+import {createRequire} from 'node:module'
+import {resolve} from 'node:path'
+import {createServer} from 'vite'
+const tool=process.env.SWTB23_BROWSER_TOOL_DIR
+if(!tool)throw Error('BROWSER_TOOL_DIR_REQUIRED')
+const {chromium}=createRequire(resolve(tool,'package.json'))('playwright')
+for(const name of ['WORK_POOL','TASKS','PRESENCE','REVIEW','HISTORY','TERM'])process.env['VITE_SWTB22_'+name+'_FOCUS_UI']='true'
+process.env.VITE_SWTB19_UNIFIED_WORK_UI='true'
+const out=resolve('test-results/swtb24-r5-ia-synthetic')
+await mkdir(out,{recursive:true})
+let server,browser,page,context,blocked=0
+const errors=[],observations={}
+try{
+ server=await createServer({configFile:resolve('tests/browser/vite.swtb24-r5.config.mjs')})
+ await server.listen()
+ browser=await chromium.launch({headless:true,channel:'chrome',args:['--no-sandbox','--disable-background-networking']})
+ context=await browser.newContext({viewport:{width:1440,height:900},locale:'fa-IR',serviceWorkers:'block'})
+ await context.route('**/*',route=>{const url=new URL(route.request().url());if(url.origin==='http://127.0.0.1:4179')return route.continue();blocked++;return route.abort('blockedbyclient')})
+ page=await context.newPage()
+ page.on('pageerror',e=>errors.push(e.message))
+ await page.goto('http://127.0.0.1:4179/tests/browser/swtb24-r5-manager-review.html',{waitUntil:'domcontentloaded'})
+ const parent=id=>page.locator('[data-swtb22-route="'+id+'"]')
+ const sub=label=>page.locator('.ow-tabs').getByRole('button',{name:label,exact:true})
+ const snap=async name=>{
+  assert.equal(await page.locator('[aria-current="page"]').count(),1)
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,name+' horizontal overflow')
+  await page.screenshot({path:resolve(out,name+'.png')})
+ }
+ const poolOpen=page.getByRole('button',{name:'تعریف کار جدید',exact:true})
+ await poolOpen.waitFor()
+ assert.equal(await page.locator('[data-swtb22-route]').count(),6)
+ assert.equal(await parent('tasks').getAttribute('aria-current'),'page')
+ await snap('01-work-hub-pool')
+ await poolOpen.click()
+ const poolInput=page.locator('.swtb19-unified-work__form input').first()
+ await poolInput.fill('پیش‌نویس ساختگی فرصت')
+ await snap('02-pool-editor')
+ await sub('وظایف واگذارشده').click()
+ await page.locator('.swtb22-task-directory').waitFor()
+ await snap('03-direct-tasks')
+ const openDirect=page.getByRole('button',{name:'واگذاری کار جدید'})
+ await openDirect.click()
+ const dialog=page.locator('#swtb22-task-assign-dialog[open]')
+ const title=dialog.locator('input[maxlength="160"]')
+ await title.fill('پیش‌نویس ساختگی واگذاری')
+ await snap('04-direct-editor')
+ await dialog.getByRole('button',{name:'بستن و حفظ پیش‌نویس'}).click()
+ await openDirect.click()
+ assert.equal(await title.inputValue(),'پیش‌نویس ساختگی واگذاری')
+ await dialog.getByRole('button',{name:'بستن و حفظ پیش‌نویس'}).click()
+ await sub('فرصت‌های قابل انتخاب').click()
+ await poolOpen.click()
+ observations.poolDraftSurvivesRoute=await poolInput.inputValue()==='پیش‌نویس ساختگی فرصت'
+ await sub('وظایف واگذارشده').click()
+ await openDirect.click()
+ observations.directDraftSurvivesRoute=await title.inputValue()==='پیش‌نویس ساختگی واگذاری'
+ await dialog.getByRole('button',{name:'بستن و حفظ پیش‌نویس'}).click()
+ await parent('applicants').click()
+ await page.locator('.swtb22-candidate-row').first().click()
+ await snap('05-people-applicants')
+ await sub('پرونده دانشجوکاران').click()
+ await page.getByRole('heading',{name:/پرونده دانشجوکار/}).last().waitFor({timeout:10000})
+ await snap('06-people-profiles')
+ await sub('مجوز همکاری نیمسال').click()
+ await page.getByText('نیمسال نمونه نمایشی',{exact:false}).first().waitFor()
+ await snap('07-people-term')
+ await parent('inbox').click()
+ await sub('تأیید ساعات').click()
+ await page.getByRole('heading',{name:'گزارش‌های منتظر تأیید'}).waitFor()
+ await snap('08-inbox-approvals')
+ await page.setViewportSize({width:1920,height:1080})
+ await parent('applicants').click()
+ await page.locator('.swtb22-candidate-grid').waitFor()
+ await snap('09-people-wide')
+ assert.equal(await page.evaluate(()=>globalThis.__qaWriteAttempts),0)
+ assert.equal(blocked,0);assert.deepEqual(errors,[])
+ console.log('SWTB24_R5_NATIVE_REVIEW_DRAFT_OBSERVATIONS='+JSON.stringify(observations))
+ console.log('PASS R5_SYNTHETIC_VISUAL_NAVIGATION_NO_WRITES')
+ console.log(observations.poolDraftSurvivesRoute&&observations.directDraftSurvivesRoute?'DRAFT_LIFETIME_REVIEW_PASS':'R5_A2_DRAFT_LIFETIME_RELEASE_HOLD')
+}finally{
+ await writeFile(resolve(out,'observations.json'),JSON.stringify({observations,blocked,errors},null,2))
+ await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})
+}
