@@ -296,6 +296,34 @@ export function createWindowFixtureApiV1({fixtureTransport,syntheticReviewOnly}=
   }finally{if(g===generation)busy=false}
  }
  const replay=()=>pending&&replayable(pending.method)?invoke(pending.method,pending.args,true):Promise.resolve({status:'blocked'})
+ // Only read authoritative current state for an uncertain, non-replayable
+ // operation. A matching observation is NOT proof of the original request
+ // being executed, and missing/unchanged data never proves non-execution.
+ const observePending=async()=>{
+  if(disposed||!cap||busy||!pending||replayable(pending.method))return {status:'blocked'}
+  const p=pending,c=context,a=p.args
+  const method=p.method==='start'?'worker_read':p.method==='review'?'manager_read':p.method==='recovery'?'recovery':null
+  if(!method)return {status:'blocked'}
+  const r=await invoke(method,method==='recovery'?{p_action:'discover',p_epoch:null,p_request_id:null}:{})
+  if(disposed||context!==c||pending!==p||r.status==='stale')return {status:'stale'}
+  if(r.status!=='ok')return {status:'unavailable'}
+  const v=r.value
+  let evidence='not_proven'
+  if(p.method==='start'){
+   const t=v.tasks.find(t=>t.id===a.p_task_id)
+   if(t&&t.schedule_kind==='single_report_window'&&t.window_revision===a.p_expected_revision&&t.state==='in_progress')evidence='start_state_observed'
+  }else if(p.method==='review'){
+   const es=v.time_entries.filter(e=>e?.id===a.p_entry_id)
+   if(es.length===1){
+    const e=es[0],ts=v.tasks.filter(t=>t?.id===e.task_id),ws=v.workers.filter(w=>w?.id===e.worker_id),t=ts[0]
+    if(ts.length===1&&ws.length===1&&uuid(e.worker_id)&&t.worker_id===e.worker_id&&t.schedule_kind==='single_report_window'&&t.window_revision===a.p_expected_revision&&t.state==='completed'&&t.has_any_report===true&&day(e.work_date)&&day(t.window_start)&&day(t.window_end)&&e.work_date>=t.window_start&&e.work_date<=t.window_end&&int(e.reported_minutes,1,1440)&&int(e.approved_minutes,0,e.reported_minutes)&&e.review_state==='approved'&&e.approved_minutes===a.p_approved_minutes)evidence='approval_state_observed'
+   }
+  }else if(a.p_action==='cancel'&&v.epoch===a.p_epoch&&v.active?.kind==='single_report_window_v1'&&v.active.requestId===a.p_request_id){
+   if(v.active.status==='cancelled')evidence='cancel_state_observed'
+   if(v.active.status==='committed')evidence='committed_state_observed'
+  }else if(a.p_action==='acknowledge'&&v.epoch===a.p_epoch+1&&v.active===null)evidence='cursor_advanced_observed'
+  return frozen({status:'observed',evidence,writeStillBlocked:true})
+ }
  const dispose=()=>{disposed=true;generation++;context=null;cap=null;busy=false;pending=null;recovery=null;verified=false}
- return frozen({setContext,negotiate,call:(m,a={})=>invoke(m,a),replay,state,dispose})
+ return frozen({setContext,negotiate,call:(m,a={})=>invoke(m,a),replay,observePending,state,dispose})
 }

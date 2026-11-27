@@ -37,29 +37,30 @@ export function createWindowEditorSession({syntheticReviewOnly,fixtureTransport,
    else receipt=r.value
    if(kind==='ack')for(const k of drafts.keys())if(k.startsWith('assignment:'))drafts.delete(k)
   }else if(r.status!=='uncertain'&&r.status!=='stale'){pendingKind=null;pendingTarget=null}
-  publish(r.status==='ok'&&(['commit','start','submit','review'].includes(kind)||(kind==='reserve'&&r.value?.active?.status==='committed')))
+  publish(r.status==='ok'&&(['commit','start','submit','review'].includes(kind)||(['reserve','cancel'].includes(kind)&&r.value?.active?.status==='committed')))
   return r
  }
  const reserve=async args=>{
   if(!usable()||context.role!=='manager'||!slot||slot.active!==null||args.p_action!=='reserve'||args.p_epoch!==slot.epoch)return blocked()
   if(!Array.isArray(args.p_prerequisites))return blocked()
   frozenDraft=Object.freeze({...args,p_prerequisites:Object.freeze([...args.p_prerequisites])});pendingKind='reserve';pendingTarget='assignment';const g=generation
-  const r=settle('reserve',await api.call('assignment',frozenDraft),g);if(r.status==='invalid'||r.status==='blocked')frozenDraft=null;return r
+  const work=api.call('assignment',frozenDraft);publish();const r=settle('reserve',await work,g);if(r.status==='invalid'||r.status==='blocked'){frozenDraft=null;publish()}return r
  }
  const commit=async()=>{
   if(!usable()||!frozenDraft||slot?.active?.status!=='reserved'||slot.active.requestId!==frozenDraft.p_request_id||slot.epoch!==frozenDraft.p_epoch)return blocked()
-  pendingKind='commit';pendingTarget='assignment';const g=generation;return settle('commit',await api.call('assignment',{...frozenDraft,p_action:'commit'}),g)
+  pendingKind='commit';pendingTarget='assignment';const g=generation;const work=api.call('assignment',{...frozenDraft,p_action:'commit'});publish();return settle('commit',await work,g)
  }
  const recoveryAction=async action=>{
   if(!usable()||context.role!=='manager'||slot?.active?.kind!=='single_report_window_v1'||(action==='cancel'?slot.active.status!=='reserved':!['committed','cancelled'].includes(slot.active.status)))return blocked()
   const kind=action==='cancel'?'cancel':'ack';pendingKind=kind;pendingTarget='assignment';const g=generation
-  return settle(kind,await api.call('recovery',{p_action:action,p_epoch:slot.epoch,p_request_id:slot.active.requestId}),g)
+  const work=api.call('recovery',{p_action:action,p_epoch:slot.epoch,p_request_id:slot.active.requestId});publish();return settle(kind,await work,g)
  }
  const perform=async(kind,args)=>{
   if(!usable()||!['start','submit','review'].includes(kind))return blocked()
-  pendingKind=kind;pendingTarget=kind==='review'?'review:'+args.p_entry_id:'report:'+args.p_task_id;const g=generation;return settle(kind,await api.call(kind,args),g)
+  pendingKind=kind;pendingTarget=kind==='review'?'review:'+args.p_entry_id:'report:'+args.p_task_id;const g=generation;const work=api.call(kind,args);publish();return settle(kind,await work,g)
  }
- const replay=async()=>{if(closed||!verified||!api.state().canReplay||!['reserve','commit','submit'].includes(pendingKind))return blocked();const k=pendingKind,g=generation;return settle(k,await api.replay(),g)}
+ const replay=async()=>{if(closed||!verified||!api.state().canReplay||!['reserve','commit','submit'].includes(pendingKind))return blocked();const k=pendingKind,g=generation;const work=api.replay();publish();return settle(k,await work,g)}
+ const observePending=async()=>{if(closed||!verified||!api.state().ready||api.state().busy||!api.state().uncertain||api.state().canReplay)return blocked();const g=generation,work=api.observePending();publish();const r=await work;if(g!==generation||closed||!verified)return {status:'stale'};publish();return r}
  const dispose=()=>{closed=true;verified=false;generation++;api.dispose();slot=null;frozenDraft=null;receipt=null;pendingKind=null;receiptTarget=null;pendingTarget=null;drafts.clear();publish();listeners.clear()}
- return Object.freeze({connect,reconcile,reserve,commit,cancel:()=>recoveryAction('cancel'),ack:()=>recoveryAction('acknowledge'),perform,replay,state,dispose,setAuthority,suspend,scopeMatches,draft,saveDraft,clearDraft,subscribe,getVersion,getReadVersion})
+ return Object.freeze({connect,reconcile,reserve,commit,cancel:()=>recoveryAction('cancel'),ack:()=>recoveryAction('acknowledge'),perform,replay,observePending,state,dispose,setAuthority,suspend,scopeMatches,draft,saveDraft,clearDraft,subscribe,getVersion,getReadVersion})
 }
