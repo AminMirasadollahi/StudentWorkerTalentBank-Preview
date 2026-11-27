@@ -1,0 +1,36 @@
+name: SWTB25 window read synthetic review (NO DEPLOY)
+on:
+  push:
+    branches: [review/swtb25-window-read-contract-20261127]
+permissions:
+  contents: read
+concurrency:
+  group: swtb25-window-read-review
+  cancel-in-progress: true
+jobs:
+  review:
+    if: github.ref == 'refs/heads/review/swtb25-window-read-contract-20261127'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - name: Native Node regression suite
+        run: node --test tests/swtb25ManagerWindowReadV2.test.mjs tests/swtb25WindowFixtureApiV1.test.mjs tests/swtb25WindowReviewPresentation.test.mjs
+      - name: Chrome and actual XLSX round-trip (synthetic only)
+        run: |
+          google-chrome --version
+          export SWTB23_BROWSER_TOOL_DIR="$RUNNER_TEMP/swtb25-window-browser"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "$SWTB23_BROWSER_TOOL_DIR" --ignore-scripts --no-audit --no-fund playwright@1.56.1
+          node tests/browser/run-swtb25-window-read-review.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swtb25-window-synthetic-review
+          path: test-results/swtb25-window-read
+          retention-days: 7

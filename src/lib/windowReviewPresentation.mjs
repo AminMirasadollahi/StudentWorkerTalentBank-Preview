@@ -45,6 +45,6 @@ export function workerWindowReviewModel(raw,workerId,format=jalaliWindowDay){
    a.hold_reason==='WINDOW_NOT_STARTED'?'upcoming':a.can_start||a.can_submit?'action':'held'
   groups[lane].push(windowTaskDisplay(t,format))
  }
- for(const k of Object.keys(groups))groups[k].sort((a,b)=>String(a.windowEnd||'9999-12-31').localeCompare(String(b.windowEnd||'9999-12-31'))||a.id.localeCompare(b.id))
+ for(const k of Object.keys(groups)){const fixed=groups[k].filter(t=>t.kind==='روز مشخص'),windows=groups[k].filter(t=>t.kind==='بازه‌ای').sort((a,b)=>a.windowEnd.localeCompare(b.windowEnd)||a.id.localeCompare(b.id));groups[k]=[...fixed,...windows]}
  return {groups,reports,approvedMinutesTotal:raw.approved_minutes_total,historyCoverage:'bounded_not_lifetime',serverToday:raw.server_today}
 }
