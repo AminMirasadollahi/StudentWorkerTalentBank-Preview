@@ -1,0 +1,58 @@
+import assert from 'node:assert/strict'
+import {mkdir,writeFile} from 'node:fs/promises'
+import {createRequire} from 'node:module'
+import {resolve} from 'node:path'
+import {createServer} from 'vite'
+const tool=process.env.SWTB23_BROWSER_TOOL_DIR
+if(!tool)throw Error('BROWSER_TOOL_DIR_REQUIRED')
+const {chromium}=createRequire(resolve(tool,'package.json'))('playwright')
+const out=resolve('test-results/swtb25-window-editor');await mkdir(out,{recursive:true})
+let server,browser,ctx,page,blocked=0;const errors=[]
+try{
+ server=await createServer({configFile:resolve('tests/browser/vite.swtb25-window-editor.config.mjs')});await server.listen()
+ browser=await chromium.launch({headless:true,channel:'chrome',args:['--no-sandbox','--disable-background-networking']})
+ ctx=await browser.newContext({viewport:{width:1440,height:900},locale:'fa-IR',serviceWorkers:'block'})
+ await ctx.route('**/*',r=>new URL(r.request().url()).origin==='http://127.0.0.1:4183'?r.continue():(blocked++,r.abort()))
+ page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message))
+ await page.goto('http://127.0.0.1:4183/tests/browser/swtb25-window-editor-review.html')
+ const btn=n=>page.getByRole('button',{name:n,exact:true})
+ const snap=async name=>{assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,name);await page.screenshot({path:resolve(out,name+'.png'),fullPage:true})}
+ await btn('رزرو درخواست واگذاری').waitFor()
+ await page.getByLabel('دانشجوکار واگذاری').selectOption({label:'دانشجوکار نمونه'})
+ await page.getByLabel('عنوان کار',{exact:true}).fill('آزمون واگذاری بازه‌ای')
+ await page.getByLabel('شرح کار',{exact:true}).fill('شرح آزمایشی')
+ await page.getByLabel('دلیل واگذاری نزدیک به موعد').fill('ضرورت آزمایشی')
+ await snap('01-assignment')
+ await btn('رزرو درخواست واگذاری').click()
+ await page.getByText('درخواست رزرو شده؛ هنوز ثبت نهایی نشده است.',{exact:true}).waitFor()
+ assert.equal(await page.getByLabel('عنوان کار',{exact:true}).isDisabled(),true)
+ await btn('ثبت نهایی واگذاری').click()
+ await page.getByText('نتیجه نامشخص؛ عملیات جدید متوقف است.',{exact:true}).waitFor()
+ assert.equal(await btn('رزرو درخواست واگذاری').isDisabled(),true)
+ await btn('بازیابی همان درخواست').click()
+ await page.getByText('ثبت نهایی با رسید معتبر تأیید شد.',{exact:true}).waitFor()
+ await btn('تأیید دریافت رسید').click()
+ await page.getByText('درخواستی در انتظار نیست',{exact:true}).waitFor()
+ const calls=await page.evaluate(()=>globalThis.__qaEditorCalls.filter(c=>c.name.endsWith('assignment_v1')))
+ assert.equal(calls.length,3);assert.deepEqual(calls[1],calls[2])
+ await btn('گزارش نمونه').click()
+ await btn('شروع کار آزمایشی').click()
+ await page.getByLabel('زمان انجام کار (دقیقه)').fill('150')
+ await page.getByLabel('علت زمان اضافه').selectOption('other')
+ await page.getByLabel('توضیح زمان اضافه').fill('توضیح آزمایشی برای زمان اضافه')
+ await page.setViewportSize({width:390,height:844});await snap('02-report-mobile')
+ await btn('ارسال گزارش آزمایشی').click()
+ await page.getByText('نتیجه نامشخص؛ عملیات جدید متوقف است.',{exact:true}).waitFor()
+ await btn('بازیابی همان درخواست').click()
+ await page.getByText(/رسید گزارش: دریافت شد/).waitFor()
+ assert.equal(await page.evaluate(()=>globalThis.__qaReportCount()),1)
+ assert.equal(await btn('ارسال گزارش آزمایشی').isDisabled(),true)
+ await btn('تأیید نمونه').click()
+ await page.getByLabel('زمان تأییدشده (دقیقه)').fill('120')
+ await page.getByLabel('توضیح مدیر').fill('توضیح تأیید آزمایشی')
+ await btn('تأیید گزارش آزمایشی').click()
+ await page.getByText('تأیید آزمایشی: 120 دقیقه',{exact:true}).waitFor()
+ await snap('03-approval-mobile')
+ assert.equal(blocked,0);assert.deepEqual(errors,[])
+ console.log('PASS SWTB25_WINDOW_EDITOR_SYNTHETIC_RECEIPTS')
+}finally{await writeFile(resolve(out,'observations.json'),JSON.stringify({blocked,errors},null,2));await ctx?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}
