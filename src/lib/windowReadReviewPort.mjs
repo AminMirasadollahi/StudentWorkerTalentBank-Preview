@@ -1,7 +1,8 @@
 // Explicitly injected, read-only synthetic capability. No SDK, URL flags,
 // local/session storage, production RPC or automatic legacy fallback.
 import {createWindowFixtureApiV1} from './windowFixtureApiV1.mjs'
-const brand=new WeakSet()
+const brand=new WeakMap()
+let nextPortId=0
 const coverage='independent_recent_kinds_plus_all_open_and_loaded_report_links'
 const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(x)&&x!=='00000000-0000-0000-0000-000000000000'
 export function createWindowReadReviewPort({syntheticReviewOnly,fixtureTransport}={}){
@@ -20,7 +21,7 @@ export function createWindowReadReviewPort({syntheticReviewOnly,fixtureTransport
    return v.value
   }finally{api.dispose()}
  }})
- brand.add(p);return p
+ brand.set(p,++nextPortId);return p
 }
 export function windowReadReviewScope(request,role,workerId,revision){
  if(!request||!brand.has(request.port)||!Number.isSafeInteger(revision)||revision<0)return null
@@ -30,5 +31,5 @@ export function windowReadReviewScope(request,role,workerId,revision){
  if(role==='worker'&&(!uuid(workerId)||c.workerId!==workerId||c.ready!==true))return null
  if(!['manager','worker'].includes(role))return null
  return {port:request.port,context:{status:'verified',role,actorId:c.actorId,workerId:role==='worker'?workerId:null},
-  key:JSON.stringify([role,c.actorId,workerId??null,revision])}
+  key:JSON.stringify([brand.get(request.port),role,c.actorId,workerId??null,revision])}
 }

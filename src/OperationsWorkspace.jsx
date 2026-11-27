@@ -2898,7 +2898,7 @@ export function WorkerOperations({profile,navigation,setNavigation,refreshRevisi
           <strong>{settingsOpen?'تنظیمات حساب':sectionNames[section]}</strong></span>
         <span className="ow-b3-online">حساب فعال · اطلاعات عملیاتی</span>
       </header>
-      {windowReadReview!==null?<>{!settingsOpen&&['tasks','history'].includes(section)?<WindowReadReviewSlot request={windowReadReview} role="worker" workerId={profile.worker_id} section={section} refreshRevision={refreshRevision}/>:<p role="status">این مسیر در نمای خواندنی آزمایشی فعال نیست.</p>}</>:<>
+      {windowReadReview!==null?<>{!settingsOpen&&['tasks','history'].includes(section)?<WindowReadReviewSlot request={profile.state==='active'&&profile.onboarding_state==='ready'?windowReadReview:null} role="worker" workerId={profile.worker_id} section={section} refreshRevision={refreshRevision}/>:<p role="status">این مسیر در نمای خواندنی آزمایشی فعال نیست.</p>}</>:<>
       {settingsNotice&&<p className="ops-alert-success" role="status">{settingsNotice}</p>}
       {settingsOpen&&settingsPanel}
       {loading&&<p className="ow-muted" role="status">در حال دریافت برنامه…</p>}
