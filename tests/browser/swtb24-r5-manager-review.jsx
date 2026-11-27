@@ -147,6 +147,14 @@ const flags={r5IaFixture:true}
 function Stage(){
  const [fence]=useState(createWorkPoolRouteFence)
  const [draftGuard]=useState(createManagerDraftGuard)
+ // Synthetic-only controls: manipulate the actual in-memory route guards, not RPCs.
+ const [qaControls]=useState(()=>{
+  const owner=Symbol('synthetic-unresolved-operation');let unregister=null
+  return {lockUnknown:()=>fence.begin(owner,'create')&&fence.unknown(owner),unlock:()=>fence.confirmed(owner),
+   dirty:()=>{if(!unregister)unregister=draftGuard.register(Symbol('synthetic-dirty-form'))},
+   clean:()=>{unregister?.();unregister=null}}
+ })
+ globalThis.__qaR5LaunchGuards=qaControls
  const [navigation,commitNavigation]=useState({
   section:'work',workView:'workPool',workPoolKind:'general',candidateView:'applicants',
   candidateFilter:'all',candidateSearch:'',candidateId:'',
