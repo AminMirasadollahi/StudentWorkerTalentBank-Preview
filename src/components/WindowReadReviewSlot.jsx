@@ -1,4 +1,4 @@
-import {useEffect,useState,useSyncExternalStore} from 'react'
+import {useEffect,useState,useSyncExternalStore,useRef} from 'react'
 import {windowReadReviewScope} from '../lib/windowReadReviewPort.mjs'
 import WindowReadReview from './WindowReadReview.jsx'
 import WindowEditorReview from './WindowEditorReview.jsx'
@@ -56,8 +56,19 @@ function ScopedRead({scope,section,editor}){
  if(result.state==='loading')return <p role="status">در حال دریافت اطلاعات معتبر آزمایشی…</p>
  if(result.state!=='ready')return <><p role="alert">دریافت قرارداد معتبر ممکن نشد؛ اطلاعات قبلی نمایش داده نمی‌شود.</p><button type="button" onClick={()=>{setResult({state:'loading'});setRetry(x=>x+1)}}>تلاش مجدد برای دریافت اطلاعات</button></>
  if(scope.context.role==='manager'&&['terms','termMemberships'].includes(section))return <WindowTermReview scope={scope} section={section} snapshot={result.snapshot} initial={result.termRead}/>
+ if(editor?.session.state().pendingReceiptV2||editor?.session.state().refreshRequired)return <p role="status">فرم تا تعیین تکلیف درخواست قبلی متوقف است.</p>
  if(editor&&((scope.context.role==='manager'&&['tasks','inbox','approvals'].includes(section))||(scope.context.role==='worker'&&section==='tasks')))return <Editors scope={scope} section={section} snapshot={result.snapshot} editor={editor} assignmentScope={result.assignmentScope}/>
  return <WindowReadReview role={scope.context.role} workerId={scope.context.workerId} snapshot={result.snapshot} syntheticReviewOnly section={section} embedded/>
+}
+function ReceiptRecovery({session}){
+ const s=session.state(),[message,setMessage]=useState(''),lock=useRef(false)
+ const run=async fn=>{if(lock.current)return;lock.current=true;try{const r=await fn();setMessage(r.status==='ok'?'پاسخ معتبر دریافت شد.':r.status==='uncertain'?'پاسخ قطعی دریافت نشد.':'بازخوانی یا بازیابی هنوز کامل نشده است.')}finally{lock.current=false}}
+ useEffect(()=>{if(!session.state().ready&&!session.state().busy)void session.connect()},[session])
+ return <section className="wr-shell" dir="rtl" aria-label="بازیابی تراکنش">
+ {s.pendingReceiptV2&&<><p role="alert">نتیجه نامشخص؛ عملیات جدید متوقف است.</p><button type="button" disabled={s.busy||!s.canReplay} onClick={()=>run(()=>session.replay())}>بازیابی همان درخواست تراکنشی</button></>}
+ {s.refreshRequired&&<><p role="status">رسید تاریخی معتبر است؛ تا بازخوانی وضعیت فعلی عملیات جدید متوقف است.</p><button type="button" disabled={s.busy||!s.ready} onClick={()=>run(()=>session.refreshReceipt())}>بازخوانی وضعیت پس از رسید</button></>}
+ {s.historicalReceipt&&<p className="wr-meta">رسید عملیات قبلی دریافت شده است؛ وضعیت فعلی فقط از بازخوانی معتبر مشخص می‌شود.</p>}
+ {message&&<p role="status">{message}</p>}</section>
 }
 export default function WindowReadReviewSlot({request,role,workerId=null,refreshRevision=0,section}){
  const scope=windowReadReviewScope(request,role,workerId,refreshRevision)
@@ -67,5 +78,7 @@ export default function WindowReadReviewSlot({request,role,workerId=null,refresh
  const mutationRevision=useSyncExternalStore(s?.subscribe??noSubscribe,s?.getReadVersion??zero,s?.getReadVersion??zero)
  useSyncExternalStore(s?.subscribe??noSubscribe,s?.getVersion??zero,s?.getVersion??zero)
  if(!scope||editor&&(!s?.scopeMatches?.(scope.context)||typeof editor.newId!=='function'))return <p role="alert">مجوز نمای آزمایشی تأیید نشده است.</p>
- return <ScopedRead key={scope.key+':'+section+':'+mutationRevision} scope={scope} section={section} editor={editor}/>
+ const ss=s?.state()
+ return <>{ss?.receiptV2&&(ss.pendingReceiptV2||ss.refreshRequired||ss.historicalReceipt)&&<ReceiptRecovery key={scope.key} session={s}/>}
+ <ScopedRead key={scope.key+':'+section+':'+mutationRevision} scope={scope} section={section} editor={editor}/></>
 }

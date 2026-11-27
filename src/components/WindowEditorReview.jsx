@@ -34,7 +34,7 @@ function Assignment({scope,s,session,run,setMessage,newId}){
  const [d,set]=useSessionDraft(session,'assignment:'+scope.term.id,initial)
  const hadDraft=useRef(false)
  useEffect(()=>{if(hadDraft.current&&!s.frozenDraft&&!s.slot?.active&&s.slot){set(initial())}hadDraft.current=!!s.frozenDraft},[s.frozenDraft,s.slot])
- const frozen=!!s.frozenDraft||!!s.slot?.active||s.uncertain||s.busy||!s.ready||!s.slot
+ const frozen=!!s.frozenDraft||!!s.slot?.active||s.uncertain||s.refreshRequired||s.busy||!s.ready||!s.slot
  const reserve=e=>{e.preventDefault();if(frozen)return;const v=assignmentWindowPayload(d,scope,newId(),s.slot.epoch);if(!v.ok){setMessage(errors[v.code]);return}void run(()=>session.reserve(v.args))}
  return <><h2>واگذاری کار بازه‌ای</h2><p>یک وظیفه، یک برآورد کل، یک گزارش. زمان بین روزهای بازه تقسیم نمی‌شود.</p>
  <form onSubmit={reserve}><fieldset disabled={frozen}><div className="we-grid">
@@ -55,7 +55,7 @@ function Report({task,s,session,run,setMessage,newId}){
  const a=task.window_actions
  const [d,set]=useSessionDraft(session,'report:'+task.id+':'+task.window_revision,()=>({date:a.date_max,minutes:String(task.estimate_minutes),note:'',reasonCode:'',reasonText:''}))
  const [started,setStarted]=useState(false),[submitted,setSubmitted]=useState(false)
- const disabled=s.busy||s.uncertain||!s.ready||submitted||s.receipt?.status!=null
+ const disabled=s.busy||s.uncertain||s.refreshRequired||!s.ready||submitted||s.receipt?.status!=null
  const send=e=>{e.preventDefault();if(disabled)return;const v=reportWindowPayload(task,d,newId());if(!v.ok){setMessage(errors[v.code]);return}void run(()=>session.perform('submit',v.args)).then(r=>{if(r.status==='ok')setSubmitted(true)})}
  return <><h2>ثبت فعالیت بازه‌ای</h2><h3>{task.title}</h3><p>بازه انجام: {jalaliWindowDay(task.window_start)} تا {jalaliWindowDay(task.window_end)} · برآورد {task.estimate_minutes} دقیقه</p>
  {a.can_start&&<button type="button" disabled={disabled||started||s.receipt?.state==='in_progress'} onClick={()=>run(()=>session.perform('start',{p_task_id:task.id,p_expected_revision:task.window_revision})).then(r=>{if(r.status==='ok')setStarted(true)})}>شروع کار آزمایشی</button>}
@@ -69,7 +69,7 @@ function Report({task,s,session,run,setMessage,newId}){
 }
 function Approval({task,entry,s,session,run,setMessage}){
  const [d,set]=useSessionDraft(session,'review:'+entry.id+':'+task.window_revision,()=>({minutes:String(entry.reported_minutes),note:''}))
- const disabled=s.busy||s.uncertain||!s.ready||!!s.slot?.active||s.receipt?.review_state==='approved'
+ const disabled=s.busy||s.uncertain||s.refreshRequired||!s.ready||!!s.slot?.active||s.receipt?.review_state==='approved'
  const send=e=>{e.preventDefault();if(disabled)return;const v=reviewWindowPayload(task,entry,d);if(!v.ok){setMessage(errors[v.code]);return}void run(()=>session.perform('review',v.args))}
  return <><h2>تأیید گزارش بازه‌ای</h2><h3>{task.title}</h3><p>تاریخ واقعی: {jalaliWindowDay(entry.work_date)} · استاندارد {task.estimate_minutes} · درخواستی {entry.reported_minutes} دقیقه</p><form onSubmit={send}><fieldset disabled={disabled}><div className="we-grid"><label>زمان تأییدشده (دقیقه)<input type="number" min="0" max={entry.reported_minutes} {...field(d,set,'minutes')}/></label><label className="we-wide">توضیح مدیر<textarea aria-label="توضیح مدیر" maxLength={1000} rows={3} {...field(d,set,'note')}/></label></div><button type="submit">تأیید گزارش آزمایشی</button></fieldset></form><p className="wr-meta">رد گزارش، درخواست اصلاح و تمدید بازه هنوز فعال نیستند.</p>{s.receipt?.review_state==='approved'&&<p role="status">تأیید آزمایشی: {s.receipt.approved_minutes} دقیقه</p>}</>
 }
@@ -87,6 +87,6 @@ export default function WindowEditorReview({session,role,scope,task,entry,mode,n
  const editorState={...s,busy:s.busy||localBusy,receipt:s.receiptTarget===target?s.receipt:null}
  return <section className="wr-shell we-shell" dir="rtl"><p className="wr-banner">فقط آزمایش با داده مصنوعی؛ هیچ اطلاعات واقعی ثبت نمی‌شود.</p>
  {message&&<p role="status" className="wr-held">{message}</p>}
- {s.uncertain&&<section className="we-recovery" role="alert"><strong>نتیجه نامشخص؛ عملیات جدید متوقف است.</strong><p>{s.canReplay?'فقط همان درخواست با همان شناسه قابل بازیابی است.':'این عملیات نیازمند بررسی مستقل وضعیت است؛ ارسال مجدد غیرفعال است.'}</p>{s.canReplay&&s.pendingTarget!==target&&<p>برای بازیابی به همان فرم قبلی بازگردید.</p>}{!s.canReplay&&s.pendingTarget===target&&<button type="button" disabled={s.busy||localBusy||!s.ready} onClick={()=>run(()=>session.observePending())}>بررسی وضعیت فعلی بدون ثبت مجدد</button>}{s.canReplay&&s.pendingTarget===target&&<button type="button" disabled={s.busy||localBusy} onClick={()=>run(()=>session.replay())}>بازیابی همان درخواست</button>}</section>}
+ {s.uncertain&&!s.pendingReceiptV2&&<section className="we-recovery" role="alert"><strong>نتیجه نامشخص؛ عملیات جدید متوقف است.</strong><p>{s.canReplay?'فقط همان درخواست با همان شناسه قابل بازیابی است.':'این عملیات نیازمند بررسی مستقل وضعیت است؛ ارسال مجدد غیرفعال است.'}</p>{s.canReplay&&s.pendingTarget!==target&&<p>برای بازیابی به همان فرم قبلی بازگردید.</p>}{!s.canReplay&&s.pendingTarget===target&&<button type="button" disabled={s.busy||localBusy||!s.ready} onClick={()=>run(()=>session.observePending())}>بررسی وضعیت فعلی بدون ثبت مجدد</button>}{s.canReplay&&s.pendingTarget===target&&<button type="button" disabled={s.busy||localBusy} onClick={()=>run(()=>session.replay())}>بازیابی همان درخواست</button>}</section>}
  {role==='manager'&&mode==='assignment'?<Assignment scope={scope} s={editorState} session={session} run={run} setMessage={setMessage} newId={newId}/>:role==='manager'&&mode==='approval'?<Approval task={task} entry={entry} s={editorState} session={session} run={run} setMessage={setMessage}/>:role==='worker'&&mode==='report'?<Report task={task} s={editorState} session={session} run={run} setMessage={setMessage} newId={newId}/>:<p role="alert">مسیر معتبر نیست.</p>}</section>
 }

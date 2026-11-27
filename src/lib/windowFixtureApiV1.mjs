@@ -245,10 +245,13 @@ function validateResponse(m,raw,args,context){
 // Scope lifetime is local, not authorization. Every request must still be checked by server.
 // No mutation after uncertain result; only explicit exact replay for replay-safe methods.
 // Reads can help investigation but do not automatically unlock an uncertain write.
-export function createWindowFixtureApiV1({fixtureTransport,syntheticReviewOnly}={}){
+export function createWindowFixtureApiV1({fixtureTransport,syntheticReviewOnly,operationReceiptsV2=false}={}){
  if(syntheticReviewOnly!==true||typeof fixtureTransport!=='function')fail('WINDOW_FIXTURE_ONLY')
- let context=null,cap=null,generation=0,busy=false,pending=null,recovery=null,disposed=false,verified=false
- const state=()=>frozen({ready:!!cap&&!disposed,busy,uncertain:!!pending,canReplay:!!cap&&!busy&&!!pending&&replayable(pending.method),recoveryState:recovery?.active?.status??null})
+ let context=null,cap=null,generation=0,busy=false,pending=null,recovery=null,disposed=false,verified=false,refreshRequired=false,historicalReceipt=null
+ const v2=operationReceiptsV2===true
+ const v2Write=(m,a)=>v2&&(['start','review'].includes(m)||m==='recovery'&&a.p_action!=='discover')
+ const canReplayPending=()=>!!pending&&(pending.v2||replayable(pending.method))
+ const state=()=>frozen({ready:!!cap&&!disposed,busy,uncertain:!!pending,canReplay:!!cap&&!busy&&canReplayPending(),receiptV2:v2,pendingReceiptV2:!!pending?.v2,refreshRequired,historicalReceipt:verified?historicalReceipt:null,recoveryState:recovery?.active?.status??null})
  const setContext=next=>{
   if(disposed)return
   const valid=next?.status==='verified'&&['manager','worker'].includes(next.role)&&uuid(next.actorId)&&
@@ -258,36 +261,44 @@ export function createWindowFixtureApiV1({fixtureTransport,syntheticReviewOnly}=
   if(next?.status==='checking'){return}
   verified=!!valid
   context=valid?frozen({role:next.role,actorId:next.actorId,workerId:next.workerId??null}):null
-  if(!context||!prior||prior.actorId!==context.actorId||prior.role!==context.role||prior.workerId!==context.workerId)pending=null
+  if(!context||!prior||prior.actorId!==context.actorId||prior.role!==context.role||prior.workerId!==context.workerId){pending=null;refreshRequired=false;historicalReceipt=null}
  }
  const negotiate=async()=>{
   if(disposed||!verified||!context||busy)return {status:'blocked'}
   const c=context,g=++generation;cap=null;busy=true
   try{
-   const raw=await fixtureTransport(METHODS.capabilities.name,{p_audience:c.role})
+   const raw=await fixtureTransport(v2?'qa_window_api_capabilities_v2':METHODS.capabilities.name,{p_audience:c.role})
    if(g!==generation||disposed)return {status:'stale'}
-   cap=capability(raw,c);return {status:'ready'}
+   cap=v2?validateWindowReceiptV2Capability(raw,c):capability(raw,c);return {status:'ready'}
   }catch{if(g!==generation||disposed)return {status:'stale'};return {status:'blocked'}}
   finally{if(g===generation)busy=false}
  }
  const invoke=async(method,input,exactReplay=false)=>{
   if(disposed||!cap||busy||!own(METHODS,method)||method==='capabilities'||!METHODS[method].roles.includes(context.role))return {status:'blocked'}
-  let args
-  try{validateArgs(method,input);args=deepFreeze(clone(input))}catch{return {status:'invalid'}}
+  let args,wireArgs
+  const useV2=v2Write(method,input)
+  try{if(useV2){wireArgs=validateWindowOperationReceiptArgs(method,input,context);const {p_operation_id,...rest}=wireArgs;args=deepFreeze(rest)}else{validateArgs(method,input);args=deepFreeze(clone(input));wireArgs=args}}catch{return {status:'invalid'}}
   const writing=isWrite(method,args)
+  if(writing&&refreshRequired)return {status:'blocked'}
   if(writing&&pending&&!exactReplay)return {status:'uncertain'}
-  if(exactReplay&&(!pending||pending.method!==method||JSON.stringify(pending.args)!==JSON.stringify(args)||!replayable(method)))return {status:'blocked'}
+  if(exactReplay&&(!pending||pending.method!==method||JSON.stringify(pending.args)!==JSON.stringify(wireArgs)||!canReplayPending()))return {status:'blocked'}
   if(method==='assignment'&&!exactReplay){
    const active=recovery?.active
    if(!recovery||recovery.epoch!==args.p_epoch||(args.p_action==='reserve'?active!==null:active?.kind!=='single_report_window_v1'||active.requestId!==args.p_request_id||active.status!=='reserved'))return {status:'blocked'}
   }
-  if(method==='recovery'&&writing&&(!recovery?.active||recovery.epoch!==args.p_epoch||recovery.active.requestId!==args.p_request_id||
+  if(method==='recovery'&&writing&&!exactReplay&&(!recovery?.active||recovery.epoch!==args.p_epoch||recovery.active.requestId!==args.p_request_id||
    recovery.active.kind!=='single_report_window_v1'||(args.p_action==='cancel'?recovery.active.status!=='reserved':!['cancelled','committed'].includes(recovery.active.status))))return {status:'blocked'}
   const g=++generation,c=context;busy=true
-  if(writing)pending=frozen({method,args}) // Set BEFORE transport, including auth recheck interruption.
+  if(writing)pending=frozen({method,args:wireArgs,v2:useV2}) // Set BEFORE transport, including auth recheck interruption.
   try{
-   const raw=await fixtureTransport(METHODS[method].name,args)
+   const route=useV2?METHODS[method].name.replace(/_v1$/,'_v2'):METHODS[method].name
+   const raw=await fixtureTransport(route,wireArgs)
    if(g!==generation||disposed)return {status:'stale'}
+   if(useV2){
+    historicalReceipt=parseWindowOperationReceiptV1(method,raw,wireArgs,c)
+    pending=null;recovery=null;refreshRequired=true
+    return {status:'ok',value:historicalReceipt.result,historicalReceipt}
+   }
    const value=deepFreeze(clone(validateResponse(method,raw,args,c)))
    if(method==='assignment'||method==='recovery')recovery=value
    if(writing)pending=null
@@ -298,12 +309,30 @@ export function createWindowFixtureApiV1({fixtureTransport,syntheticReviewOnly}=
    return {status:writing?'uncertain':'unavailable'}
   }finally{if(g===generation)busy=false}
  }
- const replay=()=>pending&&replayable(pending.method)?invoke(pending.method,pending.args,true):Promise.resolve({status:'blocked'})
+ const replay=()=>canReplayPending()?invoke(pending.method,pending.args,true):Promise.resolve({status:'blocked'})
+ // Clear the refresh fence only after a fresh validated read AND (manager) discovery.
+ // Do not expose an API allowing the caller to assert that it refreshed.
+ const refreshAfterReceipt=async validateSnapshot=>{
+  if(!v2||!refreshRequired||!cap||busy||pending||typeof validateSnapshot!=='function')return {status:'blocked'}
+  const c=context
+  const read=await invoke(c.role==='manager'?'manager_read':'worker_read',{})
+  if(disposed||!cap||context!==c||read.status==='stale')return {status:'stale'}
+  if(read.status!=='ok')return {status:'unavailable'}
+  try{validateSnapshot(read.value,c)}catch{return {status:'unavailable'}}
+  let slot=null
+  if(c.role==='manager'){
+   const r=await invoke('recovery',{p_action:'discover',p_epoch:null,p_request_id:null})
+   if(disposed||!cap||context!==c||r.status==='stale')return {status:'stale'}
+   if(r.status!=='ok')return {status:'unavailable'}
+   slot=r.value
+  }
+  refreshRequired=false;return {status:'ok',value:slot}
+ }
  // Only read authoritative current state for an uncertain, non-replayable
  // operation. A matching observation is NOT proof of the original request
  // being executed, and missing/unchanged data never proves non-execution.
  const observePending=async()=>{
-  if(disposed||!cap||busy||!pending||replayable(pending.method))return {status:'blocked'}
+  if(disposed||!cap||busy||!pending||canReplayPending())return {status:'blocked'}
   const p=pending,c=context,a=p.args
   const method=p.method==='start'?'worker_read':p.method==='review'?'manager_read':p.method==='recovery'?'recovery':null
   if(!method)return {status:'blocked'}
@@ -327,8 +356,8 @@ export function createWindowFixtureApiV1({fixtureTransport,syntheticReviewOnly}=
   }else if(a.p_action==='acknowledge'&&v.epoch===a.p_epoch+1&&v.active===null)evidence='cursor_advanced_observed'
   return frozen({status:'observed',evidence,writeStillBlocked:true})
  }
- const dispose=()=>{disposed=true;generation++;context=null;cap=null;busy=false;pending=null;recovery=null;verified=false}
- return frozen({setContext,negotiate,call:(m,a={})=>invoke(m,a),replay,observePending,state,dispose})
+ const dispose=()=>{disposed=true;generation++;context=null;cap=null;busy=false;pending=null;recovery=null;verified=false;historicalReceipt=null;refreshRequired=false}
+ return frozen({setContext,negotiate,call:(m,a={})=>invoke(m,a),replay,observePending,refreshAfterReceipt,state,dispose})
 }
 
 // Shared pure validators for the explicitly negotiated receipt V2 candidate.
