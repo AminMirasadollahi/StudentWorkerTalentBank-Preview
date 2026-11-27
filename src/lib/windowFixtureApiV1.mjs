@@ -244,20 +244,21 @@ function validateResponse(m,raw,args,context){
 // Reads can help investigation but do not automatically unlock an uncertain write.
 export function createWindowFixtureApiV1({fixtureTransport,syntheticReviewOnly}={}){
  if(syntheticReviewOnly!==true||typeof fixtureTransport!=='function')fail('WINDOW_FIXTURE_ONLY')
- let context=null,cap=null,generation=0,busy=false,pending=null,recovery=null,disposed=false
+ let context=null,cap=null,generation=0,busy=false,pending=null,recovery=null,disposed=false,verified=false
  const state=()=>frozen({ready:!!cap&&!disposed,busy,uncertain:!!pending,canReplay:!!cap&&!busy&&!!pending&&replayable(pending.method),recoveryState:recovery?.active?.status??null})
  const setContext=next=>{
   if(disposed)return
   const valid=next?.status==='verified'&&['manager','worker'].includes(next.role)&&uuid(next.actorId)&&
    (next.role==='manager'?next.workerId==null:uuid(next.workerId))
   const prior=context
-  generation++;cap=null;busy=false;recovery=null
+  generation++;cap=null;busy=false;recovery=null;verified=false
   if(next?.status==='checking'){return}
+  verified=!!valid
   context=valid?frozen({role:next.role,actorId:next.actorId,workerId:next.workerId??null}):null
   if(!context||!prior||prior.actorId!==context.actorId||prior.role!==context.role||prior.workerId!==context.workerId)pending=null
  }
  const negotiate=async()=>{
-  if(disposed||!context||busy)return {status:'blocked'}
+  if(disposed||!verified||!context||busy)return {status:'blocked'}
   const c=context,g=++generation;cap=null;busy=true
   try{
    const raw=await fixtureTransport(METHODS.capabilities.name,{p_audience:c.role})
@@ -295,6 +296,6 @@ export function createWindowFixtureApiV1({fixtureTransport,syntheticReviewOnly}=
   }finally{if(g===generation)busy=false}
  }
  const replay=()=>pending&&replayable(pending.method)?invoke(pending.method,pending.args,true):Promise.resolve({status:'blocked'})
- const dispose=()=>{disposed=true;generation++;context=null;cap=null;busy=false;pending=null;recovery=null}
+ const dispose=()=>{disposed=true;generation++;context=null;cap=null;busy=false;pending=null;recovery=null;verified=false}
  return frozen({setContext,negotiate,call:(m,a={})=>invoke(m,a),replay,state,dispose})
 }
