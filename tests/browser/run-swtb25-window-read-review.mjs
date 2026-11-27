@@ -45,6 +45,7 @@ try{
  assert.equal(sh.getRow(2).getCell(approved).numFmt,'0')
  assert.equal(sh.getRow(3).getCell(approved).value,null)
  results.xlsx=true
+ console.log('PASS SWTB25_REAL_XLSX_ROUNDTRIP')
  await page.getByLabel('وضعیت',{exact:true}).selectOption('without_report')
  assert.equal(await rows.count(),3)
  await page.getByRole('button',{name:'از تاریخ سوابق',exact:true}).click()
