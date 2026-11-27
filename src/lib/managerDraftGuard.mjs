@@ -35,7 +35,7 @@ export function useManagerRetainedState(key,revision,initial,allowed=true){
  const retained=Boolean(guard&&key)
  const baseline=useRef(null)
  if(baseline.current===null)baseline.current=initial()
- const [value,setValue]=useState(()=>retained?(guard.readDraft(key,revision)??baseline.current):baseline.current)
+ const [value,setValue]=useState(()=>retained&&allowed?(guard.readDraft(key,revision)??baseline.current):baseline.current)
  const suppressed=useRef(false)
  const dirty=JSON.stringify(value)!==JSON.stringify(baseline.current)
  const clear=()=>{suppressed.current=true;if(retained)guard.clearDraft(key)}

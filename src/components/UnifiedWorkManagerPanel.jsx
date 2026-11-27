@@ -35,7 +35,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
  const {owner,lock,blockedByOther}=useWorkPoolFence(routeFence)
  const retained=useManagerRetainedState('general-pool',0,()=>({form:initial(),termId:''}))
  const {form,termId:termSelection}=retained.value
- const setForm=next=>retained.change(p=>({...p,form:typeof next==='function'?next(p.form):next,termId:p.termId||term?.id||''}))
+ const setForm=next=>retained.change(p=>({...p,form:typeof next==='function'?next(p.form):next,termId:retained.retained?(p.termId||term?.id||''):p.termId}))
  const [view,setView]=useState({status:'loading',terms:[],templates:[],offers:[]})
  const [open,setOpen]=useState(false)
  const [deskMode,setDeskMode]=useState(false)
@@ -77,7 +77,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
    setView(snapshot)
    return snapshot
   }catch{
-   if(serial===requestSerial.current){if(retained.retained)retained.reset();setView(v=>routeFence?{status:'error',terms:[],templates:[],offers:[]}:{...v,status:'error'})}
+   if(serial===requestSerial.current){if(retained.retained){if(pending.current||inFlight.current||routeFence?.getSnapshot())retained.clear();else retained.reset()}setView(v=>routeFence?{status:'error',terms:[],templates:[],offers:[]}:{...v,status:'error'})}
    return null
   }
  },[routeFence,owner])
@@ -107,6 +107,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
   if(retry&&!pending.current)return
   const requestId=pending.current?.requestId||globalThis.crypto.randomUUID()
   if(routeFence&&!(retry?routeFence.retry(owner,'create'):routeFence.begin(owner,'create')))return
+  retained.clear()
   pending.current={requestId,signature,publish}
   inFlight.current=true;setBusy(true);setNotice('')
   let receipt
