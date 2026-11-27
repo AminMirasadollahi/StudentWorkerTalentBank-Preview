@@ -24,7 +24,7 @@ const todayISO=()=>{
  const part=k=>pieces.find(p=>p.type===k)?.value||''
  return part('year')+'-'+part('month')+'-'+part('day')
 }
-export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='general',onKindChange,routeFence=null,commonEntry=false,createIntent=null,onCreateHandled}){
+export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='general',onKindChange,routeFence=null,commonEntry=false,createIntent=null,onCreateHandled,onReturnToCreate}){
  const {owner,lock,blockedByOther}=useWorkPoolFence(routeFence)
  const today=todayISO()
  const [revision,setRevision]=useState(0)
@@ -137,7 +137,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
  if(unifiedUIEnabled)return <section className="report-panel ow-work-pool swtb22-work-pool"
   aria-label="تعریف و انتشار فعالیت">
    <Suspense fallback={<p role="status">در حال آماده‌سازی تعریف کار…</p>}>
-    <UnifiedWorkManagerPanel refreshRevision={refreshRevision} routeFence={routeFence} commonEntry={commonEntry} createIntent={createIntent} onCreateHandled={onCreateHandled}/>
+    <UnifiedWorkManagerPanel refreshRevision={refreshRevision} routeFence={routeFence} commonEntry={commonEntry} createIntent={createIntent} onCreateHandled={onCreateHandled} onReturnToCreate={onReturnToCreate}/>
    </Suspense>
   </section>
  const editorSurface=(<div key="editor" className="ow-work-pool-compose" ref={editorRootRef}>
@@ -273,7 +273,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
   </div>}
   <div className="swtb22-work-pool-kind-view" hidden={focusUIEnabled&&kind==='desk'}>
   {unifiedUIEnabled?<Suspense fallback={<p role="status">در حال آماده‌سازی تعریف کار…</p>}>
-   <UnifiedWorkManagerPanel refreshRevision={refreshRevision} routeFence={routeFence} commonEntry={commonEntry} createIntent={createIntent} onCreateHandled={onCreateHandled}/>
+   <UnifiedWorkManagerPanel refreshRevision={refreshRevision} routeFence={routeFence} commonEntry={commonEntry} createIntent={createIntent} onCreateHandled={onCreateHandled} onReturnToCreate={onReturnToCreate}/>
   </Suspense>:<>
   <p className="ow-compact-hint">{deskPoolUIEnabled?'فرصت‌های عمومی در این بخش و نوبت‌های زمان‌دار کتابخانه در بخش بعدی همین صفحه مدیریت می‌شوند.':'این بخش فقط برای کارهای عمومی است. نوبت‌های زمان‌دار کتابخانه، کار گروهی و درخواست‌های نیازمند تأیید مدیر همچنان از مسیرهای تخصصی خود انجام می‌شوند.'} انتخاب کار، ساعت تأییدشده ایجاد نمی‌کند.</p>
   {blockedByOther&&<p role="alert">عملیات حل‌نشده دیگری وجود دارد؛ ثبت جدید مسدود است.</p>}

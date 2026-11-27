@@ -31,7 +31,7 @@ const initial=()=>({
 const faDate=x=>x?new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
  dateStyle:'medium',timeZone:'UTC'}).format(new Date(x+'T12:00:00Z')):'—'
 
-export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=null,commonEntry=false,createIntent=null,onCreateHandled}){
+export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=null,commonEntry=false,createIntent=null,onCreateHandled,onReturnToCreate}){
  const {owner,lock,blockedByOther}=useWorkPoolFence(routeFence)
  const draftScope=useManagerDraftScope()
  const retained=useManagerRetainedState('general-pool',0,()=>({form:initial(),termId:''}))
@@ -320,7 +320,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
       else setRevision(n=>n+1)
      }}>بازخوانی فهرست</button>
     {(!commonEntry||open)&&<button type="button" className={'report-btn '+(commonEntry?'report-btn--light':'report-btn--primary')}
-     disabled={disabled} onClick={()=>{setOpen(v=>!v);if(commonEntry)document.querySelector('.swtb24-work-entry button')?.focus()}}>{open?'بستن فرم':'تعریف کار جدید'}</button>}
+     disabled={disabled} onClick={()=>{setOpen(v=>!v);if(commonEntry)onReturnToCreate?.()}}>{open?'بستن فرم':'تعریف کار جدید'}</button>}
    </div>
   </div>
   {notice&&<div role={hasUnresolved?'alert':'status'}

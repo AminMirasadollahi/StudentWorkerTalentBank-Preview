@@ -1221,7 +1221,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     }
     setTaskEditorOpen(false)
     if(reset)setTaskEditorRevision(v=>v+1)
-    (commonCreateRef.current||taskEditorOpenerRef.current)?.focus?.({preventScroll:true})
+    const opener=commonCreateRef.current||taskEditorOpenerRef.current
+    opener?.focus?.({preventScroll:true})
   }
   useEffect(()=>{
     if(view!=='tasks'&&taskEditorOpen)setTaskEditorOpen(false)
@@ -1437,7 +1438,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     {loading&&<p className="ow-muted">در حال دریافت اطلاعات…</p>}
     <Message error={error} notice={notice}/>
 
-    {commonWorkEntry&&['tasks','workPool'].includes(view)&&<section className="report-panel swtb24-work-entry" aria-label="تعریف و واگذاری کار">
+    {commonWorkEntry&&['tasks','workPool'].includes(view)&&<section className="report-panel swtb24-work-entry" aria-label="تعریف و واگذاری کار"
+      onKeyDown={event=>{if(createChoiceOpen&&event.key==='Escape'){event.preventDefault();setCreateChoiceOpen(false);commonCreateRef.current?.focus()}}}>
       <div className="report-panel-heading">
         <div><h2>تعریف و واگذاری کار</h2><p className="ow-muted">روش تخصیص را انتخاب کنید؛ هنوز کاری ثبت نمی‌شود.</p></div>
         <button type="button" className="report-btn report-btn--primary" ref={commonCreateRef}
@@ -1445,7 +1447,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
           onClick={()=>{setCreateNotice('');setCreateChoiceOpen(v=>!v)}}>+ تعریف کار</button>
       </div>
       {createChoiceOpen&&<div id="swtb24-create-choices" className="swtb24-create-choices"
-        role="group" aria-label="روش تخصیص کار" onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();setCreateChoiceOpen(false);commonCreateRef.current?.focus()}}}>
+        role="group" aria-label="روش تخصیص کار">
         <button type="button" disabled={active.length===0} onClick={()=>launchWorkEditor('tasks')}>
           <strong>واگذاری مستقیم</strong><small>انتخاب دانشجوکاران مشخص توسط مدیر</small>
         </button>
@@ -1460,7 +1462,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       focusedUI={hideSectionTabs&&focusTermBudgetUIEnabled}/>}
     {workPoolUIEnabled&&view==='workPool'&&<Suspense fallback={<p className="ow-muted">در حال آماده‌سازی مخزن وظایف…</p>}>
       <WorkPoolManagerPanel refreshRevision={refreshRevision} routeFence={workPoolRouteFence}
-       commonEntry={commonWorkEntry} createIntent={createIntent?.target==='workPool'?createIntent:null} onCreateHandled={finishPoolLaunch}
+       commonEntry={commonWorkEntry} createIntent={createIntent?.target==='workPool'?createIntent:null} onCreateHandled={finishPoolLaunch} onReturnToCreate={()=>commonCreateRef.current?.focus()}
        activeKind={navigation.workPoolKind||'general'}
        onKindChange={kind=>setNavigation(previous=>({...previous,workPoolKind:kind}))}/>
     </Suspense>}
