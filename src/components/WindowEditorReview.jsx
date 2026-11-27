@@ -1,4 +1,4 @@
-import {useState,useEffect,useRef} from 'react'
+import {useState,useEffect,useRef,useSyncExternalStore} from 'react'
 import JalaliDatePicker from './JalaliDatePicker.jsx'
 import {assignmentWindowPayload,reportWindowPayload,reviewWindowPayload,extraReasons} from '../lib/windowEditorPayloads.mjs'
 import {jalaliWindowDay} from '../lib/windowReviewPresentation.mjs'
@@ -27,7 +27,10 @@ function useSessionDraft(session,key,initial){
  return [d,set]
 }
 function Assignment({scope,s,session,run,setMessage,newId}){
- const [d,set]=useSessionDraft(session,'assignment:'+scope.term.id,()=>({workerId:'',unit:'research',title:'',instructions:'',start:scope.serverToday,end:scope.serverToday,minutes:'60',reason:'',prerequisites:[]}))
+ const initial=()=>({workerId:'',unit:'research',title:'',instructions:'',start:scope.serverToday,end:scope.serverToday,minutes:'60',reason:'',prerequisites:[]})
+ const [d,set]=useSessionDraft(session,'assignment:'+scope.term.id,initial)
+ const hadDraft=useRef(false)
+ useEffect(()=>{if(hadDraft.current&&!s.frozenDraft&&!s.slot?.active&&s.slot){set(initial())}hadDraft.current=!!s.frozenDraft},[s.frozenDraft,s.slot])
  const frozen=!!s.frozenDraft||!!s.slot?.active||s.uncertain||s.busy||!s.ready||!s.slot
  const reserve=e=>{e.preventDefault();if(frozen)return;const v=assignmentWindowPayload(d,scope,newId(),s.slot.epoch);if(!v.ok){setMessage(errors[v.code]);return}void run(()=>session.reserve(v.args))}
  return <><h2>واگذاری کار بازه‌ای</h2><p>یک وظیفه، یک برآورد کل، یک گزارش. زمان بین روزهای بازه تقسیم نمی‌شود.</p>
@@ -69,16 +72,18 @@ function Approval({task,entry,s,session,run,setMessage}){
 }
 // Mounted only by a synthetic fixture. Session retained by caller across tabs.
 export default function WindowEditorReview({session,role,scope,task,entry,mode,newId,syntheticReviewOnly,onConfirmed}){
- const [s,setS]=useState(()=>session.state()),[message,setMessage]=useState('')
+ const [message,setMessage]=useState(''),[localBusy,setLocalBusy]=useState(false)
+ useSyncExternalStore(session.subscribe,session.getVersion,session.getVersion)
+ const s=session.state()
  const live=useRef(true),lock=useRef(false)
  useEffect(()=>{live.current=true;return()=>{live.current=false}},[])
- const run=async fn=>{if(lock.current)return {status:'blocked'};lock.current=true;setMessage('');try{const promise=fn();setS(session.state());const r=await promise;if(live.current){setS(session.state());setMessage(statusText[r.status]||'وضعیت نیازمند بررسی است.');if(r.status==='ok'&&(r.value?.active?.status==='committed'||r.value?.state==='in_progress'||r.value?.status||r.value?.review_state==='approved'))onConfirmed?.(r.value)}return r}finally{lock.current=false}}
+ const run=async fn=>{if(lock.current)return {status:'blocked'};lock.current=true;setLocalBusy(true);setMessage('');try{const promise=fn();const r=await promise;if(live.current){setMessage(statusText[r.status]||'وضعیت نیازمند بررسی است.');if(r.status==='ok'&&(r.value?.active?.status==='committed'||r.value?.state==='in_progress'||r.value?.status||r.value?.review_state==='approved'))onConfirmed?.(r.value)}return r}finally{lock.current=false;if(live.current)setLocalBusy(false)}}
  useEffect(()=>{if(syntheticReviewOnly===true&&!session.state().ready)void run(()=>session.connect())},[session,syntheticReviewOnly])
  if(syntheticReviewOnly!==true)return <p role="alert">نمای آزمایشی غیرفعال است.</p>
  const target=mode==='assignment'?'assignment':mode==='approval'?'review:'+entry?.id:'report:'+task?.id
- const editorState={...s,receipt:s.receiptTarget===target?s.receipt:null}
+ const editorState={...s,busy:s.busy||localBusy,receipt:s.receiptTarget===target?s.receipt:null}
  return <section className="wr-shell we-shell" dir="rtl"><p className="wr-banner">فقط آزمایش با داده مصنوعی؛ هیچ اطلاعات واقعی ثبت نمی‌شود.</p>
  {message&&<p role="status" className="wr-held">{message}</p>}
- {s.uncertain&&<section className="we-recovery" role="alert"><strong>نتیجه نامشخص؛ عملیات جدید متوقف است.</strong><p>{s.canReplay?'فقط همان درخواست با همان شناسه قابل بازیابی است.':'این عملیات نیازمند بررسی مستقل وضعیت است؛ ارسال مجدد غیرفعال است.'}</p>{s.canReplay&&<button type="button" disabled={s.busy} onClick={()=>run(()=>session.replay())}>بازیابی همان درخواست</button>}</section>}
+ {s.uncertain&&<section className="we-recovery" role="alert"><strong>نتیجه نامشخص؛ عملیات جدید متوقف است.</strong><p>{s.canReplay?'فقط همان درخواست با همان شناسه قابل بازیابی است.':'این عملیات نیازمند بررسی مستقل وضعیت است؛ ارسال مجدد غیرفعال است.'}</p>{s.canReplay&&s.pendingTarget!==target&&<p>برای بازیابی به همان فرم قبلی بازگردید.</p>}{s.canReplay&&s.pendingTarget===target&&<button type="button" disabled={s.busy||localBusy} onClick={()=>run(()=>session.replay())}>بازیابی همان درخواست</button>}</section>}
  {role==='manager'&&mode==='assignment'?<Assignment scope={scope} s={editorState} session={session} run={run} setMessage={setMessage} newId={newId}/>:role==='manager'&&mode==='approval'?<Approval task={task} entry={entry} s={editorState} session={session} run={run} setMessage={setMessage}/>:role==='worker'&&mode==='report'?<Report task={task} s={editorState} session={session} run={run} setMessage={setMessage} newId={newId}/>:<p role="alert">مسیر معتبر نیست.</p>}</section>
 }
