@@ -63,7 +63,7 @@ function ScopedRead({scope,section,editor}){
 function ReceiptRecovery({session}){
  const s=session.state(),[message,setMessage]=useState(''),lock=useRef(false)
  const run=async fn=>{if(lock.current)return;lock.current=true;try{const r=await fn();setMessage(r.status==='ok'?'پاسخ معتبر دریافت شد.':r.status==='uncertain'?'پاسخ قطعی دریافت نشد.':'بازخوانی یا بازیابی هنوز کامل نشده است.')}finally{lock.current=false}}
- useEffect(()=>{if(!session.state().ready&&!session.state().busy)void session.connect()},[session])
+ useEffect(()=>{if((session.state().pendingReceiptV2||session.state().refreshRequired)&&!session.state().ready&&!session.state().busy)void session.connect()},[session])
  return <section className="wr-shell" dir="rtl" aria-label="بازیابی تراکنش">
  {s.pendingReceiptV2&&<><p role="alert">نتیجه نامشخص؛ عملیات جدید متوقف است.</p><button type="button" disabled={s.busy||!s.canReplay} onClick={()=>run(()=>session.replay())}>بازیابی همان درخواست تراکنشی</button></>}
  {s.refreshRequired&&<><p role="status">رسید تاریخی معتبر است؛ تا بازخوانی وضعیت فعلی عملیات جدید متوقف است.</p><button type="button" disabled={s.busy||!s.ready} onClick={()=>run(()=>session.refreshReceipt())}>بازخوانی وضعیت پس از رسید</button></>}

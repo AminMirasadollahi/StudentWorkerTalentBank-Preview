@@ -33,7 +33,7 @@ export function createWindowEditorSession({syntheticReviewOnly,fixtureTransport,
  }
  const blocked=()=>({status:'blocked'})
  const usable=()=>verified&&!closed&&api.state().ready&&!api.state().busy&&!api.state().uncertain&&!api.state().refreshRequired&&!refreshing
- const reconcile=async()=>{if(closed||!verified||principal.role!=='manager'||api.state().busy||refreshing||api.state().refreshRequired||api.state().uncertain)return blocked();const g=generation;const r=await api.call('recovery',{p_action:'discover',p_epoch:null,p_request_id:null});if(g!==generation||closed)return {status:'stale'};if(r.status==='ok')slot=r.value;else slot=null;publish();return r}
+ const reconcile=async()=>{if(closed||!verified||principal.role!=='manager'||api.state().busy||refreshing||api.state().refreshRequired||api.state().pendingReceiptV2)return blocked();const g=generation;const r=await api.call('recovery',{p_action:'discover',p_epoch:null,p_request_id:null});if(g!==generation||closed)return {status:'stale'};if(r.status==='ok')slot=r.value;else slot=null;publish();return r}
  const refreshReceipt=async()=>{
   if(closed||!verified||refreshing||!api.state().refreshRequired||!api.state().ready||api.state().busy)return blocked()
   const g=generation;refreshing=true;slot=null;publish()
@@ -50,7 +50,7 @@ export function createWindowEditorSession({syntheticReviewOnly,fixtureTransport,
   }
   publish(r.status==='ok');return r
  }
- const connect=async()=>{if(closed||!verified)return blocked();const g=generation;const r=await api.negotiate();if(g!==generation||closed)return {status:'stale'};if(r.status==='ready'&&api.state().refreshRequired)await refreshReceipt();else if(r.status==='ready'&&principal.role==='manager'&&!api.state().uncertain)await reconcile();publish();return g===generation&&!closed?r:{status:'stale'}}
+ const connect=async()=>{if(closed||!verified)return blocked();const g=generation;const r=await api.negotiate();if(g!==generation||closed)return {status:'stale'};if(r.status==='ready'&&api.state().refreshRequired)await refreshReceipt();else if(r.status==='ready'&&principal.role==='manager'&&!api.state().pendingReceiptV2)await reconcile();publish();return g===generation&&!closed?r:{status:'stale'}}
  const settle=(kind,r,g)=>{
   if(g!==generation||closed||!verified)return {status:'stale'}
   if(r.status==='ok'&&r.historicalReceipt){

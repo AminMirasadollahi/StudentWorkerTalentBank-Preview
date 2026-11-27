@@ -19,7 +19,8 @@ const holds=['window_extension','late_submission','correction','term_closure_pol
 const mc={status:'verified',role:'manager',actorId:id(98)},wc={status:'verified',role:'worker',actorId:id(99),workerId:worker,ready:true}
 const db=structuredClone(manager);db.workers[0].state='active'
 let epoch=0,active=null,reserved=null,reportArgs=null,loseReport=true,serial=200,failRead=false
-const metrics={reads:0,commits:0,reports:0,approvals:0,submitCalls:[]}
+const metrics={reads:0,commits:0,reports:0,approvals:0,starts:0,cancels:0,acks:0,submitCalls:[],receiptCalls:[]}
+const receiptMap=new Map(),lost=new Set(['start','approve','cancel','acknowledge'])
 globalThis.__qaIntegratedMetrics=()=>structuredClone(metrics)
 const cap=c=>({contract_version:1,audience:c.role,actor_id:c.actorId,worker_id:c.workerId??null,schedule_contract_version:2,review_only:true,operational_enabled:false,fixture_enabled:true,allowed_schedule_kinds:['legacy_day','single_report_window'],held_operations:holds})
 function workerSnapshot(){
@@ -50,13 +51,26 @@ function currentTerm(a){
 }
 const transport=c=>async(n,a)=>{
  if(n.endsWith('capabilities_v1'))return cap(c)
+ if(n.endsWith('capabilities_v2'))return {...cap(c),operation_receipt_version:1,operation_receipts:['start','approve','cancel','acknowledge'],receipt_state_basis:'historical_result_refresh_required'}
+ if(['qa_window_api_start_v2','qa_window_api_review_v2','qa_window_api_recovery_v2'].includes(n)){
+  const {p_operation_id,...args}=a,key=c.actorId+':'+p_operation_id
+  const operation=n.includes('start')?'start':n.includes('review')?'approve':args.p_action
+  metrics.receiptCalls.push({operation,args:structuredClone(a)})
+  const previous=receiptMap.get(key)
+  if(previous){if(JSON.stringify(previous.args)!==JSON.stringify(args)||previous.operation!==operation)throw Error('QA_RECEIPT_CONFLICT');return {...structuredClone(previous.receipt),replayed:true}}
+  const result=await transport(c)(n.replace('_v2','_v1'),args)
+  const receipt={receipt_version:1,operation_id:p_operation_id,operation,replayed:false,result:structuredClone(result)}
+  receiptMap.set(key,{operation,args:structuredClone(args),receipt})
+  if(lost.delete(operation))throw Error('QA_RECEIPT_REPLY_LOST')
+  return structuredClone(receipt)
+ }
  if(n.endsWith('assignment_scope_v1')){if(failRead)throw Error('QA_SCOPE_READ_FAIL');return structuredClone(assignmentScopeFixture)}
  if(n.endsWith('term_read_v1')){if(failRead)throw Error('QA_TERM_READ_FAIL');return currentTerm(a)}
  if(n.endsWith('term_access_v1')){if(failRead)throw Error('QA_ACCESS_READ_FAIL');return structuredClone(accessFixture)}
  if(n.endsWith('_read_v1')){metrics.reads++;if(failRead)throw Error('QA_REFRESH_FAIL');return structuredClone(c.role==='manager'?db:workerSnapshot())}
  if(n.endsWith('recovery_v1')){
-  if(a.p_action==='cancel')active={...active,status:'cancelled'}
-  if(a.p_action==='acknowledge'){epoch++;active=null;reserved=null}
+  if(a.p_action==='cancel'){metrics.cancels++;active={...active,status:'cancelled'}}
+  if(a.p_action==='acknowledge'){metrics.acks++;epoch++;active=null;reserved=null}
   return {ok:true,epoch,active}
  }
  if(n.endsWith('assignment_v1')){
@@ -68,7 +82,7 @@ const transport=c=>async(n,a)=>{
   return {ok:true,epoch,active}
  }
  const t=db.tasks.find(t=>t.id===a.p_task_id)
- if(n.endsWith('start_v1')){t.state='in_progress';return {ok:true,state:'in_progress'}}
+ if(n.endsWith('start_v1')){metrics.starts++;t.state='in_progress';return {ok:true,state:'in_progress'}}
  if(n.endsWith('submit_v1')){
   metrics.submitCalls.push(structuredClone(a))
   if(reportArgs&&JSON.stringify(reportArgs)!==JSON.stringify(a))throw Error('QA_CHANGED_REPORT')
@@ -79,7 +93,7 @@ const transport=c=>async(n,a)=>{
  if(n.endsWith('review_v1')){const e=db.time_entries.find(e=>e.id===a.p_entry_id);metrics.approvals++;e.review_state='approved';e.approved_minutes=a.p_approved_minutes;db.tasks.find(t=>t.id===e.task_id).state='completed';return {id:e.id,review_state:'approved',approved_minutes:e.approved_minutes}}
  throw Error('QA_ROUTE_DENIED')
 }
-const make=c=>({port:createWindowReadReviewPort({syntheticReviewOnly:true,fixtureTransport:transport(c)}),session:createWindowEditorSession({syntheticReviewOnly:true,context:c,fixtureTransport:transport(c)})})
+const make=c=>({port:createWindowReadReviewPort({syntheticReviewOnly:true,fixtureTransport:transport(c)}),session:createWindowEditorSession({syntheticReviewOnly:true,context:c,fixtureTransport:transport(c),operationReceiptsV2:true,newOperationId:()=>id(++serial)})})
 const m=make(mc),w=make(wc),newId=()=>id(++serial)
 function Stage(){
  const [role,setRole]=useState('manager'),[status,setStatus]=useState('verified'),[rev,setRev]=useState(0)
