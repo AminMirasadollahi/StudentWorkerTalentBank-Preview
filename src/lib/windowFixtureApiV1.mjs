@@ -330,3 +330,25 @@ export function createWindowFixtureApiV1({fixtureTransport,syntheticReviewOnly}=
  const dispose=()=>{disposed=true;generation++;context=null;cap=null;busy=false;pending=null;recovery=null;verified=false}
  return frozen({setContext,negotiate,call:(m,a={})=>invoke(m,a),replay,observePending,state,dispose})
 }
+
+// Shared pure validators for the explicitly negotiated receipt V2 candidate.
+export function validateWindowReceiptV2Capability(raw,context){
+ if(!obj(raw)||raw.operation_receipt_version!==1||raw.receipt_state_basis!=='historical_result_refresh_required'||!Array.isArray(raw.operation_receipts)||raw.operation_receipts.length!==4||!['start','approve','cancel','acknowledge'].every(x=>raw.operation_receipts.includes(x)))fail('WINDOW_RECEIPT_CAPABILITY_MISMATCH')
+ const {operation_receipt_version,receipt_state_basis,operation_receipts,...v1}=raw
+ return capability(v1,context)
+}
+export function parseWindowOperationReceiptV1(method,raw,args,context){
+ const {p_operation_id,...v1}=args
+ if(!uuid(p_operation_id)||!['start','review','recovery'].includes(method))fail('WINDOW_OPERATION_RECEIPT_ARGUMENT')
+ validateArgs(method,v1)
+ if(!METHODS[method].roles.includes(context.role)||method==='recovery'&&v1.p_action==='discover')fail('WINDOW_OPERATION_RECEIPT_ROLE')
+ const operation=method==='start'?'start':method==='review'?'approve':v1.p_action
+ if(!exact(raw,['receipt_version','operation_id','operation','replayed','result'])||raw.receipt_version!==1||raw.operation_id!==p_operation_id||raw.operation!==operation||typeof raw.replayed!=='boolean')fail('WINDOW_OPERATION_RECEIPT_INVALID')
+ return deepFreeze({operationId:p_operation_id,operation,replayed:raw.replayed,historical:true,result:clone(validateResponse(method,raw.result,v1,context))})
+}
+export function validateWindowOperationReceiptArgs(method,args,context){
+ if(!obj(args)||!uuid(args.p_operation_id)||!['start','review','recovery'].includes(method)||!METHODS[method].roles.includes(context.role))fail('WINDOW_OPERATION_RECEIPT_ARGUMENT')
+ const {p_operation_id,...v1}=args;validateArgs(method,v1)
+ if(method==='recovery'&&v1.p_action==='discover')fail('WINDOW_OPERATION_RECEIPT_ARGUMENT')
+ return deepFreeze(clone(args))
+}
