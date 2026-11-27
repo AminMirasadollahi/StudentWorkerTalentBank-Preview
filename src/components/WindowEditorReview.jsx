@@ -20,8 +20,14 @@ function Recovery({s,run,session}){
  {['committed','cancelled'].includes(a?.status)&&<button type="button" disabled={s.busy||s.uncertain} onClick={()=>run(()=>session.ack())}>تأیید دریافت رسید</button>}</div>
  {a?.status==='reserved'&&!s.frozenDraft&&<p>پیش‌نویس دقیق این رزرو در نشست فعلی موجود نیست؛ ثبت نهایی مجاز نیست.</p>}</section>
 }
+function useSessionDraft(session,key,initial){
+ const [d,setLocal]=useState(()=>session.draft(key,initial()))
+ const ref=useRef(d)
+ const set=change=>{const v=typeof change==='function'?change(ref.current):change;if(session.saveDraft(key,v)){ref.current=v;setLocal(v)}}
+ return [d,set]
+}
 function Assignment({scope,s,session,run,setMessage,newId}){
- const [d,set]=useState(()=>({workerId:'',unit:'research',title:'',instructions:'',start:scope.serverToday,end:scope.serverToday,minutes:'60',reason:'',prerequisites:[]}))
+ const [d,set]=useSessionDraft(session,'assignment:'+scope.term.id,()=>({workerId:'',unit:'research',title:'',instructions:'',start:scope.serverToday,end:scope.serverToday,minutes:'60',reason:'',prerequisites:[]}))
  const frozen=!!s.frozenDraft||!!s.slot?.active||s.uncertain||s.busy||!s.ready||!s.slot
  const reserve=e=>{e.preventDefault();if(frozen)return;const v=assignmentWindowPayload(d,scope,newId(),s.slot.epoch);if(!v.ok){setMessage(errors[v.code]);return}void run(()=>session.reserve(v.args))}
  return <><h2>واگذاری کار بازه‌ای</h2><p>یک وظیفه، یک برآورد کل، یک گزارش. زمان بین روزهای بازه تقسیم نمی‌شود.</p>
@@ -41,7 +47,7 @@ function Assignment({scope,s,session,run,setMessage,newId}){
 }
 function Report({task,s,session,run,setMessage,newId}){
  const a=task.window_actions
- const [d,set]=useState(()=>({date:a.date_max,minutes:String(task.estimate_minutes),note:'',reasonCode:'',reasonText:''}))
+ const [d,set]=useSessionDraft(session,'report:'+task.id+':'+task.window_revision,()=>({date:a.date_max,minutes:String(task.estimate_minutes),note:'',reasonCode:'',reasonText:''}))
  const [started,setStarted]=useState(false),[submitted,setSubmitted]=useState(false)
  const disabled=s.busy||s.uncertain||!s.ready||submitted||s.receipt?.status!=null
  const send=e=>{e.preventDefault();if(disabled)return;const v=reportWindowPayload(task,d,newId());if(!v.ok){setMessage(errors[v.code]);return}void run(()=>session.perform('submit',v.args)).then(r=>{if(r.status==='ok')setSubmitted(true)})}
@@ -56,21 +62,23 @@ function Report({task,s,session,run,setMessage,newId}){
  {s.receipt?.status&&<p role="status">رسید گزارش: {s.receipt.status==='approved'?'تأییدشده':s.receipt.status==='submitted'?'دریافت شد؛ در انتظار بررسی':'وضعیت ثبت‌شده در سرور'}؛ ثبت گزارش به‌معنای اعتبار قطعی نیست.</p>}</>
 }
 function Approval({task,entry,s,session,run,setMessage}){
- const [d,set]=useState({minutes:String(entry.reported_minutes),note:''})
+ const [d,set]=useSessionDraft(session,'review:'+entry.id+':'+task.window_revision,()=>({minutes:String(entry.reported_minutes),note:''}))
  const disabled=s.busy||s.uncertain||!s.ready||!!s.slot?.active||s.receipt?.review_state==='approved'
  const send=e=>{e.preventDefault();if(disabled)return;const v=reviewWindowPayload(task,entry,d);if(!v.ok){setMessage(errors[v.code]);return}void run(()=>session.perform('review',v.args))}
  return <><h2>تأیید گزارش بازه‌ای</h2><h3>{task.title}</h3><p>تاریخ واقعی: {jalaliWindowDay(entry.work_date)} · استاندارد {task.estimate_minutes} · درخواستی {entry.reported_minutes} دقیقه</p><form onSubmit={send}><fieldset disabled={disabled}><div className="we-grid"><label>زمان تأییدشده (دقیقه)<input type="number" min="0" max={entry.reported_minutes} {...field(d,set,'minutes')}/></label><label className="we-wide">توضیح مدیر<textarea maxLength={1000} rows={3} {...field(d,set,'note')}/></label></div><button type="submit">تأیید گزارش آزمایشی</button></fieldset></form><p className="wr-meta">رد گزارش، درخواست اصلاح و تمدید بازه هنوز فعال نیستند.</p>{s.receipt?.review_state==='approved'&&<p role="status">تأیید آزمایشی: {s.receipt.approved_minutes} دقیقه</p>}</>
 }
 // Mounted only by a synthetic fixture. Session retained by caller across tabs.
-export default function WindowEditorReview({session,role,scope,task,entry,mode,newId,syntheticReviewOnly}){
+export default function WindowEditorReview({session,role,scope,task,entry,mode,newId,syntheticReviewOnly,onConfirmed}){
  const [s,setS]=useState(()=>session.state()),[message,setMessage]=useState('')
  const live=useRef(true),lock=useRef(false)
  useEffect(()=>{live.current=true;return()=>{live.current=false}},[])
- const run=async fn=>{if(lock.current)return {status:'blocked'};lock.current=true;setMessage('');try{const promise=fn();setS(session.state());const r=await promise;if(live.current){setS(session.state());setMessage(statusText[r.status]||'وضعیت نیازمند بررسی است.')}return r}finally{lock.current=false}}
+ const run=async fn=>{if(lock.current)return {status:'blocked'};lock.current=true;setMessage('');try{const promise=fn();setS(session.state());const r=await promise;if(live.current){setS(session.state());setMessage(statusText[r.status]||'وضعیت نیازمند بررسی است.');if(r.status==='ok'&&(r.value?.active?.status==='committed'||r.value?.state==='in_progress'||r.value?.status||r.value?.review_state==='approved'))onConfirmed?.(r.value)}return r}finally{lock.current=false}}
  useEffect(()=>{if(syntheticReviewOnly===true&&!session.state().ready)void run(()=>session.connect())},[session,syntheticReviewOnly])
  if(syntheticReviewOnly!==true)return <p role="alert">نمای آزمایشی غیرفعال است.</p>
+ const target=mode==='assignment'?'assignment':mode==='approval'?'review:'+entry?.id:'report:'+task?.id
+ const editorState={...s,receipt:s.receiptTarget===target?s.receipt:null}
  return <section className="wr-shell we-shell" dir="rtl"><p className="wr-banner">فقط آزمایش با داده مصنوعی؛ هیچ اطلاعات واقعی ثبت نمی‌شود.</p>
  {message&&<p role="status" className="wr-held">{message}</p>}
  {s.uncertain&&<section className="we-recovery" role="alert"><strong>نتیجه نامشخص؛ عملیات جدید متوقف است.</strong><p>{s.canReplay?'فقط همان درخواست با همان شناسه قابل بازیابی است.':'این عملیات نیازمند بررسی مستقل وضعیت است؛ ارسال مجدد غیرفعال است.'}</p>{s.canReplay&&<button type="button" disabled={s.busy} onClick={()=>run(()=>session.replay())}>بازیابی همان درخواست</button>}</section>}
- {role==='manager'&&mode==='assignment'?<Assignment scope={scope} s={s} session={session} run={run} setMessage={setMessage} newId={newId}/>:role==='manager'&&mode==='approval'?<Approval task={task} entry={entry} s={s} session={session} run={run} setMessage={setMessage}/>:role==='worker'&&mode==='report'?<Report task={task} s={s} session={session} run={run} setMessage={setMessage} newId={newId}/>:<p role="alert">مسیر معتبر نیست.</p>}</section>
+ {role==='manager'&&mode==='assignment'?<Assignment scope={scope} s={editorState} session={session} run={run} setMessage={setMessage} newId={newId}/>:role==='manager'&&mode==='approval'?<Approval task={task} entry={entry} s={editorState} session={session} run={run} setMessage={setMessage}/>:role==='worker'&&mode==='report'?<Report task={task} s={editorState} session={session} run={run} setMessage={setMessage} newId={newId}/>:<p role="alert">مسیر معتبر نیست.</p>}</section>
 }
