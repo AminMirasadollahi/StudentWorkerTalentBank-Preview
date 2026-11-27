@@ -1,3 +1,4 @@
+import {useManagerDraftWarning} from '../lib/managerDraftGuard.mjs'
 import {Fragment,useEffect,useMemo,useRef,useState} from 'react'
 import JalaliDatePicker from './JalaliDatePicker'
 import {assignWorkerTask} from '../lib/operations'
@@ -63,6 +64,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const [committed,setCommitted]=useState(false)
  const [error,setError]=useState('')
  const [notice,setNotice]=useState('')
+ useManagerDraftWarning({workerIds,date,title,instructions,estimate,taskUnit,libraryTemplateSelected,deskStart,deskEnd,reason,prerequisiteIds},!committed,Boolean(cancelDraft))
  const selected=workers.filter(w=>workerIds.includes(w.id)&&w.state==='active')
  const shortNotice=date<dayAfter(localToday(),2)
  const routineGroupOk=canDraftLibraryDeskGroup(taskUnit,libraryTemplateSelected,selected.length)

@@ -1,3 +1,4 @@
+import {useManagerDraftWarning} from '../lib/managerDraftGuard.mjs'
 import {lazy,Suspense,useCallback,useEffect,useMemo,useRef,useState} from 'react'
 const DeskWorkPoolManagerSection=lazy(()=>import('./DeskWorkPoolManagerSection'))
 import JalaliDatePicker from './JalaliDatePicker'
@@ -47,6 +48,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
  const [closeReason,setCloseReason]=useState('')
  const [descriptionWarning,setDescriptionWarning]=useState('')
  const [edit,setEdit]=useState({id:'',previous:'',text:'',status:'idle',message:''})
+ useManagerDraftWarning({form,termSelection},true,Boolean(closeId)||Boolean(edit.id&&edit.text!==edit.previous))
  const editRequest=useRef(null)
  const editInputRef=useRef(null)
  const [inspectedId,setInspectedId]=useState('')

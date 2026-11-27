@@ -38,7 +38,14 @@ try{
  const poolInput=page.locator('.swtb19-unified-work__form input').first()
  await poolInput.fill('پیش‌نویس ساختگی فرصت')
  await snap('02-pool-editor')
- await sub('وظایف واگذارشده').click()
+ const discard=async(button,accept)=>{
+  const prompt=page.waitForEvent('dialog',{timeout:5000}).then(async d=>{assert.equal(d.type(),'confirm');assert.match(d.message(),/پیش‌نویس حذف/);await (accept?d.accept():d.dismiss())})
+  await Promise.all([prompt,button.click()])
+ }
+ await discard(sub('وظایف واگذارشده'),false)
+ assert.equal(await poolInput.inputValue(),'پیش‌نویس ساختگی فرصت')
+ observations.poolCancelPreservesDraft=true
+ await discard(sub('وظایف واگذارشده'),true)
  await page.locator('.swtb22-task-directory').waitFor()
  await snap('03-direct-tasks')
  const openDirect=page.getByRole('button',{name:'واگذاری کار جدید'})
@@ -51,7 +58,12 @@ try{
  await openDirect.click()
  assert.equal(await title.inputValue(),'پیش‌نویس ساختگی واگذاری')
  await dialog.getByRole('button',{name:'بستن و حفظ پیش‌نویس'}).click()
- await sub('فرصت‌های قابل انتخاب').click()
+ await discard(sub('فرصت‌های قابل انتخاب'),false)
+ await openDirect.click()
+ assert.equal(await title.inputValue(),'پیش‌نویس ساختگی واگذاری')
+ observations.directCancelPreservesDraft=true
+ await dialog.getByRole('button',{name:'بستن و حفظ پیش‌نویس'}).click()
+ await discard(sub('فرصت‌های قابل انتخاب'),true)
  await poolOpen.click()
  observations.poolDraftSurvivesRoute=await poolInput.inputValue()==='پیش‌نویس ساختگی فرصت'
  await sub('وظایف واگذارشده').click()
@@ -81,7 +93,11 @@ try{
  assert.equal(blocked,0);assert.deepEqual(errors,[])
  console.log('SWTB24_R5_NATIVE_REVIEW_DRAFT_OBSERVATIONS='+JSON.stringify(observations))
  console.log('PASS R5_SYNTHETIC_VISUAL_NAVIGATION_NO_WRITES')
- console.log(observations.poolDraftSurvivesRoute&&observations.directDraftSurvivesRoute?'DRAFT_LIFETIME_REVIEW_PASS':'R5_A2_DRAFT_LIFETIME_RELEASE_HOLD')
+ assert.equal(observations.poolDraftSurvivesRoute,false)
+ assert.equal(observations.directDraftSurvivesRoute,false)
+ assert.ok(observations.poolCancelPreservesDraft&&observations.directCancelPreservesDraft)
+ console.log('PASS R5_UNSENT_DRAFT_EXPLICIT_DISCARD_GUARD')
+ console.log('R5_A2_CROSS_ROUTE_RETENTION_STILL_PENDING')
 }catch(e){console.error('R5_SYNTHETIC_DIAGNOSTIC',JSON.stringify({observations,blocked,errors,headings:await page?.locator('h1,h2,h3').allTextContents().catch(()=>[])}));throw e}finally{
  await writeFile(resolve(out,'observations.json'),JSON.stringify({observations,blocked,errors},null,2))
  await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})

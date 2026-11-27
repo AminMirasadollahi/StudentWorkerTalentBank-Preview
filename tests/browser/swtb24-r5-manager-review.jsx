@@ -1,3 +1,4 @@
+import {ManagerDraftContext,createManagerDraftGuard,sameManagerRoute,DISCARD_DRAFT_MESSAGE} from '../../src/lib/managerDraftGuard.mjs'
 // Synthetic browser appearance-only manager shell; no real Supabase imports.
 import React,{useState} from 'react'
 import {createRoot} from 'react-dom/client'
@@ -145,11 +146,16 @@ const demoCandidates=[
 const flags={r5IaFixture:true}
 function Stage(){
  const [fence]=useState(createWorkPoolRouteFence)
+ const [draftGuard]=useState(createManagerDraftGuard)
  const [navigation,commitNavigation]=useState({
   section:'work',workView:'workPool',workPoolKind:'general',candidateView:'applicants',
   candidateFilter:'all',candidateSearch:'',candidateId:'',
  })
- const setNavigation=change=>commitNavigation(prev=>{const next=typeof change==='function'?change(prev):change;return fence.permitsNavigation(prev,next)?next:prev})
+ const setNavigation=change=>{
+  const next=typeof change==='function'?change(navigation):change
+  if(!fence.permitsNavigation(navigation,next)||!draftGuard.permitsNavigation(navigation,next,()=>window.confirm(DISCARD_DRAFT_MESSAGE)))return
+  commitNavigation(prev=>{const candidate=typeof change==='function'?change(prev):change;return fence.permitsNavigation(prev,candidate)&&sameManagerRoute(next,candidate)?candidate:prev})
+ }
  const navigate=item=>setNavigation(prev=>nextManagerNavigation(prev,item))
  const title=currentManagerDestination(navigation,flags)?.label||'مدیریت'
  return <main className="report-shell report-shell--dashboard ops-root swtb22-manager-enabled" dir="rtl">
@@ -162,7 +168,7 @@ function Stage(){
    </div></header>
    <ManagerWorkHubTabs navigation={navigation} flags={flags} onNavigate={navigate}/>
    {navigation.section==='work'
-     ?<AdminOperations navigation={navigation} setNavigation={setNavigation} hideSectionTabs workPoolRouteFence={fence}/>
+     ?<ManagerDraftContext.Provider value={draftGuard}><AdminOperations navigation={navigation} setNavigation={setNavigation} hideSectionTabs workPoolRouteFence={fence}/></ManagerDraftContext.Provider>
     :navigation.section==='candidates'&&navigation.candidateView==='applicants'
      ?<ManagerCandidatesWorkspace rows={demoCandidates} filter={navigation.candidateFilter}
        search={navigation.candidateSearch} selectedId={navigation.candidateId}

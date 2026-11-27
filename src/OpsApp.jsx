@@ -1,3 +1,4 @@
+import {ManagerDraftContext,createManagerDraftGuard,sameManagerRoute,DISCARD_DRAFT_MESSAGE} from './lib/managerDraftGuard.mjs'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { documentTitleForOperationsIdentity } from './lib/routeTitles.mjs'
 import {
@@ -572,19 +573,24 @@ function CandidateCard({
 
 function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refreshRevision = 0, workHubFixture=false, r5IaFixture=false, assignmentReceiptPort=null }) {
   const [fence]=useState(createWorkPoolRouteFence)
+  const [draftGuard]=useState(createManagerDraftGuard)
+  const activeDraftGuard=managerShellEnabled&&r5IaFixture===true?draftGuard:null
   const [routeNotice,setRouteNotice]=useState('')
   const routeFence=managerShellEnabled&&(workHubFixture===true||r5IaFixture===true)&&managerNavFlags.workPoolEnabled?fence:null
   const setNavigation=change=>{
-   if(!routeFence){commitNavigation(change);return}
+   if(!routeFence&&!activeDraftGuard){commitNavigation(change);return}
    const next=typeof change==='function'?change(navigation):change
-   if(!routeFence.permitsNavigation(navigation,next)){
+   if(routeFence&&!routeFence.permitsNavigation(navigation,next)){
     setRouteNotice('ابتدا نتیجه درخواست فرصت کاری را تعیین‌تکلیف کنید؛ جابه‌جایی فعلاً ممکن نیست.')
     return
    }
+   if(activeDraftGuard&&!activeDraftGuard.permitsNavigation(navigation,next,()=>window.confirm(DISCARD_DRAFT_MESSAGE)))return
    setRouteNotice('')
    commitNavigation(prev=>{
     const candidate=typeof change==='function'?change(prev):change
-    return routeFence.permitsNavigation(prev,candidate)?candidate:prev
+    if(routeFence&&!routeFence.permitsNavigation(prev,candidate))return prev
+    if(activeDraftGuard&&!sameManagerRoute(next,candidate))return prev
+    return candidate
    })
   }
   const [rows, setRows] = useState([])
@@ -852,10 +858,10 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
       {routeFence&&routeNotice&&<p role="alert" className="report-alert report-alert--error">{routeNotice}</p>}
       {!navFlags.r5IaFixture&&<ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>}
       {adminSection !== 'work' && assignmentReceiptPort?.panel}
-      {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation}
+      {adminSection === 'work' && <ManagerDraftContext.Provider value={activeDraftGuard}><AdminOperations navigation={navigation} setNavigation={setNavigation}
         assignmentReceiptPort={assignmentReceiptPort}
         refreshRevision={refreshRevision + manualWorkRevision}
-        hideSectionTabs={managerShellEnabled} loadOriginalCandidates={getOperationsCandidates} workPoolRouteFence={routeFence} />}
+        hideSectionTabs={managerShellEnabled} loadOriginalCandidates={getOperationsCandidates} workPoolRouteFence={routeFence} /></ManagerDraftContext.Provider>}
       {issuedCredentials && (
         <div className="ops-modal" role="dialog" aria-modal="true" aria-labelledby="ops-credentials-title">
           <div className="ops-modal__card">

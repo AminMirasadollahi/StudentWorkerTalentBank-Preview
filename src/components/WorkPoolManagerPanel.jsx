@@ -1,3 +1,4 @@
+import {useManagerDraftWarning} from '../lib/managerDraftGuard.mjs'
 import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react'
 // Hidden until audited D2A+D2B database rollout.
 const deskPoolUIEnabled=import.meta.env?.VITE_SWTB21_DESK_POOL_UI!=='false'
@@ -58,6 +59,7 @@ export default function WorkPoolManagerPanel({refreshRevision=0,activeKind='gene
  const [busy,setBusy]=useState('')
  const [uncertain,setUncertain]=useState(false)
  const [notice,setNotice]=useState('')
+ useManagerDraftWarning({template,offer},!unifiedUIEnabled,Boolean(closing))
  const pending=useRef(false)
  const readIndex=useRef(0)
  const reload=useCallback(async()=>{
