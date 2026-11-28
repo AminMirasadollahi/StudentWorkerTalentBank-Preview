@@ -663,12 +663,15 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
         enableFallback:import.meta.env.VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK==='true',
       })
       if(readId!==candidateReadSequence.current)return false
-      if(sharedReview&&(!settleRead||settleRead('ready',results)!==true))throw Error('CANDIDATE_READ_UNCONFIRMED')
+      if(sharedReview){
+        if(settleRead?.isCurrent?.()!==true)return false
+        if(settleRead('ready',results)!==true)throw Error('CANDIDATE_READ_UNCONFIRMED')
+      }
       setRows(results)
       if(!sharedReview){if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')}
       return true
     } catch (e) {
-      if(readId!==candidateReadSequence.current)return false
+      if(readId!==candidateReadSequence.current||sharedReview&&settleRead?.isCurrent?.()!==true)return false
       // A denied read invalidates both privileged rows and the previous
       // inspector selection; a later authorized refresh must require a new
       // explicit candidate selection, even if the same row is returned.
