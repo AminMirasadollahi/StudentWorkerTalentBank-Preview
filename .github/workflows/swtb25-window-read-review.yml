@@ -31,6 +31,7 @@ jobs:
           node tests/browser/run-swtb25-window-shell-review.mjs
           node tests/browser/run-swtb25-window-editor-review.mjs
           node tests/browser/run-swtb25-window-integrated-editor.mjs
+          node tests/browser/run-swtb26-window-durable-v4.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -40,4 +41,5 @@ jobs:
             test-results/swtb25-window-shell
             test-results/swtb25-window-editor
             test-results/swtb25-window-integrated-editor
+            test-results/swtb26-window-durable-v4
           retention-days: 7
