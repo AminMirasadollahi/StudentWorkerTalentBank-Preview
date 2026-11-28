@@ -28,11 +28,21 @@ const validRows=rows=>{
  }
  return pairs<=80
 }
+import {createTypedAssignmentReleaseRequestBoundary} from './typedAssignmentReleaseAdmission.mjs'
 export function createScopedDayBatchHttpTransport({mode,expectedProjectRef,projectUrl,publishableKey,auth,actorId,isCurrent,fetchImpl}){
  // Real release configuration intentionally unsupported until separate acceptance.
  if(mode!=='review'||typeof expectedProjectRef!=='string'||!/^[a-z0-9]{20}$/.test(expectedProjectRef)||expectedProjectRef===PRODUCTION_REF||
  projectUrl!=='https://'+expectedProjectRef+'.supabase.co'||typeof publishableKey!=='string'||!/^sb_publishable_[A-Za-z0-9_-]+$/.test(publishableKey)||
  !uuid(actorId)||typeof auth?.getSession!=='function'||typeof auth?.getUser!=='function'||typeof isCurrent!=='function'||typeof fetchImpl!=='function')throw error()
+ return buildDayBatchHttpTransport({projectUrl,publishableKey,auth,actorId,isCurrent,fetchImpl})
+}
+// Detached candidate, not imported by the normal entry. Never expose raw cancellation here.
+export function createScopedDayBatchReleaseHttpTransport({env,auth,actorId,isCurrent,fetchImpl}){
+ const boundary=createTypedAssignmentReleaseRequestBoundary({env,auth,actorId,isCurrent,fetchImpl})
+ const transport=buildDayBatchHttpTransport({...boundary,auth,actorId,isCurrent})
+ return Object.freeze({legacyWrite:transport.legacyWrite,legacyControl:transport.legacyControl,batchWrite:transport.batchWrite,batchControl:transport.batchControl})
+}
+function buildDayBatchHttpTransport({projectUrl,publishableKey,auth,actorId,isCurrent,fetchImpl}){
  const legacy=createScopedRecoveryHttpTransport({projectUrl,publishableKey,auth,actorId,isCurrent,fetchImpl,version:3})
  const current=()=>{if(isCurrent()!==true)throw error()}
  const token=async()=>{

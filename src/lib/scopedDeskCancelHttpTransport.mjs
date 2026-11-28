@@ -10,11 +10,21 @@ const controlKeys=['p_action','p_epoch','p_request_id']
 const writeKeys=[...controlKeys,'p_shift_id','p_task_id','p_worker_id','p_day','p_start_minute','p_end_minute','p_reason']
 const validReason=x=>typeof x==='string'&&x===x.replace(/^ +| +$/g,'')&&Array.from(x).length>=5&&Array.from(x).length<=500&&!x.includes('\0')&&!Array.from(x).some(c=>c.length===1&&/[\uD800-\uDFFF]/.test(c))
 const validWrite=a=>exact(a,writeKeys)&&['reserve','commit'].includes(a.p_action)&&epoch(a.p_epoch)&&[a.p_request_id,a.p_shift_id,a.p_task_id,a.p_worker_id].every(uuid)&&day(a.p_day)&&!a.p_day.startsWith('0000-')&&Number.isInteger(a.p_start_minute)&&Number.isInteger(a.p_end_minute)&&a.p_start_minute>=0&&a.p_end_minute<=1440&&a.p_start_minute<a.p_end_minute&&validReason(a.p_reason)
+import {createTypedAssignmentReleaseRequestBoundary} from './typedAssignmentReleaseAdmission.mjs'
 export function createScopedDeskCancelHttpTransport({mode,expectedProjectRef,projectUrl,publishableKey,auth,actorId,isCurrent,fetchImpl}){
  // Real release configuration intentionally unsupported until separate acceptance.
  if(mode!=='review'||typeof expectedProjectRef!=='string'||!/^[a-z0-9]{20}$/.test(expectedProjectRef)||expectedProjectRef===PRODUCTION_REF||
  projectUrl!=='https://'+expectedProjectRef+'.supabase.co'||typeof publishableKey!=='string'||!/^sb_publishable_[A-Za-z0-9_-]+$/.test(publishableKey)||
  !uuid(actorId)||typeof auth?.getSession!=='function'||typeof auth?.getUser!=='function'||typeof isCurrent!=='function'||typeof fetchImpl!=='function')throw error()
+ return buildDeskCancelHttpTransport({projectUrl,publishableKey,auth,actorId,isCurrent,fetchImpl})
+}
+// Detached candidate, not imported by the normal entry. Never expose raw cancellation here.
+export function createScopedDeskCancelReleaseHttpTransport({env,auth,actorId,isCurrent,fetchImpl}){
+ const boundary=createTypedAssignmentReleaseRequestBoundary({env,auth,actorId,isCurrent,fetchImpl})
+ const transport=buildDeskCancelHttpTransport({...boundary,auth,actorId,isCurrent})
+ return transport
+}
+function buildDeskCancelHttpTransport({projectUrl,publishableKey,auth,actorId,isCurrent,fetchImpl}){
  const current=()=>{if(isCurrent()!==true)throw error()}
  const token=async()=>{
   current();const r=await auth.getSession();current()

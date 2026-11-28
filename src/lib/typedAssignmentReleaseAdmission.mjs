@@ -30,9 +30,10 @@ export function createTypedAssignmentReleaseAdmission({env,auth,actorId,isCurren
  if(config.mode!=='release'||!uuid(actorId)||typeof auth?.getSession!=='function'||typeof auth?.getUser!=='function'||typeof isCurrent!=='function'||typeof fetchImpl!=='function')throw Error('TYPED_RELEASE_ADMISSION_BLOCKED')
  const current=()=>{if(isCurrent()!==true)throw Error('TYPED_RELEASE_ADMISSION_BLOCKED')}
  const token=async()=>{current();const s=await auth.getSession();current();const t=s?.data?.session?.access_token;if(s?.error||!jwt(t))throw Error('TYPED_RELEASE_ADMISSION_BLOCKED');return t}
- const check=async()=>{
+ const check=async(expectedToken=null)=>{
   try{
-   const t=await token(),u=await auth.getUser(t);current()
+   const t=await token();if(expectedToken!==null&&t!==expectedToken)return false
+   const u=await auth.getUser(t);current()
    if(u?.error||u?.data?.user?.id!==actorId||u.data.user.is_anonymous===true||await token()!==t)return false
    current()
    const response=await fetchImpl(config.projectUrl+'/rest/v1/rpc/ops_assignment_typed_release_status_v1',{method:'POST',headers:{apikey:config.publishableKey,Authorization:'Bearer '+t,'Content-Type':'application/json',Accept:'application/json','Content-Profile':'public'},body:'{}',credentials:'omit',redirect:'error',cache:'no-store',referrerPolicy:'no-referrer'})
@@ -43,4 +44,36 @@ export function createTypedAssignmentReleaseAdmission({env,auth,actorId,isCurren
   }catch{return false}
  }
  return Object.freeze({check})
+}
+
+// Fixed dispatch allowlist for the detached candidate only.
+// Status checks never invoke discover (which can create a recovery cursor).
+const releaseRoutes=Object.freeze([
+ 'ops_assignment_recovery_write_v3','ops_assignment_recovery_control_v2',
+ 'ops_assignment_batch_write_v1','ops_assignment_batch_control_v1',
+ 'ops_desk_cancel_write_v1','ops_desk_cancel_control_v1'
+])
+export function createTypedAssignmentReleaseRequestBoundary({env,auth,actorId,isCurrent,fetchImpl}){
+ const config=resolveTypedAssignmentReleaseConfig(env)
+ const admission=createTypedAssignmentReleaseAdmission({env,auth,actorId,isCurrent,fetchImpl})
+ const deny=()=>Error('TYPED_RELEASE_DISPATCH_BLOCKED')
+ const current=()=>{if(isCurrent()!==true)throw deny()}
+ const tokenStillCurrent=async t=>{current();const s=await auth.getSession();current();if(s?.error||s?.data?.session?.access_token!==t)throw deny()}
+ const dispatch=async(url,init)=>{
+  try{
+   current()
+   const prefix=config.projectUrl+'/rest/v1/rpc/'
+   const h=init?.headers,t=typeof h?.Authorization==='string'&&h.Authorization.startsWith('Bearer ')?h.Authorization.slice(7):null
+   if(typeof url!=='string'||!url.startsWith(prefix)||!releaseRoutes.includes(url.slice(prefix.length))||
+      init.method!=='POST'||init.redirect!=='error'||init.credentials!=='omit'||init.cache!=='no-store'||init.referrerPolicy!=='no-referrer'||
+      h.apikey!==config.publishableKey||h['Content-Profile']!=='public'||!jwt(t)||typeof init.body!=='string')throw deny()
+   // Bind the status proof to the exact token used in the pending RPC.
+   if(await admission.check(t)!==true)throw deny()
+   await tokenStillCurrent(t);current()
+   const response=await fetchImpl(url,init)
+   await tokenStillCurrent(t);current()
+   return response
+  }catch{throw deny()}
+ }
+ return Object.freeze({projectUrl:config.projectUrl,publishableKey:config.publishableKey,fetchImpl:dispatch,check:admission.check})
 }
