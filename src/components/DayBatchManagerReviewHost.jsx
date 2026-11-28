@@ -1,12 +1,13 @@
-// Synthetic-only mounted owner. Not imported by OpsApp or production entry.
+// Synthetic-only mounted owner. Injected into OpsApp only by a DEV review fixture; no normal entry import.
  // Keep this owner ABOVE editor/route remounts. No real fetch default.
 import React,{useLayoutEffect,useRef,useState} from 'react'
 import {createDayBatchVerifiedOwner} from '../lib/dayBatchVerifiedOwner.mjs'
+import {createWorkPoolRouteFence} from '../lib/workPoolRouteFence.mjs'
 import {createDayBatchWorkspaceReadGate} from '../lib/dayBatchWorkspaceRead.mjs'
 import {ManagerDraftContext,createManagerDraftGuard} from '../lib/managerDraftGuard.mjs'
 const denied={state:'checking',canStart:false,canDiscover:false}
 const fa=n=>Number(n).toLocaleString('fa-IR')
-export default function DayBatchManagerReviewHost({fixture,scope='work',workspace=false,checking=false,children}){
+export default function DayBatchManagerReviewHost({fixture,scope='work',workspace=false,checking=false,onLogout,children}){
  const ref=useRef(null),scopeRef=useRef(scope),parentChecking=useRef(checking)
  const [,paint]=useState(0)
  const redraw=i=>{if(ref.current===i)paint(n=>n+1)}
@@ -62,7 +63,7 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
   const visibility=()=>{if(document.visibilityState==='hidden')suspend();else resume()}
   try{
    const owner=createDayBatchVerifiedOwner({...fixture,mode:'review',isVisible})
-   i={owner,fixture,closed:false,terminal:false,verified:false,revision:0,editorRevision:0,batchRevision:0,legacyRevision:0,committedRevision:0,drafts:createManagerDraftGuard(),readGate:createDayBatchWorkspaceReadGate(),readScopeOwner:Object.freeze({}),workspaceReadRevision:0,data:null,ack:null,uiBusy:false,schedule}
+   i={owner,fixture,closed:false,terminal:false,verified:false,revision:0,editorRevision:0,batchRevision:0,legacyRevision:0,committedRevision:0,drafts:createManagerDraftGuard(),readGate:createDayBatchWorkspaceReadGate(),readScopeOwner:Object.freeze({}),workPoolRouteFence:createWorkPoolRouteFence(),workspaceReadRevision:0,data:null,ack:null,uiBusy:false,schedule}
    ref.current=i;owner.selectReadScope(scopeRef.current)
    subscription=fixture.auth.onAuthStateChange((event,session)=>{
     if(event==='INITIAL_SESSION'||!active(i))return
@@ -92,7 +93,7 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
  if(!i||i.fixture!==fixture)return <p role="status">مسیر بررسی در دسترس نیست.</p>
  const s=i.owner.snapshot(),renderRevision=i.revision,renderData=i.data
  const run=async(method,...args)=>{
-  if(!active(i)||i.uiBusy||!i.verified||i.revision!==renderRevision)return 'blocked'
+  if(!active(i)||i.uiBusy||!i.verified||parentChecking.current||checking||i.revision!==renderRevision||scope!==scopeRef.current)return 'blocked'
   const g=i.revision
   if(method==='acknowledge'){
    if(!s.canAcknowledge)return 'blocked'
@@ -158,9 +159,14 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
  </section>
  if(workspace){
   if(!i.verified||checking)return panel
-  const port={...legacyPort,panel,readScopeOwner:i.readScopeOwner,beginScopedRead:beginWorkspaceRead,workspaceReadRevision:i.workspaceReadRevision,
+  const guardedLogout=()=>{
+   if(!active(i))return
+   i.terminal=true;i.verified=false;i.revision++;i.data=null;i.readGate.invalidate();i.drafts.clearRetained();i.owner.terminate();redraw(i)
+   return onLogout?.()
+  }
+  const port={...legacyPort,panel,readScopeOwner:i.readScopeOwner,beginScopedRead:beginWorkspaceRead,workspaceReadRevision:i.workspaceReadRevision,managerDraftGuard:i.drafts,workPoolRouteFence:i.workPoolRouteFence,
    batchWorkspace:{mode:'synthetic-review',contextFor:data=>active(i)&&i.verified&&!parentChecking.current?i.readGate.contextFor(data):null,port:batchPort}}
-  return <ManagerDraftContext.Provider value={i.drafts}>{children({workspacePort:port,draftGuard:i.drafts})}</ManagerDraftContext.Provider>
+  return <ManagerDraftContext.Provider value={i.drafts}>{children({workspacePort:port,draftGuard:i.drafts,guardedLogout})}</ManagerDraftContext.Provider>
  }
  return <section dir="rtl" aria-label="مالک مشترک واگذاری" data-state={snap.state}>{panel}{i.verified&&i.data&&scope==='work'&&!checking&&<ManagerDraftContext.Provider value={i.drafts}>{children({context:i.data,legacyPort,batchPort,editorRevision:i.editorRevision,committedRevision:i.committedRevision})}</ManagerDraftContext.Provider>}</section>
 }
