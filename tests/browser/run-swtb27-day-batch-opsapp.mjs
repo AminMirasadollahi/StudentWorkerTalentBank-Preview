@@ -19,7 +19,7 @@ try{
  browser=await chromium.launch({headless:true,channel:'chrome',args:['--no-sandbox','--disable-background-networking']})
  context=await browser.newContext({viewport:{width:1440,height:900},locale:'fa-IR',serviceWorkers:'block'})
  await context.route('**/*',r=>new URL(r.request().url()).origin==='http://127.0.0.1:4179'?r.continue():(blocked++,r.abort('blockedbyclient')))
- page=await context.newPage();page.on('pageerror',e=>errors.push(e.message))
+ page=await context.newPage();page.on('pageerror',e=>errors.push(e.stack||e.message))
  await page.goto('http://127.0.0.1:4179/tests/browser/swtb27-day-batch-opsapp.html',{waitUntil:'domcontentloaded'})
  await page.bringToFront()
  const state=async name=>page.locator('[aria-label="مالک مشترک واگذاری"][data-state="'+name+'"]').waitFor({timeout:10000})

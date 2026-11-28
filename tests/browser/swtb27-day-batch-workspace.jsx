@@ -59,6 +59,8 @@ globalThis.__qaWriteAttempts=0
 globalThis.__qaDayBatch={counts:()=>({reserves:f.calls.filter(x=>x[1].p_action==='reserve').length,commits:f.calls.filter(x=>x[1].p_action==='commit').length,acks:f.calls.filter(x=>x[1].p_action==='acknowledge').length,reads:f.reads(),admin:f.calls.filter(x=>x[0]==='ops_is_admin').length,legacyFallback:globalThis.__qaWriteAttempts}),lose:f.lose,refresh:()=>f.auth('TOKEN_REFRESHED'),logout:()=>f.auth('SIGNED_OUT'),holdAdmin:f.holdAdmin}
 
 globalThis.__qaAdminWork={...context.data,workers:context.workers,time_entries:[],profile_requests:[],approved_minutes_total:0}
+// The legacy WorkPool read fixture also needs a concrete term, independent of the typed proof provider.
+globalThis.__qaTerm=structuredClone(context.term)
 globalThis.__qaGeneralOffers=[];globalThis.__qaDeskOffers=[]
 let termMode='missing',termReads=0
 const dashboard=()=>({ok:true,term:context.term,terms:[context.term],units:[],weeks:[],workers:[],pools:[],filters:{unit_code:null,worker_id:null},allocation_scope:'all_workers'})
