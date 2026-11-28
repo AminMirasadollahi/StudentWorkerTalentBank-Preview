@@ -1281,14 +1281,17 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     try{
       const result=await getAdminWorkV2()
       if(sequence!==readSequence.current)return false
-      if(assignmentReceiptPort?.batchWorkspace?.mode==='synthetic-review'&&(!settleRead||settleRead('ready',result)!==true))throw Error('WORKSPACE_READ_UNCONFIRMED')
+      if(assignmentReceiptPort?.batchWorkspace?.mode==='synthetic-review'){
+        if(settleRead?.isCurrent?.()!==true)return false
+        if(settleRead('ready',result)!==true)throw Error('WORKSPACE_READ_UNCONFIRMED')
+      }
       setData(result||{workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       setReadFailed(false)
       setError('')
       if(assignmentReceiptPort?.batchWorkspace?.mode!=='synthetic-review'){if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')}
       return true
     }catch(e){
-      if(sequence!==readSequence.current)return false
+      if(sequence!==readSequence.current||assignmentReceiptPort?.batchWorkspace?.mode==='synthetic-review'&&settleRead?.isCurrent?.()!==true)return false
       // A previous successful read is not proof of CURRENT authorization.
       setData({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       draftScope?.clearRetained()
