@@ -63,7 +63,7 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
   const visibility=()=>{if(document.visibilityState==='hidden')suspend();else resume()}
   try{
    const owner=createDayBatchVerifiedOwner({...fixture,mode:'review',isVisible})
-   i={owner,fixture,closed:false,terminal:false,verified:false,revision:0,editorRevision:0,batchRevision:0,legacyRevision:0,committedRevision:0,drafts:createManagerDraftGuard(),readGate:createDayBatchWorkspaceReadGate(),readScopeOwner:Object.freeze({}),workPoolRouteFence:createWorkPoolRouteFence(),workspaceReadRevision:0,data:null,ack:null,uiBusy:false,schedule}
+   i={owner,fixture,closed:false,terminal:false,verified:false,revision:0,editorRevision:0,batchRevision:0,legacyRevision:0,committedRevision:0,drafts:createManagerDraftGuard(),readGate:createDayBatchWorkspaceReadGate(),readScopeOwner:Object.freeze({}),workPoolRouteFence:createWorkPoolRouteFence(),workspaceReadRevision:0,data:null,ack:null,uiBusy:false,schedule,clearSchedule:clear}
    ref.current=i;owner.selectReadScope(scopeRef.current)
    subscription=fixture.auth.onAuthStateChange((event,session)=>{
     if(event==='INITIAL_SESSION'||!active(i))return
@@ -80,7 +80,7 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
  useLayoutEffect(()=>{
   parentChecking.current=checking;const i=ref.current
   if(!i||!active(i))return
-  if(checking)pause(i);else i.schedule()
+  if(checking){i.clearSchedule();pause(i)}else i.schedule()
  },[checking,fixture,workspace])
  useLayoutEffect(()=>{
   scopeRef.current=scope;const i=ref.current
@@ -121,11 +121,11 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
  const batchPort={mode:'synthetic-review',editorRevision:i.batchRevision,snapshot:{...snap,canStart:allow&&Boolean(context)},submit:(d,c)=>allow&&active(i)&&c===context&&(!workspace||i.readGate.contextFor(i.data)===c)?run('submitBatch',d,c):Promise.resolve('blocked')}
  const button=(label,method,flag)=>snap[flag]&&<button type="button" className="report-btn report-btn--light" onClick={()=>void run(method)}>{label}</button>
  const beginWorkspaceRead=route=>{
-  if(!workspace||!active(i)||!i.verified||checking||route!==scopeRef.current||!['work','candidates'].includes(route))return ()=>false
+  if(!workspace||!active(i)||!i.verified||checking||parentChecking.current||route!==scopeRef.current||!['work','candidates'].includes(route))return Object.assign(()=>false,{isCurrent:()=>false})
   const g=++i.revision,ticket=i.readGate.begin(),settle=i.owner.beginScopedRead(route);i.data=null;redraw(i)
   let done=false
   const live=()=>active(i)&&i.verified&&g===i.revision&&ticket.isCurrent()&&route===scopeRef.current&&!parentChecking.current
-  return (state,value)=>{
+  const complete=(state,value)=>{
    if(done||!live())return false
    done=true
    const ok=state==='ready'&&(route==='work'?ticket.acceptWork(value):Array.isArray(value))
@@ -143,6 +143,8 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
    })()
    return true
   }
+  // Distinguish a superseded read from a current authoritative denial.
+  return Object.assign(complete,{isCurrent:live})
  }
  const panel=<section dir="rtl" aria-label={workspace?'مالک مشترک واگذاری':undefined} data-state={workspace?snap.state:undefined}>
   {!i.verified&&<><p role="status">{i.terminal?'نشست قبلی پایان یافته است.':'در حال بررسی دسترسی یا دسترسی تأیید نشده است.'}</p>{!i.terminal&&<button type="button" onClick={i.schedule}>بررسی مجدد دسترسی</button>}</>}
