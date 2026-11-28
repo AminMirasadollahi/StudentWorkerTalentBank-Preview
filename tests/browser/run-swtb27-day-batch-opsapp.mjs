@@ -9,6 +9,8 @@ if(!tool)throw Error('BROWSER_TOOL_DIR_REQUIRED')
 const {chromium}=createRequire(resolve(tool,'package.json'))('playwright')
 for(const n of ['MANAGER_SHELL_UI','TASKS_FOCUS_UI','WORK_POOL_FOCUS_UI'])process.env['VITE_SWTB22_'+n]='true'
 process.env.VITE_SWTB19_UNIFIED_WORK_UI='true'
+// Explicit fictional non-production config; fake transport remains mandatory.
+Object.assign(process.env,{VITE_SWTB28_STAGING_REVIEW_UI:'true',VITE_SWTB28_STAGING_PROJECT_REF:'abcdefghijklmnopqrst',VITE_SWTB22_RECOVERY_REVIEW_UI:'true',VITE_SWTB22_RECOVERY_REVIEW_PROJECT_REF:'abcdefghijklmnopqrst',VITE_SWTB22_RECOVERY_RELEASE_UI:'false',VITE_SWTB23_WORKER_POLICY_RELEASE:'true',VITE_SWTB24_R5_MANAGER_IA_UI:'true',VITE_SUPABASE_URL:'https://abcdefghijklmnopqrst.supabase.co',VITE_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_fixture'})
 const out=resolve('test-results/swtb27-opsapp-synthetic')
 await mkdir(out,{recursive:true})
 let server,browser,context,page,blocked=0
@@ -31,7 +33,7 @@ try{
  const counts=()=>page.evaluate(()=>globalThis.__qaDayBatch.counts())
  const open=async()=>{await common.click();await page.getByRole('group',{name:'روش تخصیص کار'}).getByRole('button',{name:/واگذاری مجموعه‌ای/}).click();await dialog.waitFor()}
  const snap=async n=>{assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);await page.screenshot({path:resolve(out,n+'.png')})}
- await state('idle');await route('tasks').click();await common.waitFor();await open()
+ await state('idle');await page.getByText('محیط آزمایشی مستقل؛ این نسخه برای انتشار عمومی نیست.',{exact:true}).waitFor();await route('tasks').click();await common.waitFor();await open()
  await batch.getByLabel('عنوان کار ۱',{exact:true}).fill('پیش‌نویس در OpsApp واقعی')
  await batch.getByLabel('دلیل اطلاع‌رسانی کوتاه (در صورت نیاز)').fill('آزمون مصنوعی هماهنگی قبلی')
  await batch.getByRole('checkbox',{name:'دانشجوکار الف',exact:true}).check()
@@ -97,7 +99,7 @@ try{
  assert.equal(await direct.getByRole('button',{name:'لغو نوبت',exact:true}).count(),0)
  await button('بستن و حفظ پیش‌نویس').click();await direct.waitFor({state:'hidden'})
  const final=await counts();assert.equal(final.reserves,2);assert.equal(final.commits,2);assert.equal(final.acks,2);assert.equal(final.deskReserves,1);assert.equal(final.deskCommits,1);assert.equal(final.deskAcks,1);assert.ok(final.deskReads>=4);assert.equal(final.shiftCancelled,true);assert.equal(final.legacyFallback,0)
- const reads=await page.evaluate(()=>globalThis.__qaOpsApp.counts());assert.ok(reads.identityReads>=2);assert.ok(reads.candidateReads>=2);assert.ok(reads.reportReads>=1)
+ const reads=await page.evaluate(()=>globalThis.__qaOpsApp.counts());assert.ok(reads.identityReads>=2);assert.ok(reads.candidateReads>=2);assert.ok(reads.reportReads>=1);assert.deepEqual([...reads.stagedReadRoutes].sort(),['ops_get_library_desk_shifts','ops_get_operations_term_dashboard','ops_get_operations_v3','ops_list_candidates'].sort())
  await button('خروج').click();await common.waitFor({state:'hidden'})
  assert.equal(await page.getByTestId('batch-receipt-summary').count(),0)
  assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0)
@@ -105,5 +107,6 @@ try{
  assert.equal(blocked,0);assert.deepEqual(errors,[])
  console.log('PASS SWTB27_ACTUAL_OPSAPP_IDENTITY_CANDIDATE_REPORT_RECOVERY_NO_NETWORK')
  console.log('PASS SWTB28_ACTUAL_OPSAPP_DURABLE_DESK_CANCEL_LOST_COMMIT_WRONG_DAY_TASK_NO_FALLBACK')
+ console.log('PASS SWTB28_ACTUAL_OPSAPP_STAGING_ADAPTER_FOUR_SCOPED_READS_FAKE_ONLY')
 }catch(e){console.error('SWTB27_OPSAPP_CHROME_DIAGNOSTIC',JSON.stringify({observations,blocked,errors,headings:await page?.locator('h1,h2,h3').allTextContents().catch(()=>[])}));throw e}
 finally{await writeFile(resolve(out,'observations.json'),JSON.stringify({observations,blocked,errors},null,2));await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}

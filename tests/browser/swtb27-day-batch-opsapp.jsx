@@ -3,6 +3,7 @@ import React,{useState} from 'react'
 import {createRoot} from 'react-dom/client'
 import DayBatchManagerReviewHost from '../../src/components/DayBatchManagerReviewHost.jsx'
 import OpsApp from '../../src/OpsApp.jsx'
+import {createStagingManagerFixture} from '../../src/lib/stagingManagerReview.mjs'
 import '../../src/manager-shell.css'
 import '../../src/typography.css'
 import '../../src/styles.css'
@@ -28,6 +29,11 @@ function fixture(initial=null){
   assert.ok(url.startsWith('https://abcdefghijklmnopqrst.supabase.co/rest/v1/rpc/'))
   const rpc=url.split('/').pop(),a=JSON.parse(init.body);calls.push([rpc,a])
   if(rpc==='ops_is_admin'){if(adminWait){const pending=adminWait;adminWait=null;await pending}return {ok:true,json:async()=>true}}
+  // Actual staged read adapter, still backed solely by this fake server.
+  if(rpc==='ops_get_operations_v3'){reads++;return {ok:true,json:async()=>structuredClone(globalThis.__qaAdminWork)}}
+  if(rpc==='ops_list_candidates')return {ok:true,json:async()=>globalThis.__qaOpsAppApi.candidates()}
+  if(rpc==='ops_get_operations_term_dashboard'){assert.equal(a.p_term_id,null);assert.equal(a.p_unit_code,null);assert.equal(a.p_worker_id,null);return {ok:true,json:async()=>workspaceFixture.readTerm()}}
+  if(rpc==='ops_get_library_desk_shifts'){assert.equal(a.p_from,a.p_to);return {ok:true,json:async()=>f.config.readDeskShifts(a.p_from)}}
   assert.ok(['ops_assignment_batch_write_v1','ops_assignment_batch_control_v1','ops_assignment_recovery_write_v3','ops_assignment_recovery_control_v2','ops_desk_cancel_write_v1','ops_desk_cancel_control_v1'].includes(rpc))
   const desk=rpc.includes('_desk_cancel_'),batch=rpc.includes('_batch_'),control=rpc.endsWith('control_v1')||rpc.endsWith('control_v2')
   if(a.p_action==='reserve'){
@@ -77,6 +83,6 @@ globalThis.__qaOpsAppApi={
  rpc:async name=>{if(name==='ops_get_admin_student_worker_report'){reportReads++;return {data:null,error:{code:'SYNTHETIC_REPORT_UNAVAILABLE'}}}if(name==='ops_get_operations_v3')return {data:structuredClone(globalThis.__qaAdminWork),error:null};return forbid()},
  logout:async()=>f.auth('SIGNED_OUT')
 }
-const injected=Object.freeze({Host:DayBatchManagerReviewHost,fixture:workspaceFixture})
-globalThis.__qaOpsApp={counts:()=>({identityReads,candidateReads,termReads,reportReads}),holdIdentity:()=>{let release;identityWait=new Promise(r=>release=r);return release},candidateFail:value=>{candidateFail=value},role:value=>{role=value},changeActor:()=>{f.setActor(id(90));f.auth('TOKEN_REFRESHED')}}
+const injected=Object.freeze({mode:'staging-review',Host:DayBatchManagerReviewHost,createFixture:actorId=>createStagingManagerFixture({env:import.meta.env,location:window.location,auth:f.config.auth,actorId,fetchImpl:f.config.fetchImpl,makeId:f.config.makeId,today:()=>today})})
+globalThis.__qaOpsApp={counts:()=>({identityReads,candidateReads,termReads,reportReads,stagedReadRoutes:[...new Set(f.calls.map(x=>x[0]).filter(x=>['ops_get_operations_v3','ops_list_candidates','ops_get_operations_term_dashboard','ops_get_library_desk_shifts'].includes(x)))]}),holdIdentity:()=>{let release;identityWait=new Promise(r=>release=r);return release},candidateFail:value=>{candidateFail=value},role:value=>{role=value},changeActor:()=>{f.setActor(id(90));f.auth('TOKEN_REFRESHED')}}
 createRoot(document.getElementById('root')).render(<OpsApp r5IaFixture dayBatchReviewFixture={injected}/>)

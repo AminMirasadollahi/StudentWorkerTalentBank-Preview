@@ -32,7 +32,10 @@ jobs:
           VITE_SWTB24_R5_MANAGER_IA_UI: 'true'
           VITE_SUPABASE_URL: https://aaaaaaaaaaaaaaaaaaaa.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
-        run: npm run build -- --outDir /tmp/swtb23-integrated-build
+        run: |
+          npm run build -- --outDir /tmp/swtb23-integrated-build
+          if grep -R -l 'SWTB28_STAGING_REVIEW_BLOCKED' /tmp/swtb23-integrated-build; then exit 1; fi
+          echo PASS STAGING_ADAPTER_EXCLUDED_FROM_NORMAL_BUILD
       - name: Native Chrome six-space visual review (synthetic only)
         run: |
           google-chrome --version

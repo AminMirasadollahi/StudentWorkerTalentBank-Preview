@@ -81,7 +81,13 @@ try{
  assert.ok(final.admin>=2);assert.ok(await page.evaluate(()=>globalThis.__qaWorkspace.termReads())>=3)
  assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0)
  observations.final=final;observations.workReadFailure=true;observations.termIndependent=true;observations.parentChecking=true
+ // Open the real separate staging HTML with NO stage opt-in; it must refuse
+ // before loading any real operations client (external network blocked).
+ await page.goto('http://127.0.0.1:4179/tests/staging/swtb28-manager-review.html',{waitUntil:'domcontentloaded'})
+ await page.getByText('تنظیمات محیط آزمایشی معتبر نیست؛ اتصال برقرار نشد.',{exact:true}).waitFor()
+ observations.stagingEntryUnconfiguredBlocked=true
  assert.equal(blocked,0);assert.deepEqual(errors,[])
+ console.log('PASS SWTB28_UNCONFIGURED_STAGING_ENTRY_BLOCKED_BEFORE_CLIENT')
  console.log('PASS SWTB27_ACTUAL_WORKSPACE_LAUNCHER_SCOPED_READ_TERM_RECEIPT_NO_NETWORK')
 }catch(e){console.error('SWTB27_WORKSPACE_CHROME_DIAGNOSTIC',JSON.stringify({observations,blocked,errors,headings:await page?.locator('h1,h2,h3').allTextContents().catch(()=>[])}));throw e}
 finally{await writeFile(resolve(out,'observations.json'),JSON.stringify({observations,blocked,errors},null,2));await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}
