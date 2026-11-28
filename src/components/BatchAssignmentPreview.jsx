@@ -1,5 +1,5 @@
-// Synthetic review-only composer. No API import or submit callback.
-// A future authorized host must own lifecycle and revalidate on server.
+// Preview by default. Only the isolated SWTB27 review host supplies a submit port.
+// No API import, fallback writer, storage or independent retry.
 import React,{useRef,useState} from 'react'
 import JalaliDatePicker from './JalaliDatePicker.jsx'
 import {previewBatchAssignment} from '../lib/batchAssignmentPreview.mjs'
@@ -10,12 +10,17 @@ const day=x=>new Intl.DateTimeFormat('fa-IR-u-ca-persian',{dateStyle:'medium',ti
 const errors={CONTEXT_UNAVAILABLE:'اطلاعات لازم برای پیش‌نمایش در دسترس نیست.',INVALID_PLAN_OR_TERM:'نیمسال یا ساختار مجموعه معتبر نیست.',INVALID_ROW:'ساختار ردیف نامعتبر یا تکراری است.',UNSUPPORTED_MODE:'این نوع تخصیص هنوز پشتیبانی نمی‌شود.',SELECT_WORKERS:'حداقل یک مسئول انتخاب کنید.',DUPLICATE_PAIR:'مسئول تکراری انتخاب شده است.',WORKER_NOT_ACTIVE_OR_UNKNOWN:'مسئول غیرفعال یا ناشناخته است.',GROUP_SIZE:'کار گروهی باید ۲ تا ۲۰ عضو داشته باشد.',DATE_OUTSIDE_TERM_OR_PAST:'روز برنامه‌ریزی باید از امروز و در نیمسال فعال باشد.',INVALID_UNIT:'واحد را مشخص کنید.',SHORT_NOTICE_REASON:'برای امروز یا فردا دلیل اطلاع‌رسانی کوتاه را بنویسید.',INVALID_PREREQUISITES:'مجموعه پیش‌نیاز نامعتبر است.',PREREQUISITE_NOT_LOADED:'پیش‌نیاز در اطلاعات فعلی یافت نشد.',INVALID_V3_FIELDS:'عنوان، شرح، زمان یا دلیل را بررسی کنید.'}
 const capacity={ok:'ظرفیت کافی در داده‌های فعلی',full:'ظرفیت پر می‌شود',overbooked:'بیش از ظرفیت اعلام‌شده',unavailable:'عدم حضور',not_configured:'برنامه حضور ثبت نشده',unknown:'ظرفیت نامشخص'}
 const blank=id=>({id,title:'',instructions:'',minutes:60,mode:'independent',workerIds:[],date:null,unit:null,reason:null,prerequisiteIds:[]})
-export default function BatchAssignmentPreview({context}){
+export default function BatchAssignmentPreview({context,reviewPort=null}){
  const next=useRef(2)
  const [draft,setDraft]=useState(()=>({termId:context.term.id,defaults:{date:context.defaultDate??context.today,unit:'library',reason:''},rows:[blank('row-1')]}))
  const [review,setReview]=useState(null)
  const previewRef=useRef(null)
- const change=fn=>{setDraft(fn);setReview(null)}
+ const submitLock=useRef(false)
+ const [submitting,setSubmitting]=useState(false)
+ const [notice,setNotice]=useState('')
+ const enabled=reviewPort?.mode==='synthetic-review'&&reviewPort?.snapshot?.canStart===true&&typeof reviewPort.submit==='function'
+ const locked=reviewPort!==null&&(!enabled||submitting)
+ const change=fn=>{if(locked||submitLock.current)return;setDraft(fn);setReview(null);setNotice('')}
  const defaults=(key,value)=>change(p=>({...p,defaults:{...p.defaults,[key]:value}}))
  const rowChange=(id,fn)=>change(p=>({...p,rows:p.rows.map(r=>r.id===id?fn(r):r)}))
  const field=(id,key,value)=>rowChange(id,r=>({...r,[key]:value}))
@@ -23,9 +28,17 @@ export default function BatchAssignmentPreview({context}){
  const workers=context.workers.filter(w=>w.state==='active')
  const workerName=id=>workers.find(w=>w.id.toLowerCase()===id)?.name??'فرد نامشخص'
  const displayReview=review?.context===context?review.result:null
+ const submit=async()=>{
+  if(!enabled||submitLock.current||!displayReview?.ok)return
+  submitLock.current=true;setSubmitting(true);setNotice('')
+  try{const result=await reviewPort.submit(draft,context);if(result==='invalid')setNotice('اطلاعات مجموعه معتبر نیست. پیش‌نویس را اصلاح کنید.');else if(result==='blocked')setNotice('درخواست جدید ارسال نشد. وضعیت واگذاری را بررسی کنید.')}
+  catch{setNotice('نتیجه درخواست تأیید نشده است؛ وضعیت را بررسی کنید.')}
+  finally{submitLock.current=false;setSubmitting(false)}
+ }
  const units=(value,onChange,inherit=false)=><select value={value??''} onChange={e=>onChange(e.target.value||null)}>{inherit&&<option value="">پیش‌فرض مجموعه</option>}{Object.entries(labels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>
  return <section className="report-panel swtb24-batch-preview" dir="rtl" aria-label="پیش‌نمایش واگذاری مجموعه‌ای">
-  <header><h2>تعریف مجموعه کارها</h2><p role="status">نسخه بررسی با اطلاعات نمونه؛ هیچ وظیفه یا ساعتی ثبت نمی‌شود.</p></header>
+  <header><h2>تعریف مجموعه کارها</h2><p role="status">{reviewPort===null?'نسخه بررسی با اطلاعات نمونه؛ هیچ وظیفه یا ساعتی ثبت نمی‌شود.':'مسیر بررسی با اطلاعات مصنوعی؛ ثبت واقعی انجام نمی‌شود.'}</p></header>
+  <fieldset disabled={locked} style={{border:0,margin:0,padding:0,minWidth:0}}>
   <fieldset className="swtb24-batch-defaults"><legend>پیش‌فرض مشترک</legend>
    <label className="report-field"><span>واحد</span>{units(draft.defaults.unit,v=>defaults('unit',v))}</label>
    <div className="report-field"><span>روز برنامه‌ریزی</span><JalaliDatePicker value={draft.defaults.date} min={context.today} onChange={v=>defaults('date',v)} ariaLabel="روز مشترک مجموعه"/></div>
@@ -64,8 +77,10 @@ export default function BatchAssignmentPreview({context}){
     <div className="swtb24-batch-matrix-scroll"><table><thead><tr><th>فرد / روز</th><th>زمان پیشنهادی</th><th>کارهای موجود</th><th>ظرفیت اعلام‌شده</th><th>وضعیت</th></tr></thead><tbody>{displayReview.plan.dailyTotals.map(x=><tr key={x.workerId+'/'+x.date}><th scope="row">{workerName(x.workerId)} · {day(x.date)}</th><td>{fa(x.proposedMinutes)}</td><td>{x.existingMinutes===null?'نامشخص':fa(x.existingMinutes)}</td><td>{x.availableMinutes===null?'نامشخص':fa(x.availableMinutes)}</td><td>{capacity[x.capacityCode]}</td></tr>)}</tbody></table></div>
     {displayReview.plan.warnings.some(w=>w.code==='CANCELLED_PREREQUISITE')&&<p role="alert">حداقل یک پیش‌نیاز لغوشده وجود دارد؛ تا تعیین تکلیف امکان انجام کار وابسته وجود نخواهد داشت.</p>}
     <p>ظرفیت صرفاً راهنمای برنامه‌ریزی بر اساس داده‌های موجود است؛ مجوز همکاری یا تأیید ساعت نیست.</p>
-    <button type="button" className="report-btn report-btn--primary" disabled>ثبت نهایی مجموعه (هنوز فعال نیست)</button>
+    <button type="button" className="report-btn report-btn--primary" disabled={!enabled||submitting} onClick={reviewPort===null?undefined:submit}>{reviewPort===null?'ثبت نهایی مجموعه (هنوز فعال نیست)':submitting?'در حال ثبت آزمایشی…':'ثبت آزمایشی مجموعه'}</button>
    </section>}
   </div>
+  </fieldset>
+  {notice&&<p role="alert">{notice}</p>}
  </section>
 }
