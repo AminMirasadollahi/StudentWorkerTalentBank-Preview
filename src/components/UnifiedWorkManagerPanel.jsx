@@ -1,3 +1,4 @@
+import {useManagerDraftWarning,useManagerRetainedState,useManagerDraftScope} from '../lib/managerDraftGuard.mjs'
 import {lazy,Suspense,useCallback,useEffect,useMemo,useRef,useState} from 'react'
 const DeskWorkPoolManagerSection=lazy(()=>import('./DeskWorkPoolManagerSection'))
 import JalaliDatePicker from './JalaliDatePicker'
@@ -30,12 +31,16 @@ const initial=()=>({
 const faDate=x=>x?new Intl.DateTimeFormat('fa-IR-u-ca-persian',{
  dateStyle:'medium',timeZone:'UTC'}).format(new Date(x+'T12:00:00Z')):'—'
 
-export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=null}){
+export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=null,commonEntry=false,createIntent=null,onCreateHandled,onReturnToCreate}){
  const {owner,lock,blockedByOther}=useWorkPoolFence(routeFence)
- const [form,setForm]=useState(initial)
+ const draftScope=useManagerDraftScope()
+ const retained=useManagerRetainedState('general-pool',0,()=>({form:initial(),termId:''}))
+ const {form,termId:termSelection}=retained.value
+ const setForm=next=>retained.change(p=>({...p,form:typeof next==='function'?next(p.form):next,termId:retained.retained?(p.termId||term?.id||''):p.termId}))
  const [view,setView]=useState({status:'loading',terms:[],templates:[],offers:[]})
- const [termSelection,setTermSelection]=useState('')
  const [open,setOpen]=useState(false)
+ const launchFocus=useRef(false)
+ const createFormRef=useRef(null)
  const [deskMode,setDeskMode]=useState(false)
  const [deskVisited,setDeskVisited]=useState(false)
  const [notice,setNotice]=useState('')
@@ -47,6 +52,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
  const [closeReason,setCloseReason]=useState('')
  const [descriptionWarning,setDescriptionWarning]=useState('')
  const [edit,setEdit]=useState({id:'',previous:'',text:'',status:'idle',message:''})
+ useManagerDraftWarning({form,termSelection},!retained.retained||Boolean(closeId)||Boolean(edit.id&&edit.text!==edit.previous),Boolean(closeId)||Boolean(edit.id&&edit.text!==edit.previous))
  const editRequest=useRef(null)
  const editInputRef=useRef(null)
  const [inspectedId,setInspectedId]=useState('')
@@ -74,21 +80,31 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
    setView(snapshot)
    return snapshot
   }catch{
-   if(serial===requestSerial.current)setView(v=>routeFence?{status:'error',terms:[],templates:[],offers:[]}:{...v,status:'error'})
+   if(serial===requestSerial.current){if(retained.retained){draftScope?.clearDraft('direct-task');if(pending.current||inFlight.current||routeFence?.getSnapshot())retained.clear();else retained.reset()}setView(v=>routeFence?{status:'error',terms:[],templates:[],offers:[]}:{...v,status:'error'})}
    return null
   }
  },[routeFence,owner])
  useEffect(()=>{void load();return()=>{requestSerial.current+=1}},[load,revision,refreshRevision])
  const activeTerms=view.terms.filter(x=>x.state==='active')
- const term=activeTerms.find(x=>x.id===termSelection)||activeTerms[0]
+ const term=activeTerms.find(x=>x.id===termSelection)||(!retained.retained||!termSelection?activeTerms[0]:undefined)
  const setField=(name,value)=>setForm(p=>({...p,[name]:value}))
  const preview=useMemo(()=>{
-  if(!term)return {error:'هیچ نیمسال فعالی برای انتشار وجود ندارد.'}
+  if(!term)return {error:termSelection?'نیمسال پیش‌نویس دیگر فعال نیست؛ پیش‌نویس محلی را حذف کنید و کار جدید تعریف کنید.':'هیچ نیمسال فعالی برای انتشار وجود ندارد.'}
   try{return workPackagePayload(form,term.id,todayTehran(),term)}
   catch(e){return {error:e.message}}
  },[form,term])
  const hasUnresolved=uncertain||retryReady||['uncertain','retry'].includes(edit.status)
  const disabled=busy||hasUnresolved||blockedByOther||view.status!=='ready'
+ useEffect(()=>{
+  if(!commonEntry||!createIntent||view.status==='loading')return
+  if(createIntent.scope===draftScope&&createIntent.generation===draftScope?.generation()&&!disabled&&!routeFence?.getSnapshot()&&!draftScope?.hasDraft()){
+   launchFocus.current=true;setDeskMode(false);setOpen(true)
+  }else setNotice('فرم جدید باز نشد؛ ابتدا وضعیت اطلاعات و عملیات قبلی را بررسی کنید.')
+  onCreateHandled?.(createIntent)
+ },[commonEntry,createIntent,view.status,disabled,routeFence,draftScope,onCreateHandled])
+ useEffect(()=>{
+  if(open&&!deskMode&&launchFocus.current){launchFocus.current=false;createFormRef.current?.querySelector('input')?.focus()}
+ },[open,deskMode,createIntent])
  const create=async(publish,retry=false)=>{
   if(inFlight.current||blockedByOther||view.status!=='ready'||uncertain||!globalThis.crypto?.randomUUID||(routeFence&&['saving','uncertain','retry'].includes(edit.status)))return
   let resolved
@@ -104,6 +120,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
   if(retry&&!pending.current)return
   const requestId=pending.current?.requestId||globalThis.crypto.randomUUID()
   if(routeFence&&!(retry?routeFence.retry(owner,'create'):routeFence.begin(owner,'create')))return
+  retained.clear()
   pending.current={requestId,signature,publish}
   inFlight.current=true;setBusy(true);setNotice('')
   let receipt
@@ -121,7 +138,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
   // A confirmed server receipt stays confirmed even if the read/navigation fails.
   routeFence?.confirmed(owner)
   pending.current=null;setUncertain(false);setRetryReady(false)
-  setForm(initial());setOpen(false)
+  retained.reset();setOpen(false)
   setNotice(publish?'کار ثبت و منتشر شد. فقط دانشجوی واجد شرایط می‌تواند آن را انتخاب کند.'
    :'پیش‌نویس کار ثبت شد؛ از فهرست می‌توانید آن را منتشر کنید.')
   inFlight.current=false;setBusy(false)
@@ -137,7 +154,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
    if(found){
     routeFence?.confirmed(owner)
     pending.current=null;setUncertain(false);setRetryReady(false)
-    setForm(initial());setOpen(false)
+    retained.reset();setOpen(false)
     setNotice('ثبت قبلی در سرور تأیید شد؛ هیچ کار تکراری ساخته نشد.')
    }else{
     setUncertain(false);setRetryReady(true)
@@ -302,8 +319,8 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
       else if(hasUnresolved)void verify()
       else setRevision(n=>n+1)
      }}>بازخوانی فهرست</button>
-    <button type="button" className="report-btn report-btn--primary"
-     disabled={disabled} onClick={()=>setOpen(v=>!v)}>{open?'بستن فرم':'تعریف کار جدید'}</button>
+    {(!commonEntry||open)&&<button type="button" className={'report-btn '+(commonEntry?'report-btn--light':'report-btn--primary')}
+     disabled={disabled} onClick={()=>{setOpen(v=>!v);if(commonEntry)onReturnToCreate?.()}}>{open?'بستن فرم':'تعریف کار جدید'}</button>}
    </div>
   </div>
   {notice&&<div role={hasUnresolved?'alert':'status'}
@@ -318,7 +335,8 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
   {lock?.owner===owner&&lock.kind==='transition'&&lock.status==='reviewed'&&<button type="button" className="ow-mini-btn" disabled={busy||view.status!=='ready'} onClick={()=>{if(routeFence.acknowledgeReview(owner)){setUncertain(false);setNotice('بررسی فهرست تأیید شد؛ این تأیید، رسید تراکنش نیست.')}}}>تأیید بررسی وضعیت فرصت</button>}
   {view.status==='error'&&<p role="alert">اطلاعات مدیر دریافت نشد؛ ساخت کار تا بازخوانی موفق غیرفعال است.</p>}
   {view.status==='loading'&&<p role="status">در حال دریافت کارها و نیمسال فعال…</p>}
-  {open&&view.status==='ready'&&<form className="swtb19-unified-work__form"
+  {retained.retained&&retained.dirty&&!hasUnresolved&&!busy&&view.status==='ready'&&<button type="button" className="report-btn report-btn--light" onClick={()=>{if(window.confirm('پیش‌نویس ثبت‌نشده حذف شود؟'))retained.reset()}}>حذف پیش‌نویس محلی</button>}
+  {open&&view.status==='ready'&&<form ref={createFormRef} className="swtb19-unified-work__form"
     onSubmit={e=>{e.preventDefault();void create(true)}}>
     <h4>تعریف کار جدید</h4>
     <label className="report-field"><span>عنوان کار</span>
@@ -441,7 +459,7 @@ export default function UnifiedWorkManagerPanel({refreshRevision=0,routeFence=nu
    <div className="swtb19-unified-work__list">
    <h4>کارهای تعریف‌شده ({nf.format(offers.length)})</h4>
    {offers.length===0&&<p className="ow-work-pool-empty">
-    هنوز فرصت منتشرشده‌ای وجود ندارد. برای شروع، «تعریف کار جدید» را انتخاب کنید.</p>}
+    هنوز فرصت منتشرشده‌ای وجود ندارد. برای شروع، {commonEntry?'«تعریف کار»':'«تعریف کار جدید»'} را انتخاب کنید.</p>}
    {offers.map(o=>{
     const t=view.templates.find(x=>x.id===o.template_id)
     return <article key={o.id} className="ow-work-pool-item">

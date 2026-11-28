@@ -1,3 +1,5 @@
+import {useManagerDraftScope} from './lib/managerDraftGuard.mjs'
+import {managerIdentityLabel} from './lib/managerIdentityLabel.mjs'
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
 import {workerGuideStorageKey,workerGuideSessionStorageKey,shouldAutoOfferWorkerGuide,suppressWorkerGuideAutoOffers} from './lib/workerGuide.mjs'
@@ -45,6 +47,7 @@ import {buildOriginalWorkerNameIndex,selectManagerWorkerProfiles} from './lib/ma
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
 const WorkPoolManagerPanel = lazy(()=>import('./components/WorkPoolManagerPanel'))
 const WorkPoolWorkerPanel = lazy(()=>import('./components/WorkPoolWorkerPanel'))
+const BatchAssignmentPreview = lazy(()=>import('./components/BatchAssignmentPreview.jsx'))
 // SWTB15 separate from mandatory acceptance: informational, nonblocking RC6.
 const WorkerAgreementModalPreview = lazy(()=>import('./components/WorkerAgreementModalPreview.jsx'))
 import * as unifiedPeerApi from './lib/operationsV2'
@@ -1082,7 +1085,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
         {original&&!original.complete&&<p className="ow-muted" role="status">برخی نام‌های زمان ثبت‌نام در دسترس نیستند؛ نتایج ممکن است محدود باشند.</p>}
         {shownWorkers.map(({worker:w,matchKind})=><button type="button" key={w.id}
           className={selectedId===w.id?'is-selected':''} onClick={()=>onChange(w.id)}>
-          <strong>{w.name}</strong>
+          <strong>{managerIdentityLabel(w.name,w.id)}</strong>
           <small>{unitLabels[w.unit]||w.unit}</small>
           {matchKind!=='current'&&<small>{matchKind==='original'?'مطابق نام زمان ثبت‌نام':'مطابق نام قبلی تأییدشده'}</small>}
           {(data.profile_requests||[]).some(r=>r.worker_id===w.id&&r.review_state==='pending')
@@ -1094,7 +1097,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
       {!selected&&<p className="ow-muted">از فهرست، پرونده یک دانشجوکار را انتخاب کنید.</p>}
     {selected&&<>
       <div className="ow-profile-heading">
-        <div><h3>{selected.name}</h3>
+        <div><h3>{managerIdentityLabel(selected.name,selected.id)}</h3>
           <small className="ow-muted">{unitLabels[selected.unit]||selected.unit||'—'}
             {selected.major&&<> · {selected.major}</>}</small></div>
         <span className="ow-status">{workerStateLabels[selected.state]||selected.state}</span>
@@ -1158,6 +1161,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
 }
 export function AdminOperations({ navigation, setNavigation, refreshRevision = 0,
   hideSectionTabs = false, loadOriginalCandidates, assignmentReceiptPort=null, workPoolRouteFence=null }) {
+  const draftScope=useManagerDraftScope()
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const view=navigation.workView
   const profileWorkerId=navigation.profileWorkerId||''
@@ -1201,7 +1205,13 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const [busy,setBusy]=useState(false)
   const [assignmentDialogDate,setAssignmentDialogDate]=useState('')
   const focusedTasks=hideSectionTabs&&focusTaskUIEnabled
+  const commonWorkEntry=Boolean(draftScope&&focusedTasks&&workPoolUIEnabled&&import.meta.env?.VITE_SWTB19_UNIFIED_WORK_UI==='true')
+  const [createChoiceOpen,setCreateChoiceOpen]=useState(false)
+  const [createIntent,setCreateIntent]=useState(null)
+  const [createNotice,setCreateNotice]=useState('')
+  const commonCreateRef=useRef(null)
   const [taskEditorOpen,setTaskEditorOpen]=useState(false)
+  const [taskEditorKind,setTaskEditorKind]=useState('direct')
   const [prerequisiteTaskId,setPrerequisiteTaskId]=useState(null)
   const [taskEditorRevision,setTaskEditorRevision]=useState(0)
   const taskEditorDialogRef=useRef(null)
@@ -1213,8 +1223,10 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       else dialog.removeAttribute('open')
     }
     setTaskEditorOpen(false)
+    setTaskEditorKind('direct')
     if(reset)setTaskEditorRevision(v=>v+1)
-    taskEditorOpenerRef.current?.focus?.({preventScroll:true})
+    const opener=commonCreateRef.current||taskEditorOpenerRef.current
+    opener?.focus?.({preventScroll:true})
   }
   useEffect(()=>{
     if(view!=='tasks'&&taskEditorOpen)setTaskEditorOpen(false)
@@ -1268,17 +1280,22 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     if(!settleRead)assignmentReceiptPort?.setReadState?.('checking')
     setLoading(true)
     try{
-      const result=await getAdminWorkV2()
+      const result=assignmentReceiptPort?.readWork?await assignmentReceiptPort.readWork(settleRead):await getAdminWorkV2()
       if(sequence!==readSequence.current)return false
+      if(['synthetic-review','typed-release'].includes(assignmentReceiptPort?.batchWorkspace?.mode)){
+        if(settleRead?.isCurrent?.()!==true)return false
+        if(settleRead('ready',result)!==true)throw Error('WORKSPACE_READ_UNCONFIRMED')
+      }
       setData(result||{workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       setReadFailed(false)
       setError('')
-      if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')
+      if(!['synthetic-review','typed-release'].includes(assignmentReceiptPort?.batchWorkspace?.mode)){if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')}
       return true
     }catch(e){
-      if(sequence!==readSequence.current)return false
+      if(sequence!==readSequence.current||['synthetic-review','typed-release'].includes(assignmentReceiptPort?.batchWorkspace?.mode)&&settleRead?.isCurrent?.()!==true)return false
       // A previous successful read is not proof of CURRENT authorization.
       setData({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+      draftScope?.clearRetained()
       setReadFailed(true)
       setAssignmentDialogDate('')
       // Drop any stale privileged draft after authorization/read rejection.
@@ -1289,10 +1306,46 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       return false
     }finally{if(sequence===readSequence.current)setLoading(false)}
   }
-  useEffect(()=>{void refresh();return ()=>{if(assignmentReceiptPort)readSequence.current++}},[refreshRevision,assignmentReceiptPort?.committedRevision])
+  useEffect(()=>{void refresh();return ()=>{if(assignmentReceiptPort)readSequence.current++}},[refreshRevision,assignmentReceiptPort?.committedRevision,assignmentReceiptPort?.workspaceReadRevision])
 
   const workers=data.workers||[]
   const active=workers.filter(w=>w.state==='active')
+  const batchWorkspace=['synthetic-review','typed-release'].includes(assignmentReceiptPort?.batchWorkspace?.mode)?assignmentReceiptPort.batchWorkspace:null
+  // The common launcher also contains independent Work Pool publishing.
+  // Disable only fresh assignment paths during typed recovery-only admission.
+  const typedRecoveryOnly=batchWorkspace?.mode==='typed-release'&&assignmentReceiptPort?.snapshot?.releaseCapability==='recover_only'
+  const batchContext=batchWorkspace?.contextFor?.(data)??null
+  const canOpenBatch=Boolean(batchContext&&['synthetic-review','typed-release'].includes(batchWorkspace?.port?.mode)&&batchWorkspace.port.snapshot?.canStart===true&&active.length>0)
+  const launchWorkEditor=(target,kind='direct')=>{
+    setCreateNotice('')
+    if(loading||readFailed||!commonWorkEntry||workPoolRouteFence?.getSnapshot()||
+      (target==='tasks'&&(active.length===0||typedRecoveryOnly))||kind==='batch'&&(!canOpenBatch||taskEditorOpen||assignmentDialogDate)){
+      setCreateNotice('ابتدا دریافت اطلاعات یا بررسی عملیات قبلی را کامل کنید.');return
+    }
+    if(view===target&&draftScope?.hasDraft()){
+      setCreateNotice('ابتدا فرم یا تغییرات ثبت‌نشده فعلی را تعیین‌تکلیف کنید.');return
+    }
+    setCreateChoiceOpen(false)
+    const intent={target,kind,scope:draftScope,generation:draftScope.generation(),owner:assignmentReceiptPort?.readScopeOwner,context:kind==='batch'?batchContext:null}
+    if(view!==target&&setNavigation(previous=>({...previous,workView:target}))!==true)return
+    setCreateIntent(intent)
+  }
+  useLayoutEffect(()=>{
+    if(!createIntent)return
+    if(!commonWorkEntry||createIntent.scope!==draftScope||createIntent.generation!==draftScope.generation()||
+      view!==createIntent.target||readFailed||workPoolRouteFence?.getSnapshot()){
+      setCreateIntent(null);return
+    }
+    if(createIntent.target==='tasks'){
+      setCreateIntent(null)
+      if(!loading&&active.length>0&&!typedRecoveryOnly){
+        if(createIntent.kind==='batch'&&(!canOpenBatch||createIntent.owner!==assignmentReceiptPort?.readScopeOwner||createIntent.context!==batchContext||assignmentDialogDate||taskEditorOpen))return
+        setTaskEditorKind(createIntent.kind==='batch'?'batch':'direct');setTaskEditorOpen(true)
+      }
+    }
+  },[createIntent,commonWorkEntry,draftScope,view,readFailed,loading,active.length,workPoolRouteFence,canOpenBatch,batchContext,assignmentReceiptPort?.readScopeOwner,assignmentDialogDate,taskEditorOpen,typedRecoveryOnly])
+  useEffect(()=>{setCreateChoiceOpen(false);setCreateNotice('')},[view,draftScope])
+  const finishPoolLaunch=(intent)=>setCreateIntent(current=>current===intent?null:current)
   const chosen=workers.find(w=>w.id===workerId)
   const allWorkerHistory=scopeWorkerHistory(data,historyWorkerId)
   const historyData=filterWorkerHistory(allWorkerHistory,{
@@ -1402,10 +1455,34 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     {loading&&<p className="ow-muted">در حال دریافت اطلاعات…</p>}
     <Message error={error} notice={notice}/>
 
+    {commonWorkEntry&&['tasks','workPool'].includes(view)&&<section className="report-panel swtb24-work-entry" aria-label="تعریف و واگذاری کار"
+      onKeyDown={event=>{if(createChoiceOpen&&event.key==='Escape'){event.preventDefault();setCreateChoiceOpen(false);commonCreateRef.current?.focus()}}}>
+      <div className="report-panel-heading">
+        <div><h2>تعریف و واگذاری کار</h2><p className="ow-muted">روش تخصیص را انتخاب کنید؛ هنوز کاری ثبت نمی‌شود.</p></div>
+        <button type="button" className="report-btn report-btn--primary" ref={commonCreateRef}
+          disabled={loading||readFailed} aria-expanded={createChoiceOpen} aria-controls="swtb24-create-choices"
+          onClick={()=>{setCreateNotice('');setCreateChoiceOpen(v=>!v)}}>+ تعریف کار</button>
+      </div>
+      {createChoiceOpen&&<div id="swtb24-create-choices" className="swtb24-create-choices"
+        role="group" aria-label="روش تخصیص کار">
+        <button type="button" disabled={active.length===0||typedRecoveryOnly} onClick={()=>launchWorkEditor('tasks')}>
+          <strong>واگذاری مستقیم</strong><small>انتخاب دانشجوکاران مشخص توسط مدیر</small>
+        </button>
+        {batchWorkspace&&<button type="button" disabled={!canOpenBatch} onClick={()=>launchWorkEditor('tasks','batch')}>
+          <strong>واگذاری مجموعه‌ای</strong><small>{canOpenBatch?'تعریف چند کار و تعیین مسئولان هر کار':'در انتظار نیمسال فعال و وضعیت معتبر واگذاری'}</small>
+        </button>}
+        <button type="button" onClick={()=>launchWorkEditor('workPool')}>
+          <strong>انتشار فرصت کاری</strong><small>انتخاب کار توسط دانشجوکاران واجد شرایط</small>
+        </button>
+        <button type="button" className="report-btn report-btn--light" onClick={()=>{setCreateChoiceOpen(false);commonCreateRef.current?.focus()}}>انصراف</button>
+      </div>}
+      {createNotice&&<p role="status">{createNotice}</p>}
+    </section>}
     {view==='terms'&&<TermBudgetPanel workers={workers} refreshRevision={refreshRevision}
       focusedUI={hideSectionTabs&&focusTermBudgetUIEnabled}/>}
     {workPoolUIEnabled&&view==='workPool'&&<Suspense fallback={<p className="ow-muted">در حال آماده‌سازی مخزن وظایف…</p>}>
       <WorkPoolManagerPanel refreshRevision={refreshRevision} routeFence={workPoolRouteFence}
+       commonEntry={commonWorkEntry} createIntent={createIntent?.target==='workPool'?createIntent:null} onCreateHandled={finishPoolLaunch} onReturnToCreate={()=>commonCreateRef.current?.focus()}
        activeKind={navigation.workPoolKind||'general'}
        onKindChange={kind=>setNavigation(previous=>({...previous,workPoolKind:kind}))}/>
     </Suspense>}
@@ -1460,7 +1537,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
           </div>
           <div className="swtb22-task-heading-actions">
            <small>{n(matchingTasks.length)} از {n(taskCounts.total)} کار</small>
-           {focusedTasks&&<button type="button" ref={taskEditorOpenerRef}
+           {focusedTasks&&!commonWorkEntry&&<button type="button" ref={taskEditorOpenerRef}
              className="report-btn report-btn--primary"
              disabled={loading||active.length===0} aria-haspopup="dialog"
              aria-controls="swtb22-task-assign-dialog"
@@ -1549,20 +1626,20 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
        ref={taskEditorDialogRef} className="ow-assignment-dialog swtb22-task-editor-dialog"
        aria-labelledby="swtb22-task-editor-heading"
        onCancel={event=>{event.preventDefault();closeTaskEditor()}}
-       onClose={()=>{setTaskEditorOpen(false);taskEditorOpenerRef.current?.focus?.({preventScroll:true})}}>
+       onClose={()=>{setTaskEditorOpen(false);setTaskEditorKind('direct');(commonCreateRef.current||taskEditorOpenerRef.current)?.focus?.({preventScroll:true})}}>
        <div className="swtb22-task-editor-dialog-head">
         <div><h2 id="swtb22-task-editor-heading" tabIndex={-1}
-         data-swtb22-task-editor-heading>واگذاری مستقیم کار جدید</h2>
-         <p>این فرم برای واگذاری به دانشجوکاران مشخص است؛ فرصت‌های انتخاب آزاد در «مخزن فرصت‌های کاری» منتشر می‌شوند.</p>
+         data-swtb22-task-editor-heading>{taskEditorKind==='batch'?'واگذاری مجموعه‌ای کارها':'واگذاری مستقیم کار جدید'}</h2>
+         <p>{taskEditorKind==='batch'?'چند کار و مسئولان هر کار را مشخص کنید. ثبت مجموعه فقط با اطلاعات معتبر انجام می‌شود.':'این فرم برای واگذاری به دانشجوکاران مشخص است؛ فرصت‌های انتخاب آزاد در «مخزن فرصت‌های کاری» منتشر می‌شوند.'}</p>
         </div>
         <button type="button" className="report-btn report-btn--light"
          onClick={()=>closeTaskEditor()}>بستن و حفظ پیش‌نویس</button>
        </div>
        {taskEditorOpen&&!assignmentDialogDate&&assignmentReceiptPort?.panel}
-       <TaskAssignmentEditor key={assignmentReceiptPort?taskEditorRevision+':'+assignmentReceiptPort.editorRevision:taskEditorRevision}
-        assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
+       {taskEditorKind==='batch'? (batchContext&&batchWorkspace?<Suspense fallback={<p role="status">در حال آماده‌سازی فرم مجموعه‌ای…</p>}><BatchAssignmentPreview key={batchWorkspace.port.editorRevision} context={batchContext} reviewPort={batchWorkspace.port}/></Suspense>:<p role="status">اطلاعات معتبر مجموعه در حال بازخوانی یا در دسترس نیست.</p>):<TaskAssignmentEditor key={assignmentReceiptPort?taskEditorRevision+':'+assignmentReceiptPort.editorRevision:taskEditorRevision}
+        retentionKey="direct-task" assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
         onSaved={refresh} onCancel={()=>closeTaskEditor()}
-        onClose={()=>closeTaskEditor(true)}/>
+        onClose={()=>closeTaskEditor(true)}/>}
       </dialog>}
     </>}
 
@@ -1639,8 +1716,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       </label>
       {workerId?<ScheduleEditor key={focusedPresence?workerId+':'+presenceEditingDate:workerId}
         workerId={workerId} data={data} initialDate={focusedPresence?presenceEditingDate:''}
-        onSaved={refresh} onPlanAssignment={setAssignmentDialogDate}/>:<TeamScheduleOverview
-           data={data} todayIso={today()} onPlanAssignment={setAssignmentDialogDate}
+        onSaved={refresh} onPlanAssignment={typedRecoveryOnly?undefined:setAssignmentDialogDate}/>:<TeamScheduleOverview
+           data={data} todayIso={today()} onPlanAssignment={typedRecoveryOnly?undefined:setAssignmentDialogDate}
            inlineManager={focusedPresence}
            selectedDay={focusedPresence?presenceSelectedDate:''}
            onSelectedDayChange={focusedPresence?setPresenceSelectedDate:null}

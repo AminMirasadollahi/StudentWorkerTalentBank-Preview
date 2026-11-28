@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useRef} from 'react'
+import {managerIdentityLabel} from '../lib/managerIdentityLabel.mjs'
 import {candidateStage,candidateOnboardingLabel,candidateDisplayName,candidateDisplayMajor,selectManagerCandidates} from '../lib/managerCandidateView.mjs'
 
 // One navigable directory and one purpose-built candidate inspector.
@@ -62,7 +63,7 @@ export default function ManagerCandidatesWorkspace({
          aria-controls="swtb22-candidate-inspector"
          disabled={busy} onClick={()=>onSelect(row.id)}>
          <span className="swtb22-candidate-row-main">
-          <strong>{candidateDisplayName(row)}</strong>
+          <strong>{managerIdentityLabel(candidateDisplayName(row),row.id)}</strong>
           <small>{candidateDisplayMajor(row)||'رشته نامشخص'}{row.entry_year?' · ورودی '+row.entry_year:''}</small>
           {row.worker_id && row.worker_onboarding_state && <small>راه‌اندازی: {candidateOnboardingLabel(row)}</small>}
          </span>
@@ -80,7 +81,7 @@ export default function ManagerCandidatesWorkspace({
      {selected
       ?<>
         <div className="swtb22-candidate-inspector-head">
-         <h3 tabIndex={-1} ref={inspectorHeading}>بررسی پرونده: {candidateDisplayName(selected)}</h3>
+         <h3 tabIndex={-1} ref={inspectorHeading}>بررسی پرونده: {managerIdentityLabel(candidateDisplayName(selected),selected.id)}</h3>
          <button type="button" className="report-btn report-btn--light" disabled={busy}
           onClick={()=>onSelect('')}>بستن جزئیات</button>
         </div>

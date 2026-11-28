@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {ManagerDraftContext,createManagerDraftGuard,sameManagerRoute,DISCARD_DRAFT_MESSAGE} from './lib/managerDraftGuard.mjs'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { documentTitleForOperationsIdentity } from './lib/routeTitles.mjs'
 import {
   currentOperationsIdentity,
@@ -37,13 +38,18 @@ import {
 import './report.css'
 import './ops.css'
 import './manager-shell.css'
+import {managerIdentityLabel} from './lib/managerIdentityLabel.mjs'
 
 // UI availability is separately guarded by staff permissions and server-side
 // OPS_EMAIL_INVITES_ENABLED. Enabling this public flag never bypasses the Edge gate.
 const emailInvitesAvailable = import.meta.env.VITE_OPS_EMAIL_INVITES_AVAILABLE === 'true'
 // Rollback-safe preview: preserve the current manager UI until the new shell is accepted.
 const managerShellEnabled=import.meta.env.VITE_SWTB22_MANAGER_SHELL_UI==='true'
+// Six-space manager IA is opt-in and remains OFF in the production env until owner visual acceptance.
+const managerR5IaEnabled=import.meta.env.VITE_SWTB24_R5_MANAGER_IA_UI==='true'
 const recoveryReviewConfig=resolveRecoveryReviewConfig(import.meta.env)
+const typedReleaseRequested=import.meta.env.VITE_SWTB32_TYPED_ASSIGNMENT_RELEASE!==undefined&&import.meta.env.VITE_SWTB32_TYPED_ASSIGNMENT_RELEASE!=='false'
+const TypedReleaseHost=import.meta.env.PROD&&import.meta.env.VITE_SWTB32_TYPED_ASSIGNMENT_RELEASE==='true'?lazy(()=>import('./components/TypedAssignmentReleaseHost.jsx')):null
 const managerNavFlags={
  workPoolEnabled:import.meta.env.VITE_SWTB21_WORK_POOL_UI!=='false',
  termMembershipEnabled:import.meta.env.VITE_SWTB21_TERM_MEMBERSHIP_UI!=='false',
@@ -459,7 +465,7 @@ function CandidateCard({
     <article className="ops-candidate">
       <div className="ops-candidate__head">
         <div>
-          <strong>{candidateDisplayName(candidate)}</strong>
+          <strong>{managerIdentityLabel(candidateDisplayName(candidate),candidate.id)}</strong>
           <small>{candidateDisplayMajor(candidate)} · ورودی {candidate.entry_year} · {unitLabels[candidate.primary_unit]}</small>
           {candidate.worker_id && candidateDisplayName(candidate)!==candidate.full_name && <small>نام هنگام ثبت‌نام: {candidate.full_name}</small>}
           {candidate.worker_id && candidateDisplayMajor(candidate)!==candidate.major && <small>رشته هنگام ثبت‌نام: {candidate.major}</small>}
@@ -570,22 +576,30 @@ function CandidateCard({
   )
 }
 
-function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refreshRevision = 0, workHubFixture=false, assignmentReceiptPort=null }) {
+function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refreshRevision = 0, workHubFixture=false, r5IaFixture=false, assignmentReceiptPort=null }) {
   const [fence]=useState(createWorkPoolRouteFence)
+  const draftGuard=useMemo(createManagerDraftGuard,[assignmentReceiptPort?.readScopeOwner])
+  const r5IaActive=managerShellEnabled&&(r5IaFixture===true||managerR5IaEnabled)
+  const sharedReview=(import.meta.env.DEV&&assignmentReceiptPort?.batchWorkspace?.mode==='synthetic-review')||(typedReleaseRequested&&assignmentReceiptPort?.batchWorkspace?.mode==='typed-release')
+  const activeDraftGuard=r5IaActive?(sharedReview?assignmentReceiptPort.managerDraftGuard:draftGuard):null
   const [routeNotice,setRouteNotice]=useState('')
-  const routeFence=managerShellEnabled&&workHubFixture===true&&managerNavFlags.workPoolEnabled?fence:null
+  const routeFence=managerShellEnabled&&(workHubFixture===true||r5IaActive)&&managerNavFlags.workPoolEnabled?(sharedReview?assignmentReceiptPort.workPoolRouteFence:fence):null
   const setNavigation=change=>{
-   if(!routeFence){commitNavigation(change);return}
+   if(!routeFence&&!activeDraftGuard){commitNavigation(change);return true}
    const next=typeof change==='function'?change(navigation):change
-   if(!routeFence.permitsNavigation(navigation,next)){
+   if(routeFence&&!routeFence.permitsNavigation(navigation,next)){
     setRouteNotice('ابتدا نتیجه درخواست فرصت کاری را تعیین‌تکلیف کنید؛ جابه‌جایی فعلاً ممکن نیست.')
-    return
+    return false
    }
+   if(activeDraftGuard&&!activeDraftGuard.permitsNavigation(navigation,next,()=>window.confirm(DISCARD_DRAFT_MESSAGE)))return false
    setRouteNotice('')
    commitNavigation(prev=>{
     const candidate=typeof change==='function'?change(prev):change
-    return routeFence.permitsNavigation(prev,candidate)?candidate:prev
+    if(routeFence&&!routeFence.permitsNavigation(prev,candidate))return prev
+    if(activeDraftGuard&&!sameManagerRoute(next,candidate))return prev
+    return candidate
    })
+   return true
   }
   const [rows, setRows] = useState([])
   const [busyId, setBusyId] = useState('')
@@ -640,10 +654,11 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
       // ops_list_candidates. This path uses an EXISTING manager-guarded RPC;
       // no protected public operations API file or database function changes.
       const results = await fetchCandidatesWithAuthorizedWorkerIdentity({
-        fetchCandidates:getOperationsCandidates,
+        fetchCandidates:assignmentReceiptPort?.readCandidates?()=>assignmentReceiptPort.readCandidates(settleRead):getOperationsCandidates,
         // Use the already-injected manager session client. Never import a
         // second unmocked operations module into role-sensitive UI tests.
         fetchManagerSnapshot:async()=>{
+          if(assignmentReceiptPort?.readWork)return assignmentReceiptPort.readWork(settleRead)
           const {data,error}=await opsClient.rpc('ops_get_operations_v3')
           if(error)throw error
           if(data?.error)throw new Error('manager_snapshot_denied')
@@ -652,16 +667,21 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
         enableFallback:import.meta.env.VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK==='true',
       })
       if(readId!==candidateReadSequence.current)return false
+      if(sharedReview){
+        if(settleRead?.isCurrent?.()!==true)return false
+        if(settleRead('ready',results)!==true)throw Error('CANDIDATE_READ_UNCONFIRMED')
+      }
       setRows(results)
-      if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')
+      if(!sharedReview){if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')}
       return true
     } catch (e) {
-      if(readId!==candidateReadSequence.current)return false
+      if(readId!==candidateReadSequence.current||sharedReview&&settleRead?.isCurrent?.()!==true)return false
       // A denied read invalidates both privileged rows and the previous
       // inspector selection; a later authorized refresh must require a new
       // explicit candidate selection, even if the same row is returned.
       setRows([])
       setCandidateDrafts({})
+      activeDraftGuard?.clearRetained()
       setSelectedCandidateId('')
       setError(getMessage(e))
       if(settleRead)settleRead('failed');else assignmentReceiptPort?.setReadState?.('failed')
@@ -676,7 +696,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   useEffect(() => {
     if (adminSection === 'candidates' && candidateView === 'applicants') void refresh()
     return ()=>{if(assignmentReceiptPort)candidateReadSequence.current+=1}
-  }, [adminSection, candidateView, refreshRevision])
+  }, [adminSection, candidateView, refreshRevision, assignmentReceiptPort?.workspaceReadRevision])
   const refreshCurrentSection = () => {
     if (adminSection === 'work') setManualWorkRevision(v => v + 1)
     else if (candidateView === 'report') setManualReportRevision(v => v + 1)
@@ -747,7 +767,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   const activeCount = rows.filter(row => Boolean(row.worker_id)).length
   const readyCount = rows.filter(row => !row.worker_id
     && row.interview_status === 'approved' && row.clearance_status === 'cleared').length
-  const navFlags={...managerNavFlags,workHubFixture:managerShellEnabled&&workHubFixture===true}
+  const navFlags={...managerNavFlags,workHubFixture:managerShellEnabled&&workHubFixture===true,r5IaEnabled:r5IaActive,r5IaFixture:managerShellEnabled&&r5IaFixture===true}
   const currentDestination=currentManagerDestination(navigation,navFlags)
   const navigateManager=item=>setNavigation(previous=>nextManagerNavigation(previous,item))
 
@@ -769,6 +789,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
           <button type="button" className="report-btn report-btn--ghost" onClick={onLogout}>خروج</button>
         </div>
       </header>
+      {navFlags.r5IaEnabled&&<ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>}
       {!managerShellEnabled&&<nav className="ow-tabs" aria-label="بخش‌های مدیریت دانشجوکار">
         <button type="button"
           className={adminSection === 'candidates' ? 'ow-tab is-selected' : 'ow-tab'}
@@ -777,6 +798,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
           className={adminSection === 'work' ? 'ow-tab is-selected' : 'ow-tab'}
           onClick={() => setAdminSection('work')}>برنامه و کارها</button>
       </nav>}
+      {adminSection !== 'work' && assignmentReceiptPort?.panel}
       {adminSection === 'candidates' && <>
       {!managerShellEnabled&&<nav className="ow-tabs ops-subtabs" aria-label="بخش‌های داشبورد و داوطلبان">
         <button type="button" className={candidateView === 'applicants' ? 'ow-tab is-selected' : 'ow-tab'}
@@ -849,12 +871,11 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
         </div>
        </section>}
       {routeFence&&routeNotice&&<p role="alert" className="report-alert report-alert--error">{routeNotice}</p>}
-      <ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>
-      {adminSection !== 'work' && assignmentReceiptPort?.panel}
-      {adminSection === 'work' && <AdminOperations navigation={navigation} setNavigation={setNavigation}
+      {!navFlags.r5IaEnabled&&<ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>}
+      {adminSection === 'work' && <ManagerDraftContext.Provider value={activeDraftGuard}><AdminOperations navigation={navigation} setNavigation={setNavigation}
         assignmentReceiptPort={assignmentReceiptPort}
         refreshRevision={refreshRevision + manualWorkRevision}
-        hideSectionTabs={managerShellEnabled} loadOriginalCandidates={getOperationsCandidates} workPoolRouteFence={routeFence} />}
+        hideSectionTabs={managerShellEnabled} loadOriginalCandidates={getOperationsCandidates} workPoolRouteFence={routeFence} /></ManagerDraftContext.Provider>}
       {issuedCredentials && (
         <div className="ops-modal" role="dialog" aria-modal="true" aria-labelledby="ops-credentials-title">
           <div className="ops-modal__card">
@@ -899,7 +920,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   )
 }
 
-export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, workHubFixture=false }) {
+export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, workHubFixture=false, r5IaFixture=false, dayBatchReviewFixture=null }) {
   // This does NOT trust a cached session for authorization. When the fresh
   // server identity check returns no user but a local Supabase session still
   // exists, we cannot distinguish temporary network failure from revoked
@@ -917,6 +938,11 @@ export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, 
     return null
   }
   const [identity, setIdentity] = useState(null)
+  const stageFactory=import.meta.env.DEV&&dayBatchReviewFixture?.mode==='staging-review'?dayBatchReviewFixture.createFixture:null
+  const stageFixture=useMemo(()=>{
+    if(typeof stageFactory!=='function'||identity?.role!=='admin'||!identity.user?.id)return null
+    try{return stageFactory(identity.user.id)}catch{return null}
+  },[stageFactory,identity?.role,identity?.user?.id])
   const [adminNavigation, setAdminNavigation] = useState(initialAdminNavigation)
   const [workerNavigation, setWorkerNavigation] = useState(initialWorkerNavigation)
   const [busy, setBusy] = useState(true)
@@ -1150,22 +1176,39 @@ export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, 
   // tab focus, but never present or accept input in privileged UI while
   // permission is being checked. Identity/role/revocation changes remount.
   const ReceiptHost=[2,3].includes(assignmentReceiptFixture?.version)?AssignmentRecoveryFixtureHost:DirectAssignmentFixtureHost
+  // Injected DEV review only. No component import, build-time release switch or actual credentials.
+  const dayBatchRequested=import.meta.env.DEV&&dayBatchReviewFixture!==null
+  const ReviewHost=dayBatchReviewFixture?.Host
+  const stageRequested=dayBatchReviewFixture?.mode==='staging-review'
+  const reviewFixture=stageRequested?stageFixture:dayBatchReviewFixture?.fixture
+  const validReviewMode=stageRequested?import.meta.env.DEV&&import.meta.env.VITE_SWTB28_STAGING_REVIEW_UI==='true'&&recoveryReviewConfig.mode==='review'&&reviewFixture?.mode==='staging-review'&&reviewFixture.projectUrl===recoveryReviewConfig.projectUrl:reviewFixture?.mode==='synthetic-review'
+  const validDayBatchReview=dayBatchRequested&&r5IaFixture===true&&managerShellEnabled&&assignmentReceiptFixture===null&&typeof ReviewHost==='function'&&validReviewMode&&reviewFixture.actorId===identity.user?.id
+  const reviewScope=adminNavigation.section==='work'?'work':adminNavigation.candidateView==='report'?'report':'candidates'
   const authorizedView = identity.role === 'admin'
-    ? (assignmentReceiptFixture===null&&recoveryReviewConfig.mode!=='off'
+    ? (typedReleaseRequested
+      ? (TypedReleaseHost&&managerShellEnabled&&managerR5IaEnabled&&dayBatchReviewFixture===null&&assignmentReceiptFixture===null&&recoveryReviewConfig.mode==='release'&&recoveryReviewConfig.version===3
+        ? <Suspense fallback={<p role="status">در حال آماده‌سازی مسیر جدید واگذاری…</p>}><TypedReleaseHost key={'typed-release:'+identity.user?.id} auth={opsClient.auth} actorId={identity.user?.id} scope={reviewScope} checking={recheckingAccess||busy} onLogout={logout}>
+           {({workspacePort,guardedLogout})=><AdminView onLogout={guardedLogout} navigation={adminNavigation} setNavigation={setAdminNavigation} refreshRevision={dataRefreshRevision} assignmentReceiptPort={workspacePort}/>}
+          </TypedReleaseHost></Suspense>:<main role="alert" dir="rtl">مسیر جدید واگذاری در دسترس نیست؛ ثبت جایگزین انجام نمی‌شود.<button type="button" onClick={logout}>خروج</button></main>)
+      : dayBatchRequested
+      ? (validDayBatchReview?<ReviewHost key={'day-batch-review:'+identity.user?.id} workspace fixture={reviewFixture} scope={reviewScope} checking={recheckingAccess||busy} onLogout={logout}>
+         {({workspacePort,guardedLogout})=><AdminView onLogout={guardedLogout} navigation={adminNavigation} setNavigation={setAdminNavigation} refreshRevision={dataRefreshRevision} assignmentReceiptPort={workspacePort} r5IaFixture={r5IaFixture} workHubFixture={workHubFixture}/>}
+        </ReviewHost>:<main role="alert" dir="rtl">مسیر بررسی آزمایشی در دسترس نیست.<button type="button" onClick={logout}>خروج</button></main>)
+      : assignmentReceiptFixture===null&&recoveryReviewConfig.mode!=='off'
       ? <AssignmentRecoveryReviewHost key={'review-admin:' + identity.user?.id}
          config={recoveryReviewConfig} auth={opsClient.auth} actorId={identity.user?.id}
          checking={recheckingAccess||busy} onLogout={logout}>
          {(port,guardedLogout)=><AdminView onLogout={guardedLogout} navigation={adminNavigation} setNavigation={setAdminNavigation}
-          refreshRevision={dataRefreshRevision} assignmentReceiptPort={port} workHubFixture={workHubFixture}/>}
+          refreshRevision={dataRefreshRevision} assignmentReceiptPort={port} workHubFixture={workHubFixture} r5IaFixture={r5IaFixture}/>}
         </AssignmentRecoveryReviewHost>
       : assignmentReceiptFixture===null
       ? <AdminView key={'admin:' + identity.user?.id}
         onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
-        refreshRevision={dataRefreshRevision} workHubFixture={workHubFixture}/>
+        refreshRevision={dataRefreshRevision} workHubFixture={workHubFixture} r5IaFixture={r5IaFixture}/>
       : <ReceiptHost key={'fixture-admin:' + identity.user?.id}
          actorId={identity.user?.id} checking={recheckingAccess} fixture={assignmentReceiptFixture}>
          {port=><AdminView onLogout={logout} navigation={adminNavigation} setNavigation={setAdminNavigation}
-          refreshRevision={dataRefreshRevision} assignmentReceiptPort={port} workHubFixture={workHubFixture}/>}
+          refreshRevision={dataRefreshRevision} assignmentReceiptPort={port} workHubFixture={workHubFixture} r5IaFixture={r5IaFixture}/>}
         </ReceiptHost>)
     : identity.role === 'worker_disabled'
       ? <WorkerDisabledView key={'disabled:' + identity.user?.id + ':' + identity.profile?.state}

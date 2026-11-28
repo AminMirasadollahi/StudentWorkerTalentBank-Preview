@@ -31,6 +31,16 @@ test('reviewed intake and SWTB22 authorized API/auth/QA/deploy baselines are byt
   for(const [path,sha] of Object.entries(critical))
     assert.equal(gitBlobSha(path),sha,`BLOCK RELEASE: modified protected public asset ${path}`)
 })
+test('R5 six-space IA is wired but production-default OFF and not enabled by Pages release workflow',()=>{
+  const ops=read('src/OpsApp.jsx').toString()
+  const env=read('.env.production').toString()
+  const pages=read('.github/workflows/pages.yml').toString()
+  assert.match(ops,/VITE_SWTB24_R5_MANAGER_IA_UI==='true'/)
+  assert.match(ops,/const r5IaActive=managerShellEnabled&&\(r5IaFixture===true\|\|managerR5IaEnabled\)/)
+  assert.match(env,/VITE_SWTB24_R5_MANAGER_IA_UI=false/)
+  assert.doesNotMatch(pages,/VITE_SWTB24_R5_MANAGER_IA_UI:\s*'true'/)
+})
+
 test('manager lifecycle is explicitly authorized by existing audited RPCs, not raw client writes',()=>{
   const workspace=read('src/OperationsWorkspace.jsx').toString()
   assert.match(workspace,/import WorkerLifecycleManager from ['"]\.\/components\/WorkerLifecycleManager['"]/)
@@ -77,4 +87,12 @@ test('SWTB24 release stays manual, SHA-authorized, backend-gated and strict V3',
   assert.match(workflow,/c\.mode!=="release"\|\|c\.version!==3/)
   assert.match(workflow,/inputs\.backend_cutover_verified == true && vars\.SWTB22_RELEASE_APPROVED_SHA == github\.sha/)
   assert.match(workflow,/test "\$CURRENT_SHA" = "\$GITHUB_SHA"/)
+})
+
+test('typed assignment release defaults OFF, explicit production entry and no automatic publication',()=>{
+ const ops=read('src/OpsApp.jsx').toString(),env=read('.env.production').toString(),pages=read('.github/workflows/pages.yml').toString()
+ assert.match(env,/VITE_SWTB32_TYPED_ASSIGNMENT_RELEASE=false/)
+ assert.match(ops,/import\.meta\.env\.PROD&&import\.meta\.env\.VITE_SWTB32_TYPED_ASSIGNMENT_RELEASE==='true'\?lazy/)
+ assert.doesNotMatch(pages,/VITE_SWTB32_TYPED_ASSIGNMENT_RELEASE:\s*'true'/)
+ assert.doesNotMatch(ops,/DayBatchManagerReviewHost|stagingManagerReview/)
 })
