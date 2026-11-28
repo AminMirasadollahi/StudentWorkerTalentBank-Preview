@@ -13,9 +13,10 @@ const shift={id:shiftId,task_id:taskId,worker_id:worker,shift_date:day,start_min
 const cancelDraft={shiftId,reason:'دلیل نمونه'}
 const cancelContext={day,shifts:{ok:true,from:day,to:day,shifts:[shift]},work:{tasks:[{id:taskId,worker_id:worker,unit:'library',planned_date:day,estimate_minutes:60,state:'assigned'}],time_entries:[]}}
 function fixture(initial=null){
- let active=initial,epoch=7,seq=20,fail=null,hold=null,calls=[]
+ let active=initial,epoch=7,seq=20,fail=null,hold=null,calls=[],staleRoute=null
  const run=async(route,a)=>{
   const action=a.p_action;calls.push([route,action,a])
+  if(action==='discover'&&staleRoute===route){staleRoute=null;return {ok:true,epoch:epoch-1,active:null,...(route==='legacy'?{}:{durable_active:false})}}
   if(hold?.route===route&&hold.action===action){const h=hold;hold=null;await h.wait.promise}
   if(fail?.route===route&&fail.action===action&&fail.before){fail=null;throw Error('LOST')}
   if(action==='reserve'){
@@ -38,7 +39,7 @@ function fixture(initial=null){
  const m=createDayBatchSharedManager({actorId:actor,makeId:()=>id(seq++),legacyWrite:a=>run('legacy',a),legacyControl:a=>run('legacy',a),batchWrite:a=>run('batch',a),batchControl:a=>run('batch',a),deskCancelWrite:a=>run('deskCancel',a),deskCancelControl:a=>run('deskCancel',a),cancelExistingShift:a=>run('shift',a)})
  const verify=()=>m.setAccess({status:'verified',actorId:actor})
  verify();m.selectReadScope('work');m.beginScopedRead('work')('ready')
- return {m,calls,verify,fail:(route,action,before=false)=>{fail={route,action,before}},hold:(route,action)=>{const wait=defer();hold={route,action,wait};return wait}}
+ return {m,calls,verify,stale:route=>{staleRoute=route},fail:(route,action,before=false)=>{fail={route,action,before}},hold:(route,action)=>{const wait=defer();hold={route,action,wait};return wait}}
 }
 test('typed cancellation blocks legacy and batch until matching terminal ack and fresh idle',async()=>{
  const {m,calls}=fixture();assert.equal(await m.discover(),'idle')
@@ -94,4 +95,20 @@ test('foreign batch/direct retain their own controls and cannot be abandoned via
   assert.equal(await m.submitDeskCancel(cancelDraft,cancelContext),'blocked')
   assert.equal(await m.cancel(),'cancelled');assert.equal(calls.filter(c=>c[0]==='deskCancel'&&c[1]==='cancel').length,0)
  }
+})
+
+test('shared epoch floor rejects stale idle from another kind after desk acknowledgement',async()=>{
+ const f=fixture(),{m,calls}=f;await m.discover()
+ assert.equal(await m.submitDeskCancel(cancelDraft,cancelContext),'committed');await m.discover()
+ assert.equal(await m.acknowledge(),'needs_discovery');assert.equal(await m.discover(),'idle')
+ f.stale('batch');assert.equal(await m.submitBatch(draft,context),'unknown')
+ assert.equal(m.snapshot().canStart,false);assert.equal(calls.filter(x=>x[0]==='batch'&&x[1]==='reserve').length,0)
+ assert.equal(await m.discover(),'idle');assert.equal(await m.submitBatch(draft,context),'committed')
+})
+test('fresh owner recovers committed desk receipt without reconstruction or repeat mutation',async()=>{
+ const key=id(88),receipt={ok:true,kind:'desk_cancel_v1',request_id:key,result:{shift_id:shiftId,task_id:taskId,state:'cancelled'}}
+ const {m,calls}=fixture({kind:'desk_cancel_v1',status:'committed',request_id:key,receipt})
+ assert.equal(await m.discover(),'committed');assert.deepEqual(m.snapshot().receipt,receipt)
+ assert.equal(await m.commit(),'blocked');assert.equal(await m.acknowledge(),'needs_discovery');assert.equal(await m.discover(),'idle')
+ assert.equal(calls.filter(x=>['reserve','commit'].includes(x[1])).length,0)
 })

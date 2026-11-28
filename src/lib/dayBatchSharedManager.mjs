@@ -5,12 +5,23 @@ import {createAssignmentRecoverySession,parseRecoveryView} from './assignmentRec
 import {createDayBatchManagerSession,createManagerAssignmentFence} from './dayBatchManagerSession.mjs'
 import {batchDiscoverArgs,parseDayBatchSnapshot} from './dayBatchAssignmentContract.mjs'
 import {createDeskCancelManagerSession} from './deskCancelManagerSession.mjs'
+import {parseDeskCancelSnapshot} from './deskCancelContract.mjs'
 const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(x)&&x!=='00000000-0000-0000-0000-000000000000'
 const blocked=()=>Promise.resolve('blocked')
 export function createDayBatchSharedManager({actorId,legacyWrite,legacyControl,batchWrite,batchControl,cancelExistingShift,deskCancelWrite=null,deskCancelControl=null,makeId}){
  const durable=deskCancelWrite!==null||deskCancelControl!==null
  if(!uuid(actorId)||[legacyWrite,legacyControl,batchWrite,batchControl,makeId,...(durable?[deskCancelWrite,deskCancelControl]:[cancelExistingShift])].some(x=>typeof x!=='function'))throw Error('SHARED_MANAGER_DEPENDENCIES')
- let generation=0,verified=false,disposed=false,busy=false,owner=null,ready=false,route=null,readReady=false,readRevision=0,shiftHeld=false,status='checking',legacyAck=null,legacyAttempt=null,legacyObserved=null
+ let generation=0,verified=false,disposed=false,busy=false,owner=null,ready=false,route=null,readReady=false,readRevision=0,shiftHeld=false,status='checking',legacyAck=null,legacyAttempt=null,legacyObserved=null,epochFloor=0
+ // Shared cursor floor spans all three owners; never trust an earlier idle response
+ // after an acknowledged operation of another kind. Only current discovery can raise it.
+ const acceptEpoch=(epoch,g)=>{if(disposed||generation!==g||!Number.isSafeInteger(epoch)||epoch<epochFloor)throw Error('SHARED_EPOCH_STALE');epochFloor=epoch}
+ const guardedControl=(fn,parse)=>async args=>{
+  const g=generation,raw=await fn(args)
+  if(args.p_action==='discover'&&durable){const n=parse(raw);if(!n||n.state==='invalid'||n.state==='held')throw Error('SHARED_DISCOVERY_INVALID');acceptEpoch(n.epoch,g)}
+  return raw
+ }
+ const batchRead=guardedControl(batchControl,raw=>parseDayBatchSnapshot(raw,{source:'discover'}))
+ const deskRead=durable?guardedControl(deskCancelControl,raw=>parseDeskCancelSnapshot(raw,{source:'discover'})):null
  const fence=createManagerAssignmentFence()
  const allowed=()=>verified&&!disposed&&readReady
  const legacy=createAssignmentRecoverySession({version:3,write:async args=>{
@@ -19,8 +30,9 @@ export function createDayBatchSharedManager({actorId,legacyWrite,legacyControl,b
   return legacyWrite(args)
  },control:async args=>{
   if(args.p_action==='discover'){
-   const raw=await legacyControl(args),v=parseRecoveryView(raw)
+   const g=generation,raw=await legacyControl(args),v=parseRecoveryView(raw)
    if(!v)throw Error('LEGACY_VIEW_INVALID')
+   if(durable)acceptEpoch(v.epoch,g)
    if(legacyAttempt&&(v.epoch<legacyAttempt.epoch||v.epoch===legacyAttempt.epoch&&v.active&&v.active.requestId!==legacyAttempt.key))throw Error('LEGACY_TARGET_HELD')
    if(legacyAck&&v.epoch<legacyAck.epoch)throw Error('LEGACY_ACK_HELD')
    legacyObserved=v
@@ -28,8 +40,8 @@ export function createDayBatchSharedManager({actorId,legacyWrite,legacyControl,b
   }
   return legacyControl(args)
  },makeId})
- const batch=createDayBatchManagerSession({write:batchWrite,control:batchControl,makeId,fence})
- const desk=durable?createDeskCancelManagerSession({write:deskCancelWrite,control:deskCancelControl,makeId,fence}):null
+ const batch=createDayBatchManagerSession({write:batchWrite,control:batchRead,makeId,fence})
+ const desk=durable?createDeskCancelManagerSession({write:deskCancelWrite,control:deskRead,makeId,fence}):null
  const sessionFor=k=>k==='batch'?batch:k==='deskCancel'?desk:k==='legacy'?legacy:null
  const sync=()=>{
   generation++;ready=false;status='checking';legacyObserved=null
@@ -88,7 +100,7 @@ export function createDayBatchSharedManager({actorId,legacyWrite,legacyControl,b
   // Legacy owner never calls a mutating batch operation. A typed batch
   // discovery is an independent read used to detect incompatible states.
   // Do not call the batch session's discover here: it may take its lease.
-  const n=parseDayBatchSnapshot(await batchControl(batchDiscoverArgs()),{source:'discover'})
+  const n=parseDayBatchSnapshot(await batchRead(batchDiscoverArgs()),{source:'discover'})
   if(!current())return 'stale'
   if(n.state==='invalid'||n.state==='held')return unknown()
   if(!owner&&durable&&n.state==='foreign'&&n.kind==='desk_cancel_v1'){
@@ -145,6 +157,7 @@ export function createDayBatchSharedManager({actorId,legacyWrite,legacyControl,b
    if(!session)return unknown()
    if(owner==='legacy'&&method==='acknowledge')legacyAck={epoch:session.snapshot().epoch}
    const out=await session[method]();if(!current())return 'stale'
+   if(durable&&method==='acknowledge'&&['idle','needs_discovery'].includes(out))acceptEpoch(session.snapshot().epoch,generation)
    // Never use acknowledgement response alone to authorize a new request.
    status=out==='idle'?'needs_discovery':out;ready=false;return status
   })
