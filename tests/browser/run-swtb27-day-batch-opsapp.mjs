@@ -95,6 +95,10 @@ try{
  await button('تأیید و بستن نتیجه').click();await state('idle')
  await route('tasks').click();await state('idle')
  await common.click();await page.getByRole('group',{name:'روش تخصیص کار'}).getByRole('button',{name:/واگذاری مستقیم/}).click();await direct.waitFor()
+ // Preserve the independent assignment draft; a fresh read must follow the
+ // current work proof, not the transient checking projection.
+ assert.equal(await direct.getByLabel('واحد انجام کار',{exact:true}).inputValue(),'library')
+ await direct.getByRole('button',{name:'بازنشانی شرح وظیفه ثابت',exact:true}).waitFor()
  await direct.getByText('هنوز نوبتی برای این روز ثبت نشده است.',{exact:true}).waitFor()
  assert.equal(await direct.getByRole('button',{name:'لغو نوبت',exact:true}).count(),0)
  await button('بستن و حفظ پیش‌نویس').click();await direct.waitFor({state:'hidden'})
@@ -108,5 +112,5 @@ try{
  console.log('PASS SWTB27_ACTUAL_OPSAPP_IDENTITY_CANDIDATE_REPORT_RECOVERY_NO_NETWORK')
  console.log('PASS SWTB28_ACTUAL_OPSAPP_DURABLE_DESK_CANCEL_LOST_COMMIT_WRONG_DAY_TASK_NO_FALLBACK')
  console.log('PASS SWTB28_ACTUAL_OPSAPP_STAGING_ADAPTER_FOUR_SCOPED_READS_FAKE_ONLY')
-}catch(e){console.error('SWTB27_OPSAPP_CHROME_DIAGNOSTIC',JSON.stringify({observations,blocked,errors,headings:await page?.locator('h1,h2,h3').allTextContents().catch(()=>[])}));throw e}
+}catch(e){console.error('SWTB27_OPSAPP_CHROME_DIAGNOSTIC',JSON.stringify({observations,blocked,errors,headings:await page?.locator('h1,h2,h3').allTextContents().catch(()=>[]),status:await page?.locator('[role=status],[role=alert]').allTextContents().catch(()=>[]),deskCoverage:await page?.locator('.ow-desk-coverage').allTextContents().catch(()=>[]),counters:await page?.evaluate(()=>globalThis.__qaDayBatch?.counts()).catch(()=>null)}));throw e}
 finally{await writeFile(resolve(out,'observations.json'),JSON.stringify({observations,blocked,errors},null,2));await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}

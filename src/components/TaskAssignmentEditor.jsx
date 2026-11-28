@@ -65,7 +65,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const interval=libraryTemplateSelected?deskInterval(deskStart,deskEnd):null
  const estimateInt=libraryTemplateSelected?(interval?.minutes??NaN):Number(estimate)
  const estimateValid=Number.isInteger(estimateInt)&&estimateInt>=1&&estimateInt<=1440
- const deskVerified=libraryTemplateSelected&&deskRead.date===date&&deskRead.state==='ready'
+ const deskVerified=libraryTemplateSelected&&deskRead.date===date&&deskRead.state==='ready'&&(!typedDesk||typedDesk.readReady===true&&deskRead.readRevision===typedDesk.readRevision)
  const deskCoverage=projectDeskCoverage(
    deskRead.shifts,selected.map(w=>w.id),
    interval?.startMinute,interval?.endMinute)
@@ -77,18 +77,22 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
     setDeskRead({date:'',state:'idle',shifts:[]})
     return
   }
+  // The parent can begin a fresh scoped work read before the new data arrives.
+  // The revision alone does not change when that read settles. Wait for readiness
+  // and re-read the exact day when it becomes available; never use the old list.
+  if(typedDesk&&typedDesk.readReady!==true){setDeskRead({date,state:'loading',shifts:[]});return}
   let active=true
   setDeskRead({date,state:'loading',shifts:[]})
   const read=typedDesk?()=>typedDesk.read(date):()=>getLibraryDeskShifts({from:date,to:date})
   Promise.resolve().then(read).then(result=>{
     if(!active)return
     if(result?.ok!==true||!Array.isArray(result.shifts))throw Error('invalid_shift_read')
-    setDeskRead({date,state:'ready',shifts:result.shifts,envelope:typedDesk?result:null})
+    setDeskRead({date,state:'ready',shifts:result.shifts,envelope:typedDesk?result:null,readRevision:typedDesk?.readRevision})
   }).catch(()=>{
     if(active)setDeskRead({date,state:'error',shifts:[]})
   })
   return ()=>{active=false}
- },[date,libraryTemplateSelected,taskUnit,deskRevision,typedDesk?.readRevision,Boolean(typedDesk)])
+ },[date,libraryTemplateSelected,taskUnit,deskRevision,typedDesk?.readRevision,typedDesk?.readReady,Boolean(typedDesk)])
  const applyLibraryTemplate=()=>{
   setTaskUnit(LIBRARY_DESK_TEMPLATE.unit)
   setTitle(LIBRARY_DESK_TEMPLATE.title)

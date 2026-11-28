@@ -121,8 +121,9 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
  // Bind exact current day projection to the current work read; no editor-supplied work.
  const deskLive=()=>active(i)&&i.verified&&!checking&&!parentChecking.current&&scope==='work'&&scopeRef.current==='work'&&i.revision===renderRevision&&i.data===renderData&&document.visibilityState==='visible'&&document.hasFocus()
  const deskWork=workspace?renderData:renderData?.data
+ const deskReadReady=Boolean(deskLive()&&Array.isArray(deskWork?.tasks)&&Array.isArray(deskWork?.time_entries))
  const deskRead=async day=>{
-  if(!deskLive()||!deskWork)throw Error('DESK_READ_STALE')
+  if(!deskReadReady||!deskLive())throw Error('DESK_READ_STALE')
   const ticket={day,revision:renderRevision,value:null};i.deskReadTicket=ticket
   const raw=await fixture.readDeskShifts(day,()=>deskLive()&&i.deskReadTicket===ticket)
   if(!deskLive()||i.deskReadTicket!==ticket||raw?.ok!==true||raw.from!==day||raw.to!==day||!Array.isArray(raw.shifts))throw Error('DESK_READ_INVALID')
@@ -130,7 +131,7 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
   ticket.value=value;return value
  }
  const deskContext=value=>deskLive()&&i.deskReadTicket?.revision===renderRevision&&i.deskReadTicket.value===value?{day:i.deskReadTicket.day,shifts:value,work:deskWork}:null
- const deskPort=fixture.durableDeskCancel===true?Object.freeze({mode:'synthetic-review',readRevision:renderRevision,read:deskRead,canStart:allow&&snap.canStartDeskCancel===true,
+ const deskPort=fixture.durableDeskCancel===true?Object.freeze({mode:'synthetic-review',readRevision:renderRevision,readReady:deskReadReady,read:deskRead,canStart:allow&&snap.canStartDeskCancel===true,
   eligible:(shiftId,value)=>{const c=deskContext(value);return Boolean(c&&captureDeskCancellationTarget({shiftId,...c}))},
   submit:(d,value)=>{const c=deskContext(value);return allow&&snap.canStartDeskCancel===true&&c&&captureDeskCancellationTarget({shiftId:d?.shiftId,...c})?run('submitDeskCancel',d,c):Promise.resolve('blocked')}
  }):null
