@@ -88,3 +88,11 @@ test('SWTB24 release stays manual, SHA-authorized, backend-gated and strict V3',
   assert.match(workflow,/inputs\.backend_cutover_verified == true && vars\.SWTB22_RELEASE_APPROVED_SHA == github\.sha/)
   assert.match(workflow,/test "\$CURRENT_SHA" = "\$GITHUB_SHA"/)
 })
+
+test('typed assignment release defaults OFF, explicit production entry and no automatic publication',()=>{
+ const ops=read('src/OpsApp.jsx').toString(),env=read('.env.production').toString(),pages=read('.github/workflows/pages.yml').toString()
+ assert.match(env,/VITE_SWTB32_TYPED_ASSIGNMENT_RELEASE=false/)
+ assert.match(ops,/import\.meta\.env\.PROD&&import\.meta\.env\.VITE_SWTB32_TYPED_ASSIGNMENT_RELEASE==='true'\?lazy/)
+ assert.doesNotMatch(pages,/VITE_SWTB32_TYPED_ASSIGNMENT_RELEASE:\s*'true'/)
+ assert.doesNotMatch(ops,/DayBatchManagerReviewHost|stagingManagerReview/)
+})

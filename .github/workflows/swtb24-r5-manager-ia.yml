@@ -36,6 +36,8 @@ jobs:
           npm run build -- --outDir /tmp/swtb23-integrated-build
           if grep -R -l 'SWTB28_STAGING_REVIEW_BLOCKED' /tmp/swtb23-integrated-build; then exit 1; fi
           echo PASS STAGING_ADAPTER_EXCLUDED_FROM_NORMAL_BUILD
+          if grep -R -l 'TYPED_RELEASE_ADMISSION_BLOCKED' /tmp/swtb23-integrated-build; then exit 1; fi
+          echo PASS TYPED_RELEASE_ADAPTER_EXCLUDED_WHEN_FLAG_OFF
       - name: Native Chrome six-space visual review (synthetic only)
         run: |
           google-chrome --version

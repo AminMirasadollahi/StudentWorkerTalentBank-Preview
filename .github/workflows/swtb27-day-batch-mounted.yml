@@ -36,6 +36,7 @@ jobs:
           node tests/browser/run-swtb27-day-batch-review.mjs
           node tests/browser/run-swtb27-day-batch-workspace.mjs
           node tests/browser/run-swtb27-day-batch-opsapp.mjs
+          node tests/browser/run-swtb32-typed-release-opsapp.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -44,4 +45,5 @@ jobs:
             test-results/swtb27-day-batch-synthetic
             test-results/swtb27-workspace-synthetic
             test-results/swtb27-opsapp-synthetic
+            test-results/swtb32-typed-release-synthetic
           retention-days: 7
