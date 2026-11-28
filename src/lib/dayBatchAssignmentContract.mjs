@@ -13,7 +13,7 @@ const freeze=x=>{if(x&&typeof x==='object'&&!Object.isFrozen(x)){for(const v of 
 const sort=(a,b)=>a<b?-1:a>b?1:0
 const same=(a,b)=>a.length===b.length&&a.every((v,i)=>v===b[i])
 const fail=code=>{throw Error(code)}
-const plans=new WeakSet(),intents=new WeakSet(),snapshots=new WeakSet(),snapshotIntents=new WeakMap()
+const plans=new WeakSet(),intents=new WeakSet(),snapshots=new WeakSet(),snapshotIntents=new WeakMap(),controls=new WeakSet()
 export function buildDayBatchPlan(draft,context){
  const review=previewBatchAssignment(draft,context)
  if(!review.ok)fail('BATCH_PREVIEW_INVALID')
@@ -84,7 +84,7 @@ export function batchDiscoverArgs(){return freeze({p_action:'discover',p_epoch:n
 // Only accept raw results of the audited transport from the actual operation,
 // never arbitrary objects from another session or HTTP errors. Source is a
 // mandatory caller-supplied discriminator; the host must enforce provenance.
-export function parseDayBatchSnapshot(raw,{source,intent=null}={}){
+function parseSnapshot(raw,{source,intent=null}={}){
  if(!['discover','write','control'].includes(source)||intent!==null&&!intents.has(intent))return invalid()
  const recovery=source!=='write'
  if(!exact(raw,recovery?['ok','epoch','active','durable_active']:['ok','epoch','active'])||raw.ok!==true||!epoch(raw.epoch)||recovery&&typeof raw.durable_active!=='boolean')return invalid()
@@ -110,8 +110,20 @@ export function parseDayBatchSnapshot(raw,{source,intent=null}={}){
  // original payload to commit. Only the retained, branded intent can commit.
  return snapshot({...base,state:a.status,requestId:a.request_id,receipt},intent)
 }
+export function parseDayBatchSnapshot(raw,options={}){
+ if(!['discover','write'].includes(options?.source))return invalid()
+ return parseSnapshot(raw,options)
+}
 export function batchControlArgs(action,observed){
  if(!snapshots.has(observed)||observed.source!=='discover'&&observed.source!=='control')fail('BATCH_CONTROL_INVALID')
  if(action==='cancel'?observed.state!=='reserved':action==='acknowledge'?!['committed','cancelled'].includes(observed.state):true)fail('BATCH_CONTROL_INVALID')
- return freeze({p_action:action,p_epoch:observed.epoch,p_request_id:observed.requestId})
+ const args=freeze({p_action:action,p_epoch:observed.epoch,p_request_id:observed.requestId})
+ controls.add(args);return args
+}
+export function parseDayBatchControlResult(raw,args){
+ if(!controls.has(args))return invalid()
+ const state=parseSnapshot(raw,{source:'control'})
+ if(args.p_action==='cancel'&&state.state==='cancelled'&&state.epoch===args.p_epoch&&state.requestId===args.p_request_id)return state
+ if(args.p_action==='acknowledge'&&state.state==='idle'&&state.epoch===args.p_epoch+1)return state
+ return invalid()
 }
