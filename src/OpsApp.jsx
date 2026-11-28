@@ -577,9 +577,10 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   const [fence]=useState(createWorkPoolRouteFence)
   const draftGuard=useMemo(createManagerDraftGuard,[assignmentReceiptPort?.readScopeOwner])
   const r5IaActive=managerShellEnabled&&(r5IaFixture===true||managerR5IaEnabled)
-  const activeDraftGuard=r5IaActive?draftGuard:null
+  const sharedReview=import.meta.env.DEV&&assignmentReceiptPort?.batchWorkspace?.mode==='synthetic-review'
+  const activeDraftGuard=r5IaActive?(sharedReview?assignmentReceiptPort.managerDraftGuard:draftGuard):null
   const [routeNotice,setRouteNotice]=useState('')
-  const routeFence=managerShellEnabled&&(workHubFixture===true||r5IaActive)&&managerNavFlags.workPoolEnabled?fence:null
+  const routeFence=managerShellEnabled&&(workHubFixture===true||r5IaActive)&&managerNavFlags.workPoolEnabled?(sharedReview?assignmentReceiptPort.workPoolRouteFence:fence):null
   const setNavigation=change=>{
    if(!routeFence&&!activeDraftGuard){commitNavigation(change);return true}
    const next=typeof change==='function'?change(navigation):change
@@ -662,8 +663,9 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
         enableFallback:import.meta.env.VITE_SWTB17_MANAGER_V3_IDENTITY_FALLBACK==='true',
       })
       if(readId!==candidateReadSequence.current)return false
+      if(sharedReview&&(!settleRead||settleRead('ready',results)!==true))throw Error('CANDIDATE_READ_UNCONFIRMED')
       setRows(results)
-      if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')
+      if(!sharedReview){if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')}
       return true
     } catch (e) {
       if(readId!==candidateReadSequence.current)return false
@@ -687,7 +689,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   useEffect(() => {
     if (adminSection === 'candidates' && candidateView === 'applicants') void refresh()
     return ()=>{if(assignmentReceiptPort)candidateReadSequence.current+=1}
-  }, [adminSection, candidateView, refreshRevision])
+  }, [adminSection, candidateView, refreshRevision, assignmentReceiptPort?.workspaceReadRevision])
   const refreshCurrentSection = () => {
     if (adminSection === 'work') setManualWorkRevision(v => v + 1)
     else if (candidateView === 'report') setManualReportRevision(v => v + 1)
@@ -911,7 +913,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   )
 }
 
-export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, workHubFixture=false, r5IaFixture=false }) {
+export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, workHubFixture=false, r5IaFixture=false, dayBatchReviewFixture=null }) {
   // This does NOT trust a cached session for authorization. When the fresh
   // server identity check returns no user but a local Supabase session still
   // exists, we cannot distinguish temporary network failure from revoked
@@ -1162,8 +1164,18 @@ export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, 
   // tab focus, but never present or accept input in privileged UI while
   // permission is being checked. Identity/role/revocation changes remount.
   const ReceiptHost=[2,3].includes(assignmentReceiptFixture?.version)?AssignmentRecoveryFixtureHost:DirectAssignmentFixtureHost
+  // Injected DEV review only. No component import, build-time release switch or actual credentials.
+  const dayBatchRequested=import.meta.env.DEV&&dayBatchReviewFixture!==null
+  const ReviewHost=dayBatchReviewFixture?.Host
+  const reviewFixture=dayBatchReviewFixture?.fixture
+  const validDayBatchReview=dayBatchRequested&&r5IaFixture===true&&managerShellEnabled&&assignmentReceiptFixture===null&&typeof ReviewHost==='function'&&reviewFixture?.mode==='synthetic-review'&&reviewFixture.actorId===identity.user?.id
+  const reviewScope=adminNavigation.section==='work'?'work':adminNavigation.candidateView==='report'?'report':'candidates'
   const authorizedView = identity.role === 'admin'
-    ? (assignmentReceiptFixture===null&&recoveryReviewConfig.mode!=='off'
+    ? (dayBatchRequested
+      ? (validDayBatchReview?<ReviewHost key={'day-batch-review:'+identity.user?.id} workspace fixture={reviewFixture} scope={reviewScope} checking={recheckingAccess||busy} onLogout={logout}>
+         {({workspacePort,guardedLogout})=><AdminView onLogout={guardedLogout} navigation={adminNavigation} setNavigation={setAdminNavigation} refreshRevision={dataRefreshRevision} assignmentReceiptPort={workspacePort} r5IaFixture={r5IaFixture} workHubFixture={workHubFixture}/>}
+        </ReviewHost>:<main role="alert" dir="rtl">مسیر بررسی آزمایشی در دسترس نیست.<button type="button" onClick={logout}>خروج</button></main>)
+      : assignmentReceiptFixture===null&&recoveryReviewConfig.mode!=='off'
       ? <AssignmentRecoveryReviewHost key={'review-admin:' + identity.user?.id}
          config={recoveryReviewConfig} auth={opsClient.auth} actorId={identity.user?.id}
          checking={recheckingAccess||busy} onLogout={logout}>
