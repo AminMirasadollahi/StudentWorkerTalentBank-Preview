@@ -1,0 +1,30 @@
+name: SWTB27 day-batch mounted review (NO DEPLOY)
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: swtb27-day-batch-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  synthetic:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'review/swtb27-day-batch-contract-20261128'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - name: Consolidated day-batch source and actual React mounted regression
+        run: node --test tests/swtb27DayBatchAssignmentContract.test.mjs tests/swtb27DayBatchManagerSession.test.mjs tests/swtb27DayBatchSharedManager.test.mjs tests/swtb27DayBatchVerifiedOwner.test.mjs tests/swtb27DayBatchMounted.test.mjs tests/swtb24R5BatchPreview.test.mjs tests/assignmentPrerequisitesV3Mounted.test.mjs tests/assignmentRecoveryHostMounted.test.mjs tests/releaseBoundary.test.mjs
+      - name: Confirm normal entry has no mounted review owner
+        run: |
+          if grep -nE 'DayBatchManagerReviewHost|dayBatchVerifiedOwner' src/OpsApp.jsx src/App.jsx index.html; then exit 1; fi
+          echo PASS NO_REVIEW_OWNER_IN_NORMAL_ENTRY
