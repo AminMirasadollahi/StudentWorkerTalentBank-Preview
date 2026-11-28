@@ -69,7 +69,7 @@ async function mount(f,{editor='batch',scope='work'}={}){
  const node=document.createElement('div');document.body.append(node);const root=createRoot(node);let port
  const render=(kind=editor,route=scope)=>root.render(h(Host,{fixture:f.config,scope:route},p=>{
   port=p
-  return kind==='batch'?h(Batch,{key:p.editorRevision,context:p.context,reviewPort:p.batchPort}):h(Direct,{key:p.editorRevision,workers:p.context.workers,data:p.context.data,defaultWorkerId:worker,defaultDate:date,assignmentReceiptPort:p.legacyPort})
+  return kind==='batch'?h(Batch,{key:p.batchPort.editorRevision,context:p.context,reviewPort:p.batchPort}):h(Direct,{key:p.legacyPort.editorRevision,retentionKey:'direct-task',workers:p.context.workers,data:p.context.data,defaultWorkerId:worker,defaultDate:date,assignmentReceiptPort:p.legacyPort})
  }))
  await act(async()=>render())
  const state=()=>node.querySelector('[data-state]')?.dataset.state
@@ -152,4 +152,53 @@ test('identity refresh hides stale editor and rediscovery does not repeat commit
   await m.click('تأیید و بستن نتیجه');assert.equal(m.state(),'idle')
   assert.ok(f.reads()>=3)
  }finally{await m.cleanup()}
+})
+
+test('unsent batch and direct drafts survive editor navigation and same actor recheck without browser storage',{timeout:10000},async()=>{
+ const f=fixture(),m=await mount(f)
+ const title=()=>m.node.querySelector('input[maxlength="160"]')?.value
+ try{
+  await fillBatch(m);await m.click('+ افزودن کار دیگر')
+  await m.fill('fieldset[data-row-id="row-2"] input[maxlength="160"]','کار دوم مصنوعی')
+  await m.render('direct');await m.fill('input[maxlength="160"]','پیش‌نویس مستقیم مصنوعی')
+  await m.render('batch');assert.equal(title(),'کار مصنوعی آزمایشی')
+  assert.equal(m.node.querySelector('fieldset[data-row-id="row-2"] input[maxlength="160"]').value,'کار دوم مصنوعی')
+  assert.equal(Boolean(m.button('ثبت آزمایشی مجموعه')),false,'fresh preview required')
+  await m.click('+ افزودن کار دیگر');assert.equal(m.node.querySelectorAll('fieldset[data-row-id]').length,3)
+  assert.equal(new Set([...m.node.querySelectorAll('fieldset[data-row-id]')].map(e=>e.dataset.rowId)).size,3)
+  const release=f.holdAdmin()
+  try{
+   await act(async()=>{f.auth('TOKEN_REFRESHED')})
+   assert.equal(Boolean(m.node.querySelector('.swtb24-batch-preview')),false)
+  }finally{release()}
+  await until(()=>m.state()==='idle')
+  assert.equal(title(),'کار مصنوعی آزمایشی')
+  await m.render('direct');assert.equal(title(),'پیش‌نویس مستقیم مصنوعی')
+  assert.equal(window.localStorage.length,0);assert.equal(window.sessionStorage.length,0)
+  assert.equal(f.calls.filter(x=>['reserve','commit'].includes(x[1].p_action)).length,0)
+ }finally{await m.cleanup()}
+})
+test('batch acknowledgement resets only batch draft; unrelated direct draft remains',{timeout:10000},async()=>{
+ const f=fixture(),m=await mount(f,{editor:'direct'})
+ try{
+  await m.fill('input[maxlength="160"]','پیش‌نویس مستقل مستقیم')
+  await m.render('batch');await fillBatch(m);await m.click('ثبت آزمایشی مجموعه')
+  await m.click('بررسی وضعیت درخواست');await m.click('تأیید و بستن نتیجه')
+  assert.equal(m.node.querySelector('input[maxlength="160"]').value,'')
+  await m.render('direct')
+  assert.equal(m.node.querySelector('input[maxlength="160"]').value,'پیش‌نویس مستقل مستقیم')
+  assert.equal(f.calls.filter(x=>x[1].p_action==='commit').length,1)
+ }finally{await m.cleanup()}
+})
+test('logout clears retained draft; fresh host cannot inherit it',{timeout:10000},async()=>{
+ const f=fixture(),m=await mount(f)
+ try{
+  await fillBatch(m)
+  await act(async()=>{f.auth('SIGNED_OUT')})
+  assert.equal(Boolean(m.node.querySelector('.swtb24-batch-preview')),false)
+  assert.match(m.node.textContent,/نشست قبلی پایان یافته/)
+ }finally{await m.cleanup()}
+ const fresh=await mount(f)
+ try{assert.equal(fresh.node.querySelector('input[maxlength="160"]').value,'');assert.equal(window.localStorage.length,0);assert.equal(window.sessionStorage.length,0)}
+ finally{await fresh.cleanup()}
 })
