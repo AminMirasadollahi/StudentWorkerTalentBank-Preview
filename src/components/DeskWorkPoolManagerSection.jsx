@@ -1,3 +1,4 @@
+import {useManagerDraftWarning} from '../lib/managerDraftGuard.mjs'
 import {useCallback,useEffect,useRef,useState} from 'react'
 import JalaliDatePicker from './JalaliDatePicker'
 import {useWorkPoolFence} from './useWorkPoolFence.mjs'
@@ -51,6 +52,7 @@ export default function DeskWorkPoolManagerSection({refreshRevision=0,routeFence
  const [uncertain,setUncertain]=useState(false)
  const [notice,setNotice]=useState('')
  const [revision,setRevision]=useState(0)
+ useManagerDraftWarning({draft,offer},true,Boolean(closing))
  const pending=useRef(false)
  const sequence=useRef(0)
  const refresh=useCallback(async()=>{

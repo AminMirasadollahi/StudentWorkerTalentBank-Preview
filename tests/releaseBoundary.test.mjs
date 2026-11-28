@@ -31,6 +31,16 @@ test('reviewed intake and SWTB22 authorized API/auth/QA/deploy baselines are byt
   for(const [path,sha] of Object.entries(critical))
     assert.equal(gitBlobSha(path),sha,`BLOCK RELEASE: modified protected public asset ${path}`)
 })
+test('R5 six-space IA is wired but production-default OFF and not enabled by Pages release workflow',()=>{
+  const ops=read('src/OpsApp.jsx').toString()
+  const env=read('.env.production').toString()
+  const pages=read('.github/workflows/pages.yml').toString()
+  assert.match(ops,/VITE_SWTB24_R5_MANAGER_IA_UI==='true'/)
+  assert.match(ops,/const r5IaActive=managerShellEnabled&&\(r5IaFixture===true\|\|managerR5IaEnabled\)/)
+  assert.match(env,/VITE_SWTB24_R5_MANAGER_IA_UI=false/)
+  assert.doesNotMatch(pages,/VITE_SWTB24_R5_MANAGER_IA_UI:\s*'true'/)
+})
+
 test('manager lifecycle is explicitly authorized by existing audited RPCs, not raw client writes',()=>{
   const workspace=read('src/OperationsWorkspace.jsx').toString()
   assert.match(workspace,/import WorkerLifecycleManager from ['"]\.\/components\/WorkerLifecycleManager['"]/)

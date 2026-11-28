@@ -1,3 +1,4 @@
+import {useManagerDraftScope} from './lib/managerDraftGuard.mjs'
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
 import {workerGuideStorageKey,workerGuideSessionStorageKey,shouldAutoOfferWorkerGuide,suppressWorkerGuideAutoOffers} from './lib/workerGuide.mjs'
@@ -1158,6 +1159,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
 }
 export function AdminOperations({ navigation, setNavigation, refreshRevision = 0,
   hideSectionTabs = false, loadOriginalCandidates, assignmentReceiptPort=null, workPoolRouteFence=null }) {
+  const draftScope=useManagerDraftScope()
   const [data,setData]=useState({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
   const view=navigation.workView
   const profileWorkerId=navigation.profileWorkerId||''
@@ -1201,6 +1203,11 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const [busy,setBusy]=useState(false)
   const [assignmentDialogDate,setAssignmentDialogDate]=useState('')
   const focusedTasks=hideSectionTabs&&focusTaskUIEnabled
+  const commonWorkEntry=Boolean(draftScope&&focusedTasks&&workPoolUIEnabled&&import.meta.env?.VITE_SWTB19_UNIFIED_WORK_UI==='true')
+  const [createChoiceOpen,setCreateChoiceOpen]=useState(false)
+  const [createIntent,setCreateIntent]=useState(null)
+  const [createNotice,setCreateNotice]=useState('')
+  const commonCreateRef=useRef(null)
   const [taskEditorOpen,setTaskEditorOpen]=useState(false)
   const [prerequisiteTaskId,setPrerequisiteTaskId]=useState(null)
   const [taskEditorRevision,setTaskEditorRevision]=useState(0)
@@ -1214,7 +1221,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     }
     setTaskEditorOpen(false)
     if(reset)setTaskEditorRevision(v=>v+1)
-    taskEditorOpenerRef.current?.focus?.({preventScroll:true})
+    const opener=commonCreateRef.current||taskEditorOpenerRef.current
+    opener?.focus?.({preventScroll:true})
   }
   useEffect(()=>{
     if(view!=='tasks'&&taskEditorOpen)setTaskEditorOpen(false)
@@ -1279,6 +1287,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       if(sequence!==readSequence.current)return false
       // A previous successful read is not proof of CURRENT authorization.
       setData({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
+      draftScope?.clearRetained()
       setReadFailed(true)
       setAssignmentDialogDate('')
       // Drop any stale privileged draft after authorization/read rejection.
@@ -1293,6 +1302,33 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
 
   const workers=data.workers||[]
   const active=workers.filter(w=>w.state==='active')
+  const launchWorkEditor=target=>{
+    setCreateNotice('')
+    if(loading||readFailed||!commonWorkEntry||workPoolRouteFence?.getSnapshot()||
+      (target==='tasks'&&active.length===0)){
+      setCreateNotice('ابتدا دریافت اطلاعات یا بررسی عملیات قبلی را کامل کنید.');return
+    }
+    if(view===target&&draftScope?.hasDraft()){
+      setCreateNotice('ابتدا فرم یا تغییرات ثبت‌نشده فعلی را تعیین‌تکلیف کنید.');return
+    }
+    setCreateChoiceOpen(false)
+    const intent={target,scope:draftScope,generation:draftScope.generation()}
+    if(view!==target&&setNavigation(previous=>({...previous,workView:target}))!==true)return
+    setCreateIntent(intent)
+  }
+  useLayoutEffect(()=>{
+    if(!createIntent)return
+    if(!commonWorkEntry||createIntent.scope!==draftScope||createIntent.generation!==draftScope.generation()||
+      view!==createIntent.target||readFailed||workPoolRouteFence?.getSnapshot()){
+      setCreateIntent(null);return
+    }
+    if(createIntent.target==='tasks'){
+      setCreateIntent(null)
+      if(!loading&&active.length>0)setTaskEditorOpen(true)
+    }
+  },[createIntent,commonWorkEntry,draftScope,view,readFailed,loading,active.length,workPoolRouteFence])
+  useEffect(()=>{setCreateChoiceOpen(false);setCreateNotice('')},[view,draftScope])
+  const finishPoolLaunch=(intent)=>setCreateIntent(current=>current===intent?null:current)
   const chosen=workers.find(w=>w.id===workerId)
   const allWorkerHistory=scopeWorkerHistory(data,historyWorkerId)
   const historyData=filterWorkerHistory(allWorkerHistory,{
@@ -1402,10 +1438,31 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     {loading&&<p className="ow-muted">در حال دریافت اطلاعات…</p>}
     <Message error={error} notice={notice}/>
 
+    {commonWorkEntry&&['tasks','workPool'].includes(view)&&<section className="report-panel swtb24-work-entry" aria-label="تعریف و واگذاری کار"
+      onKeyDown={event=>{if(createChoiceOpen&&event.key==='Escape'){event.preventDefault();setCreateChoiceOpen(false);commonCreateRef.current?.focus()}}}>
+      <div className="report-panel-heading">
+        <div><h2>تعریف و واگذاری کار</h2><p className="ow-muted">روش تخصیص را انتخاب کنید؛ هنوز کاری ثبت نمی‌شود.</p></div>
+        <button type="button" className="report-btn report-btn--primary" ref={commonCreateRef}
+          disabled={loading||readFailed} aria-expanded={createChoiceOpen} aria-controls="swtb24-create-choices"
+          onClick={()=>{setCreateNotice('');setCreateChoiceOpen(v=>!v)}}>+ تعریف کار</button>
+      </div>
+      {createChoiceOpen&&<div id="swtb24-create-choices" className="swtb24-create-choices"
+        role="group" aria-label="روش تخصیص کار">
+        <button type="button" disabled={active.length===0} onClick={()=>launchWorkEditor('tasks')}>
+          <strong>واگذاری مستقیم</strong><small>انتخاب دانشجوکاران مشخص توسط مدیر</small>
+        </button>
+        <button type="button" onClick={()=>launchWorkEditor('workPool')}>
+          <strong>انتشار فرصت کاری</strong><small>انتخاب کار توسط دانشجوکاران واجد شرایط</small>
+        </button>
+        <button type="button" className="report-btn report-btn--light" onClick={()=>{setCreateChoiceOpen(false);commonCreateRef.current?.focus()}}>انصراف</button>
+      </div>}
+      {createNotice&&<p role="status">{createNotice}</p>}
+    </section>}
     {view==='terms'&&<TermBudgetPanel workers={workers} refreshRevision={refreshRevision}
       focusedUI={hideSectionTabs&&focusTermBudgetUIEnabled}/>}
     {workPoolUIEnabled&&view==='workPool'&&<Suspense fallback={<p className="ow-muted">در حال آماده‌سازی مخزن وظایف…</p>}>
       <WorkPoolManagerPanel refreshRevision={refreshRevision} routeFence={workPoolRouteFence}
+       commonEntry={commonWorkEntry} createIntent={createIntent?.target==='workPool'?createIntent:null} onCreateHandled={finishPoolLaunch} onReturnToCreate={()=>commonCreateRef.current?.focus()}
        activeKind={navigation.workPoolKind||'general'}
        onKindChange={kind=>setNavigation(previous=>({...previous,workPoolKind:kind}))}/>
     </Suspense>}
@@ -1460,7 +1517,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
           </div>
           <div className="swtb22-task-heading-actions">
            <small>{n(matchingTasks.length)} از {n(taskCounts.total)} کار</small>
-           {focusedTasks&&<button type="button" ref={taskEditorOpenerRef}
+           {focusedTasks&&!commonWorkEntry&&<button type="button" ref={taskEditorOpenerRef}
              className="report-btn report-btn--primary"
              disabled={loading||active.length===0} aria-haspopup="dialog"
              aria-controls="swtb22-task-assign-dialog"
@@ -1549,7 +1606,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
        ref={taskEditorDialogRef} className="ow-assignment-dialog swtb22-task-editor-dialog"
        aria-labelledby="swtb22-task-editor-heading"
        onCancel={event=>{event.preventDefault();closeTaskEditor()}}
-       onClose={()=>{setTaskEditorOpen(false);taskEditorOpenerRef.current?.focus?.({preventScroll:true})}}>
+       onClose={()=>{setTaskEditorOpen(false);(commonCreateRef.current||taskEditorOpenerRef.current)?.focus?.({preventScroll:true})}}>
        <div className="swtb22-task-editor-dialog-head">
         <div><h2 id="swtb22-task-editor-heading" tabIndex={-1}
          data-swtb22-task-editor-heading>واگذاری مستقیم کار جدید</h2>
@@ -1560,7 +1617,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
        </div>
        {taskEditorOpen&&!assignmentDialogDate&&assignmentReceiptPort?.panel}
        <TaskAssignmentEditor key={assignmentReceiptPort?taskEditorRevision+':'+assignmentReceiptPort.editorRevision:taskEditorRevision}
-        assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
+        retentionKey="direct-task" assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
         onSaved={refresh} onCancel={()=>closeTaskEditor()}
         onClose={()=>closeTaskEditor(true)}/>
       </dialog>}

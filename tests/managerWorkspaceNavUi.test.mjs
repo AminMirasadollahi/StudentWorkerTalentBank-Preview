@@ -122,6 +122,15 @@ test('flagged-off navigation never mounts hidden work pool or term membership bu
  }finally{await ui.cleanup()}
 })
 
+test('explicit R5 feature flag maps all routes to six parents without relying on test fixture prop',()=>{
+ const flags={r5IaEnabled:true,workPoolEnabled:true,termMembershipEnabled:true}
+ assert.equal(flatten(flags).length,6)
+ assert.equal(flatten(flags).flatMap(x=>x.children).length,11)
+ assert.equal(currentManagerDestination(initial(),flags).id,'applicants')
+ const uiFlags={...flags,workPoolEnabled:false,termMembershipEnabled:false}
+ assert.equal(flatten(uiFlags).length,6)
+ assert.equal(flatten(uiFlags).flatMap(x=>x.children).length,9)
+})
 test('canonical work hub maps both internal routes to one sidebar destination',()=>{
  const flags={workHubFixture:true}
  assert.equal(flatten(flags).length,10)
