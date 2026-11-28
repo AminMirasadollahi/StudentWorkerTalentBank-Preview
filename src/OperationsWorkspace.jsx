@@ -1,4 +1,5 @@
 import {useManagerDraftScope} from './lib/managerDraftGuard.mjs'
+import {managerIdentityLabel} from './lib/managerIdentityLabel.mjs'
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {WorkerGuideWelcome,WorkerGuideSpotlight} from './WorkerGuide.jsx'
 import {workerGuideStorageKey,workerGuideSessionStorageKey,shouldAutoOfferWorkerGuide,suppressWorkerGuideAutoOffers} from './lib/workerGuide.mjs'
@@ -1084,7 +1085,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
         {original&&!original.complete&&<p className="ow-muted" role="status">برخی نام‌های زمان ثبت‌نام در دسترس نیستند؛ نتایج ممکن است محدود باشند.</p>}
         {shownWorkers.map(({worker:w,matchKind})=><button type="button" key={w.id}
           className={selectedId===w.id?'is-selected':''} onClick={()=>onChange(w.id)}>
-          <strong>{w.name}</strong>
+          <strong>{managerIdentityLabel(w.name,w.id)}</strong>
           <small>{unitLabels[w.unit]||w.unit}</small>
           {matchKind!=='current'&&<small>{matchKind==='original'?'مطابق نام زمان ثبت‌نام':'مطابق نام قبلی تأییدشده'}</small>}
           {(data.profile_requests||[]).some(r=>r.worker_id===w.id&&r.review_state==='pending')
@@ -1096,7 +1097,7 @@ function ManagerWorkerProfile({data,selectedId,onChange,onDone,focusedReview=fal
       {!selected&&<p className="ow-muted">از فهرست، پرونده یک دانشجوکار را انتخاب کنید.</p>}
     {selected&&<>
       <div className="ow-profile-heading">
-        <div><h3>{selected.name}</h3>
+        <div><h3>{managerIdentityLabel(selected.name,selected.id)}</h3>
           <small className="ow-muted">{unitLabels[selected.unit]||selected.unit||'—'}
             {selected.major&&<> · {selected.major}</>}</small></div>
         <span className="ow-status">{workerStateLabels[selected.state]||selected.state}</span>

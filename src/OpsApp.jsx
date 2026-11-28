@@ -38,6 +38,7 @@ import {
 import './report.css'
 import './ops.css'
 import './manager-shell.css'
+import {managerIdentityLabel} from './lib/managerIdentityLabel.mjs'
 
 // UI availability is separately guarded by staff permissions and server-side
 // OPS_EMAIL_INVITES_ENABLED. Enabling this public flag never bypasses the Edge gate.
@@ -462,7 +463,7 @@ function CandidateCard({
     <article className="ops-candidate">
       <div className="ops-candidate__head">
         <div>
-          <strong>{candidateDisplayName(candidate)}</strong>
+          <strong>{managerIdentityLabel(candidateDisplayName(candidate),candidate.id)}</strong>
           <small>{candidateDisplayMajor(candidate)} · ورودی {candidate.entry_year} · {unitLabels[candidate.primary_unit]}</small>
           {candidate.worker_id && candidateDisplayName(candidate)!==candidate.full_name && <small>نام هنگام ثبت‌نام: {candidate.full_name}</small>}
           {candidate.worker_id && candidateDisplayMajor(candidate)!==candidate.major && <small>رشته هنگام ثبت‌نام: {candidate.major}</small>}
@@ -795,6 +796,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
           className={adminSection === 'work' ? 'ow-tab is-selected' : 'ow-tab'}
           onClick={() => setAdminSection('work')}>برنامه و کارها</button>
       </nav>}
+      {adminSection !== 'work' && assignmentReceiptPort?.panel}
       {adminSection === 'candidates' && <>
       {!managerShellEnabled&&<nav className="ow-tabs ops-subtabs" aria-label="بخش‌های داشبورد و داوطلبان">
         <button type="button" className={candidateView === 'applicants' ? 'ow-tab is-selected' : 'ow-tab'}
@@ -868,7 +870,6 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
        </section>}
       {routeFence&&routeNotice&&<p role="alert" className="report-alert report-alert--error">{routeNotice}</p>}
       {!navFlags.r5IaEnabled&&<ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>}
-      {adminSection !== 'work' && assignmentReceiptPort?.panel}
       {adminSection === 'work' && <ManagerDraftContext.Provider value={activeDraftGuard}><AdminOperations navigation={navigation} setNavigation={setNavigation}
         assignmentReceiptPort={assignmentReceiptPort}
         refreshRevision={refreshRevision + manualWorkRevision}

@@ -16,3 +16,11 @@
 .swtb24-batch-preview input[type=checkbox]{width:20px;height:20px;accent-color:#176d76}
 .swtb24-batch-preview input:focus-visible,.swtb24-batch-preview button:focus-visible,.swtb24-batch-preview select:focus-visible,.swtb24-batch-preview summary:focus-visible{outline:2px solid #176d76;outline-offset:2px}
 .swtb24-batch-result{padding:12px;background:#f2f8f7;border-radius:8px}
+
+/* SWTB31: wrap long identity and task labels without hiding their content. */
+.swtb24-batch-preview th,.swtb24-batch-preview td,.swtb24-batch-people label{overflow-wrap:anywhere;white-space:normal;min-width:0}
+.swtb24-batch-preview thead th{min-width:6rem;max-width:14rem}
+.swtb24-batch-preview tbody th{min-width:9rem;max-width:18rem}
+.swtb24-batch-preview .swtb24-batch-matrix-scroll{border:1px solid #dbe3e5;border-radius:6px}
+.swtb24-batch-preview .swtb24-batch-matrix-scroll table{margin:0}
+.swtb24-batch-preview .swtb24-batch-result p{line-height:1.65}

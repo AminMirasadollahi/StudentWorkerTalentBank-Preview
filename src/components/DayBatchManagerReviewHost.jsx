@@ -137,7 +137,7 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
  }):null
  const legacyPort={deskCancelPort:deskPort,version:3,snapshot:{...snap,state:allow?'idle':snap.state==='idle'?'checking':snap.state},editorRevision:i.legacyRevision,committedRevision:i.committedRevision,syntheticSharedOwner:true,submit:d=>allow&&active(i)&&i.data===renderData?run('submitLegacy',d):Promise.resolve('blocked')}
  const context=workspace?i.readGate.contextFor(i.data):i.data
- const batchPort={mode:'synthetic-review',editorRevision:i.batchRevision,snapshot:{...snap,canStart:allow&&Boolean(context)},submit:(d,c)=>allow&&active(i)&&c===context&&(!workspace||i.readGate.contextFor(i.data)===c)?run('submitBatch',d,c):Promise.resolve('blocked')}
+ const batchPort={mode:'synthetic-review',environment:fixture.mode,editorRevision:i.batchRevision,snapshot:{...snap,canStart:allow&&Boolean(context)},submit:(d,c)=>allow&&active(i)&&c===context&&(!workspace||i.readGate.contextFor(i.data)===c)?run('submitBatch',d,c):Promise.resolve('blocked')}
  const button=(label,method,flag)=>snap[flag]&&<button type="button" className="report-btn report-btn--light" onClick={()=>void run(method)}>{label}</button>
  const beginWorkspaceRead=route=>{
   if(!workspace||!active(i)||!i.verified||checking||parentChecking.current||route!==scopeRef.current||!['work','candidates'].includes(route))return Object.assign(()=>false,{isCurrent:()=>false})
@@ -165,10 +165,10 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
   // Distinguish a superseded read from a current authoritative denial.
   return Object.assign(complete,{isCurrent:live})
  }
- const panel=<section dir="rtl" aria-label={workspace?'مالک مشترک واگذاری':undefined} data-state={workspace?snap.state:undefined}>
+ const panel=<section className="swtb30-recovery-panel" dir="rtl" aria-label={workspace?'مالک مشترک واگذاری':undefined} data-state={workspace?snap.state:undefined}>
   {!i.verified&&<><p role="status">{i.terminal?'نشست قبلی پایان یافته است.':'در حال بررسی دسترسی یا دسترسی تأیید نشده است.'}</p>{!i.terminal&&<button type="button" onClick={i.schedule}>بررسی مجدد دسترسی</button>}</>}
   {fixture.mode==='staging-review'&&<p role="status">محیط آزمایشی مستقل؛ این نسخه برای انتشار عمومی نیست.</p>}
-  {i.verified&&<section aria-label="بازیابی مشترک واگذاری">
+  {i.verified&&<section className="swtb30-recovery-content" aria-label="بازیابی مشترک واگذاری" data-recovery-state={snap.state}>
    <p role="status">{snap.state==='idle'?'مسیر واگذاری آماده است.':snap.state==='committed'?(snap.kind==='desk_cancel_v1'?'لغو نوبت و وظیفه مرتبط تأیید شد؛ این رسید تأیید ساعت نیست.':'ثبت واگذاری تأیید شد؛ این رسید تأیید ساعت نیست.'):snap.state==='cancelled'?(snap.kind==='desk_cancel_v1'?'درخواست لغو نوبت کنار گذاشته شد؛ این نتیجه به معنی لغو نوبت نیست.':'لغو درخواست تأیید شد.'):snap.state==='reserved'?(snap.kind==='desk_cancel_v1'?'درخواست لغو نوبت رزرو شده است؛ هنوز لغو نهایی نشده است.':'درخواست رزرو شده است؛ هنوز کاری ثبت نشده است.'):snap.state==='shift_unconfirmed'?'نتیجه لغو شیفت نامشخص است؛ ثبت جدید مسدود است.':'در حال بررسی یا تعیین تکلیف وضعیت عملیات.'}</p>
    {snap.receipt?.kind==='batch_direct_v1'&&<p data-testid="batch-receipt-summary">{fa(snap.receipt.result.pair_count)} تخصیص · {fa(snap.receipt.result.standard_person_minutes)} دقیقه زمان استاندارد</p>}
    {button('بررسی وضعیت درخواست','discover','canDiscover')}

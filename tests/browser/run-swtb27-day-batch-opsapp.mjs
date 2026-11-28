@@ -32,6 +32,7 @@ try{
  const batch=dialog.getByRole('region',{name:'پیش‌نمایش واگذاری مجموعه‌ای'})
  const counts=()=>page.evaluate(()=>globalThis.__qaDayBatch.counts())
  const open=async()=>{await common.click();await page.getByRole('group',{name:'روش تخصیص کار'}).getByRole('button',{name:/واگذاری مجموعه‌ای/}).click();await dialog.waitFor()}
+ const receiptVisible=async()=>{const panel=page.locator('.swtb30-recovery-content[data-recovery-state="committed"]');await panel.waitFor();const ack=panel.getByRole('button',{name:'تأیید و بستن نتیجه',exact:true});await ack.waitFor();assert.equal(await ack.evaluate(el=>{const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth}),true,'RECOVERY_ACK_MUST_BE_IN_VIEWPORT');return panel}
  const snap=async n=>{assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);await page.screenshot({path:resolve(out,n+'.png')})}
  await state('idle');await page.getByText('محیط آزمایشی مستقل؛ این نسخه برای انتشار عمومی نیست.',{exact:true}).waitFor();await route('tasks').click();await common.waitFor();await open()
  await batch.getByLabel('عنوان کار ۱',{exact:true}).fill('پیش‌نویس در OpsApp واقعی')
@@ -49,7 +50,7 @@ try{
  await button('بستن و حفظ پیش‌نویس').click();await dialog.waitFor({state:'hidden'})
  await route('applicants').click();await state('committed')
  assert.match(await page.getByTestId('batch-receipt-summary').textContent(),/۱ تخصیص.*۶۰ دقیقه/)
- await snap('01-opsapp-candidate-recovery')
+ const batchReceipt=await receiptVisible();await snap('01-opsapp-candidate-recovery');await batchReceipt.screenshot({path:resolve(out,'01a-batch-receipt.png')})
  await route('history').click();await state('committed')
  await button('آمار و خروجی پذیرش').click();await state('committed')
  await button('تأیید و بستن نتیجه').click();await state('idle')
@@ -89,7 +90,7 @@ try{
  await button('بستن و حفظ پیش‌نویس').click();await direct.waitFor({state:'hidden'})
  await route('applicants').click();await state('committed')
  await page.getByText('لغو نوبت و وظیفه مرتبط تأیید شد؛ این رسید تأیید ساعت نیست.',{exact:true}).waitFor()
- await snap('04-opsapp-desk-cancel-recovered')
+ const deskReceipt=await receiptVisible();await snap('04-opsapp-desk-cancel-recovered');await deskReceipt.screenshot({path:resolve(out,'04a-desk-receipt.png')})
  await route('history').click();await state('committed')
  await button('آمار و خروجی پذیرش').click();await state('committed')
  await button('تأیید و بستن نتیجه').click();await state('idle')
@@ -112,5 +113,6 @@ try{
  console.log('PASS SWTB27_ACTUAL_OPSAPP_IDENTITY_CANDIDATE_REPORT_RECOVERY_NO_NETWORK')
  console.log('PASS SWTB28_ACTUAL_OPSAPP_DURABLE_DESK_CANCEL_LOST_COMMIT_WRONG_DAY_TASK_NO_FALLBACK')
  console.log('PASS SWTB28_ACTUAL_OPSAPP_STAGING_ADAPTER_FOUR_SCOPED_READS_FAKE_ONLY')
+ console.log('PASS SWTB31_VISIBLE_RECOVERY_ACK_AND_TARGETED_RECEIPTS')
 }catch(e){console.error('SWTB27_OPSAPP_CHROME_DIAGNOSTIC',JSON.stringify({observations,blocked,errors,headings:await page?.locator('h1,h2,h3').allTextContents().catch(()=>[]),status:await page?.locator('[role=status],[role=alert]').allTextContents().catch(()=>[]),deskCoverage:await page?.locator('.ow-desk-coverage').allTextContents().catch(()=>[]),counters:await page?.evaluate(()=>globalThis.__qaDayBatch?.counts()).catch(()=>null)}));throw e}
 finally{await writeFile(resolve(out,'observations.json'),JSON.stringify({observations,blocked,errors},null,2));await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}

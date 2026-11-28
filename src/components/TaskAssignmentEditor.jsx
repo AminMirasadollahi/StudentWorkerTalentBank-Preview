@@ -7,6 +7,7 @@ import {assessAssignmentCapacity} from '../lib/assignmentCapacity.mjs'
 import {LIBRARY_DESK_TEMPLATE,canDraftLibraryDeskGroup} from '../lib/libraryDeskTemplate.mjs'
 import {deskInterval,minuteClock,projectDeskCoverage,visibleDeskShifts} from '../lib/libraryDeskShifts.mjs'
 import {canonicalAssignmentPrerequisites} from '../lib/assignmentPrerequisites.mjs'
+import {managerIdentityLabel} from '../lib/managerIdentityLabel.mjs'
 
 const fa=new Intl.NumberFormat('fa-IR')
 const clockFa=minute=>minuteClock(minute).replace(/[0-9]/g,digit=>'۰۱۲۳۴۵۶۷۸۹'[Number(digit)])
@@ -232,7 +233,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
   }finally{cancelLock.current=false;setCancelBusy(false)}
  }
  const options=workers.filter(w=>w.state==='active'&&
-  (w.name||'').toLocaleLowerCase('fa-IR').includes(filter.toLocaleLowerCase('fa-IR')))
+  managerIdentityLabel(w.name,w.id).toLocaleLowerCase('fa-IR').includes(filter.toLocaleLowerCase('fa-IR')))
  return <form className="ow-assignment-form" onSubmit={submit}>
   <Fields {...fieldProps}>
   {taskUnit==='library'&&<div className="ow-library-template-panel" aria-label="قالب خدمات جاری کتابخانه">
@@ -253,7 +254,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
     <div className="report-field ow-multi-picker">
       <span>دانشجوکارها · {fa.format(selected.length)} نفر انتخاب‌شده</span>
       <details>
-        <summary>{selected.length?selected.map(w=>w.name).slice(0,2).join('، ')+
+        <summary>{selected.length?selected.map(w=>managerIdentityLabel(w.name,w.id)).slice(0,2).join('، ')+
           (selected.length>2?` و ${fa.format(selected.length-2)} نفر دیگر`:''):'انتخاب یک یا چند نفر'}</summary>
         <div className="ow-worker-options">
           <input type="search" value={filter} onChange={e=>setFilter(e.target.value)}
@@ -261,7 +262,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
           <div className="ow-worker-option-list">
             {options.map(w=><label key={w.id}>
               <input type="checkbox" checked={workerIds.includes(w.id)} onChange={()=>toggle(w.id)}/>
-              <span>{w.name}</span>
+              <span>{managerIdentityLabel(w.name,w.id)}</span>
             </label>)}
             {!options.length&&<span>دانشجوکار فعالی یافت نشد.</span>}
           </div>
@@ -341,7 +342,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
           <ul className={cancelDraft?'ow-desk-bookings ow-desk-bookings--editing':'ow-desk-bookings'}>
             {visibleDeskShifts(deskRead.shifts).map(s=><li key={s.id} className="ow-desk-booking">
               <span>{clockFa(s.start_minute)} تا {clockFa(s.end_minute)}</span>
-              <span>{workers.find(w=>w.id===s.worker_id)?.name||'دانشجوکار'}</span>
+              <span>{managerIdentityLabel(workers.find(w=>w.id===s.worker_id)?.name,s.worker_id)}</span>
               <button type="button" className="ow-desk-cancel-trigger"
                 aria-expanded={cancelDraft?.id===s.id} disabled={!deskCancelAllowed||cancelBusy||busy||Boolean(typedDesk&&!typedDesk.eligible(s.id,deskRead.envelope))}
                 onClick={()=>{setCancelError('');setCancelDraft(prev=>

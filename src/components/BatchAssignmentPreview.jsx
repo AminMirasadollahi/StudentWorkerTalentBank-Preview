@@ -5,6 +5,7 @@ import JalaliDatePicker from './JalaliDatePicker.jsx'
 import {previewBatchAssignment} from '../lib/batchAssignmentPreview.mjs'
 import {useManagerRetainedState} from '../lib/managerDraftGuard.mjs'
 import './batch-assignment-preview.css'
+import {managerIdentityLabel} from '../lib/managerIdentityLabel.mjs'
 const labels={library:'کتابخانه',research:'پژوهش',public_relations:'روابط عمومی'}
 const fa=x=>Number(x).toLocaleString('fa-IR')
 const day=x=>new Intl.DateTimeFormat('fa-IR-u-ca-persian',{dateStyle:'medium',timeZone:'UTC'}).format(new Date(x+'T12:00:00Z'))
@@ -28,7 +29,7 @@ export default function BatchAssignmentPreview({context,reviewPort=null}){
  const field=(id,key,value)=>rowChange(id,r=>({...r,[key]:value}))
  const toggle=(id,worker)=>rowChange(id,r=>({...r,workerIds:r.workerIds.includes(worker)?r.workerIds.filter(x=>x!==worker):[...r.workerIds,worker]}))
  const workers=context.workers.filter(w=>w.state==='active')
- const workerName=id=>workers.find(w=>w.id.toLowerCase()===id)?.name??'فرد نامشخص'
+ const workerName=id=>managerIdentityLabel(workers.find(w=>w.id.toLowerCase()===id)?.name,id)
  const displayReview=review?.context===context&&review?.draft===draft?review.result:null
  const submit=async()=>{
   if(!enabled||submitLock.current||!displayReview?.ok)return
@@ -39,7 +40,7 @@ export default function BatchAssignmentPreview({context,reviewPort=null}){
  }
  const units=(value,onChange,inherit=false)=><select value={value??''} onChange={e=>onChange(e.target.value||null)}>{inherit&&<option value="">پیش‌فرض مجموعه</option>}{Object.entries(labels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>
  return <section className="report-panel swtb24-batch-preview" dir="rtl" aria-label="پیش‌نمایش واگذاری مجموعه‌ای">
-  <header><h2>تعریف مجموعه کارها</h2><p role="status">{reviewPort===null?'نسخه بررسی با اطلاعات نمونه؛ هیچ وظیفه یا ساعتی ثبت نمی‌شود.':'مسیر بررسی با اطلاعات مصنوعی؛ ثبت واقعی انجام نمی‌شود.'}</p></header>
+  <header><h2>تعریف مجموعه کارها</h2><p role="status">{reviewPort===null?'نسخه بررسی با اطلاعات نمونه؛ هیچ وظیفه یا ساعتی ثبت نمی‌شود.':reviewPort.environment==='staging-review'?'ثبت در محیط آزمایشی مستقل انجام می‌شود؛ اطلاعات عملیاتی تغییر نمی‌کند.':'مسیر بررسی با اطلاعات مصنوعی؛ اطلاعات عملیاتی تغییر نمی‌کند.'}</p></header>
   <fieldset disabled={locked} style={{border:0,margin:0,padding:0,minWidth:0}}>
   <fieldset className="swtb24-batch-defaults"><legend>پیش‌فرض مشترک</legend>
    <label className="report-field"><span>واحد</span>{units(draft.defaults.unit,v=>defaults('unit',v))}</label>
@@ -54,7 +55,7 @@ export default function BatchAssignmentPreview({context,reviewPort=null}){
     </div>
     <label className="report-field"><span>شرح کار و نتیجه مورد انتظار</span><textarea rows={2} maxLength={3000} value={r.instructions} onChange={e=>field(r.id,'instructions',e.target.value)}/></label>
     <label className="report-field"><span>نوع تخصیص</span><select value={r.mode} onChange={e=>field(r.id,'mode',e.target.value)}><option value="independent">وظایف مستقل برای افراد منتخب</option><option value="collaborative">کار گروهی با گزارش فردی</option></select></label>
-    {draft.rows.length===1&&<fieldset><legend>مسئولان کار</legend><div className="swtb24-batch-people">{workers.map(w=><label key={w.id}><input type="checkbox" checked={r.workerIds.includes(w.id)} onChange={()=>toggle(r.id,w.id)}/>{w.name}</label>)}</div></fieldset>}
+    {draft.rows.length===1&&<fieldset><legend>مسئولان کار</legend><div className="swtb24-batch-people">{workers.map(w=><label key={w.id}><input type="checkbox" checked={r.workerIds.includes(w.id)} onChange={()=>toggle(r.id,w.id)}/>{managerIdentityLabel(w.name,w.id)}</label>)}</div></fieldset>}
     <details><summary>تنظیمات اختصاصی و پیش‌نیازها</summary>
      <label className="report-field"><span>واحد اختصاصی</span>{units(r.unit,v=>field(r.id,'unit',v),true)}</label>
      <label><input type="checkbox" checked={r.date!==null} onChange={e=>field(r.id,'date',e.target.checked?draft.defaults.date:null)}/>روز اختصاصی</label>
@@ -67,8 +68,8 @@ export default function BatchAssignmentPreview({context,reviewPort=null}){
   </div>
   <button type="button" className="report-btn report-btn--light" onClick={()=>change(p=>{let n=2;while(p.rows.some(r=>r.id==='row-'+n))n++;return {...p,rows:[...p.rows,blank('row-'+n)]}})}>+ افزودن کار دیگر</button>
   {draft.rows.length>1&&<section><h3>تخصیص مسئولان</h3><p>فقط مواردی که علامت می‌زنید در پیش‌نمایش منظور می‌شوند.</p>
-   <div className="swtb24-batch-matrix-scroll"><table><thead><tr><th scope="col">کار</th>{workers.map(w=><th scope="col" key={w.id}>{w.name}</th>)}</tr></thead><tbody>
-    {draft.rows.map((r,i)=><tr key={r.id}><th scope="row">{r.title||'کار '+fa(i+1)}</th>{workers.map(w=><td key={w.id}><input type="checkbox" aria-label={'کار '+fa(i+1)+' — '+w.name} checked={r.workerIds.includes(w.id)} onChange={()=>toggle(r.id,w.id)}/></td>)}</tr>)}
+   <div className="swtb24-batch-matrix-scroll"><table><thead><tr><th scope="col">کار</th>{workers.map(w=><th scope="col" key={w.id}>{managerIdentityLabel(w.name,w.id)}</th>)}</tr></thead><tbody>
+    {draft.rows.map((r,i)=><tr key={r.id}><th scope="row">{r.title||'کار '+fa(i+1)}</th>{workers.map(w=><td key={w.id}><input type="checkbox" aria-label={'کار '+fa(i+1)+' — '+managerIdentityLabel(w.name,w.id)} checked={r.workerIds.includes(w.id)} onChange={()=>toggle(r.id,w.id)}/></td>)}</tr>)}
    </tbody></table></div></section>}
   <button type="button" className="report-btn report-btn--primary" onClick={()=>{setReview({context,draft,result:previewBatchAssignment(draft,context)});requestAnimationFrame(()=>previewRef.current?.focus())}}>بررسی تخصیص</button>
   {reviewPort?.mode==='synthetic-review'&&retained.dirty&&<button type="button" className="report-btn report-btn--light" onClick={()=>{if(locked||submitLock.current)return;if(window.confirm('پیش‌نویس ثبت‌نشده حذف شود؟')){retained.reset();setReview(null);setNotice('')}}}>حذف پیش‌نویس محلی</button>}
