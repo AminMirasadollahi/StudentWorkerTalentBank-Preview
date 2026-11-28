@@ -12,7 +12,7 @@ jobs:
   synthetic:
     if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'review/swtb27-day-batch-contract-20261128'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,3 +28,15 @@ jobs:
         run: |
           if grep -nE 'DayBatchManagerReviewHost|dayBatchVerifiedOwner' src/OpsApp.jsx src/App.jsx index.html; then exit 1; fi
           echo PASS NO_REVIEW_OWNER_IN_NORMAL_ENTRY
+      - name: Native Chrome day-batch review (loopback only)
+        run: |
+          google-chrome --version
+          export SWTB23_BROWSER_TOOL_DIR="$RUNNER_TEMP/swtb27-day-batch-browser"
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "$SWTB23_BROWSER_TOOL_DIR" --ignore-scripts --no-audit --no-fund playwright@1.56.1
+          node tests/browser/run-swtb27-day-batch-review.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swtb27-day-batch-synthetic
+          path: test-results/swtb27-day-batch-synthetic
+          retention-days: 7
