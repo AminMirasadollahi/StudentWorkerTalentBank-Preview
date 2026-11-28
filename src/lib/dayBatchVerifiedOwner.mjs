@@ -2,16 +2,30 @@
  // No auth subscription, window, storage or real network on construction.
  // Mount host must suspend synchronously on blur/read/auth events, not just hide UI.
 import {createDayBatchSharedManager} from './dayBatchSharedManager.mjs'
-import {createScopedDayBatchHttpTransport} from './scopedDayBatchHttpTransport.mjs'
-import {createScopedDeskCancelHttpTransport} from './scopedDeskCancelHttpTransport.mjs'
+import {createScopedDayBatchHttpTransport,createScopedDayBatchReleaseHttpTransport} from './scopedDayBatchHttpTransport.mjs'
+import {createScopedDeskCancelHttpTransport,createScopedDeskCancelReleaseHttpTransport} from './scopedDeskCancelHttpTransport.mjs'
 import {verifyRecoveryReviewAdmin} from './recoveryReviewLifecycle.mjs'
+import {createTypedAssignmentReleaseAdmission} from './typedAssignmentReleaseAdmission.mjs'
 export function createDayBatchVerifiedOwner({mode,expectedProjectRef,projectUrl,publishableKey,auth,actorId,isVisible,fetchImpl,makeId,durableDeskCancel=false}){
- if(typeof isVisible!=='function'||typeof makeId!=='function')throw Error('DAY_BATCH_OWNER_DEPENDENCIES')
  const config={mode,expectedProjectRef,projectUrl,publishableKey,auth,actorId,fetchImpl}
- // Validate review config immediately, with an inert current guard.
- if(typeof durableDeskCancel!=='boolean')throw Error('DAY_BATCH_OWNER_DEPENDENCIES')
- createScopedDayBatchHttpTransport({...config,isCurrent:()=>false})
- if(durableDeskCancel)createScopedDeskCancelHttpTransport({...config,isCurrent:()=>false})
+ return buildVerifiedOwner({actorId,isVisible,makeId,durableDeskCancel,
+  transport:(desk,isCurrent)=>(desk?createScopedDeskCancelHttpTransport:createScopedDayBatchHttpTransport)({...config,isCurrent}),
+  verify:async isCurrent=>{const identity=await verifyRecoveryReviewAdmin({projectUrl,publishableKey,auth,fetchImpl,actorId,isCurrent});return identity?.role==='admin'&&identity.user?.id===actorId}
+ })
+}
+// Detached release owner always uses durable desk cancellation and a fresh exact
+// server admission proof. No raw route and no implicit fallback to review/V2.
+export function createTypedAssignmentReleaseOwner({env,auth,actorId,isVisible,fetchImpl,makeId}){
+ const config={env,auth,actorId,fetchImpl}
+ return buildVerifiedOwner({actorId,isVisible,makeId,durableDeskCancel:true,
+  transport:(desk,isCurrent)=>(desk?createScopedDeskCancelReleaseHttpTransport:createScopedDayBatchReleaseHttpTransport)({...config,isCurrent}),
+  verify:isCurrent=>createTypedAssignmentReleaseAdmission({...config,isCurrent}).check()
+ })
+}
+function buildVerifiedOwner({actorId,isVisible,makeId,durableDeskCancel,transport,verify}){
+ if(typeof isVisible!=='function'||typeof makeId!=='function'||typeof durableDeskCancel!=='boolean')throw Error('DAY_BATCH_OWNER_DEPENDENCIES')
+ transport(false,()=>false)
+ if(durableDeskCancel)transport(true,()=>false)
  let generation=0,phase='checking',disposed=false
  const visible=()=>{try{return isVisible()===true}catch{return false}}
  const current=g=>!disposed&&phase==='verified'&&g===generation&&visible()
@@ -20,8 +34,8 @@ export function createDayBatchVerifiedOwner({mode,expectedProjectRef,projectUrl,
   if(!current(g))throw Error('DAY_BATCH_OWNER_UNVERIFIED')
   const deskMethod=method==='deskCancelWrite'||method==='deskCancelControl'
   if(deskMethod&&!durableDeskCancel||durableDeskCancel&&method==='cancelExistingShift')throw Error('DAY_BATCH_OWNER_UNVERIFIED')
-  const transport=(deskMethod?createScopedDeskCancelHttpTransport:createScopedDayBatchHttpTransport)({...config,isCurrent:()=>current(g)})
-  const result=await transport[deskMethod?(method==='deskCancelWrite'?'write':'control'):method](args)
+  const scoped=transport(deskMethod,()=>current(g))
+  const result=await scoped[deskMethod?(method==='deskCancelWrite'?'write':'control'):method](args)
   if(!current(g))throw Error('DAY_BATCH_OWNER_UNVERIFIED')
   return result
  }
@@ -34,9 +48,9 @@ export function createDayBatchVerifiedOwner({mode,expectedProjectRef,projectUrl,
   suspend();const g=generation
   const valid=()=>!disposed&&g===generation&&visible()
   try{
-   const identity=await verifyRecoveryReviewAdmin({projectUrl,publishableKey,auth,fetchImpl,actorId,isCurrent:valid})
+   const verified=await verify(valid)
    if(!valid())return false
-   if(identity?.role!=='admin'||identity.user?.id!==actorId)throw Error('DAY_BATCH_OWNER_UNVERIFIED')
+   if(verified!==true)throw Error('DAY_BATCH_OWNER_UNVERIFIED')
    phase='verified';manager.setAccess({status:'verified',actorId});return true
   }catch{
    if(valid()){phase='blocked';manager.setAccess({status:'checking'})}
