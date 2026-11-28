@@ -57,7 +57,7 @@ globalThis.__qaDayBatch={counts:()=>({reserves:f.calls.filter(x=>x[1].p_action==
 globalThis.__qaAdminWork={...context.data,workers:context.workers,time_entries:[],profile_requests:[],approved_minutes_total:0}
 globalThis.__qaGeneralOffers=[];globalThis.__qaDeskOffers=[]
 let termMode='valid',termReads=0
-const dashboard=()=>({ok:true,term:context.term,terms:[context.term],units:[],weeks:[],workers:[],pools:[]})
+const dashboard=()=>({ok:true,term:context.term,terms:[context.term],units:[],weeks:[],workers:[],pools:[],filters:{unit_code:null,worker_id:null},allocation_scope:'all_workers'})
 const workspaceFixture=Object.freeze({...f.config,today:()=>today,readTerm:async()=>{termReads++;if(termMode==='failed')throw Error('FAKE_TERM_READ_FAILED');if(termMode==='missing')return {...dashboard(),term:null,terms:[]};return structuredClone(dashboard())}})
 
 let identityReads=0,candidateReads=0,identityWait=null,role='admin',candidateFail=false,reportReads=0
