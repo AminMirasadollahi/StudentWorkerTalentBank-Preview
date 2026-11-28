@@ -2,11 +2,12 @@
  // Keep this owner ABOVE editor/route remounts. No real fetch default.
 import React,{useLayoutEffect,useRef,useState} from 'react'
 import {createDayBatchVerifiedOwner} from '../lib/dayBatchVerifiedOwner.mjs'
+import {createDayBatchWorkspaceReadGate} from '../lib/dayBatchWorkspaceRead.mjs'
 import {ManagerDraftContext,createManagerDraftGuard} from '../lib/managerDraftGuard.mjs'
 const denied={state:'checking',canStart:false,canDiscover:false}
 const fa=n=>Number(n).toLocaleString('fa-IR')
-export default function DayBatchManagerReviewHost({fixture,scope='work',children}){
- const ref=useRef(null),scopeRef=useRef(scope)
+export default function DayBatchManagerReviewHost({fixture,scope='work',workspace=false,checking=false,children}){
+ const ref=useRef(null),scopeRef=useRef(scope),parentChecking=useRef(checking)
  const [,paint]=useState(0)
  const redraw=i=>{if(ref.current===i)paint(n=>n+1)}
  const active=i=>ref.current===i&&!i.closed
@@ -16,11 +17,14 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',children
   if(ack.owner==='legacy'){i.legacyRevision++;i.drafts.clearDraft('direct-task')}
   if(ack.committed)i.committedRevision++
  }
- const pause=i=>{i.revision++;i.data=null;i.verified=false;i.owner.suspend();redraw(i)}
+ const pause=i=>{i.revision++;i.data=null;i.readGate.invalidate();i.verified=false;i.owner.suspend();redraw(i)}
  const reload=async i=>{
   if(!active(i)||!i.verified)return 'blocked'
   const g=++i.revision,route=scopeRef.current
-  i.data=null;i.owner.selectReadScope(route);redraw(i)
+  i.data=null;i.readGate.invalidate();i.owner.selectReadScope(route);redraw(i)
+  if(workspace&&route!=='report'){
+   i.owner.beginScopedRead(route);i.workspaceReadRevision++;redraw(i);return 'checking'
+  }
   if(route==='work'||route==='candidates'){
    const settle=i.owner.beginScopedRead(route)
    try{
@@ -48,21 +52,21 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',children
   return ok
  }
  useLayoutEffect(()=>{
-  if(fixture?.mode!=='synthetic-review'||typeof fixture.read!=='function'||typeof fixture.fetchImpl!=='function'||typeof fixture.auth?.onAuthStateChange!=='function')return
+  if(fixture?.mode!=='synthetic-review'||(workspace?(typeof fixture.readTerm!=='function'||typeof fixture.today!=='function'):typeof fixture.read!=='function')||typeof fixture.fetchImpl!=='function'||typeof fixture.auth?.onAuthStateChange!=='function')return
   let i=null,subscription=null,timer=null
   const clear=()=>{if(timer!==null){clearTimeout(timer);timer=null}}
-  const isVisible=()=>i!==null&&active(i)&&document.visibilityState==='visible'&&document.hasFocus()
+  const isVisible=()=>i!==null&&active(i)&&!parentChecking.current&&document.visibilityState==='visible'&&document.hasFocus()
   const schedule=()=>{clear();if(isVisible()&&!i.terminal)timer=setTimeout(()=>{timer=null;void verify(i)},0)}
   const suspend=()=>{clear();if(i&&active(i))pause(i)}
   const resume=()=>{suspend();schedule()}
   const visibility=()=>{if(document.visibilityState==='hidden')suspend();else resume()}
   try{
    const owner=createDayBatchVerifiedOwner({...fixture,mode:'review',isVisible})
-   i={owner,fixture,closed:false,terminal:false,verified:false,revision:0,editorRevision:0,batchRevision:0,legacyRevision:0,committedRevision:0,drafts:createManagerDraftGuard(),data:null,ack:null,uiBusy:false,schedule}
+   i={owner,fixture,closed:false,terminal:false,verified:false,revision:0,editorRevision:0,batchRevision:0,legacyRevision:0,committedRevision:0,drafts:createManagerDraftGuard(),readGate:createDayBatchWorkspaceReadGate(),readScopeOwner:Object.freeze({}),workspaceReadRevision:0,data:null,ack:null,uiBusy:false,schedule}
    ref.current=i;owner.selectReadScope(scopeRef.current)
    subscription=fixture.auth.onAuthStateChange((event,session)=>{
     if(event==='INITIAL_SESSION'||!active(i))return
-    clear();i.revision++;i.data=null;i.verified=false
+    clear();i.revision++;i.data=null;i.readGate.invalidate();i.verified=false
     const retry=owner.authChanged(event,session)
     if(!retry){i.terminal=true;i.drafts.clearRetained()}
     redraw(i);if(retry)schedule()
@@ -70,14 +74,19 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',children
    window.addEventListener('blur',suspend);window.addEventListener('focus',resume);document.addEventListener('visibilitychange',visibility)
    schedule();redraw(i)
   }catch{if(i){i.closed=true;i.owner.dispose();if(ref.current===i)ref.current=null}}
-  return ()=>{clear();if(i){i.closed=true;i.owner.dispose();i.drafts.clearRetained();i.data=null;if(ref.current===i)ref.current=null}subscription?.unsubscribe();window.removeEventListener('blur',suspend);window.removeEventListener('focus',resume);document.removeEventListener('visibilitychange',visibility)}
- },[fixture])
+  return ()=>{clear();if(i){i.closed=true;i.owner.dispose();i.drafts.clearRetained();i.readGate.invalidate();i.data=null;if(ref.current===i)ref.current=null}subscription?.unsubscribe();window.removeEventListener('blur',suspend);window.removeEventListener('focus',resume);document.removeEventListener('visibilitychange',visibility)}
+ },[fixture,workspace])
+ useLayoutEffect(()=>{
+  parentChecking.current=checking;const i=ref.current
+  if(!i||!active(i))return
+  if(checking)pause(i);else i.schedule()
+ },[checking,fixture,workspace])
  useLayoutEffect(()=>{
   scopeRef.current=scope;const i=ref.current
   if(!i||!active(i))return
   i.owner.selectReadScope(scope)
   if(i.verified)void reload(i)
- },[scope,fixture])
+ },[scope,fixture,workspace])
  const i=ref.current
  // Config/actor changes cannot render an old owner before effect cleanup.
  if(!i||i.fixture!==fixture)return <p role="status">مسیر بررسی در دسترس نیست.</p>
@@ -105,11 +114,36 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',children
   }catch{return 'unknown'}finally{if(active(i)){i.uiBusy=false;redraw(i)}}
  }
  const snap=i.uiBusy?{...denied,state:'busy'}:s
- const allow=Boolean(i.verified&&scope==='work'&&i.data&&snap.canStart&&!i.ack)
+ const allow=Boolean(i.verified&&!checking&&scope==='work'&&i.data&&snap.canStart&&!i.ack)
  const legacyPort={version:3,snapshot:{...snap,state:allow?'idle':snap.state==='idle'?'checking':snap.state},editorRevision:i.legacyRevision,committedRevision:i.committedRevision,syntheticSharedOwner:true,submit:d=>allow&&active(i)&&i.data===renderData?run('submitLegacy',d):Promise.resolve('blocked')}
- const batchPort={mode:'synthetic-review',editorRevision:i.batchRevision,snapshot:{...snap,canStart:allow},submit:(d,c)=>allow&&active(i)&&c===i.data?run('submitBatch',d,c):Promise.resolve('blocked')}
+ const context=workspace?i.readGate.contextFor(i.data):i.data
+ const batchPort={mode:'synthetic-review',editorRevision:i.batchRevision,snapshot:{...snap,canStart:allow&&Boolean(context)},submit:(d,c)=>allow&&active(i)&&c===context&&(!workspace||i.readGate.contextFor(i.data)===c)?run('submitBatch',d,c):Promise.resolve('blocked')}
  const button=(label,method,flag)=>snap[flag]&&<button type="button" className="report-btn report-btn--light" onClick={()=>void run(method)}>{label}</button>
- return <section dir="rtl" aria-label="مالک مشترک واگذاری" data-state={snap.state}>
+ const beginWorkspaceRead=route=>{
+  if(!workspace||!active(i)||!i.verified||checking||route!==scopeRef.current||!['work','candidates'].includes(route))return ()=>false
+  const g=++i.revision,ticket=i.readGate.begin(),settle=i.owner.beginScopedRead(route);i.data=null;redraw(i)
+  let done=false
+  const live=()=>active(i)&&i.verified&&g===i.revision&&ticket.isCurrent()&&route===scopeRef.current&&!parentChecking.current
+  return (state,value)=>{
+   if(done||!live())return false
+   done=true
+   const ok=state==='ready'&&(route==='work'?ticket.acceptWork(value):Array.isArray(value))
+   if(!settle(ok?'ready':'failed'))return false
+   if(!ok){i.drafts.clearRetained();redraw(i);return false}
+   i.data=value;redraw(i)
+   void (async()=>{
+    const out=await i.owner.discover();if(!live())return
+    if(i.ack&&out==='idle'){finishAck(i);await reload(i);return}
+    redraw(i)
+   })()
+   if(route==='work')void (async()=>{
+    try{const result=await fixture.readTerm();if(live())ticket.acceptTerm(result,fixture.today())}catch{/* batch only remains disabled */}
+    if(live())redraw(i)
+   })()
+   return true
+  }
+ }
+ const panel=<section dir="rtl" aria-label={workspace?'مالک مشترک واگذاری':undefined} data-state={workspace?snap.state:undefined}>
   {!i.verified&&<><p role="status">{i.terminal?'نشست قبلی پایان یافته است.':'در حال بررسی دسترسی یا دسترسی تأیید نشده است.'}</p>{!i.terminal&&<button type="button" onClick={i.schedule}>بررسی مجدد دسترسی</button>}</>}
   {i.verified&&<section aria-label="بازیابی مشترک واگذاری">
    <p role="status">{snap.state==='idle'?'مسیر واگذاری آماده است.':snap.state==='committed'?'ثبت واگذاری تأیید شد؛ این رسید تأیید ساعت نیست.':snap.state==='cancelled'?'لغو درخواست تأیید شد.':snap.state==='reserved'?'درخواست رزرو شده است؛ هنوز کاری ثبت نشده است.':snap.state==='shift_unconfirmed'?'نتیجه لغو شیفت نامشخص است؛ ثبت جدید مسدود است.':'در حال بررسی یا تعیین تکلیف وضعیت عملیات.'}</p>
@@ -119,8 +153,14 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',children
    {button('ثبت نهایی درخواست رزروشده','commit','canCommit')}
    {button('لغو ایمن درخواست','cancel','canCancel')}
    {button('تأیید و بستن نتیجه','acknowledge','canAcknowledge')}
-   {scope!=='report'&&!i.data&&<button type="button" disabled={i.uiBusy} onClick={()=>void reload(i)}>بازخوانی اطلاعات</button>}
+   {!workspace&&scope!=='report'&&!i.data&&<button type="button" disabled={i.uiBusy} onClick={()=>void reload(i)}>بازخوانی اطلاعات</button>}
   </section>}
-  {i.verified&&i.data&&scope==='work'&&<ManagerDraftContext.Provider value={i.drafts}>{children({context:i.data,legacyPort,batchPort,editorRevision:i.editorRevision,committedRevision:i.committedRevision})}</ManagerDraftContext.Provider>}
  </section>
+ if(workspace){
+  if(!i.verified||checking)return panel
+  const port={...legacyPort,panel,readScopeOwner:i.readScopeOwner,beginScopedRead:beginWorkspaceRead,workspaceReadRevision:i.workspaceReadRevision,
+   batchWorkspace:{mode:'synthetic-review',contextFor:data=>active(i)&&i.verified&&!parentChecking.current?i.readGate.contextFor(data):null,port:batchPort}}
+  return <ManagerDraftContext.Provider value={i.drafts}>{children({workspacePort:port,draftGuard:i.drafts})}</ManagerDraftContext.Provider>
+ }
+ return <section dir="rtl" aria-label="مالک مشترک واگذاری" data-state={snap.state}>{panel}{i.verified&&i.data&&scope==='work'&&!checking&&<ManagerDraftContext.Provider value={i.drafts}>{children({context:i.data,legacyPort,batchPort,editorRevision:i.editorRevision,committedRevision:i.committedRevision})}</ManagerDraftContext.Provider>}</section>
 }
