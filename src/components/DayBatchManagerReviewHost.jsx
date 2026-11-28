@@ -25,8 +25,13 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',children
    }catch{if(active(i)&&g===i.revision){settle('failed');redraw(i)}return 'blocked'}
   }
   if(!active(i)||g!==i.revision)return 'stale'
-  const out=await i.owner.discover();if(active(i)&&g===i.revision)redraw(i)
-  return out
+  const out=await i.owner.discover()
+  if(!active(i)||g!==i.revision)return 'stale'
+  if(i.ack&&out==='idle'){
+   const committed=i.ack.committed;i.ack=null;i.editorRevision++;if(committed)i.committedRevision++
+   return reload(i)
+  }
+  redraw(i);return out
  }
  const verify=async i=>{
   if(!active(i)||i.terminal)return false
@@ -70,9 +75,9 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',children
  const i=ref.current
  // Config/actor changes cannot render an old owner before effect cleanup.
  if(!i||i.fixture!==fixture)return <p role="status">مسیر بررسی در دسترس نیست.</p>
- const s=i.owner.snapshot()
+ const s=i.owner.snapshot(),renderRevision=i.revision,renderData=i.data
  const run=async(method,...args)=>{
-  if(!active(i)||i.uiBusy||!i.verified)return 'blocked'
+  if(!active(i)||i.uiBusy||!i.verified||i.revision!==renderRevision)return 'blocked'
   const g=i.revision
   if(method==='acknowledge'){
    if(!s.canAcknowledge)return 'blocked'
@@ -96,8 +101,8 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',children
   }catch{return 'unknown'}finally{if(active(i)){i.uiBusy=false;redraw(i)}}
  }
  const snap=i.uiBusy?{...denied,state:'busy'}:s
- const allow=Boolean(i.verified&&scope==='work'&&i.data&&snap.canStart)
- const legacyPort={version:3,snapshot:{...snap,state:allow?'idle':snap.state==='idle'?'checking':snap.state},editorRevision:i.editorRevision,committedRevision:i.committedRevision,submit:d=>allow&&active(i)&&i.data?run('submitLegacy',d):Promise.resolve('blocked')}
+ const allow=Boolean(i.verified&&scope==='work'&&i.data&&snap.canStart&&!i.ack)
+ const legacyPort={version:3,snapshot:{...snap,state:allow?'idle':snap.state==='idle'?'checking':snap.state},editorRevision:i.editorRevision,committedRevision:i.committedRevision,submit:d=>allow&&active(i)&&i.data===renderData?run('submitLegacy',d):Promise.resolve('blocked')}
  const batchPort={mode:'synthetic-review',snapshot:{...snap,canStart:allow},submit:(d,c)=>allow&&active(i)&&c===i.data?run('submitBatch',d,c):Promise.resolve('blocked')}
  const button=(label,method,flag)=>snap[flag]&&<button type="button" className="report-btn report-btn--light" onClick={()=>void run(method)}>{label}</button>
  return <section dir="rtl" aria-label="مالک مشترک واگذاری" data-state={snap.state}>
