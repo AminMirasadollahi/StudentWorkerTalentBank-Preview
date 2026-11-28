@@ -34,35 +34,39 @@ after(async()=>{
 })
 const wait=()=>new Promise(r=>setTimeout(r,5))
 async function until(fn){for(let i=0;i<80;i++){if(fn())return;await act(async()=>{await wait()})}throw Error('MOUNTED_WAIT_EXPIRED')}
-function fixture(initial=null){
+function fixture(initial=null,durableDeskCancel=false){
  let active=initial,epoch=7,seq=20,mode='',callback=null,reads=0,adminWait=null
- const calls=[]
+ const calls=[],shiftId=id(801),taskId=id(802)
+ const shift={id:shiftId,task_id:taskId,worker_id:worker,shift_date:date,start_minute:480,end_minute:540,state:'scheduled'}
+ const task={id:taskId,worker_id:worker,unit:'library',planned_date:date,estimate_minutes:60,state:'assigned',title:'نوبت نمونه'}
+ let cancelled=false
  const transport=async(url,init)=>{
   assert.ok(url.startsWith('https://abcdefghijklmnopqrst.supabase.co/rest/v1/rpc/'))
   const rpc=url.split('/').pop(),a=JSON.parse(init.body);calls.push([rpc,a])
   if(rpc==='ops_is_admin'){if(adminWait){const pending=adminWait;adminWait=null;await pending}return {ok:true,json:async()=>true}}
-  assert.ok(['ops_assignment_batch_write_v1','ops_assignment_batch_control_v1','ops_assignment_recovery_write_v3','ops_assignment_recovery_control_v2'].includes(rpc))
-  const batch=rpc.includes('_batch_'),control=rpc.endsWith('control_v1')||rpc.endsWith('control_v2')
+  assert.ok(['ops_assignment_batch_write_v1','ops_assignment_batch_control_v1','ops_assignment_recovery_write_v3','ops_assignment_recovery_control_v2','ops_desk_cancel_write_v1','ops_desk_cancel_control_v1'].includes(rpc))
+  const desk=rpc.includes('_desk_cancel_'),batch=rpc.includes('_batch_'),control=rpc.endsWith('control_v1')||rpc.endsWith('control_v2')
   if(a.p_action==='reserve'){
    assert.equal(active,null);assert.equal(a.p_epoch,epoch)
-   active={kind:batch?'batch_direct_v1':a.p_kind,status:'reserved',request_id:a.p_request_id}
+   active={kind:batch?'batch_direct_v1':desk?'desk_cancel_v1':a.p_kind,status:'reserved',request_id:a.p_request_id}
   }
   if(a.p_action==='commit'){
    assert.equal(active.request_id,a.p_request_id);assert.equal(active.status,'reserved')
-   const result=batch?{term_id:term,rows:a.p_rows.map((r,i)=>({row_id:r.id,mode:r.mode,group_id:null,minutes_per_worker:r.minutes,tasks:r.worker_ids.map((w,j)=>({worker_id:w,task_id:id(100+i*10+j)}))})),pair_count:a.p_rows.reduce((n,r)=>n+r.worker_ids.length,0),standard_person_minutes:a.p_rows.reduce((n,r)=>n+r.worker_ids.length*r.minutes,0)}:{id:id(101),state:'assigned',short_notice:false}
+   const result=batch?{term_id:term,rows:a.p_rows.map((r,i)=>({row_id:r.id,mode:r.mode,group_id:null,minutes_per_worker:r.minutes,tasks:r.worker_ids.map((w,j)=>({worker_id:w,task_id:id(100+i*10+j)}))})),pair_count:a.p_rows.reduce((n,r)=>n+r.worker_ids.length,0),standard_person_minutes:a.p_rows.reduce((n,r)=>n+r.worker_ids.length*r.minutes,0)}:desk?{shift_id:shiftId,task_id:taskId,state:'cancelled'}:{id:id(101),state:'assigned',short_notice:false}
+   if(desk){assert.equal(a.p_shift_id,shiftId);assert.equal(a.p_task_id,taskId);assert.equal(a.p_day,date);cancelled=true}
    active={...active,status:'committed',receipt:{ok:true,kind:active.kind,request_id:active.request_id,result}}
   }
   if(a.p_action==='cancel'){assert.equal(active.request_id,a.p_request_id);active={...active,status:'cancelled'}}
   if(a.p_action==='acknowledge'){assert.equal(active.request_id,a.p_request_id);active=null;epoch++}
   if(mode===a.p_action){mode='';throw Error('SYNTHETIC_LOST_RESPONSE')}
-  if(!batch&&active?.kind==='batch_direct_v1')throw Error('LEGACY_UPGRADE_REQUIRED')
-  const projection=batch&&a.p_action==='discover'&&active&&active.kind!=='batch_direct_v1'?{kind:active.kind,status:active.status,foreign:true}:active
-  const result={ok:true,epoch,active:projection,...(batch&&control?{durable_active:false}:{})}
+  if(!batch&&!desk&&['batch_direct_v1','desk_cancel_v1'].includes(active?.kind))throw Error('LEGACY_UPGRADE_REQUIRED')
+  const projection=(batch||desk)&&a.p_action==='discover'&&active&&active.kind!==(batch?'batch_direct_v1':'desk_cancel_v1')?{kind:active.kind,status:active.status,foreign:true}:active
+  const result={ok:true,epoch,active:projection,...((batch||desk)&&control?{durable_active:false}:{})}
   return {ok:true,json:async()=>structuredClone(result)}
  }
- const config=Object.freeze({mode:'synthetic-review',actorId:actor,expectedProjectRef:'abcdefghijklmnopqrst',projectUrl:'https://abcdefghijklmnopqrst.supabase.co',publishableKey:'sb_publishable_fixture',
+ const config=Object.freeze({mode:'synthetic-review',durableDeskCancel,actorId:actor,expectedProjectRef:'abcdefghijklmnopqrst',projectUrl:'https://abcdefghijklmnopqrst.supabase.co',publishableKey:'sb_publishable_fixture',
   auth:{getSession:async()=>({data:{session:{access_token:'abc.def.ghi'}}}),getUser:async()=>({data:{user:{id:actor,is_anonymous:false}}}),onAuthStateChange:fn=>{callback=fn;return {data:{subscription:{unsubscribe(){callback=null}}}}}},
-  makeId:()=>id(seq++),fetchImpl:transport,read:async scope=>{reads++;return scope==='work'?structuredClone(context):{rows:[]}}})
+  makeId:()=>id(seq++),fetchImpl:transport,readDeskShifts:async day=>({ok:true,from:day,to:day,shifts:day===date?[{...shift,state:cancelled?'cancelled':'scheduled'}]:[]}),read:async scope=>{reads++;return scope==='work'?structuredClone(durableDeskCancel?{...context,data:{...context.data,tasks:[{...task,state:cancelled?'cancelled':'assigned'}],time_entries:[]}}:context):{rows:[]}}})
  return {config,calls,reads:()=>reads,lose:action=>{mode=action},auth:event=>callback?.(event,{user:{id:actor}}),holdAdmin:()=>{let release;adminWait=new Promise(r=>release=r);return release},server:()=>active}
 }
 async function mount(f,{editor='batch',scope='work'}={}){
@@ -201,4 +205,30 @@ test('logout clears retained draft; fresh host cannot inherit it',{timeout:10000
  const fresh=await mount(f)
  try{assert.equal(fresh.node.querySelector('input[maxlength="160"]').value,'');assert.equal(window.localStorage.length,0);assert.equal(window.sessionStorage.length,0)}
  finally{await fresh.cleanup()}
+})
+
+test('actual mounted desk editor uses exact durable cancellation RPC and shared recovery, never raw legacy',async()=>{
+ const f=fixture(null,true),m=await mount(f,{editor:'direct'})
+ try{
+  await m.click('استفاده از شرح وظیفه آماده');await until(()=>Boolean(m.button('لغو نوبت'))&&!m.button('لغو نوبت').disabled)
+  await m.click('لغو نوبت');await m.fill('input[aria-label="علت لغو نوبت"]','دلیل لغو آزمایشی')
+  await m.click('تأیید لغو نوبت');assert.equal(m.state(),'committed')
+  assert.match(m.node.textContent,/لغو نوبت و وظیفه مرتبط تأیید شد/)
+  assert.equal(m.port().legacyPort.snapshot.canStart,false)
+  await m.click('بررسی وضعیت درخواست');await m.click('تأیید و بستن نتیجه');await until(()=>m.state()==='idle')
+  assert.equal(f.calls.filter(x=>x[0]==='ops_desk_cancel_write_v1'&&x[1].p_action==='commit').length,1)
+  assert.equal(f.calls.filter(x=>x[0]==='ops_assignment_recovery_write_v3').length,0);assert.equal(legacyCalls,0)
+  assert.equal(window.localStorage.length,0);assert.equal(window.sessionStorage.length,0)
+ }finally{await m.cleanup()}
+})
+test('mounted lost desk commit recovers in report scope with no retry',async()=>{
+ const f=fixture(null,true),m=await mount(f,{editor:'direct'})
+ try{
+  await m.click('استفاده از شرح وظیفه آماده');await until(()=>Boolean(m.button('لغو نوبت'))&&!m.button('لغو نوبت').disabled)
+  await m.click('لغو نوبت');await m.fill('input[aria-label="علت لغو نوبت"]','دلیل لغو آزمایشی');f.lose('commit')
+  await m.click('تأیید لغو نوبت');assert.equal(m.state(),'unknown')
+  await m.render('direct','report');await until(()=>m.state()==='committed')
+  assert.equal(m.node.querySelector('form'),null);await m.click('تأیید و بستن نتیجه')
+  assert.equal(f.calls.filter(x=>x[0]==='ops_desk_cancel_write_v1'&&x[1].p_action==='commit').length,1);assert.equal(legacyCalls,0)
+ }finally{await m.cleanup()}
 })

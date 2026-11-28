@@ -28,7 +28,8 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  // Only an explicitly supplied, scoped V2 capability may perform it.
  const receiptCancelAllowed=[2,3].includes(assignmentReceiptPort?.version)&&!receiptBlocked&&
    typeof assignmentReceiptPort?.cancelExistingShift==='function'
- const deskCancelAllowed=(!receiptMode&&!policyRequiresAtomic)||receiptCancelAllowed
+ const typedDesk=assignmentReceiptPort?.deskCancelPort?.mode==='synthetic-review'?assignmentReceiptPort.deskCancelPort:null
+ const deskCancelAllowed=typedDesk?(!receiptBlocked&&typedDesk.canStart===true):(!receiptMode&&!policyRequiresAtomic)||receiptCancelAllowed
  const Fields=receiptMode?'fieldset':Fragment
  const fieldProps=receiptMode?{disabled:receiptBlocked,style:{border:0,margin:0,padding:0,minWidth:0}}:{}
  const seed=assignmentReceiptPort?.initialPayload
@@ -78,15 +79,16 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
   }
   let active=true
   setDeskRead({date,state:'loading',shifts:[]})
-  getLibraryDeskShifts({from:date,to:date}).then(result=>{
+  const read=typedDesk?()=>typedDesk.read(date):()=>getLibraryDeskShifts({from:date,to:date})
+  Promise.resolve().then(read).then(result=>{
     if(!active)return
     if(result?.ok!==true||!Array.isArray(result.shifts))throw Error('invalid_shift_read')
-    setDeskRead({date,state:'ready',shifts:result.shifts})
+    setDeskRead({date,state:'ready',shifts:result.shifts,envelope:typedDesk?result:null})
   }).catch(()=>{
     if(active)setDeskRead({date,state:'error',shifts:[]})
   })
   return ()=>{active=false}
- },[date,libraryTemplateSelected,taskUnit,deskRevision])
+ },[date,libraryTemplateSelected,taskUnit,deskRevision,typedDesk?.readRevision,Boolean(typedDesk)])
  const applyLibraryTemplate=()=>{
   setTaskUnit(LIBRARY_DESK_TEMPLATE.unit)
   setTitle(LIBRARY_DESK_TEMPLATE.title)
@@ -190,12 +192,19 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  }
  const confirmCancel=async shiftId=>{
   const draft=cancelDraft
-  const reasonText=String(draft?.reason||'').trim()
+  const reasonText=typedDesk?String(draft?.reason||'').replace(/^ +| +$/g,''):String(draft?.reason||'').trim()
   if(!deskCancelAllowed||!deskVerified||busy||submitLock.current||cancelLock.current||!draft||
      draft.id!==shiftId||reasonText.length<5||reasonText.length>500||
-     !visibleDeskShifts(deskRead.shifts).some(s=>s.id===shiftId))return
+     !visibleDeskShifts(deskRead.shifts).some(s=>s.id===shiftId)||typedDesk&&!typedDesk.eligible(shiftId,deskRead.envelope))return
   cancelLock.current=true;setCancelBusy(true);setCancelError('')
   try{
+   if(typedDesk){
+    const result=await typedDesk.submit({shiftId,reason:reasonText},deskRead.envelope)
+    if(result==='committed'){setCancelDraft(null);setNotice('لغو نوبت تأیید شد؛ برای بازخوانی اطلاعات، نتیجه را در کارتابل بازیابی تأیید و ببندید.')}
+    else if(result==='blocked'||result==='invalid')setCancelError('درخواست ارسال نشد؛ اطلاعات معتبر نوبت و دسترسی را بررسی کنید.')
+    else{setCancelDraft(null);setCancelError('نتیجه درخواست را در بخش بازیابی مشترک بررسی کنید؛ درخواست جدید ارسال نکنید.')}
+    return
+   }
    // Never call the legacy cancellation RPC from an injected receipt editor.
    const cancel=receiptMode?assignmentReceiptPort.cancelExistingShift:cancelLibraryDeskShift
    const result=await cancel({shiftId,reason:reasonText})
@@ -330,7 +339,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
               <span>{clockFa(s.start_minute)} تا {clockFa(s.end_minute)}</span>
               <span>{workers.find(w=>w.id===s.worker_id)?.name||'دانشجوکار'}</span>
               <button type="button" className="ow-desk-cancel-trigger"
-                aria-expanded={cancelDraft?.id===s.id} disabled={!deskCancelAllowed||cancelBusy||busy}
+                aria-expanded={cancelDraft?.id===s.id} disabled={!deskCancelAllowed||cancelBusy||busy||Boolean(typedDesk&&!typedDesk.eligible(s.id,deskRead.envelope))}
                 onClick={()=>{setCancelError('');setCancelDraft(prev=>
                   prev?.id===s.id?null:{id:s.id,reason:''})}}>
                 لغو نوبت
@@ -347,7 +356,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
                   <button type="button" className="report-btn report-btn--light"
                     disabled={cancelBusy} onClick={()=>setCancelDraft(null)}>بازگشت</button>
                   <button type="button" className="report-btn report-btn--primary"
-                    disabled={!deskCancelAllowed||cancelBusy||busy||cancelDraft.reason.trim().length<5}
+                    disabled={!deskCancelAllowed||cancelBusy||busy||cancelDraft.reason.trim().length<5||Boolean(typedDesk&&!typedDesk.eligible(s.id,deskRead.envelope))}
                     onClick={()=>{void confirmCancel(s.id)}}>
                     {cancelBusy?'در حال لغو…':'تأیید لغو نوبت'}
                   </button>

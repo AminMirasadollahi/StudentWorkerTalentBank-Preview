@@ -2,6 +2,7 @@
  // Keep this owner ABOVE editor/route remounts. No real fetch default.
 import React,{useLayoutEffect,useRef,useState} from 'react'
 import {createDayBatchVerifiedOwner} from '../lib/dayBatchVerifiedOwner.mjs'
+import {captureDeskCancellationTarget} from '../lib/deskCancellationObservation.mjs'
 import {createWorkPoolRouteFence} from '../lib/workPoolRouteFence.mjs'
 import {createDayBatchWorkspaceReadGate} from '../lib/dayBatchWorkspaceRead.mjs'
 import {ManagerDraftContext,createManagerDraftGuard} from '../lib/managerDraftGuard.mjs'
@@ -53,7 +54,7 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
   return ok
  }
  useLayoutEffect(()=>{
-  if(fixture?.mode!=='synthetic-review'||(workspace?(typeof fixture.readTerm!=='function'||typeof fixture.today!=='function'):typeof fixture.read!=='function')||typeof fixture.fetchImpl!=='function'||typeof fixture.auth?.onAuthStateChange!=='function')return
+  if(fixture?.mode!=='synthetic-review'||fixture.durableDeskCancel===true&&typeof fixture.readDeskShifts!=='function'||(workspace?(typeof fixture.readTerm!=='function'||typeof fixture.today!=='function'):typeof fixture.read!=='function')||typeof fixture.fetchImpl!=='function'||typeof fixture.auth?.onAuthStateChange!=='function')return
   let i=null,subscription=null,timer=null
   const clear=()=>{if(timer!==null){clearTimeout(timer);timer=null}}
   const isVisible=()=>i!==null&&active(i)&&!parentChecking.current&&document.visibilityState==='visible'&&document.hasFocus()
@@ -63,7 +64,7 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
   const visibility=()=>{if(document.visibilityState==='hidden')suspend();else resume()}
   try{
    const owner=createDayBatchVerifiedOwner({...fixture,mode:'review',isVisible})
-   i={owner,fixture,closed:false,terminal:false,verified:false,revision:0,editorRevision:0,batchRevision:0,legacyRevision:0,committedRevision:0,drafts:createManagerDraftGuard(),readGate:createDayBatchWorkspaceReadGate(),readScopeOwner:Object.freeze({}),workPoolRouteFence:createWorkPoolRouteFence(),workspaceReadRevision:0,data:null,ack:null,uiBusy:false,schedule,clearSchedule:clear}
+   i={owner,fixture,closed:false,terminal:false,verified:false,revision:0,editorRevision:0,batchRevision:0,legacyRevision:0,committedRevision:0,drafts:createManagerDraftGuard(),readGate:createDayBatchWorkspaceReadGate(),readScopeOwner:Object.freeze({}),workPoolRouteFence:createWorkPoolRouteFence(),workspaceReadRevision:0,data:null,deskReadTicket:null,ack:null,uiBusy:false,schedule,clearSchedule:clear}
    ref.current=i;owner.selectReadScope(scopeRef.current)
    subscription=fixture.auth.onAuthStateChange((event,session)=>{
     if(event==='INITIAL_SESSION'||!active(i))return
@@ -116,7 +117,23 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
  }
  const snap=i.uiBusy?{...denied,state:'busy'}:s
  const allow=Boolean(i.verified&&!checking&&scope==='work'&&i.data&&snap.canStart&&!i.ack)
- const legacyPort={version:3,snapshot:{...snap,state:allow?'idle':snap.state==='idle'?'checking':snap.state},editorRevision:i.legacyRevision,committedRevision:i.committedRevision,syntheticSharedOwner:true,submit:d=>allow&&active(i)&&i.data===renderData?run('submitLegacy',d):Promise.resolve('blocked')}
+ // Bind exact current day projection to the current work read; no editor-supplied work.
+ const deskLive=()=>active(i)&&i.verified&&!checking&&!parentChecking.current&&scope==='work'&&scopeRef.current==='work'&&i.revision===renderRevision&&i.data===renderData&&document.visibilityState==='visible'&&document.hasFocus()
+ const deskWork=workspace?renderData:renderData?.data
+ const deskRead=async day=>{
+  if(!deskLive()||!deskWork)throw Error('DESK_READ_STALE')
+  const ticket={day,revision:renderRevision,value:null};i.deskReadTicket=ticket
+  const raw=await fixture.readDeskShifts(day)
+  if(!deskLive()||i.deskReadTicket!==ticket||raw?.ok!==true||raw.from!==day||raw.to!==day||!Array.isArray(raw.shifts))throw Error('DESK_READ_INVALID')
+  const value=Object.freeze({ok:true,from:day,to:day,shifts:Object.freeze(raw.shifts.map(s=>Object.freeze({id:s?.id,task_id:s?.task_id,worker_id:s?.worker_id,shift_date:s?.shift_date,start_minute:s?.start_minute,end_minute:s?.end_minute,state:s?.state})))})
+  ticket.value=value;return value
+ }
+ const deskContext=value=>deskLive()&&i.deskReadTicket?.revision===renderRevision&&i.deskReadTicket.value===value?{day:i.deskReadTicket.day,shifts:value,work:deskWork}:null
+ const deskPort=fixture.durableDeskCancel===true?Object.freeze({mode:'synthetic-review',readRevision:renderRevision,read:deskRead,canStart:allow&&snap.canStartDeskCancel===true,
+  eligible:(shiftId,value)=>{const c=deskContext(value);return Boolean(c&&captureDeskCancellationTarget({shiftId,...c}))},
+  submit:(d,value)=>{const c=deskContext(value);return allow&&snap.canStartDeskCancel===true&&c&&captureDeskCancellationTarget({shiftId:d?.shiftId,...c})?run('submitDeskCancel',d,c):Promise.resolve('blocked')}
+ }):null
+ const legacyPort={deskCancelPort:deskPort,version:3,snapshot:{...snap,state:allow?'idle':snap.state==='idle'?'checking':snap.state},editorRevision:i.legacyRevision,committedRevision:i.committedRevision,syntheticSharedOwner:true,submit:d=>allow&&active(i)&&i.data===renderData?run('submitLegacy',d):Promise.resolve('blocked')}
  const context=workspace?i.readGate.contextFor(i.data):i.data
  const batchPort={mode:'synthetic-review',editorRevision:i.batchRevision,snapshot:{...snap,canStart:allow&&Boolean(context)},submit:(d,c)=>allow&&active(i)&&c===context&&(!workspace||i.readGate.contextFor(i.data)===c)?run('submitBatch',d,c):Promise.resolve('blocked')}
  const button=(label,method,flag)=>snap[flag]&&<button type="button" className="report-btn report-btn--light" onClick={()=>void run(method)}>{label}</button>
@@ -149,12 +166,12 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
  const panel=<section dir="rtl" aria-label={workspace?'مالک مشترک واگذاری':undefined} data-state={workspace?snap.state:undefined}>
   {!i.verified&&<><p role="status">{i.terminal?'نشست قبلی پایان یافته است.':'در حال بررسی دسترسی یا دسترسی تأیید نشده است.'}</p>{!i.terminal&&<button type="button" onClick={i.schedule}>بررسی مجدد دسترسی</button>}</>}
   {i.verified&&<section aria-label="بازیابی مشترک واگذاری">
-   <p role="status">{snap.state==='idle'?'مسیر واگذاری آماده است.':snap.state==='committed'?'ثبت واگذاری تأیید شد؛ این رسید تأیید ساعت نیست.':snap.state==='cancelled'?'لغو درخواست تأیید شد.':snap.state==='reserved'?'درخواست رزرو شده است؛ هنوز کاری ثبت نشده است.':snap.state==='shift_unconfirmed'?'نتیجه لغو شیفت نامشخص است؛ ثبت جدید مسدود است.':'در حال بررسی یا تعیین تکلیف وضعیت عملیات.'}</p>
+   <p role="status">{snap.state==='idle'?'مسیر واگذاری آماده است.':snap.state==='committed'?(snap.kind==='desk_cancel_v1'?'لغو نوبت و وظیفه مرتبط تأیید شد؛ این رسید تأیید ساعت نیست.':'ثبت واگذاری تأیید شد؛ این رسید تأیید ساعت نیست.'):snap.state==='cancelled'?(snap.kind==='desk_cancel_v1'?'درخواست لغو نوبت کنار گذاشته شد؛ این نتیجه به معنی لغو نوبت نیست.':'لغو درخواست تأیید شد.'):snap.state==='reserved'?(snap.kind==='desk_cancel_v1'?'درخواست لغو نوبت رزرو شده است؛ هنوز لغو نهایی نشده است.':'درخواست رزرو شده است؛ هنوز کاری ثبت نشده است.'):snap.state==='shift_unconfirmed'?'نتیجه لغو شیفت نامشخص است؛ ثبت جدید مسدود است.':'در حال بررسی یا تعیین تکلیف وضعیت عملیات.'}</p>
    {snap.receipt?.kind==='batch_direct_v1'&&<p data-testid="batch-receipt-summary">{fa(snap.receipt.result.pair_count)} تخصیص · {fa(snap.receipt.result.standard_person_minutes)} دقیقه زمان استاندارد</p>}
    {button('بررسی وضعیت درخواست','discover','canDiscover')}
    {button('تکرار آماده‌سازی همان درخواست','retryReserve','canRetryReserve')}
    {button('ثبت نهایی درخواست رزروشده','commit','canCommit')}
-   {button('لغو ایمن درخواست','cancel','canCancel')}
+   {button(snap.kind==='desk_cancel_v1'?'انصراف از درخواست لغو نوبت':'لغو ایمن درخواست','cancel','canCancel')}
    {button('تأیید و بستن نتیجه','acknowledge','canAcknowledge')}
    {!workspace&&scope!=='report'&&!i.data&&<button type="button" disabled={i.uiBusy} onClick={()=>void reload(i)}>بازخوانی اطلاعات</button>}
   </section>}
