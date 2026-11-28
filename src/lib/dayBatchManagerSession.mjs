@@ -6,16 +6,16 @@ const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 // Shared fence is owner-scoped and non-reentrant. Never treat disposal,
 // visibility changes, or HTTP errors as evidence of server rollback.
 export function createManagerAssignmentFence(){
- let owner=null,disposed=false
- const acquire=token=>{if(disposed||!token||owner!==null)return false;owner=token;return true}
+ let owner=null,disposed=false,revision=0
+ const acquire=token=>{if(disposed||!token||owner!==null)return false;owner=token;revision++;return true}
  const holds=token=>!disposed&&owner===token
- const release=token=>{if(!holds(token))return false;owner=null;return true}
- return Object.freeze({acquire,holds,release,isIdle:()=>!disposed&&owner===null,dispose:()=>{disposed=true;owner=null}})
+ const release=token=>{if(!holds(token))return false;owner=null;revision++;return true}
+ return Object.freeze({acquire,holds,release,isIdle:()=>!disposed&&owner===null,revision:()=>revision,dispose:()=>{disposed=true;owner=null;revision++}})
 }
 export function createDayBatchManagerSession({write,control,makeId,fence}){
- if([write,control,makeId,fence?.acquire,fence?.holds,fence?.release,fence?.isIdle].some(x=>typeof x!=='function'))throw Error('BATCH_SESSION_DEPENDENCIES')
+ if([write,control,makeId,fence?.acquire,fence?.holds,fence?.release,fence?.isIdle,fence?.revision].some(x=>typeof x!=='function'))throw Error('BATCH_SESSION_DEPENDENCIES')
  const lease=Object.freeze({})
- let actor=null,verified=false,disposed=false,busy=false,generation=0,local=null,observed=null,state='checking',used=new Set(),uncertain=null
+ let actor=null,verified=false,disposed=false,busy=false,generation=0,local=null,observed=null,state='checking',used=new Set(),uncertain=null,idleRevision=null
  const allowed=()=>!disposed&&verified&&actor!==null
  const held=()=>fence.holds(lease)
  const clear=()=>{observed=null;state='checking'}
@@ -33,16 +33,17 @@ export function createDayBatchManagerSession({write,control,makeId,fence}){
   if(!allowed())return Object.freeze({state:disposed?'unavailable':'checking',canStart:false})
   const usable=!busy&&(held()||fence.isIdle())
   return Object.freeze({state,epoch:observed?.epoch??null,receipt:observed?.receipt??null,
-   canStart:usable&&fence.isIdle()&&state==='idle'&&!local&&!uncertain,
+   canStart:usable&&fence.isIdle()&&state==='idle'&&idleRevision===fence.revision()&&!local&&!uncertain,
    canCommit:usable&&held()&&state==='reserved'&&!!local&&observed?.requestId===local.requestId&&observed?.epoch===local.epoch,
    canRetryReserve:usable&&held()&&state==='reserve_unknown'&&!!local,
-   canCancel:usable&&held()&&state==='reserved',
-   canAcknowledge:usable&&held()&&['committed','cancelled'].includes(state),
+   canCancel:usable&&held()&&state==='reserved'&&observed?.source!=='write',
+   canAcknowledge:usable&&held()&&['committed','cancelled'].includes(state)&&observed?.source!=='write',
    canDiscover:usable})
  }
  const settleIdle=()=>{
   local=null;uncertain=null;state='idle'
   if(held())fence.release(lease)
+  idleRevision=fence.revision()
  }
  const invoke=async(label,fn,args,accept)=>{
   if(!allowed()||busy||!held()&&!fence.acquire(lease))return 'blocked'
