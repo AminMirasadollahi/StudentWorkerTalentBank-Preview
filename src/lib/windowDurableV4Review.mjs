@@ -4,6 +4,8 @@
 import {validateWindowReceiptV2Capability,validateWindowOperationReceiptArgs,parseWindowOperationReceiptV1,parseWindowRecoveryV1,validateWindowWorkerSnapshotV1} from './windowFixtureApiV1.mjs'
 import {managerWindowHistoryV2} from './managerWindowReadV2.mjs'
 import {workerWindowReviewModel} from './windowReviewPresentation.mjs'
+import {buildReviewAssignmentScope} from './windowTermReview.mjs'
+import {assignmentWindowPayload} from './windowEditorPayloads.mjs'
 const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(x)&&x!=='00000000-0000-0000-0000-000000000000'
 const integer=(x,min=0,max=Number.MAX_SAFE_INTEGER)=>Number.isSafeInteger(x)&&x>=min&&x<=max
 const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x)
@@ -100,25 +102,33 @@ function permitted(d,current){
 }
 const sessions=new WeakSet()
 export const isWindowDurableV4Session=x=>sessions.has(x)
-export function createWindowDurableV4Review({syntheticReviewOnly,fixtureTransport,context}={}){
+export function createWindowDurableV4Review({syntheticReviewOnly,fixtureTransport,context,assignmentWritesV1=false,newAssignmentId}={}){
  const principal=principalOf(context)
  if(syntheticReviewOnly!==true||typeof fixtureTransport!=='function'||!principal)throw Error('WINDOW_DURABLE_FIXTURE_ONLY')
  let generation=0,verified=true,closed=false,cap=false,busy=false,slot=null,current=null,draft=null,knownKey=null,uncertain=false,ackPending=null
- let version=0;const listeners=new Set(),formDrafts=new Map()
+ const assignmentEnabled=assignmentWritesV1===true&&principal.role==='manager'
+ if(assignmentEnabled&&typeof newAssignmentId!=='function')throw Error('WINDOW_ASSIGNMENT_KEY_FACTORY_REQUIRED')
+ let assignmentIntent=null
+ let version=0;const listeners=new Set(),formDrafts=new Map(),issuedAssignmentIds=new Set()
  const publish=()=>{version++;for(const f of [...listeners])f()}
  const valid=()=>verified&&!closed
  const can=()=>valid()&&cap&&!busy
+ const baseReady=()=>can()&&!!current&&slot?.active===null&&!draft&&!uncertain&&!ackPending
+ const assignmentMatches=()=>!!assignmentIntent&&current?.assignment?.epoch===assignmentIntent.args.p_epoch&&current.assignment.active?.kind==='single_report_window_v1'&&current.assignment.active.requestId===assignmentIntent.args.p_request_id
+ const assignmentIdle=()=>baseReady()&&current?.assignment?.active===null&&!assignmentIntent
+ const canRecoverBusiness=()=>baseReady()&&(!assignmentIntent||assignmentMatches())
+ const canRetryAssignment=()=>baseReady()&&!!assignmentIntent&&assignmentIntent.uncertain&&current.assignment.epoch===assignmentIntent.args.p_epoch&&(assignmentIntent.phase==='reserve'?current.assignment.active===null||assignmentMatches()&&['reserved','committed'].includes(current.assignment.active.status):assignmentMatches()&&['reserved','committed'].includes(current.assignment.active.status))
  const state=()=>freeze({verified:valid(),ready:valid()&&cap,busy,slot:valid()?slot:null,current:valid()?current:null,
-  uncertain:valid()&&uncertain,intentSummary:valid()&&draft?draft.summary:null,refreshRequired:!current,writeHeld:!valid()||!cap||busy||!current||uncertain||!!draft||!!slot?.active||!!ackPending,
-  canPrepare:can()&&!!current&&slot?.active===null&&!draft&&!uncertain&&!ackPending,
+  uncertain:valid()&&(uncertain||!!assignmentIntent?.uncertain),assignmentEnabled,assignmentPending:valid()&&!!assignmentIntent,assignmentSummary:valid()&&assignmentIntent?{title:assignmentIntent.args.p_title,phase:assignmentIntent.phase}:null,canReserveAssignment:assignmentEnabled&&assignmentIdle()&&!!current.assignmentScope,canCommitAssignment:assignmentEnabled&&baseReady()&&assignmentMatches()&&!assignmentIntent.uncertain&&assignmentIntent.phase==='reserve'&&current.assignment.active.status==='reserved',canRetryAssignment:assignmentEnabled&&canRetryAssignment(),canPrepareRecovery:canRecoverBusiness(),intentSummary:valid()&&draft?draft.summary:null,refreshRequired:!current,writeHeld:!valid()||!cap||busy||!current||uncertain||!!draft||!!slot?.active||!!ackPending||!!assignmentIntent,
+  canPrepare:baseReady()&&!assignmentIntent,
   canRetryPrepare:can()&&!!current&&!!draft&&!knownKey&&slot?.epoch===draft.epoch&&(!slot.active||slot.active.status==='reserved'&&slot.active.operation===draft.operation),
   canExecute:can()&&!!draft&&!!knownKey&&slot?.epoch===draft.epoch&&slot.active?.operationId===knownKey&&slot.active.status==='reserved',
   canSeal:can()&&!!current&&slot?.active?.status==='reserved',
   canAcknowledge:can()&&!!current&&['committed','sealed'].includes(slot?.active?.status),
-  // New assignment reserve/commit not yet exposed through this shared V4 session.
+  // Only accepted typed assignment V1 reserve/commit allowed after explicit V4 opt-in.
   legacyWritesHeld:true})
  const suspend=()=>{if(closed)return;generation++;verified=false;cap=false;busy=false;slot=null;current=null;publish()}
- const dispose=()=>{if(closed)return;suspend();closed=true;draft=null;knownKey=null;uncertain=false;ackPending=null;formDrafts.clear();publish();listeners.clear()}
+ const dispose=()=>{if(closed)return;suspend();closed=true;draft=null;knownKey=null;uncertain=false;ackPending=null;assignmentIntent=null;issuedAssignmentIds.clear();formDrafts.clear();publish();listeners.clear()}
  const setAuthority=c=>{if(closed)return false;if(c?.status==='checking'){suspend();return false}const p=principalOf(c);if(!p||JSON.stringify(p)!==JSON.stringify(principal)){dispose();return false}suspend();verified=true;publish();return true}
  const run=async fn=>{
   if(!can())return blocked()
@@ -135,13 +145,18 @@ export function createWindowDurableV4Review({syntheticReviewOnly,fixtureTranspor
   const first=await discover(call)
   const raw=await call(principal.role==='manager'?'qa_window_api_manager_read_v1':'qa_window_api_worker_read_v1',{})
   if(raw?.history_scope!==coverage)fail()
-  let assignment=null
+  let assignment=null,assignmentScope=null
   if(principal.role==='manager'){
    managerWindowHistoryV2(raw)
    assignment=parseWindowRecoveryV1(await call('qa_window_api_recovery_v1',{p_action:'discover',p_epoch:null,p_request_id:null}))
+   if(assignmentEnabled)assignmentScope=buildReviewAssignmentScope({snapshot:raw,assignmentScope:await call('qa_window_api_assignment_scope_v1',{}),actorId:principal.actorId})
   }else{
    validateWindowWorkerSnapshotV1(raw,principal.workerId);workerWindowReviewModel(raw,principal.workerId)
    if(raw.time_entries.some(e=>e.worker_id!=null&&e.worker_id!==principal.workerId))fail()
+  }
+  if(assignmentEnabled){
+   const latestAssignment=parseWindowRecoveryV1(await call('qa_window_api_recovery_v1',{p_action:'discover',p_epoch:null,p_request_id:null}))
+   if(!sameSlot(assignment,latestAssignment))fail()
   }
   const latest=await discover(call)
   if(!sameSlot(first,latest))fail()
@@ -157,7 +172,16 @@ export function createWindowDurableV4Review({syntheticReviewOnly,fixtureTranspor
   }
   if(ackPending){if(slot.epoch<ackPending.epoch)fail();if(slot.epoch>ackPending.epoch){ackPending=null;uncertain=false}}
   if(!draft&&!ackPending)uncertain=false
-  current=copy({snapshot:raw,assignment})
+  if(assignmentIntent){
+   const a=assignmentIntent.args,r=assignment
+   if(r.epoch<a.p_epoch)fail()
+   if(r.epoch>a.p_epoch||(r.active?.requestId===a.p_request_id&&r.active.kind==='single_report_window_v1'&&r.active.status==='cancelled')){
+    assignmentIntent=null;formDrafts.delete('assignment:'+a.p_term_id)
+   }else if(!r.active||r.active.requestId!==a.p_request_id||r.active.kind!=='single_report_window_v1'||r.active.status!=='reserved'&&assignmentIntent.phase==='reserve'){
+    assignmentIntent={...assignmentIntent,uncertain:true}
+   }
+  }
+  current=copy({snapshot:raw,assignment,assignmentScope})
   return {status:'ready',slot}
  })
  const connect=async()=>{
@@ -182,7 +206,7 @@ export function createWindowDurableV4Review({syntheticReviewOnly,fixtureTranspor
   }catch{if(!alive())return {status:'stale'};slot=null;return {status:'uncertain'}}
  })
  const prepare=(method,input)=>{
-  if(!state().canPrepare)return Promise.resolve(blocked())
+  if(!(method==='recovery'?state().canPrepareRecovery:state().canPrepare))return Promise.resolve(blocked())
   let d;try{d=draftOf(method,input,principal)}catch{return Promise.resolve({status:'invalid'})}
   if(!permitted(d,current))return Promise.resolve(blocked())
   const a=d.args,task=d.method==='review'?current.snapshot.tasks.find(t=>t.id===current.snapshot.time_entries.find(e=>e.id===a.p_entry_id)?.task_id):current.snapshot.tasks.find(t=>t.id===a.p_task_id)
@@ -221,10 +245,41 @@ export function createWindowDurableV4Review({syntheticReviewOnly,fixtureTranspor
    }catch{if(!alive())return {status:'stale'};slot=null;return {status:'uncertain'}}
   })
  }
- const session=Object.freeze({durableVersion:4,state,connect,refresh,prepare,retryPrepare,execute,seal:()=>recover('seal'),acknowledge:()=>recover('acknowledge'),suspend,setAuthority,dispose,
+ const sendAssignment=()=>run(async(call,alive)=>{
+  const intent=assignmentIntent,a=intent.args
+  current=null;assignmentIntent={...intent,uncertain:true};publish()
+  try{
+   const raw=await call('qa_window_api_assignment_v1',{...a,p_action:intent.phase})
+   const v=parseWindowRecoveryV1(raw,a)
+   if(!['reserved','committed'].includes(v.active?.status)||intent.phase==='commit'&&v.active.status!=='committed')fail()
+   if(v.active.status==='committed'){formDrafts.delete('assignment:'+a.p_term_id);assignmentIntent=null}
+   else assignmentIntent={...intent,uncertain:false}
+   return {status:'ok',assignment:v}
+  }catch{if(!alive())return {status:'stale'};return {status:'uncertain'}}
+ })
+ const reserveAssignment=input=>{
+  if(!state().canReserveAssignment)return Promise.resolve(blocked())
+  let v
+  try{
+   const key=newAssignmentId()
+   if(!uuid(key)||issuedAssignmentIds.has(key))fail()
+   issuedAssignmentIds.add(key)
+   v=assignmentWindowPayload(input,current.assignmentScope,key,current.assignment.epoch)
+   if(!v.ok)return Promise.resolve({status:'invalid',code:v.code})
+  }catch{return Promise.resolve({status:'invalid'})}
+  assignmentIntent=freeze({args:copy(v.args),phase:'reserve',uncertain:false})
+  return sendAssignment()
+ }
+ const commitAssignment=()=>{
+  if(!state().canCommitAssignment)return Promise.resolve(blocked())
+  assignmentIntent=freeze({...assignmentIntent,phase:'commit'})
+  return sendAssignment()
+ }
+ const retryAssignment=()=>state().canRetryAssignment?sendAssignment():Promise.resolve(blocked())
+ const session=Object.freeze({durableVersion:4,reserveAssignment,commitAssignment,retryAssignment,state,connect,refresh,prepare,retryPrepare,execute,seal:()=>recover('seal'),acknowledge:()=>recover('acknowledge'),suspend,setAuthority,dispose,
   scopeMatches:c=>valid()&&JSON.stringify(principalOf(c))===JSON.stringify(principal),
   draft:(k,initial)=>structuredClone(valid()&&formDrafts.has(k)?formDrafts.get(k):initial),
-  saveDraft:(k,v)=>{if(!valid()||typeof k!=='string'||k.length>200||!state().canPrepare)return false;formDrafts.set(k,structuredClone(v));return true},
+  saveDraft:(k,v)=>{if(!valid()||typeof k!=='string'||k.length>200||!(k.startsWith('assignment:')?state().canReserveAssignment:state().canPrepare))return false;formDrafts.set(k,structuredClone(v));return true},
   clearDraft:k=>{if(valid())formDrafts.delete(k)},
   subscribe:f=>{listeners.add(f);return()=>listeners.delete(f)},getVersion:()=>version})
  sessions.add(session);return session

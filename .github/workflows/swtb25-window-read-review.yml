@@ -21,7 +21,7 @@ jobs:
           node-version: '22'
       - run: npm ci --no-audit --no-fund
       - name: Native Node regression suite
-        run: node --test tests/swtb25ManagerWindowReadV2.test.mjs tests/swtb25WindowFixtureApiV1.test.mjs tests/swtb25WindowReviewPresentation.test.mjs tests/swtb25WindowReadReviewPort.test.mjs tests/swtb25WindowEditor.test.mjs tests/swtb25WindowEditorLifetime.test.mjs tests/swtb25WindowTermReview.test.mjs tests/swtb25WindowOperationReceiptReview.test.mjs tests/swtb25WindowEditorReceiptIntegration.test.mjs tests/swtb26WindowDurableRecoveryReview.test.mjs tests/swtb26WindowDurableV4Review.test.mjs
+        run: node --test tests/swtb25ManagerWindowReadV2.test.mjs tests/swtb25WindowFixtureApiV1.test.mjs tests/swtb25WindowReviewPresentation.test.mjs tests/swtb25WindowReadReviewPort.test.mjs tests/swtb25WindowEditor.test.mjs tests/swtb25WindowEditorLifetime.test.mjs tests/swtb25WindowTermReview.test.mjs tests/swtb25WindowOperationReceiptReview.test.mjs tests/swtb25WindowEditorReceiptIntegration.test.mjs tests/swtb26WindowDurableRecoveryReview.test.mjs tests/swtb26WindowDurableV4Review.test.mjs tests/swtb26WindowDurableV4Assignment.test.mjs
       - name: Chrome and actual XLSX round-trip (synthetic only)
         run: |
           google-chrome --version

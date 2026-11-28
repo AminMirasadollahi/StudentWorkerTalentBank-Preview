@@ -10,8 +10,8 @@ export function createDurableV4BrowserFixture(){
  const db=copy(manager);db.workers[0].state='active'
  db.tasks.push({...db.tasks[0],id:id(20),title:'کار بازه‌ای دوم'})
  const slots={manager:{epoch:0,active:null,original:null},worker:{epoch:0,active:null,original:null}}
- let assignment={ok:true,epoch:0,active:null},serial=700,lose=null,failRead=false
- const calls=[],mutations={start:0,submit:0,approve:0,cancel:0,acknowledge:0,seal:0,envelopeAck:0}
+ let assignment={ok:true,epoch:0,active:null},assignmentArgs=null,serial=700,lose=null,failRead=false
+ const calls=[],mutations={start:0,submit:0,approve:0,cancel:0,acknowledge:0,seal:0,envelopeAck:0,assignmentReserve:0,assignmentCommit:0}
  const view=role=>copy({durable_version:2,epoch:slots[role].epoch,active:slots[role].active})
  function workerSnapshot(){
   const tasks=db.tasks.filter(t=>t.worker_id===worker).map(t=>{
@@ -33,7 +33,23 @@ export function createDurableV4BrowserFixture(){
   if(name==='qa_window_api_assignment_scope_v1'){assert.equal(role,'manager');return assignmentScopeFixture}
   const slot=slots[role]
   let result
-  if(name==='qa_window_durable_recover_v4'){
+  if(name==='qa_window_api_assignment_v1'){
+   assert.equal(role,'manager');assert.equal(slot.active,null);assert.equal(a.p_epoch,assignment.epoch)
+   const {p_action,...payload}=a
+   if(p_action==='reserve'){
+    if(!assignment.active){assignmentArgs=copy(payload);assignment.active={request_id:a.p_request_id,kind:'single_report_window_v1',status:'reserved'};mutations.assignmentReserve++}
+    else assert.deepEqual(payload,assignmentArgs)
+   }else{
+    assert.equal(p_action,'commit');assert.deepEqual(payload,assignmentArgs)
+    if(assignment.active.status==='reserved'){
+     const taskId=id(++serial)
+     db.tasks.push({...db.tasks[0],id:taskId,title:a.p_title,instructions:a.p_instructions,worker_id:a.p_worker_id,unit:a.p_unit,term_id:a.p_term_id,window_start:a.p_start,window_end:a.p_end,estimate_minutes:a.p_minutes,state:'assigned',has_any_report:false})
+     assignment.active={...assignment.active,status:'committed',receipt:{ok:true,request_id:a.p_request_id,kind:'single_report_window_v1',result:{task_id:taskId,worker_id:a.p_worker_id,term_id:a.p_term_id,window_start:a.p_start,window_end:a.p_end,revision:1,standard_minutes:a.p_minutes}}}
+     mutations.assignmentCommit++
+    }
+   }
+   result=copy(assignment)
+  }else if(name==='qa_window_durable_recover_v4'){
    assert.equal(a.p_audience,role)
    if(a.p_action==='discover')assert.deepEqual(a,{p_audience:role,p_action:'discover',p_epoch:null,p_operation_id:null})
    else{
@@ -67,7 +83,7 @@ export function createDurableV4BrowserFixture(){
      }else if(op==='cancel'){
       assert.equal(assignment.active.status,'reserved');assert.equal(a.p_request_id,assignment.active.request_id);assert.equal(a.p_assignment_epoch,assignment.epoch);assignment={...assignment,active:{...assignment.active,status:'cancelled'}};r=copy(assignment)
      }else{
-      assert.ok(['cancelled','committed'].includes(assignment.active.status));assert.equal(a.p_request_id,assignment.active.request_id);assert.equal(a.p_assignment_epoch,assignment.epoch);assignment={ok:true,epoch:assignment.epoch+1,active:null};r=copy(assignment)
+      assert.ok(['cancelled','committed'].includes(assignment.active.status));assert.equal(a.p_request_id,assignment.active.request_id);assert.equal(a.p_assignment_epoch,assignment.epoch);assignment={ok:true,epoch:assignment.epoch+1,active:null};assignmentArgs=null;r=copy(assignment)
      }
      mutations[op]++;slot.active.status='committed';slot.active.historical_receipt={receipt_version:1,operation_id:p_operation_id,operation:op,replayed:true,result:r}
     }
@@ -77,5 +93,5 @@ export function createDurableV4BrowserFixture(){
   if(lose&&lose.name===name&&lose.phase===(a.p_phase??a.p_action)){lose=null;throw Error('QA_REPLY_LOST_AFTER_COMMIT')}
   return result
  }
- return {call,calls,mutations,db,view,loseNext:(name,phase)=>{lose={name,phase}},setReadFailure:x=>{failRead=x},seedAssignment:()=>{assignment={ok:true,epoch:0,active:{request_id:id(799),kind:'single_report_window_v1',status:'reserved'}}}}
+ return {call,calls,mutations,db,view,loseNext:(name,phase)=>{lose={name,phase}},setReadFailure:x=>{failRead=x},seedAssignment:()=>{assignmentArgs=null;assignment={ok:true,epoch:assignment.epoch,active:{request_id:id(799),kind:'single_report_window_v1',status:'reserved'}}}}
 }
