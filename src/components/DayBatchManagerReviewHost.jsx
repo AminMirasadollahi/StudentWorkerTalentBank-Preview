@@ -1,4 +1,4 @@
-// Synthetic-only mounted owner. Injected into OpsApp only by a DEV review fixture; no normal entry import.
+// Mounted review owner, synthetic or explicit local DEV staging. No normal entry import.
  // Keep this owner ABOVE editor/route remounts. No real fetch default.
 import React,{useLayoutEffect,useRef,useState} from 'react'
 import {createDayBatchVerifiedOwner} from '../lib/dayBatchVerifiedOwner.mjs'
@@ -54,7 +54,8 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
   return ok
  }
  useLayoutEffect(()=>{
-  if(fixture?.mode!=='synthetic-review'||fixture.durableDeskCancel===true&&typeof fixture.readDeskShifts!=='function'||(workspace?(typeof fixture.readTerm!=='function'||typeof fixture.today!=='function'):typeof fixture.read!=='function')||typeof fixture.fetchImpl!=='function'||typeof fixture.auth?.onAuthStateChange!=='function')return
+  const staging=fixture?.mode==='staging-review'
+  if(staging&&(!import.meta.env.DEV||!workspace||typeof fixture.readWork!=='function'||typeof fixture.readCandidates!=='function')||!staging&&fixture?.mode!=='synthetic-review'||fixture.durableDeskCancel===true&&typeof fixture.readDeskShifts!=='function'||(workspace?(typeof fixture.readTerm!=='function'||typeof fixture.today!=='function'):typeof fixture.read!=='function')||typeof fixture.fetchImpl!=='function'||typeof fixture.auth?.onAuthStateChange!=='function')return
   let i=null,subscription=null,timer=null
   const clear=()=>{if(timer!==null){clearTimeout(timer);timer=null}}
   const isVisible=()=>i!==null&&active(i)&&!parentChecking.current&&document.visibilityState==='visible'&&document.hasFocus()
@@ -123,7 +124,7 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
  const deskRead=async day=>{
   if(!deskLive()||!deskWork)throw Error('DESK_READ_STALE')
   const ticket={day,revision:renderRevision,value:null};i.deskReadTicket=ticket
-  const raw=await fixture.readDeskShifts(day)
+  const raw=await fixture.readDeskShifts(day,()=>deskLive()&&i.deskReadTicket===ticket)
   if(!deskLive()||i.deskReadTicket!==ticket||raw?.ok!==true||raw.from!==day||raw.to!==day||!Array.isArray(raw.shifts))throw Error('DESK_READ_INVALID')
   const value=Object.freeze({ok:true,from:day,to:day,shifts:Object.freeze(raw.shifts.map(s=>Object.freeze({id:s?.id,task_id:s?.task_id,worker_id:s?.worker_id,shift_date:s?.shift_date,start_minute:s?.start_minute,end_minute:s?.end_minute,state:s?.state})))})
   ticket.value=value;return value
@@ -155,7 +156,7 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
     redraw(i)
    })()
    if(route==='work')void (async()=>{
-    try{const result=await fixture.readTerm();if(live())ticket.acceptTerm(result,fixture.today())}catch{/* batch only remains disabled */}
+    try{const result=await fixture.readTerm(live);if(live())ticket.acceptTerm(result,fixture.today())}catch{/* batch only remains disabled */}
     if(live())redraw(i)
    })()
    return true
@@ -165,6 +166,7 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
  }
  const panel=<section dir="rtl" aria-label={workspace?'مالک مشترک واگذاری':undefined} data-state={workspace?snap.state:undefined}>
   {!i.verified&&<><p role="status">{i.terminal?'نشست قبلی پایان یافته است.':'در حال بررسی دسترسی یا دسترسی تأیید نشده است.'}</p>{!i.terminal&&<button type="button" onClick={i.schedule}>بررسی مجدد دسترسی</button>}</>}
+  {fixture.mode==='staging-review'&&<p role="status">محیط آزمایشی مستقل؛ این نسخه برای انتشار عمومی نیست.</p>}
   {i.verified&&<section aria-label="بازیابی مشترک واگذاری">
    <p role="status">{snap.state==='idle'?'مسیر واگذاری آماده است.':snap.state==='committed'?(snap.kind==='desk_cancel_v1'?'لغو نوبت و وظیفه مرتبط تأیید شد؛ این رسید تأیید ساعت نیست.':'ثبت واگذاری تأیید شد؛ این رسید تأیید ساعت نیست.'):snap.state==='cancelled'?(snap.kind==='desk_cancel_v1'?'درخواست لغو نوبت کنار گذاشته شد؛ این نتیجه به معنی لغو نوبت نیست.':'لغو درخواست تأیید شد.'):snap.state==='reserved'?(snap.kind==='desk_cancel_v1'?'درخواست لغو نوبت رزرو شده است؛ هنوز لغو نهایی نشده است.':'درخواست رزرو شده است؛ هنوز کاری ثبت نشده است.'):snap.state==='shift_unconfirmed'?'نتیجه لغو شیفت نامشخص است؛ ثبت جدید مسدود است.':'در حال بررسی یا تعیین تکلیف وضعیت عملیات.'}</p>
    {snap.receipt?.kind==='batch_direct_v1'&&<p data-testid="batch-receipt-summary">{fa(snap.receipt.result.pair_count)} تخصیص · {fa(snap.receipt.result.standard_person_minutes)} دقیقه زمان استاندارد</p>}
@@ -183,7 +185,9 @@ export default function DayBatchManagerReviewHost({fixture,scope='work',workspac
    i.terminal=true;i.verified=false;i.revision++;i.data=null;i.readGate.invalidate();i.drafts.clearRetained();i.owner.terminate();redraw(i)
    return onLogout?.()
   }
-  const port={...legacyPort,panel,readScopeOwner:i.readScopeOwner,beginScopedRead:beginWorkspaceRead,workspaceReadRevision:i.workspaceReadRevision,managerDraftGuard:i.drafts,workPoolRouteFence:i.workPoolRouteFence,
+  const scopedRead=(method,ticket)=>fixture[method](()=>active(i)&&i.verified&&!parentChecking.current&&document.visibilityState==='visible'&&document.hasFocus()&&ticket?.isCurrent?.()===true)
+  const stageReads=fixture.mode==='staging-review'?{readWork:ticket=>scopedRead('readWork',ticket),readCandidates:ticket=>scopedRead('readCandidates',ticket)}:{}
+  const port={...legacyPort,...stageReads,panel,readScopeOwner:i.readScopeOwner,beginScopedRead:beginWorkspaceRead,workspaceReadRevision:i.workspaceReadRevision,managerDraftGuard:i.drafts,workPoolRouteFence:i.workPoolRouteFence,
    batchWorkspace:{mode:'synthetic-review',contextFor:data=>active(i)&&i.verified&&!parentChecking.current?i.readGate.contextFor(data):null,port:batchPort}}
   return <ManagerDraftContext.Provider value={i.drafts}>{children({workspacePort:port,draftGuard:i.drafts,guardedLogout})}</ManagerDraftContext.Provider>
  }

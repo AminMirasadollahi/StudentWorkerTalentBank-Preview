@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   focused:
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'review/swtb24-r5-manager-ia-20261126'
+    if: github.event.pull_request.head.repo.full_name == github.repository && (github.event.pull_request.head.ref == 'review/swtb24-r5-manager-ia-20261126' || github.event.pull_request.head.ref == 'review/swtb27-day-batch-contract-20261128')
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:

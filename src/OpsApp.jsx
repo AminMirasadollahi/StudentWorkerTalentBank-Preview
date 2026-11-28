@@ -651,10 +651,11 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
       // ops_list_candidates. This path uses an EXISTING manager-guarded RPC;
       // no protected public operations API file or database function changes.
       const results = await fetchCandidatesWithAuthorizedWorkerIdentity({
-        fetchCandidates:getOperationsCandidates,
+        fetchCandidates:assignmentReceiptPort?.readCandidates?()=>assignmentReceiptPort.readCandidates(settleRead):getOperationsCandidates,
         // Use the already-injected manager session client. Never import a
         // second unmocked operations module into role-sensitive UI tests.
         fetchManagerSnapshot:async()=>{
+          if(assignmentReceiptPort?.readWork)return assignmentReceiptPort.readWork(settleRead)
           const {data,error}=await opsClient.rpc('ops_get_operations_v3')
           if(error)throw error
           if(data?.error)throw new Error('manager_snapshot_denied')
@@ -934,6 +935,11 @@ export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, 
     return null
   }
   const [identity, setIdentity] = useState(null)
+  const stageFactory=import.meta.env.DEV&&dayBatchReviewFixture?.mode==='staging-review'?dayBatchReviewFixture.createFixture:null
+  const stageFixture=useMemo(()=>{
+    if(typeof stageFactory!=='function'||identity?.role!=='admin'||!identity.user?.id)return null
+    try{return stageFactory(identity.user.id)}catch{return null}
+  },[stageFactory,identity?.role,identity?.user?.id])
   const [adminNavigation, setAdminNavigation] = useState(initialAdminNavigation)
   const [workerNavigation, setWorkerNavigation] = useState(initialWorkerNavigation)
   const [busy, setBusy] = useState(true)
@@ -1170,8 +1176,10 @@ export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, 
   // Injected DEV review only. No component import, build-time release switch or actual credentials.
   const dayBatchRequested=import.meta.env.DEV&&dayBatchReviewFixture!==null
   const ReviewHost=dayBatchReviewFixture?.Host
-  const reviewFixture=dayBatchReviewFixture?.fixture
-  const validDayBatchReview=dayBatchRequested&&r5IaFixture===true&&managerShellEnabled&&assignmentReceiptFixture===null&&typeof ReviewHost==='function'&&reviewFixture?.mode==='synthetic-review'&&reviewFixture.actorId===identity.user?.id
+  const stageRequested=dayBatchReviewFixture?.mode==='staging-review'
+  const reviewFixture=stageRequested?stageFixture:dayBatchReviewFixture?.fixture
+  const validReviewMode=stageRequested?import.meta.env.DEV&&import.meta.env.VITE_SWTB28_STAGING_REVIEW_UI==='true'&&recoveryReviewConfig.mode==='review'&&reviewFixture?.mode==='staging-review'&&reviewFixture.projectUrl===recoveryReviewConfig.projectUrl:reviewFixture?.mode==='synthetic-review'
+  const validDayBatchReview=dayBatchRequested&&r5IaFixture===true&&managerShellEnabled&&assignmentReceiptFixture===null&&typeof ReviewHost==='function'&&validReviewMode&&reviewFixture.actorId===identity.user?.id
   const reviewScope=adminNavigation.section==='work'?'work':adminNavigation.candidateView==='report'?'report':'candidates'
   const authorizedView = identity.role === 'admin'
     ? (dayBatchRequested

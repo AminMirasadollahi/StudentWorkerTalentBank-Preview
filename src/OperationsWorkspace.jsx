@@ -1279,7 +1279,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     if(!settleRead)assignmentReceiptPort?.setReadState?.('checking')
     setLoading(true)
     try{
-      const result=await getAdminWorkV2()
+      const result=assignmentReceiptPort?.readWork?await assignmentReceiptPort.readWork(settleRead):await getAdminWorkV2()
       if(sequence!==readSequence.current)return false
       if(assignmentReceiptPort?.batchWorkspace?.mode==='synthetic-review'){
         if(settleRead?.isCurrent?.()!==true)return false
