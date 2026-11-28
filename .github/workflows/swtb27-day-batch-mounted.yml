@@ -23,7 +23,7 @@ jobs:
           node-version: '22'
       - run: npm ci --no-audit --no-fund
       - name: Consolidated day-batch source and actual React mounted regression
-        run: node --test --test-concurrency=1 --test-timeout=20000 tests/swtb27DayBatchAssignmentContract.test.mjs tests/swtb27DayBatchManagerSession.test.mjs tests/swtb27DayBatchSharedManager.test.mjs tests/swtb27DayBatchVerifiedOwner.test.mjs tests/swtb27DayBatchMounted.test.mjs tests/swtb27DayBatchWorkspaceRead.test.mjs tests/swtb27DeskCancellationObservation.test.mjs tests/swtb28DeskCancelManagerSession.test.mjs tests/swtb28DeskCancelTransport.test.mjs tests/swtb24R5BatchPreview.test.mjs tests/assignmentPrerequisitesV3Mounted.test.mjs tests/assignmentRecoveryHostMounted.test.mjs tests/releaseBoundary.test.mjs
+        run: node --test --test-concurrency=1 --test-timeout=20000 tests/swtb27DayBatchAssignmentContract.test.mjs tests/swtb27DayBatchManagerSession.test.mjs tests/swtb27DayBatchSharedManager.test.mjs tests/swtb27DayBatchVerifiedOwner.test.mjs tests/swtb27DayBatchMounted.test.mjs tests/swtb27DayBatchWorkspaceRead.test.mjs tests/swtb27DeskCancellationObservation.test.mjs tests/swtb28DeskCancelManagerSession.test.mjs tests/swtb28DeskCancelTransport.test.mjs tests/swtb28DeskCancelSharedManager.test.mjs tests/swtb24R5BatchPreview.test.mjs tests/assignmentPrerequisitesV3Mounted.test.mjs tests/assignmentRecoveryHostMounted.test.mjs tests/releaseBoundary.test.mjs
       - name: Confirm normal entry has no mounted review owner
         run: |
           if grep -nE 'DayBatchManagerReviewHost|dayBatchVerifiedOwner' src/OpsApp.jsx src/App.jsx index.html; then exit 1; fi
