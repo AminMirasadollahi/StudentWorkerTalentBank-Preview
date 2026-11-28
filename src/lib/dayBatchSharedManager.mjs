@@ -34,9 +34,9 @@ export function createDayBatchSharedManager({actorId,legacyWrite,legacyControl,b
  }
  const setAccess=next=>{
   if(disposed)return
-  if(next?.status==='checking'){verified=false;sync();return}
-  if(next?.status!=='verified'||next.actorId!==actorId){dispose();return}
-  verified=true;sync()
+  if(next?.status!=='checking'&&(next?.status!=='verified'||next.actorId!==actorId)){dispose();return}
+  // Rechecking identity invalidates every previous work/candidate read proof.
+  readRevision++;readReady=route==='report';verified=next.status==='verified';sync()
  }
  const selectReadScope=scope=>{
   if(disposed||!['work','candidates','report'].includes(scope))return false
