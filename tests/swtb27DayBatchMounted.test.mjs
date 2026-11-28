@@ -210,7 +210,7 @@ test('logout clears retained draft; fresh host cannot inherit it',{timeout:10000
 test('actual mounted desk editor uses exact durable cancellation RPC and shared recovery, never raw legacy',async()=>{
  const f=fixture(null,true),m=await mount(f,{editor:'direct'})
  try{
-  await m.click('استفاده از شرح وظیفه آماده');await until(()=>Boolean(m.button('لغو نوبت'))&&!m.button('لغو نوبت').disabled)
+  await m.fill('select[aria-label="واحد انجام کار"]','library');await m.click('استفاده از شرح وظیفه آماده');await until(()=>Boolean(m.button('لغو نوبت'))&&!m.button('لغو نوبت').disabled)
   await m.click('لغو نوبت');await m.fill('input[aria-label="علت لغو نوبت"]','دلیل لغو آزمایشی')
   await m.click('تأیید لغو نوبت');assert.equal(m.state(),'committed')
   assert.match(m.node.textContent,/لغو نوبت و وظیفه مرتبط تأیید شد/)
@@ -224,7 +224,7 @@ test('actual mounted desk editor uses exact durable cancellation RPC and shared 
 test('mounted lost desk commit recovers in report scope with no retry',async()=>{
  const f=fixture(null,true),m=await mount(f,{editor:'direct'})
  try{
-  await m.click('استفاده از شرح وظیفه آماده');await until(()=>Boolean(m.button('لغو نوبت'))&&!m.button('لغو نوبت').disabled)
+  await m.fill('select[aria-label="واحد انجام کار"]','library');await m.click('استفاده از شرح وظیفه آماده');await until(()=>Boolean(m.button('لغو نوبت'))&&!m.button('لغو نوبت').disabled)
   await m.click('لغو نوبت');await m.fill('input[aria-label="علت لغو نوبت"]','دلیل لغو آزمایشی');f.lose('commit')
   await m.click('تأیید لغو نوبت');assert.equal(m.state(),'unknown')
   await m.render('direct','report');await until(()=>m.state()==='committed')
