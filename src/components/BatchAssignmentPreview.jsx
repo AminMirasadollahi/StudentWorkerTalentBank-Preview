@@ -3,6 +3,7 @@
 import React,{useRef,useState} from 'react'
 import JalaliDatePicker from './JalaliDatePicker.jsx'
 import {previewBatchAssignment} from '../lib/batchAssignmentPreview.mjs'
+import {useManagerRetainedState} from '../lib/managerDraftGuard.mjs'
 import './batch-assignment-preview.css'
 const labels={library:'کتابخانه',research:'پژوهش',public_relations:'روابط عمومی'}
 const fa=x=>Number(x).toLocaleString('fa-IR')
@@ -11,8 +12,9 @@ const errors={CONTEXT_UNAVAILABLE:'اطلاعات لازم برای پیش‌ن�
 const capacity={ok:'ظرفیت کافی در داده‌های فعلی',full:'ظرفیت پر می‌شود',overbooked:'بیش از ظرفیت اعلام‌شده',unavailable:'عدم حضور',not_configured:'برنامه حضور ثبت نشده',unknown:'ظرفیت نامشخص'}
 const blank=id=>({id,title:'',instructions:'',minutes:60,mode:'independent',workerIds:[],date:null,unit:null,reason:null,prerequisiteIds:[]})
 export default function BatchAssignmentPreview({context,reviewPort=null}){
- const next=useRef(2)
- const [draft,setDraft]=useState(()=>({termId:context.term.id,defaults:{date:context.defaultDate??context.today,unit:'library',reason:''},rows:[blank('row-1')]}))
+ const revision=context.term.id+':'+(reviewPort?.editorRevision??0)
+ const retained=useManagerRetainedState(reviewPort?.mode==='synthetic-review'?'day-batch':null,revision,()=>({termId:context.term.id,defaults:{date:context.defaultDate??context.today,unit:'library',reason:''},rows:[blank('row-1')]}))
+ const draft=retained.value
  const [review,setReview]=useState(null)
  const previewRef=useRef(null)
  const submitLock=useRef(false)
@@ -20,14 +22,14 @@ export default function BatchAssignmentPreview({context,reviewPort=null}){
  const [notice,setNotice]=useState('')
  const enabled=reviewPort?.mode==='synthetic-review'&&reviewPort?.snapshot?.canStart===true&&typeof reviewPort.submit==='function'
  const locked=reviewPort!==null&&(!enabled||submitting)
- const change=fn=>{if(locked||submitLock.current)return;setDraft(fn);setReview(null);setNotice('')}
+ const change=fn=>{if(locked||submitLock.current)return;retained.change(fn);setReview(null);setNotice('')}
  const defaults=(key,value)=>change(p=>({...p,defaults:{...p.defaults,[key]:value}}))
  const rowChange=(id,fn)=>change(p=>({...p,rows:p.rows.map(r=>r.id===id?fn(r):r)}))
  const field=(id,key,value)=>rowChange(id,r=>({...r,[key]:value}))
  const toggle=(id,worker)=>rowChange(id,r=>({...r,workerIds:r.workerIds.includes(worker)?r.workerIds.filter(x=>x!==worker):[...r.workerIds,worker]}))
  const workers=context.workers.filter(w=>w.state==='active')
  const workerName=id=>workers.find(w=>w.id.toLowerCase()===id)?.name??'فرد نامشخص'
- const displayReview=review?.context===context?review.result:null
+ const displayReview=review?.context===context&&review?.draft===draft?review.result:null
  const submit=async()=>{
   if(!enabled||submitLock.current||!displayReview?.ok)return
   submitLock.current=true;setSubmitting(true);setNotice('')
@@ -63,12 +65,13 @@ export default function BatchAssignmentPreview({context,reviewPort=null}){
     {draft.rows.length>1&&<button type="button" className="report-btn report-btn--light" onClick={()=>change(p=>({...p,rows:p.rows.filter(x=>x.id!==r.id)}))}>حذف کار {fa(i+1)}</button>}
    </fieldset>)}
   </div>
-  <button type="button" className="report-btn report-btn--light" onClick={()=>{const id='row-'+next.current++;change(p=>({...p,rows:[...p.rows,blank(id)]}))}}>+ افزودن کار دیگر</button>
+  <button type="button" className="report-btn report-btn--light" onClick={()=>change(p=>{let n=2;while(p.rows.some(r=>r.id==='row-'+n))n++;return {...p,rows:[...p.rows,blank('row-'+n)]}})}>+ افزودن کار دیگر</button>
   {draft.rows.length>1&&<section><h3>تخصیص مسئولان</h3><p>فقط مواردی که علامت می‌زنید در پیش‌نمایش منظور می‌شوند.</p>
    <div className="swtb24-batch-matrix-scroll"><table><thead><tr><th scope="col">کار</th>{workers.map(w=><th scope="col" key={w.id}>{w.name}</th>)}</tr></thead><tbody>
     {draft.rows.map((r,i)=><tr key={r.id}><th scope="row">{r.title||'کار '+fa(i+1)}</th>{workers.map(w=><td key={w.id}><input type="checkbox" aria-label={'کار '+fa(i+1)+' — '+w.name} checked={r.workerIds.includes(w.id)} onChange={()=>toggle(r.id,w.id)}/></td>)}</tr>)}
    </tbody></table></div></section>}
-  <button type="button" className="report-btn report-btn--primary" onClick={()=>{setReview({context,result:previewBatchAssignment(draft,context)});requestAnimationFrame(()=>previewRef.current?.focus())}}>بررسی تخصیص</button>
+  <button type="button" className="report-btn report-btn--primary" onClick={()=>{setReview({context,draft,result:previewBatchAssignment(draft,context)});requestAnimationFrame(()=>previewRef.current?.focus())}}>بررسی تخصیص</button>
+  {reviewPort?.mode==='synthetic-review'&&retained.dirty&&<button type="button" className="report-btn report-btn--light" onClick={()=>{if(locked||submitLock.current)return;if(window.confirm('پیش‌نویس ثبت‌نشده حذف شود؟')){retained.reset();setReview(null);setNotice('')}}}>حذف پیش‌نویس محلی</button>}
   <div ref={previewRef} tabIndex={-1} aria-live="polite">
    {displayReview&&!displayReview.ok&&<div role="alert"><h3>موارد نیازمند اصلاح</h3><ul>{displayReview.errors.map((e,i)=><li key={i}>{e.rowId?'کار '+fa(draft.rows.findIndex(r=>r.id===e.rowId)+1)+' — ':''}{errors[e.code]??e.code}</li>)}</ul></div>}
    {displayReview?.ok&&<section className="swtb24-batch-result"><h3>پیش‌نمایش تخصیص</h3>
