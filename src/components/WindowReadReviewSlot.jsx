@@ -1,5 +1,7 @@
 import {useEffect,useState,useSyncExternalStore,useRef} from 'react'
-import {windowReadReviewScope} from '../lib/windowReadReviewPort.mjs'
+import {windowReadReviewScope,isWindowDurableV4ReadPort} from '../lib/windowReadReviewPort.mjs'
+import {isWindowDurableV4Session} from '../lib/windowDurableV4Review.mjs'
+import WindowDurableV4Slot from './WindowDurableV4Slot.jsx'
 import WindowReadReview from './WindowReadReview.jsx'
 import WindowEditorReview from './WindowEditorReview.jsx'
 import WindowTermReview from './WindowTermReview.jsx'
@@ -70,7 +72,7 @@ function ReceiptRecovery({session}){
  {s.historicalReceipt&&<p className="wr-meta">رسید عملیات قبلی دریافت شده است؛ وضعیت فعلی فقط از بازخوانی معتبر مشخص می‌شود.</p>}
  {message&&<p role="status">{message}</p>}</section>
 }
-export default function WindowReadReviewSlot({request,role,workerId=null,refreshRevision=0,section}){
+function LegacyWindowReadReviewSlot({request,role,workerId=null,refreshRevision=0,section}){
  const scope=windowReadReviewScope(request,role,workerId,refreshRevision)
  const editor=request?.editor??null
  const s=editor?.session
@@ -81,4 +83,16 @@ export default function WindowReadReviewSlot({request,role,workerId=null,refresh
  const ss=s?.state()
  return <>{ss?.receiptV2&&(ss.pendingReceiptV2||ss.refreshRequired||ss.historicalReceipt)&&<ReceiptRecovery key={scope.key} session={s}/>}
  <ScopedRead key={scope.key+':'+section+':'+mutationRevision} scope={scope} section={section} editor={editor}/></>
+}
+
+export default function WindowReadReviewSlot(props){
+ const {request,role,workerId=null,refreshRevision=0,section}=props
+ const session=request?.editor?.session
+ if(session?.durableVersion===4||isWindowDurableV4ReadPort(request?.port)){
+  const scope=windowReadReviewScope(request,role,workerId,refreshRevision)
+  const context=scope?{...scope.context,ready:role==='worker'}:null
+  if(!scope||!isWindowDurableV4ReadPort(scope.port)||!isWindowDurableV4Session(session)||!session.scopeMatches(context))return <p role="alert">مجوز نمای آزمایشی تأیید نشده است.</p>
+  return <WindowDurableV4Slot session={session} scope={{...scope,context}} section={section}/>
+ }
+ return <LegacyWindowReadReviewSlot {...props}/>
 }

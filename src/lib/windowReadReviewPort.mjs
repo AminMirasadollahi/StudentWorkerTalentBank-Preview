@@ -1,14 +1,32 @@
 // Explicitly injected, read-only synthetic capability. No SDK, URL flags,
 // local/session storage, production RPC or automatic legacy fallback.
-import {createWindowFixtureApiV1} from './windowFixtureApiV1.mjs'
+import {validateWindowDurableV4Capability} from './windowDurableV4Review.mjs'
+import {managerWindowHistoryV2} from './managerWindowReadV2.mjs'
+import {workerWindowReviewModel} from './windowReviewPresentation.mjs'
+import {validateWindowWorkerSnapshotV1,createWindowFixtureApiV1} from './windowFixtureApiV1.mjs'
 import {validateWindowTermRead,validateWindowTermAccess,validateAssignmentScope} from './windowTermReview.mjs'
-const brand=new WeakMap()
+const brand=new WeakMap(),v4Ports=new WeakSet()
+export const isWindowDurableV4ReadPort=p=>v4Ports.has(p)
 let nextPortId=0
 const coverage='independent_recent_kinds_plus_all_open_and_loaded_report_links'
 const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(x)&&x!=='00000000-0000-0000-0000-000000000000'
-export function createWindowReadReviewPort({syntheticReviewOnly,fixtureTransport}={}){
+export function createWindowReadReviewPort({syntheticReviewOnly,fixtureTransport,durableV4=false}={}){
  if(syntheticReviewOnly!==true||typeof fixtureTransport!=='function')throw Error('WINDOW_REVIEW_PORT_FIXTURE_ONLY')
  const withApi=async(context,fn)=>{
+  if(durableV4===true){
+   if(context?.status!=='verified'||!uuid(context.actorId)||!['manager','worker'].includes(context.role)||!(context.role==='manager'?context.workerId==null:uuid(context.workerId)&&context.ready===true))throw Error('WINDOW_V4_READ_SCOPE')
+   validateWindowDurableV4Capability(await fixtureTransport('qa_window_api_capabilities_v4',{p_audience:context.role}),context)
+   const methods={manager_read:['manager','qa_window_api_manager_read_v1'],worker_read:['worker','qa_window_api_worker_read_v1'],term_read:['manager','qa_window_api_term_read_v1'],term_access:['manager','qa_window_api_term_access_v1'],assignment_scope:['manager','qa_window_api_assignment_scope_v1']}
+   return fn({call:async(m,args={})=>{
+    const spec=methods[m];if(!spec||spec[0]!==context.role)throw Error('WINDOW_V4_READ_ONLY')
+    if(m==='term_read'&&(![args.p_term_id,args.p_worker_id].every(x=>x===null||uuid(x))||![null,'library','research','public_relations'].includes(args.p_unit_code)))throw Error('WINDOW_TERM_FILTER_INVALID')
+    if(m==='term_access'&&!uuid(args.p_term_id))throw Error('WINDOW_TERM_FILTER_INVALID')
+    const value=await fixtureTransport(spec[1],args)
+    if(m==='manager_read')managerWindowHistoryV2(value)
+    if(m==='worker_read'){validateWindowWorkerSnapshotV1(value,context.workerId);workerWindowReviewModel(value,context.workerId)}
+    return {status:'ok',value}
+   }})
+  }
   const api=createWindowFixtureApiV1({syntheticReviewOnly:true,fixtureTransport:async(name,args)=>{
    if(!['qa_window_api_capabilities_v1','qa_window_api_manager_read_v1','qa_window_api_worker_read_v1','qa_window_api_term_read_v1','qa_window_api_term_access_v1','qa_window_api_assignment_scope_v1'].includes(name))throw Error('WINDOW_REVIEW_READ_ONLY')
    return fixtureTransport(name,args)
@@ -41,7 +59,7 @@ export function createWindowReadReviewPort({syntheticReviewOnly,fixtureTransport
   if(r.status!=='ok')throw Error('WINDOW_TERM_ACCESS_FAILED')
   return validateWindowTermAccess(r.value,term)
  })})
- brand.set(p,++nextPortId);return p
+ brand.set(p,++nextPortId);if(durableV4===true)v4Ports.add(p);return p
 }
 export function windowReadReviewScope(request,role,workerId,revision){
  if(!request||!brand.has(request.port)||!Number.isSafeInteger(revision)||revision<0)return null

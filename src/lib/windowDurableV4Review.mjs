@@ -109,9 +109,9 @@ export function createWindowDurableV4Review({syntheticReviewOnly,fixtureTranspor
  const valid=()=>verified&&!closed
  const can=()=>valid()&&cap&&!busy
  const state=()=>freeze({verified:valid(),ready:valid()&&cap,busy,slot:valid()?slot:null,current:valid()?current:null,
-  uncertain:valid()&&uncertain,refreshRequired:!current,writeHeld:!valid()||!cap||busy||!current||uncertain||!!draft||!!slot?.active||!!ackPending,
+  uncertain:valid()&&uncertain,intentSummary:valid()&&draft?draft.summary:null,refreshRequired:!current,writeHeld:!valid()||!cap||busy||!current||uncertain||!!draft||!!slot?.active||!!ackPending,
   canPrepare:can()&&!!current&&slot?.active===null&&!draft&&!uncertain&&!ackPending,
-  canRetryPrepare:can()&&!!draft&&!knownKey&&slot?.epoch===draft.epoch&&(!slot.active||slot.active.status==='reserved'&&slot.active.operation===draft.operation),
+  canRetryPrepare:can()&&!!current&&!!draft&&!knownKey&&slot?.epoch===draft.epoch&&(!slot.active||slot.active.status==='reserved'&&slot.active.operation===draft.operation),
   canExecute:can()&&!!draft&&!!knownKey&&slot?.epoch===draft.epoch&&slot.active?.operationId===knownKey&&slot.active.status==='reserved',
   canSeal:can()&&!!current&&slot?.active?.status==='reserved',
   canAcknowledge:can()&&!!current&&['committed','sealed'].includes(slot?.active?.status),
@@ -185,7 +185,8 @@ export function createWindowDurableV4Review({syntheticReviewOnly,fixtureTranspor
   if(!state().canPrepare)return Promise.resolve(blocked())
   let d;try{d=draftOf(method,input,principal)}catch{return Promise.resolve({status:'invalid'})}
   if(!permitted(d,current))return Promise.resolve(blocked())
-  draft=freeze({...d,epoch:slot.epoch});knownKey=null
+  const a=d.args,task=d.method==='review'?current.snapshot.tasks.find(t=>t.id===current.snapshot.time_entries.find(e=>e.id===a.p_entry_id)?.task_id):current.snapshot.tasks.find(t=>t.id===a.p_task_id)
+  draft=freeze({...d,epoch:slot.epoch,summary:{operation:d.operation,title:task?.title??null,minutes:a.p_reported_minutes??a.p_approved_minutes??null,workDate:a.p_work_date??null}});knownKey=null
   return sendPrepare()
  }
  const retryPrepare=()=>state().canRetryPrepare?sendPrepare():Promise.resolve(blocked())

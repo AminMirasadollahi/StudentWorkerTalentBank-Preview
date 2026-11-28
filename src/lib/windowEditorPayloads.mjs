@@ -34,3 +34,12 @@ export function reviewWindowPayload(task,entry,d){
  if((Number(d.minutes)!==entry.reported_minutes||Number(d.minutes)>task.estimate_minutes)&&!pgTrim(d.note))return deny('REVIEW_REASON')
  return good({p_entry_id:entry.id,p_expected_revision:task.window_revision,p_decision:'approved',p_approved_minutes:Number(d.minutes),p_review_note:pgTrim(d.note)||null})
 }
+
+// Validation uses the established report rules; this sentinel is local only,
+// discarded before returning V4 args. No client submission UUID is generated.
+export function durableReportWindowPayload(task,d){
+ const v=reportWindowPayload(task,d,'10000000-0000-4000-8000-000000000001')
+ if(!v.ok)return v
+ const {p_client_submission_id,...args}=v.args
+ return good(args)
+}

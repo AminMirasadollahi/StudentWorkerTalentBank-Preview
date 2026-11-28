@@ -1,6 +1,6 @@
 import {useState,useEffect,useRef,useSyncExternalStore} from 'react'
 import JalaliDatePicker from './JalaliDatePicker.jsx'
-import {assignmentWindowPayload,reportWindowPayload,reviewWindowPayload,extraReasons} from '../lib/windowEditorPayloads.mjs'
+import {assignmentWindowPayload,reportWindowPayload,durableReportWindowPayload,reviewWindowPayload,extraReasons} from '../lib/windowEditorPayloads.mjs'
 import {jalaliWindowDay} from '../lib/windowReviewPresentation.mjs'
 import './window-review.css'
 import './window-editor-review.css'
@@ -51,12 +51,12 @@ function Assignment({scope,s,session,run,setMessage,newId}){
  {s.frozenDraft&&<p className="wr-held">پیش‌نویس رزروشده تا تعیین تکلیف درخواست قفل است.</p>}
  <Recovery s={s} run={run} session={session}/></>
 }
-function Report({task,s,session,run,setMessage,newId}){
+export function Report({task,s,session,run,setMessage,newId}){
  const a=task.window_actions
  const [d,set]=useSessionDraft(session,'report:'+task.id+':'+task.window_revision,()=>({date:a.date_max,minutes:String(task.estimate_minutes),note:'',reasonCode:'',reasonText:''}))
  const [started,setStarted]=useState(false),[submitted,setSubmitted]=useState(false)
  const disabled=s.busy||s.uncertain||s.refreshRequired||!s.ready||submitted||s.receipt?.status!=null
- const send=e=>{e.preventDefault();if(disabled)return;const v=reportWindowPayload(task,d,newId());if(!v.ok){setMessage(errors[v.code]);return}void run(()=>session.perform('submit',v.args)).then(r=>{if(r.status==='ok')setSubmitted(true)})}
+ const send=e=>{e.preventDefault();if(disabled)return;const v=session.durableVersion===4?durableReportWindowPayload(task,d):reportWindowPayload(task,d,newId());if(!v.ok){setMessage(errors[v.code]);return}void run(()=>session.perform('submit',v.args)).then(r=>{if(r.status==='ok')setSubmitted(true)})}
  return <><h2>ثبت فعالیت بازه‌ای</h2><h3>{task.title}</h3><p>بازه انجام: {jalaliWindowDay(task.window_start)} تا {jalaliWindowDay(task.window_end)} · برآورد {task.estimate_minutes} دقیقه</p>
  {a.can_start&&<button type="button" disabled={disabled||started||s.receipt?.state==='in_progress'} onClick={()=>run(()=>session.perform('start',{p_task_id:task.id,p_expected_revision:task.window_revision})).then(r=>{if(r.status==='ok')setStarted(true)})}>شروع کار آزمایشی</button>}
  {!a.can_submit?<p role="status">ثبت گزارش در وضعیت فعلی مجاز نیست.</p>:<form onSubmit={send}><fieldset disabled={disabled}><div className="we-grid">
@@ -67,7 +67,7 @@ function Report({task,s,session,run,setMessage,newId}){
  </div><button type="submit">ارسال گزارش آزمایشی</button></fieldset></form>}
  {s.receipt?.status&&<p role="status">رسید گزارش: {s.receipt.status==='approved'?'تأییدشده':s.receipt.status==='submitted'?'دریافت شد؛ در انتظار بررسی':'وضعیت ثبت‌شده در سرور'}؛ ثبت گزارش به‌معنای اعتبار قطعی نیست.</p>}</>
 }
-function Approval({task,entry,s,session,run,setMessage}){
+export function Approval({task,entry,s,session,run,setMessage}){
  const [d,set]=useSessionDraft(session,'review:'+entry.id+':'+task.window_revision,()=>({minutes:String(entry.reported_minutes),note:''}))
  const disabled=s.busy||s.uncertain||s.refreshRequired||!s.ready||!!s.slot?.active||s.receipt?.review_state==='approved'
  const send=e=>{e.preventDefault();if(disabled)return;const v=reviewWindowPayload(task,entry,d);if(!v.ok){setMessage(errors[v.code]);return}void run(()=>session.perform('review',v.args))}
