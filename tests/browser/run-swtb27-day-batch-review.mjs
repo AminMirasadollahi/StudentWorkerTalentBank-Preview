@@ -12,7 +12,7 @@ await mkdir(out,{recursive:true})
 let server,browser,context,page,blocked=0
 const errors=[],observations={}
 try{
- server=await createServer({configFile:resolve('tests/browser/vite.swtb24-r5.config.mjs'),server:{hmr:false},optimizeDeps:{noDiscovery:true,include:[]}})
+ server=await createServer({configFile:resolve('tests/browser/vite.swtb24-r5.config.mjs'),server:{hmr:false},optimizeDeps:{noDiscovery:true,include:['react','react-dom/client','react/jsx-runtime','react/jsx-dev-runtime']}})
  await server.listen()
  browser=await chromium.launch({headless:true,channel:'chrome',args:['--no-sandbox','--disable-background-networking']})
  context=await browser.newContext({viewport:{width:1440,height:900},locale:'fa-IR',serviceWorkers:'block'})
