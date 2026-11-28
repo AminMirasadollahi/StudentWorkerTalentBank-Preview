@@ -12,7 +12,7 @@ const date=new Date(Date.now()+7*86400000).toISOString().slice(0,10)
 const context={today,defaultDate:date,term:{id:term,state:'active',start_date:today,end_date:new Date(Date.now()+90*86400000).toISOString().slice(0,10)},workers:[{id:worker,name:'دانشجوکار نمونه',state:'active'}],data:{tasks:[],weekly_slots:[],exceptions:[]}}
 before(async()=>{
  dom=new JSDOM('<!doctype html><html lang="fa" dir="rtl"><body></body></html>',{url:'https://fixture.invalid',pretendToBeVisual:true})
- globalThis.window=dom.window;globalThis.document=dom.window.document;globalThis.HTMLElement=dom.window.HTMLElement;globalThis.IS_REACT_ACT_ENVIRONMENT=true
+ globalThis.window=dom.window;globalThis.document=dom.window.document;globalThis.HTMLElement=dom.window.HTMLElement;globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.requestAnimationFrame=dom.window.requestAnimationFrame.bind(dom.window);globalThis.cancelAnimationFrame=dom.window.cancelAnimationFrame.bind(dom.window)
  Object.defineProperty(document,'hasFocus',{value:()=>true,configurable:true})
  globalThis.__swtb27Forbidden=()=>{legacyCalls++;throw Error('LEGACY_FORBIDDEN')}
  ;({createRoot}=await import('react-dom/client'))
@@ -30,7 +30,7 @@ before(async()=>{
 })
 after(async()=>{
  await vite?.close();dom?.window.close()
- for(const k of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT','__swtb27Forbidden'])delete globalThis[k]
+ for(const k of ['window','document','HTMLElement','IS_REACT_ACT_ENVIRONMENT','requestAnimationFrame','cancelAnimationFrame','__swtb27Forbidden'])delete globalThis[k]
 })
 const wait=()=>new Promise(r=>setTimeout(r,5))
 async function until(fn){for(let i=0;i<80;i++){if(fn())return;await act(async()=>{await wait()})}throw Error('MOUNTED_WAIT_EXPIRED')}
@@ -137,4 +137,16 @@ test('preview-only old caller still has disabled submit without a port',async()=
   await act(async()=>[...el.querySelectorAll('button')].find(x=>x.textContent==='بررسی تخصیص').click())
   assert.equal([...el.querySelectorAll('button')].find(x=>x.textContent==='ثبت نهایی مجموعه (هنوز فعال نیست)').disabled,true)
  }finally{await act(async()=>root.unmount());el.remove()}
+})
+test('identity refresh hides stale editor and rediscovery does not repeat commit',async()=>{
+ const f=fixture(),m=await mount(f)
+ try{
+  await fillBatch(m);await m.click('ثبت آزمایشی مجموعه');assert.equal(m.state(),'committed')
+  await act(async()=>f.auth('TOKEN_REFRESHED'))
+  assert.equal(m.node.querySelector('.swtb24-batch-preview'),null)
+  await until(()=>m.state()==='committed')
+  assert.equal(f.calls.filter(x=>x[1].p_action==='commit').length,1)
+  await m.click('تأیید و بستن نتیجه');assert.equal(m.state(),'idle')
+  assert.ok(f.reads()>=3)
+ }finally{await m.cleanup()}
 })
