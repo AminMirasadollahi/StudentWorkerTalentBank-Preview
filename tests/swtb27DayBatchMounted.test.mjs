@@ -23,7 +23,7 @@ before(async()=>{
   if(x==='\0swtb27-legacy')return 'export const assignWorkerTask=async()=>globalThis.__swtb27Forbidden()'
   if(x==='\0swtb27-v2')return 'export const assignGroupTask=async()=>globalThis.__swtb27Forbidden();export const assignLibraryDeskShift=assignGroupTask;export const cancelLibraryDeskShift=assignGroupTask;export const getLibraryDeskShifts=async()=>({ok:true,shifts:[]})'
  }}
- vite=await createServer({configFile:false,plugins:[isolation,react()],server:{middlewareMode:true},appType:'custom',logLevel:'error'})
+ vite=await createServer({configFile:false,plugins:[isolation,react()],server:{middlewareMode:true,hmr:false,watch:null},optimizeDeps:{noDiscovery:true,include:[]},appType:'custom',logLevel:'error'})
  Host=(await vite.ssrLoadModule('/src/components/DayBatchManagerReviewHost.jsx')).default
  Batch=(await vite.ssrLoadModule('/src/components/BatchAssignmentPreview.jsx')).default
  Direct=(await vite.ssrLoadModule('/src/components/TaskAssignmentEditor.jsx')).default
@@ -35,12 +35,12 @@ after(async()=>{
 const wait=()=>new Promise(r=>setTimeout(r,5))
 async function until(fn){for(let i=0;i<80;i++){if(fn())return;await act(async()=>{await wait()})}throw Error('MOUNTED_WAIT_EXPIRED')}
 function fixture(initial=null){
- let active=initial,epoch=7,seq=20,mode='',callback=null,reads=0
+ let active=initial,epoch=7,seq=20,mode='',callback=null,reads=0,adminWait=null
  const calls=[]
  const transport=async(url,init)=>{
   assert.ok(url.startsWith('https://abcdefghijklmnopqrst.supabase.co/rest/v1/rpc/'))
   const rpc=url.split('/').pop(),a=JSON.parse(init.body);calls.push([rpc,a])
-  if(rpc==='ops_is_admin')return {ok:true,json:async()=>true}
+  if(rpc==='ops_is_admin'){if(adminWait){const pending=adminWait;adminWait=null;await pending}return {ok:true,json:async()=>true}}
   assert.ok(['ops_assignment_batch_write_v1','ops_assignment_batch_control_v1','ops_assignment_recovery_write_v3','ops_assignment_recovery_control_v2'].includes(rpc))
   const batch=rpc.includes('_batch_'),control=rpc.endsWith('control_v1')||rpc.endsWith('control_v2')
   if(a.p_action==='reserve'){
@@ -63,7 +63,7 @@ function fixture(initial=null){
  const config=Object.freeze({mode:'synthetic-review',actorId:actor,expectedProjectRef:'abcdefghijklmnopqrst',projectUrl:'https://abcdefghijklmnopqrst.supabase.co',publishableKey:'sb_publishable_fixture',
   auth:{getSession:async()=>({data:{session:{access_token:'abc.def.ghi'}}}),getUser:async()=>({data:{user:{id:actor,is_anonymous:false}}}),onAuthStateChange:fn=>{callback=fn;return {data:{subscription:{unsubscribe(){callback=null}}}}}},
   makeId:()=>id(seq++),fetchImpl:transport,read:async scope=>{reads++;return scope==='work'?structuredClone(context):{rows:[]}}})
- return {config,calls,reads:()=>reads,lose:action=>{mode=action},auth:event=>callback?.(event,{user:{id:actor}}),server:()=>active}
+ return {config,calls,reads:()=>reads,lose:action=>{mode=action},auth:event=>callback?.(event,{user:{id:actor}}),holdAdmin:()=>{let release;adminWait=new Promise(r=>release=r);return release},server:()=>active}
 }
 async function mount(f,{editor='batch',scope='work'}={}){
  const node=document.createElement('div');document.body.append(node);const root=createRoot(node);let port
@@ -138,12 +138,15 @@ test('preview-only old caller still has disabled submit without a port',async()=
   assert.equal([...el.querySelectorAll('button')].find(x=>x.textContent==='ثبت نهایی مجموعه (هنوز فعال نیست)').disabled,true)
  }finally{await act(async()=>root.unmount());el.remove()}
 })
-test('identity refresh hides stale editor and rediscovery does not repeat commit',async()=>{
+test('identity refresh hides stale editor and rediscovery does not repeat commit',{timeout:10000},async()=>{
  const f=fixture(),m=await mount(f)
  try{
   await fillBatch(m);await m.click('ثبت آزمایشی مجموعه');assert.equal(m.state(),'committed')
-  await act(async()=>f.auth('TOKEN_REFRESHED'))
-  assert.equal(m.node.querySelector('.swtb24-batch-preview'),null)
+  const release=f.holdAdmin()
+  try{
+   await act(async()=>{f.auth('TOKEN_REFRESHED')})
+   assert.equal(Boolean(m.node.querySelector('.swtb24-batch-preview')),false,'unverified editor must be hidden')
+  }finally{release()}
   await until(()=>m.state()==='committed')
   assert.equal(f.calls.filter(x=>x[1].p_action==='commit').length,1)
   await m.click('تأیید و بستن نتیجه');assert.equal(m.state(),'idle')
