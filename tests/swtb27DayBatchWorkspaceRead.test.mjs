@@ -4,7 +4,7 @@ import {buildDayBatchWorkspaceContext,createDayBatchWorkspaceReadGate,validWorks
 const id=n=>'20000000-0000-4000-8000-'+String(n).padStart(12,'0')
 const today='2026-11-28',term={id:id(1),state:'active',start_date:'2026-09-23',end_date:'2027-02-09'}
 const makeWork=()=>({workers:[{id:id(2),state:'active'}],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
-const dashboard=(overrides={})=>({ok:true,term,terms:[term],units:[],weeks:[],workers:[],pools:[],...overrides})
+const dashboard=(overrides={})=>({ok:true,term,terms:[term],units:[],weeks:[],workers:[],pools:[],filters:{unit_code:null,worker_id:null},allocation_scope:'all_workers',...overrides})
 test('exact work identity, explicit matching active term; no inferred eligibility',()=>{
  const work=makeWork(),c=buildDayBatchWorkspaceContext(work,dashboard(),today)
  assert.equal(c.data,work);assert.equal(c.workers,work.workers);assert.equal(c.term.id,term.id)
@@ -34,4 +34,9 @@ test('out of order work read, denied work and owner invalidation reject every st
  assert.equal(current.acceptWork(w),false);assert.equal(current.acceptTerm(dashboard(),today),false)
  const a=g.begin();assert.equal(a.acceptWork(w),true);g.invalidate()
  assert.equal(a.acceptTerm(dashboard(),today),false);assert.equal(g.contextFor(w),null)
+})
+
+test('filtered, incomplete or non-global dashboard cannot prove active assignment term',()=>{
+ const work=makeWork()
+ for(const d of [dashboard({filters:undefined}),dashboard({filters:{unit_code:'library',worker_id:null}}),dashboard({filters:{unit_code:null,worker_id:id(2)}}),dashboard({filters:{unit_code:null}}),dashboard({allocation_scope:'not_applicable_to_worker_slice'}),dashboard({allocation_scope:undefined})])assert.equal(buildDayBatchWorkspaceContext(work,d,today),null)
 })
