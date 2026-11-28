@@ -8,7 +8,7 @@ const uuid=x=>typeof x==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 const blocked=()=>Promise.resolve('blocked')
 export function createDayBatchSharedManager({actorId,legacyWrite,legacyControl,batchWrite,batchControl,cancelExistingShift,makeId}){
  if(!uuid(actorId)||[legacyWrite,legacyControl,batchWrite,batchControl,cancelExistingShift,makeId].some(x=>typeof x!=='function'))throw Error('SHARED_MANAGER_DEPENDENCIES')
- let generation=0,verified=false,disposed=false,busy=false,owner=null,ready=false,route='work',readReady=false,shiftHeld=false,status='checking',legacyAck=null,legacyAttempt=null,legacyObserved=null
+ let generation=0,verified=false,disposed=false,busy=false,owner=null,ready=false,route=null,readReady=false,readRevision=0,shiftHeld=false,status='checking',legacyAck=null,legacyAttempt=null,legacyObserved=null
  const fence=createManagerAssignmentFence()
  const allowed=()=>verified&&!disposed&&readReady
  const legacy=createAssignmentRecoverySession({version:3,write:async args=>{
@@ -38,12 +38,20 @@ export function createDayBatchSharedManager({actorId,legacyWrite,legacyControl,b
   if(next?.status!=='verified'||next.actorId!==actorId){dispose();return}
   verified=true;sync()
  }
- const setReadState=(scope,state)=>{
-  if(disposed||!['work','candidates','report'].includes(scope)||!['checking','ready','failed'].includes(state))return false
-  route=scope;readReady=state==='ready';sync();return true
+ const selectReadScope=scope=>{
+  if(disposed||!['work','candidates','report'].includes(scope))return false
+  if(route===scope)return true
+  route=scope;readRevision++;readReady=scope==='report';sync();return true
  }
- // A route read change can never reopen access. Caller must only deliver
- // current scope/generation read results, as in the existing scoped host.
+ const beginScopedRead=scope=>{
+  if(disposed||scope!==route||!['work','candidates'].includes(scope))return ()=>false
+  const revision=++readRevision;readReady=false;sync();let settled=false
+  return state=>{
+   if(disposed||settled||scope!==route||revision!==readRevision||!['ready','failed'].includes(state))return false
+   settled=true;readReady=state==='ready';sync();return true
+  }
+ }
+ // A stale route read cannot reopen the gate. Auth proof is separate.
  const snapshot=()=>{
   if(disposed||!allowed())return Object.freeze({state:disposed?'unavailable':'checking',owner:null,canStart:false,canDiscover:false})
   if(shiftHeld)return Object.freeze({state:'shift_unconfirmed',owner:'shift',canStart:false,canDiscover:false})
@@ -105,7 +113,11 @@ export function createDayBatchSharedManager({actorId,legacyWrite,legacyControl,b
   const session=kind==='batch'?batch:legacy
   // Revalidate before reserve; never use stale proof after another route.
   const result=await session.discover();if(!current())return 'stale'
-  if(result!=='idle'){status=result;return result}
+  if(result!=='idle'){
+   status=result
+   if(kind==='batch'&&result==='foreign'||kind==='legacy'&&result==='unknown'){owner=null;status='unknown'}
+   return result
+  }
   const out=kind==='batch'?await batch.submit(draft,context):await legacy.submit(draft)
   if(!current())return 'stale'
   status=out
@@ -135,5 +147,5 @@ export function createDayBatchSharedManager({actorId,legacyWrite,legacyControl,b
   return Object.freeze({ok:true,shift_id:args.shiftId,state:'cancelled'})
  }
  function dispose(){generation++;verified=false;disposed=true;ready=false;legacy.dispose();batch.dispose();fence.dispose()}
- return Object.freeze({setAccess,setReadState,snapshot,discover,submitLegacy:d=>begin('legacy',d),submitBatch:(d,c)=>begin('batch',d,c),commit:()=>action('commit'),retryReserve:()=>action('retryReserve'),cancel:()=>action('cancel'),acknowledge:()=>action('acknowledge'),cancelExistingShift:shift,dispose})
+ return Object.freeze({setAccess,selectReadScope,beginScopedRead,snapshot,discover,submitLegacy:d=>begin('legacy',d),submitBatch:(d,c)=>begin('batch',d,c),commit:()=>action('commit'),retryReserve:()=>action('retryReserve'),cancel:()=>action('cancel'),acknowledge:()=>action('acknowledge'),cancelExistingShift:shift,dispose})
 }
