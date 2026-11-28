@@ -23,7 +23,7 @@ const fixtureTransport=async(name,args)=>{
  if(!r.ok)throw Error('SYNTHETIC_REPLY_UNAVAILABLE')
  return r.json()
 }
-const session=createWindowDurableV4Review({syntheticReviewOnly:true,fixtureTransport,context:c})
+const session=createWindowDurableV4Review({syntheticReviewOnly:true,fixtureTransport,context:c,assignmentWritesV1:role==='manager',newAssignmentId:()=>crypto.randomUUID()})
 const port=createWindowReadReviewPort({syntheticReviewOnly:true,fixtureTransport,durableV4:true})
 function Stage(){
  const [status,setStatus]=useState('verified'),[rev,setRev]=useState(0)

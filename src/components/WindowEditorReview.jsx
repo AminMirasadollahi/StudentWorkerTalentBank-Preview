@@ -27,7 +27,7 @@ function useSessionDraft(session,key,initial){
  const set=change=>{const v=typeof change==='function'?change(ref.current):change;if(session.saveDraft(key,v)){ref.current=v;setLocal(v)}}
  return [d,set]
 }
-function Assignment({scope,s,session,run,setMessage,newId}){
+export function Assignment({scope,s,session,run,setMessage,newId,showRecovery=true}){
  const activeUnits=scope.activeUnits??Object.keys(units)
  const initialDay=scope.serverToday>scope.term.start_date?scope.serverToday:scope.term.start_date
  const initial=()=>({workerId:'',unit:activeUnits.includes('research')?'research':activeUnits[0]||'',title:'',instructions:'',start:initialDay,end:initialDay,minutes:'60',reason:'',prerequisites:[]})
@@ -35,7 +35,7 @@ function Assignment({scope,s,session,run,setMessage,newId}){
  const hadDraft=useRef(false)
  useEffect(()=>{if(hadDraft.current&&!s.frozenDraft&&!s.slot?.active&&s.slot){set(initial())}hadDraft.current=!!s.frozenDraft},[s.frozenDraft,s.slot])
  const frozen=!!s.frozenDraft||!!s.slot?.active||s.uncertain||s.refreshRequired||s.busy||!s.ready||!s.slot
- const reserve=e=>{e.preventDefault();if(frozen)return;const v=assignmentWindowPayload(d,scope,newId(),s.slot.epoch);if(!v.ok){setMessage(errors[v.code]);return}void run(()=>session.reserve(v.args))}
+ const reserve=e=>{e.preventDefault();if(frozen)return;if(session.durableVersion===4){void run(()=>session.reserveAssignment(d));return}const v=assignmentWindowPayload(d,scope,newId(),s.slot.epoch);if(!v.ok){setMessage(errors[v.code]);return}void run(()=>session.reserve(v.args))}
  return <><h2>واگذاری کار بازه‌ای</h2><p>یک وظیفه، یک برآورد کل، یک گزارش. زمان بین روزهای بازه تقسیم نمی‌شود.</p>
  <form onSubmit={reserve}><fieldset disabled={frozen}><div className="we-grid">
  <label>دانشجوکار<select aria-label="دانشجوکار واگذاری" {...field(d,set,'workerId')}><option value="">انتخاب کنید</option>{scope.workers.filter(w=>w.state==='active'&&w.onboarding_state==='ready'&&w.eligibility==='eligible').map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label>
@@ -49,7 +49,7 @@ function Assignment({scope,s,session,run,setMessage,newId}){
  </div><details><summary>پیش‌نیازهای کار (اختیاری)</summary>{scope.prerequisites.map(t=><label className="we-check" key={t.id}><input type="checkbox" checked={d.prerequisites.includes(t.id)} onChange={e=>set(x=>({...x,prerequisites:e.target.checked?[...x.prerequisites,t.id]:x.prerequisites.filter(id=>id!==t.id)}))}/>{t.title}</label>)}</details>
  <button type="submit" disabled={!activeUnits.length}>رزرو درخواست واگذاری</button></fieldset></form>
  {s.frozenDraft&&<p className="wr-held">پیش‌نویس رزروشده تا تعیین تکلیف درخواست قفل است.</p>}
- <Recovery s={s} run={run} session={session}/></>
+ {showRecovery&&<Recovery s={s} run={run} session={session}/>}</>
 }
 export function Report({task,s,session,run,setMessage,newId}){
  const a=task.window_actions

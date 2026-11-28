@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react'
-import {Report,Approval} from './WindowEditorReview.jsx'
+import {Report,Approval,Assignment} from './WindowEditorReview.jsx'
 import WindowReadReview from './WindowReadReview.jsx'
 import WindowTermReview from './WindowTermReview.jsx'
 import {jalaliWindowDay} from '../lib/windowReviewPresentation.mjs'
@@ -15,10 +15,13 @@ function GlobalRecovery({s,session,run}){
  {s.intentSummary?.title&&<p>{s.intentSummary.title}{s.intentSummary.minutes!==null?' · '+s.intentSummary.minutes+' دقیقه':''}{s.intentSummary.workDate?' · '+jalaliWindowDay(s.intentSummary.workDate):''}</p>}
  {h&&<p className="wr-meta">این رسید تاریخی است؛ {h.operation==='submit'?'ثبت گزارش به معنی تأیید ساعت نیست. ':''}وضعیت فعلی فقط از بازخوانی معتبر مشخص می‌شود.</p>}
  {a.status==='reserved'&&!s.canExecute&&!s.canRetryPrepare&&<p>محتوای دقیق درخواست در این نشست قابل اجرا نیست. پس از بازخوانی، می‌توانید همان رزرو را مسدود کنید.</p>}</>}
+ {s.assignmentPending&&<p>درخواست واگذاری در این نشست قفل است؛ {s.assignmentSummary?.title}</p>}
  {s.uncertain&&<p role="alert">نتیجه نامشخص؛ عملیات جدید متوقف است.</p>}
  {s.refreshRequired&&<p>تا بازخوانی معتبر، عملیات جدید فعال نمی‌شود.</p>}
  <div className="we-actions">
  <button type="button" disabled={s.busy} onClick={()=>run(()=>s.ready?session.refresh():session.connect())}>بازخوانی وضعیت عملیات</button>
+ {s.canRetryAssignment&&<button type="button" disabled={s.busy} onClick={()=>run(()=>session.retryAssignment())}>بازیابی همان درخواست واگذاری</button>}
+ {s.canCommitAssignment&&<button type="button" disabled={s.busy} onClick={()=>run(()=>session.commitAssignment())}>ثبت نهایی واگذاری</button>}
  {s.canRetryPrepare&&<button type="button" disabled={s.busy} onClick={()=>run(()=>session.retryPrepare())}>بازیابی رزرو با محتوای دقیق</button>}
  {s.canExecute&&<button type="button" disabled={s.busy} onClick={()=>run(()=>session.execute())}>اجرای درخواست رزروشده</button>}
  {s.canSeal&&<button type="button" disabled={s.busy} onClick={()=>run(()=>session.seal())}>مسدودسازی درخواست رزروشده</button>}
@@ -30,9 +33,11 @@ function BusinessRecovery({s,session,run}){
  if(!r)return null
  return <section className="wr-shell" dir="rtl" aria-label="وضعیت واگذاری"><h2>صف واگذاری</h2>
  <p>{!a?'درخواستی در انتظار نیست.':a.status==='reserved'?'واگذاری رزروشده است.':a.status==='committed'?'واگذاری ثبت شده است.':a.status==='cancelled'?'واگذاری لغو شده است.':'صف دیگری فعال است؛ تغییر مجاز نیست.'}</p>
- {a?.kind==='single_report_window_v1'&&a.status==='reserved'&&<button type="button" disabled={!s.canPrepare} onClick={()=>run(()=>session.prepare('recovery',{p_action:'cancel',p_epoch:r.epoch,p_request_id:a.requestId}))}>آماده‌سازی لغو واگذاری</button>}
- {a?.kind==='single_report_window_v1'&&['committed','cancelled'].includes(a.status)&&<button type="button" disabled={!s.canPrepare} onClick={()=>run(()=>session.prepare('recovery',{p_action:'acknowledge',p_epoch:r.epoch,p_request_id:a.requestId}))}>آماده‌سازی تأیید رسید واگذاری</button>}
- <p className="wr-meta">ایجاد و ثبت نهایی واگذاری جدید در این کاندیدا هنوز فعال نیست.</p></section>
+ {a?.kind==='single_report_window_v1'&&a.status==='reserved'&&<button type="button" disabled={!s.canPrepareRecovery} onClick={()=>run(()=>session.prepare('recovery',{p_action:'cancel',p_epoch:r.epoch,p_request_id:a.requestId}))}>آماده‌سازی لغو واگذاری</button>}
+ {a?.kind==='single_report_window_v1'&&['committed','cancelled'].includes(a.status)&&<button type="button" disabled={!s.canPrepareRecovery} onClick={()=>run(()=>session.prepare('recovery',{p_action:'acknowledge',p_epoch:r.epoch,p_request_id:a.requestId}))}>آماده‌سازی تأیید رسید واگذاری</button>}
+ {a?.receipt&&<p className="wr-meta">زمان استاندارد ثبت‌شده: {a.receipt.standard_minutes} دقیقه · {jalaliWindowDay(a.receipt.window_start)} تا {jalaliWindowDay(a.receipt.window_end)}</p>}
+ {a?.status==='reserved'&&!s.assignmentPending&&<p>پیش‌نویس دقیق در این نشست موجود نیست؛ ثبت نهایی مجاز نیست.</p>}
+ {!s.assignmentEnabled&&<p className="wr-meta">ایجاد واگذاری در این کاندیدا غیرفعال است.</p>}</section>
 }
 function Term({scope,section,snapshot}){
  const [initial,setInitial]=useState(null),[failed,setFailed]=useState(false)
@@ -45,6 +50,11 @@ function Forms({s,session,role,section,run,setMessage}){
  const perform=async(kind,args)=>{const r=await session.prepare(kind,args);return r.status==='ok'?{...r,status:'prepared'}:r}
  const adapter={durableVersion:4,draft:session.draft,saveDraft:session.saveDraft,perform}
  const formState={busy:s.busy,uncertain:s.uncertain,refreshRequired:!s.canPrepare,ready:s.canPrepare,slot:null,receipt:null}
+ if(role==='manager'&&section==='tasks'&&s.assignmentEnabled){
+  if(!s.current.assignmentScope)return <p role="alert">دامنه واگذاری معتبر نیست.</p>
+  const aState={...formState,ready:s.canReserveAssignment,slot:s.current.assignment,frozenDraft:s.assignmentPending,refreshRequired:!s.canReserveAssignment}
+  return <section className="wr-shell we-shell" dir="rtl"><Assignment key={s.current.assignmentScope.term.id} scope={s.current.assignmentScope} s={aState} session={{...adapter,reserveAssignment:session.reserveAssignment}} run={run} setMessage={setMessage} showRecovery={false}/></section>
+ }
  if(role==='worker'&&section==='tasks'){
   const tasks=snapshot.tasks.filter(t=>t.schedule_kind==='single_report_window'&&t.window_actions?.can_submit===true)
   const task=tasks.find(t=>t.id===selected)||tasks[0]
