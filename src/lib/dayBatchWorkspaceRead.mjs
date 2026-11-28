@@ -9,7 +9,8 @@ export function validWorkspaceWorkRead(data){
 // Never infer an active term from a single selected/historical term.
 export function buildDayBatchWorkspaceContext(work,dashboard,today){
  if(!validWorkspaceWorkRead(work)||!validIsoDay(today)||!obj(dashboard)||dashboard.ok!==true||
- !['terms','units','weeks','workers','pools'].every(k=>Array.isArray(dashboard[k])))return null
+ !['terms','units','weeks','workers','pools'].every(k=>Array.isArray(dashboard[k]))||
+ !obj(dashboard.filters)||dashboard.filters.unit_code!==null||dashboard.filters.worker_id!==null||dashboard.allocation_scope!=='all_workers')return null
  const terms=dashboard.terms
  const active=terms.filter(t=>t?.state==='active')
  if(active.length!==1||!obj(dashboard.term))return null
