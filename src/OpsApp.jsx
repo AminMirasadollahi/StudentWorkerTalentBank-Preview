@@ -44,6 +44,8 @@ import './manager-shell.css'
 const emailInvitesAvailable = import.meta.env.VITE_OPS_EMAIL_INVITES_AVAILABLE === 'true'
 // Rollback-safe preview: preserve the current manager UI until the new shell is accepted.
 const managerShellEnabled=import.meta.env.VITE_SWTB22_MANAGER_SHELL_UI==='true'
+// Six-space manager IA is opt-in and remains OFF in the production env until owner visual acceptance.
+const managerR5IaEnabled=import.meta.env.VITE_SWTB24_R5_MANAGER_IA_UI==='true'
 const recoveryReviewConfig=resolveRecoveryReviewConfig(import.meta.env)
 const managerNavFlags={
  workPoolEnabled:import.meta.env.VITE_SWTB21_WORK_POOL_UI!=='false',
@@ -574,9 +576,10 @@ function CandidateCard({
 function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refreshRevision = 0, workHubFixture=false, r5IaFixture=false, assignmentReceiptPort=null }) {
   const [fence]=useState(createWorkPoolRouteFence)
   const draftGuard=useMemo(createManagerDraftGuard,[assignmentReceiptPort?.readScopeOwner])
-  const activeDraftGuard=managerShellEnabled&&r5IaFixture===true?draftGuard:null
+  const r5IaActive=managerShellEnabled&&(r5IaFixture===true||managerR5IaEnabled)
+  const activeDraftGuard=r5IaActive?draftGuard:null
   const [routeNotice,setRouteNotice]=useState('')
-  const routeFence=managerShellEnabled&&(workHubFixture===true||r5IaFixture===true)&&managerNavFlags.workPoolEnabled?fence:null
+  const routeFence=managerShellEnabled&&(workHubFixture===true||r5IaActive)&&managerNavFlags.workPoolEnabled?fence:null
   const setNavigation=change=>{
    if(!routeFence&&!activeDraftGuard){commitNavigation(change);return true}
    const next=typeof change==='function'?change(navigation):change
@@ -755,7 +758,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   const activeCount = rows.filter(row => Boolean(row.worker_id)).length
   const readyCount = rows.filter(row => !row.worker_id
     && row.interview_status === 'approved' && row.clearance_status === 'cleared').length
-  const navFlags={...managerNavFlags,workHubFixture:managerShellEnabled&&workHubFixture===true,r5IaFixture:managerShellEnabled&&r5IaFixture===true}
+  const navFlags={...managerNavFlags,workHubFixture:managerShellEnabled&&workHubFixture===true,r5IaEnabled:r5IaActive,r5IaFixture:managerShellEnabled&&r5IaFixture===true}
   const currentDestination=currentManagerDestination(navigation,navFlags)
   const navigateManager=item=>setNavigation(previous=>nextManagerNavigation(previous,item))
 
@@ -777,7 +780,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
           <button type="button" className="report-btn report-btn--ghost" onClick={onLogout}>خروج</button>
         </div>
       </header>
-      {navFlags.r5IaFixture&&<ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>}
+      {navFlags.r5IaEnabled&&<ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>}
       {!managerShellEnabled&&<nav className="ow-tabs" aria-label="بخش‌های مدیریت دانشجوکار">
         <button type="button"
           className={adminSection === 'candidates' ? 'ow-tab is-selected' : 'ow-tab'}
@@ -858,7 +861,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
         </div>
        </section>}
       {routeFence&&routeNotice&&<p role="alert" className="report-alert report-alert--error">{routeNotice}</p>}
-      {!navFlags.r5IaFixture&&<ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>}
+      {!navFlags.r5IaEnabled&&<ManagerWorkHubTabs navigation={navigation} flags={navFlags} onNavigate={navigateManager}/>}
       {adminSection !== 'work' && assignmentReceiptPort?.panel}
       {adminSection === 'work' && <ManagerDraftContext.Provider value={activeDraftGuard}><AdminOperations navigation={navigation} setNavigation={setNavigation}
         assignmentReceiptPort={assignmentReceiptPort}

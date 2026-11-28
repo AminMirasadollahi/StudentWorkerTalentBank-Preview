@@ -19,7 +19,7 @@ export const MANAGER_WORKSPACE_GROUPS = [
   {id:'candidateReport',section:'candidates',view:'report',label:'آمار و خروجی پذیرش',description:'گزارش آماری فرایند داوطلبان و پذیرش.'},
  ]},
 ]
-// Review-only opt-in: a single parent maps to the existing internal views.
+// Presentation-only opt-in: a single parent maps to existing internal views; it never grants access.
 export const workHubEnabled=flags=>flags?.workHubFixture===true&&flags.workPoolEnabled!==false
 export const isWorkHubView=view=>view==='tasks'||view==='workPool'
 const legacyManagerGroups=(flags={})=>MANAGER_WORKSPACE_GROUPS.map(group=>({
@@ -31,7 +31,7 @@ const legacyManagerGroups=(flags={})=>MANAGER_WORKSPACE_GROUPS.map(group=>({
 }))
 // R5 review only. Canonical route identity stays section+view; no new
 // authorization, data projection, or write operation is introduced.
-export const r5IaEnabled=flags=>flags?.r5IaFixture===true
+export const r5IaEnabled=flags=>flags?.r5IaEnabled===true||flags?.r5IaFixture===true
 const r5Groups=[
  {id:'daily',title:'عملیات روزانه',parents:[
   ['inbox','کارتابل و رسیدگی','گزارش‌ها و درخواست‌های نیازمند تصمیم مدیر.',['inbox','approvals']],

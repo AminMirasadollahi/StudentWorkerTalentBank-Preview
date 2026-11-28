@@ -2,7 +2,7 @@ import React from 'react'
 import {isWorkHubView,workHubEnabled,r5IaEnabled,managerR5SubViews,currentManagerDestination} from '../lib/managerWorkspaceNav.mjs'
 
 // Navigation controls only. No second workspace, mutation or hidden editor.
-// Review fixture must not be enabled for live users until lifetime gates pass.
+// Presentation only. Authorization and every mutation remain in OpsApp and the existing RPCs.
 export default function ManagerWorkHubTabs({navigation,flags,onNavigate}){
  if(r5IaEnabled(flags)){
   const children=managerR5SubViews(navigation,flags)

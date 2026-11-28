@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {visibleManagerGroups,currentManagerDestination,nextManagerNavigation,managerR5SubViews} from '../src/lib/managerWorkspaceNav.mjs'
-const flags={r5IaFixture:true}
+const flags={r5IaEnabled:true}
 const flat=f=>visibleManagerGroups(f).flatMap(g=>g.items)
 test('R5 maps all eleven authorized existing views to six unique parents only when opted in',()=>{
  assert.equal(flat({}).length,11)
@@ -15,6 +15,10 @@ test('R5 maps all eleven authorized existing views to six unique parents only wh
   assert.equal(managerR5SubViews(nav,flags).length,p.children.length)
   assert.equal(nextManagerNavigation(nav,c).taskSearch,'retain')
  }
+})
+test('legacy fixture alias and explicit release flag produce the same six-space map',()=>{
+ const legacy=visibleManagerGroups({r5IaFixture:true}),enabled=visibleManagerGroups(flags)
+ assert.deepEqual(legacy.map(g=>g.items.map(i=>i.id)),enabled.map(g=>g.items.map(i=>i.id)))
 })
 test('disabled features remain absent; grouped parent never routes to disabled children',()=>{
  const f={...flags,workPoolEnabled:false,termMembershipEnabled:false}

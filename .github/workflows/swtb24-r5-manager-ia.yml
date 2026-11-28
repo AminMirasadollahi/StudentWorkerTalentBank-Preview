@@ -29,6 +29,7 @@ jobs:
           VITE_SWTB23_WORKER_POLICY_RELEASE: 'true'
           VITE_SWTB22_RECOVERY_REVIEW_UI: 'true'
           VITE_SWTB22_RECOVERY_REVIEW_PROJECT_REF: aaaaaaaaaaaaaaaaaaaa
+          VITE_SWTB24_R5_MANAGER_IA_UI: 'true'
           VITE_SUPABASE_URL: https://aaaaaaaaaaaaaaaaaaaa.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_synthetic_build_only
         run: npm run build -- --outDir /tmp/swtb23-integrated-build
