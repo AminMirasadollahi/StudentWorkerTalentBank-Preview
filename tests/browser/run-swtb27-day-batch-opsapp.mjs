@@ -37,10 +37,11 @@ try{
  await state('idle');await page.getByText('محیط آزمایشی مستقل؛ این نسخه برای انتشار عمومی نیست.',{exact:true}).waitFor();await route('tasks').click();await common.waitFor();await open()
  await batch.getByLabel('عنوان کار ۱',{exact:true}).fill('پیش‌نویس در OpsApp واقعی')
  await batch.getByLabel('دلیل اطلاع‌رسانی کوتاه (در صورت نیاز)').fill('آزمون مصنوعی هماهنگی قبلی')
+ const missing=await batch.getByRole('checkbox',{name:/نام ثبت نشده · شناسه /}).all();assert.equal(missing.length,2);const missingLabels=await Promise.all(missing.map(x=>x.evaluate(el=>el.closest('label').textContent.trim())));assert.notEqual(missingLabels[0],missingLabels[1]);assert.equal(await missing[0].isChecked(),false);assert.equal(await missing[1].isChecked(),false)
  await batch.getByRole('checkbox',{name:'دانشجوکار الف',exact:true}).check()
  await button('بستن و حفظ پیش‌نویس').click();await dialog.waitFor({state:'hidden'})
  await route('applicants').click()
- await page.getByText('داوطلب کاملاً مصنوعی',{exact:true}).waitFor();await state('idle')
+ await page.getByText('داوطلب کاملاً مصنوعی',{exact:true}).waitFor();await state('idle');const missingCandidates=await page.locator('.swtb22-candidate-row strong').filter({hasText:'نام ثبت نشده · شناسه '}).allTextContents();assert.equal(missingCandidates.length,2);assert.notEqual(missingCandidates[0],missingCandidates[1])
  assert.equal(await common.count(),0);assert.equal((await counts()).commits,0)
  await route('tasks').click();await state('idle');await common.waitFor();await open()
  assert.equal(await batch.getByLabel('عنوان کار ۱',{exact:true}).inputValue(),'پیش‌نویس در OpsApp واقعی')
@@ -83,7 +84,7 @@ try{
  await page.evaluate(()=>globalThis.__qaDayBatch.deskReadMode('valid'))
  await direct.getByRole('button',{name:'بازخوانی ظرفیت نوبت‌ها',exact:true}).click()
  await page.waitForFunction(()=>Array.from(document.querySelectorAll('.ow-desk-cancel-trigger')).some(x=>!x.disabled))
- await cancel.click();await direct.getByLabel('علت لغو نوبت',{exact:true}).fill('لغو نوبت مصنوعی')
+ await cancel.click();const cancelReason=direct.getByLabel('علت لغو نوبت',{exact:true});await cancelReason.waitFor();await page.waitForFunction(()=>document.activeElement?.getAttribute('aria-label')==='علت لغو نوبت');await cancelReason.fill('لغو نوبت مصنوعی');const confirmButton=direct.getByRole('button',{name:'تأیید لغو نوبت',exact:true});assert.equal(await confirmButton.evaluate(el=>{const r=el.getBoundingClientRect(),d=el.closest('dialog').getBoundingClientRect();return r.top>=Math.max(0,d.top)&&r.bottom<=Math.min(innerHeight,d.bottom)&&r.left>=0&&r.right<=innerWidth}),true,'CANCEL_CONFIRM_MUST_BE_IN_DIALOG_VIEWPORT')
  await snap('03-opsapp-desk-cancel-confirmation')
  await page.evaluate(()=>globalThis.__qaDayBatch.lose('commit'))
  await direct.getByRole('button',{name:'تأیید لغو نوبت',exact:true}).click();await state('unknown')
@@ -114,5 +115,6 @@ try{
  console.log('PASS SWTB28_ACTUAL_OPSAPP_DURABLE_DESK_CANCEL_LOST_COMMIT_WRONG_DAY_TASK_NO_FALLBACK')
  console.log('PASS SWTB28_ACTUAL_OPSAPP_STAGING_ADAPTER_FOUR_SCOPED_READS_FAKE_ONLY')
  console.log('PASS SWTB31_VISIBLE_RECOVERY_ACK_AND_TARGETED_RECEIPTS')
+ console.log('PASS SWTB31_DISTINCT_MISSING_NAMES_AND_VISIBLE_CANCEL_CONFIRMATION')
 }catch(e){console.error('SWTB27_OPSAPP_CHROME_DIAGNOSTIC',JSON.stringify({observations,blocked,errors,headings:await page?.locator('h1,h2,h3').allTextContents().catch(()=>[]),status:await page?.locator('[role=status],[role=alert]').allTextContents().catch(()=>[]),deskCoverage:await page?.locator('.ow-desk-coverage').allTextContents().catch(()=>[]),counters:await page?.evaluate(()=>globalThis.__qaDayBatch?.counts()).catch(()=>null)}));throw e}
 finally{await writeFile(resolve(out,'observations.json'),JSON.stringify({observations,blocked,errors},null,2));await context?.close().catch(()=>{});await browser?.close().catch(()=>{});await server?.close().catch(()=>{})}

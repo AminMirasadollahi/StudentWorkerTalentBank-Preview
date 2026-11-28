@@ -51,6 +51,15 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  const [deskRevision,setDeskRevision]=useState(0)
  const [deskRead,setDeskRead]=useState({date:'',state:'idle',shifts:[]})
  const [cancelDraft,setCancelDraft]=useState(null)
+ const cancelPanelRef=useRef(null)
+ // Reveal the explicit confirmation once on opening, never on each keystroke.
+ // Focus and scrolling are presentation only; do not call the cancellation writer.
+ useEffect(()=>{
+  if(!cancelDraft?.id)return
+  const panel=cancelPanelRef.current
+  panel?.scrollIntoView?.({block:'nearest',inline:'nearest'})
+  panel?.querySelector('input')?.focus({preventScroll:true})
+ },[cancelDraft?.id])
  const [cancelBusy,setCancelBusy]=useState(false)
  const [cancelError,setCancelError]=useState('')
  const cancelLock=useRef(false)
@@ -349,7 +358,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
                   prev?.id===s.id?null:{id:s.id,reason:''})}}>
                 لغو نوبت
               </button>
-              {cancelDraft?.id===s.id&&<div className="ow-desk-cancel-confirm">
+              {cancelDraft?.id===s.id&&<div ref={cancelPanelRef} className="ow-desk-cancel-confirm">
                 <label className="report-field"><span>علت لغو (الزامی، حداقل ۵ حرف)</span>
                   <input type="text" maxLength={500} aria-label="علت لغو نوبت"
                     value={cancelDraft.reason} onChange={e=>

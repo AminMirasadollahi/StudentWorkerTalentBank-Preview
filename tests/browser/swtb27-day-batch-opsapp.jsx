@@ -16,7 +16,7 @@ const id=n=>'20000000-0000-4000-8000-'+String(n).padStart(12,'0')
 const actor=id(1),worker=id(2),term=id(3)
 const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{calendar:'gregory',timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(x=>[x.type,x.value]))
 const today=[parts.year,parts.month,parts.day].join('-'),date=new Date(Date.now()+7*86400000).toISOString().slice(0,10)
-const context={today,defaultDate:date,term:{id:term,state:'active',start_date:today,end_date:new Date(Date.now()+90*86400000).toISOString().slice(0,10)},workers:[{id:worker,name:'دانشجوکار الف',state:'active'},{id:id(5),name:'دانشجوکار ب',state:'active'}],data:{tasks:[],weekly_slots:[],exceptions:[]}}
+const context={today,defaultDate:date,term:{id:term,state:'active',start_date:today,end_date:new Date(Date.now()+90*86400000).toISOString().slice(0,10)},workers:[{id:worker,name:'دانشجوکار الف',state:'active'},{id:id(5),name:'دانشجوکار ب',state:'active'},{id:id(6),name:'',state:'active'},{id:id(7),name:'   ',state:'active'}],data:{tasks:[],weekly_slots:[],exceptions:[]}}
 const shiftId=id(801),taskId=id(802)
 const shift={id:shiftId,task_id:taskId,worker_id:worker,shift_date:today,start_minute:480,end_minute:540,state:'scheduled'}
 const task={id:taskId,worker_id:worker,unit:'library',planned_date:today,estimate_minutes:60,original_estimate_minutes:60,state:'assigned',title:'نوبت مصنوعی کتابخانه',instructions:'شرح نمونه',created_at:today+'T08:00:00Z'}
@@ -79,7 +79,7 @@ const forbid=()=>{globalThis.__qaWriteAttempts++;throw Error('SYNTHETIC_FORBIDDE
 globalThis.__qaOpsAppApi={
  auth:f.config.auth,forbid,
  identity:async()=>{identityReads++;if(identityWait){const wait=identityWait;identityWait=null;await wait}const u=await user();return u?{user:u,role}:null},
- candidates:async()=>{candidateReads++;if(candidateFail)throw Error('SYNTHETIC_CANDIDATE_READ_FAILED');return [{id:id(80),full_name:'داوطلب کاملاً مصنوعی',major:'رشته نمونه',entry_year:1404,primary_unit:'library',interview_status:'pending',clearance_status:'pending'}]},
+ candidates:async()=>{candidateReads++;if(candidateFail)throw Error('SYNTHETIC_CANDIDATE_READ_FAILED');return [{id:id(80),full_name:'داوطلب کاملاً مصنوعی',major:'رشته نمونه',entry_year:1404,primary_unit:'library',interview_status:'pending',clearance_status:'pending'},{id:id(81),full_name:'',major:'',primary_unit:'library',interview_status:'pending',clearance_status:'pending'},{id:id(82),full_name:'   ',major:'',primary_unit:'library',interview_status:'pending',clearance_status:'pending'}]},
  rpc:async name=>{if(name==='ops_get_admin_student_worker_report'){reportReads++;return {data:null,error:{code:'SYNTHETIC_REPORT_UNAVAILABLE'}}}if(name==='ops_get_operations_v3')return {data:structuredClone(globalThis.__qaAdminWork),error:null};return forbid()},
  logout:async()=>f.auth('SIGNED_OUT')
 }
