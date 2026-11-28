@@ -23,7 +23,7 @@ jobs:
           node-version: '22'
       - run: npm ci --no-audit --no-fund
       - name: Consolidated day-batch source and actual React mounted regression
-        run: node --test --test-concurrency=1 --test-timeout=20000 tests/swtb27DayBatchAssignmentContract.test.mjs tests/swtb27DayBatchManagerSession.test.mjs tests/swtb27DayBatchSharedManager.test.mjs tests/swtb27DayBatchVerifiedOwner.test.mjs tests/swtb27DayBatchMounted.test.mjs tests/swtb24R5BatchPreview.test.mjs tests/assignmentPrerequisitesV3Mounted.test.mjs tests/assignmentRecoveryHostMounted.test.mjs tests/releaseBoundary.test.mjs
+        run: node --test --test-concurrency=1 --test-timeout=20000 tests/swtb27DayBatchAssignmentContract.test.mjs tests/swtb27DayBatchManagerSession.test.mjs tests/swtb27DayBatchSharedManager.test.mjs tests/swtb27DayBatchVerifiedOwner.test.mjs tests/swtb27DayBatchMounted.test.mjs tests/swtb27DayBatchWorkspaceRead.test.mjs tests/swtb24R5BatchPreview.test.mjs tests/assignmentPrerequisitesV3Mounted.test.mjs tests/assignmentRecoveryHostMounted.test.mjs tests/releaseBoundary.test.mjs
       - name: Confirm normal entry has no mounted review owner
         run: |
           if grep -nE 'DayBatchManagerReviewHost|dayBatchVerifiedOwner' src/OpsApp.jsx src/App.jsx index.html; then exit 1; fi
@@ -34,9 +34,12 @@ jobs:
           export SWTB23_BROWSER_TOOL_DIR="$RUNNER_TEMP/swtb27-day-batch-browser"
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --prefix "$SWTB23_BROWSER_TOOL_DIR" --ignore-scripts --no-audit --no-fund playwright@1.56.1
           node tests/browser/run-swtb27-day-batch-review.mjs
+          node tests/browser/run-swtb27-day-batch-workspace.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: swtb27-day-batch-synthetic
-          path: test-results/swtb27-day-batch-synthetic
+          path: |
+            test-results/swtb27-day-batch-synthetic
+            test-results/swtb27-workspace-synthetic
           retention-days: 7
