@@ -13,7 +13,7 @@ const freeze=x=>{if(x&&typeof x==='object'&&!Object.isFrozen(x)){for(const v of 
 const sort=(a,b)=>a<b?-1:a>b?1:0
 const same=(a,b)=>a.length===b.length&&a.every((v,i)=>v===b[i])
 const fail=code=>{throw Error(code)}
-const plans=new WeakSet(),intents=new WeakSet(),snapshots=new WeakSet()
+const plans=new WeakSet(),intents=new WeakSet(),snapshots=new WeakSet(),snapshotIntents=new WeakMap()
 export function buildDayBatchPlan(draft,context){
  const review=previewBatchAssignment(draft,context)
  if(!review.ok)fail('BATCH_PREVIEW_INVALID')
@@ -48,7 +48,7 @@ function writeArgs(intent,action){
 }
 export function batchReserveArgs(intent){return writeArgs(intent,'reserve')}
 export function batchCommitArgs(intent,reserved){
- if(!intents.has(intent)||!snapshots.has(reserved)||reserved.state!=='reserved'||reserved.epoch!==intent.epoch||reserved.requestId!==intent.requestId||reserved.intent!==intent)fail('BATCH_RESERVE_NOT_CONFIRMED')
+ if(!intents.has(intent)||!snapshots.has(reserved)||reserved.state!=='reserved'||reserved.epoch!==intent.epoch||reserved.requestId!==intent.requestId||snapshotIntents.get(reserved)!==intent)fail('BATCH_RESERVE_NOT_CONFIRMED')
  return writeArgs(intent,'commit')
 }
 // Exact committed receipt shape and immutable historic mapping, not live task
@@ -78,7 +78,7 @@ function checkedReceipt(raw,requestId,plan){
  if(r.pair_count!==pairs||r.standard_person_minutes!==total||plan&&(pairs!==plan.pairCount||total!==plan.standardPersonMinutes))return null
  return freeze({ok:true,request_id:requestId,kind,result:{term_id:r.term_id,rows,pair_count:pairs,standard_person_minutes:total}})
 }
-function snapshot(x){freeze(x);snapshots.add(x);return x}
+function snapshot(x,intent=null){freeze(x);snapshots.add(x);if(intent)snapshotIntents.set(x,intent);return x}
 const invalid=()=>snapshot({state:'invalid'})
 export function batchDiscoverArgs(){return freeze({p_action:'discover',p_epoch:null,p_request_id:null})}
 // Only accept raw results of the audited transport from the actual operation,
@@ -108,10 +108,10 @@ export function parseDayBatchSnapshot(raw,{source,intent=null}={}){
  if(a.status==='committed'&&!receipt)return invalid()
  // Fresh context may identify/cancel a reservation, never reconstruct its
  // original payload to commit. Only the retained, branded intent can commit.
- return snapshot({...base,state:a.status,requestId:a.request_id,receipt,intent})
+ return snapshot({...base,state:a.status,requestId:a.request_id,receipt},intent)
 }
 export function batchControlArgs(action,observed){
- if(!snapshots.has(observed)||observed.source!=='discover'&&observed.source!=='write'&&observed.source!=='control')fail('BATCH_CONTROL_INVALID')
+ if(!snapshots.has(observed)||observed.source!=='discover'&&observed.source!=='control')fail('BATCH_CONTROL_INVALID')
  if(action==='cancel'?observed.state!=='reserved':action==='acknowledge'?!['committed','cancelled'].includes(observed.state):true)fail('BATCH_CONTROL_INVALID')
  return freeze({p_action:action,p_epoch:observed.epoch,p_request_id:observed.requestId})
 }
