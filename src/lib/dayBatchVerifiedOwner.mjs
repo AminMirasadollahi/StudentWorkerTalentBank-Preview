@@ -5,7 +5,7 @@ import {createDayBatchSharedManager} from './dayBatchSharedManager.mjs'
 import {createScopedDayBatchHttpTransport,createScopedDayBatchReleaseHttpTransport} from './scopedDayBatchHttpTransport.mjs'
 import {createScopedDeskCancelHttpTransport,createScopedDeskCancelReleaseHttpTransport} from './scopedDeskCancelHttpTransport.mjs'
 import {verifyRecoveryReviewAdmin} from './recoveryReviewLifecycle.mjs'
-import {createTypedAssignmentReleaseAdmission} from './typedAssignmentReleaseAdmission.mjs'
+import {createTypedAssignmentReleaseAdmission,permitsTypedReleaseOwnerMethod,projectTypedReleaseSnapshot} from './typedAssignmentReleaseAdmission.mjs'
 export function createDayBatchVerifiedOwner({mode,expectedProjectRef,projectUrl,publishableKey,auth,actorId,isVisible,fetchImpl,makeId,durableDeskCancel=false}){
  const config={mode,expectedProjectRef,projectUrl,publishableKey,auth,actorId,fetchImpl}
  return buildVerifiedOwner({actorId,isVisible,makeId,durableDeskCancel,
@@ -17,16 +17,16 @@ export function createDayBatchVerifiedOwner({mode,expectedProjectRef,projectUrl,
 // server admission proof. No raw route and no implicit fallback to review/V2.
 export function createTypedAssignmentReleaseOwner({env,auth,actorId,isVisible,fetchImpl,makeId}){
  const config={env,auth,actorId,fetchImpl}
- return buildVerifiedOwner({actorId,isVisible,makeId,durableDeskCancel:true,
+ return buildVerifiedOwner({actorId,isVisible,makeId,durableDeskCancel:true,typedRelease:true,
   transport:(desk,isCurrent)=>(desk?createScopedDeskCancelReleaseHttpTransport:createScopedDayBatchReleaseHttpTransport)({...config,isCurrent}),
   verify:isCurrent=>createTypedAssignmentReleaseAdmission({...config,isCurrent}).check()
  })
 }
-function buildVerifiedOwner({actorId,isVisible,makeId,durableDeskCancel,transport,verify}){
+function buildVerifiedOwner({actorId,isVisible,makeId,durableDeskCancel,transport,verify,typedRelease=false}){
  if(typeof isVisible!=='function'||typeof makeId!=='function'||typeof durableDeskCancel!=='boolean')throw Error('DAY_BATCH_OWNER_DEPENDENCIES')
  transport(false,()=>false)
  if(durableDeskCancel)transport(true,()=>false)
- let generation=0,phase='checking',disposed=false
+ let generation=0,phase='checking',disposed=false,capability=null,capabilityFloor=-1,capabilityFloorState=null,actionFlight=null
  const visible=()=>{try{return isVisible()===true}catch{return false}}
  const current=g=>!disposed&&phase==='verified'&&g===generation&&visible()
  const invoke=async(method,args)=>{
@@ -41,8 +41,12 @@ function buildVerifiedOwner({actorId,isVisible,makeId,durableDeskCancel,transpor
  }
  const manager=createDayBatchSharedManager({actorId,makeId:()=>{if(!current(generation))throw Error('DAY_BATCH_OWNER_UNVERIFIED');return makeId()},
   legacyWrite:a=>invoke('legacyWrite',a),legacyControl:a=>invoke('legacyControl',a),batchWrite:a=>invoke('batchWrite',a),batchControl:a=>invoke('batchControl',a),...(durableDeskCancel?{deskCancelWrite:a=>invoke('deskCancelWrite',a),deskCancelControl:a=>invoke('deskCancelControl',a)}:{cancelExistingShift:a=>invoke('cancelExistingShift',a)})})
- const suspend=()=>{if(disposed)return;generation++;phase='checking';manager.setAccess({status:'checking'})}
- const terminate=()=>{if(disposed)return;generation++;phase='blocked';disposed=true;manager.dispose()}
+ const suspend=()=>{if(disposed)return;generation++;phase='checking';capability=null;actionFlight=null;manager.setAccess({status:'checking'})}
+ const terminate=()=>{if(disposed)return;generation++;phase='blocked';capability=null;actionFlight=null;disposed=true;manager.dispose()}
+ const acceptCapability=c=>{
+  if(!permitsTypedReleaseOwnerMethod(c,'discover')||c.revision<capabilityFloor||c.revision===capabilityFloor&&c.state!==capabilityFloorState)return false
+  capability=c;capabilityFloor=c.revision;capabilityFloorState=c.state;return true
+ }
  const check=async()=>{
   if(disposed||!visible())return false
   suspend();const g=generation
@@ -50,7 +54,9 @@ function buildVerifiedOwner({actorId,isVisible,makeId,durableDeskCancel,transpor
   try{
    const verified=await verify(valid)
    if(!valid())return false
-   if(verified!==true)throw Error('DAY_BATCH_OWNER_UNVERIFIED')
+   if(typedRelease){
+    if(!acceptCapability(verified))throw Error('DAY_BATCH_OWNER_UNVERIFIED')
+   }else if(verified!==true)throw Error('DAY_BATCH_OWNER_UNVERIFIED')
    phase='verified';manager.setAccess({status:'verified',actorId});return true
   }catch{
    if(valid()){phase='blocked';manager.setAccess({status:'checking'})}
@@ -63,8 +69,25 @@ function buildVerifiedOwner({actorId,isVisible,makeId,durableDeskCancel,transpor
   // No async auth calls from inside auth event callback.
   suspend();return true
  }
- const snapshot=()=>current(generation)?manager.snapshot():Object.freeze({state:disposed?'unavailable':phase==='blocked'?'blocked':'checking',owner:null,canStart:false,canDiscover:false})
- const call=(method,...args)=>current(generation)?manager[method](...args):Promise.resolve('blocked')
+ const snapshot=()=>current(generation)?(typedRelease?projectTypedReleaseSnapshot(manager.snapshot(),capability):manager.snapshot()):Object.freeze({state:disposed?'unavailable':phase==='blocked'?'blocked':'checking',owner:null,canStart:false,canDiscover:false})
+ const call=async(method,...args)=>{
+  if(!current(generation))return 'blocked'
+  if(!typedRelease)return manager[method](...args)
+  if(actionFlight||!permitsTypedReleaseOwnerMethod(capability,method))return 'blocked'
+  const g=generation,flight={};actionFlight=flight
+  try{
+   // Recheck owner capability; transport checks again, SQL is authoritative.
+   const c=await verify(()=>current(g))
+   if(!current(g)||actionFlight!==flight)return 'stale'
+   if(!acceptCapability(c)){
+    suspend();return 'blocked'
+   }
+   if(!permitsTypedReleaseOwnerMethod(c,method))return 'blocked'
+   const out=await manager[method](...args)
+   return current(g)&&actionFlight===flight?out:'stale'
+  }catch{if(current(g)&&actionFlight===flight)suspend();return 'blocked'}
+  finally{if(actionFlight===flight)actionFlight=null}
+ }
  return Object.freeze({check,suspend,terminate,authChanged,snapshot,
   selectReadScope:scope=>manager.selectReadScope(scope),beginScopedRead:scope=>manager.beginScopedRead(scope),
   discover:()=>call('discover'),submitLegacy:d=>call('submitLegacy',d),submitBatch:(d,c)=>call('submitBatch',d,c),submitDeskCancel:(d,c)=>call('submitDeskCancel',d,c),

@@ -18,7 +18,7 @@ const context={today,defaultDate:date,term:{id:term,state:'active',start_date:to
 const shiftId=id(801),taskId=id(802)
 const shift={id:shiftId,task_id:taskId,worker_id:worker,shift_date:today,start_minute:480,end_minute:540,state:'scheduled'}
 const task={id:taskId,worker_id:worker,unit:'library',planned_date:today,estimate_minutes:60,original_estimate_minutes:60,state:'assigned',title:'نوبت مصنوعی کتابخانه',instructions:'شرح نمونه',created_at:today+'T08:00:00Z'}
-let deskReadMode='valid',deskReads=0,shiftCancelled=false,releaseReady=false
+let deskReadMode='valid',deskReads=0,shiftCancelled=false,releaseReady=false,releaseRevision=0,releaseDrain=false
 function fixture(initial=null){
  let active=initial,epoch=7,seq=20,mode='',reads=0,adminWait=null
  const listeners=new Set();let currentActor=actor;let signedIn=true
@@ -26,7 +26,7 @@ function fixture(initial=null){
  const transport=async(url,init)=>{
   assert.ok(url.startsWith('https://pmwxryavkrjcdobwkryw.supabase.co/rest/v1/rpc/'))
   const rpc=url.split('/').pop(),a=JSON.parse(init.body);calls.push([rpc,a])
-  if(rpc==='ops_assignment_typed_release_status_v1'){if(adminWait){const pending=adminWait;adminWait=null;await pending}return {ok:true,json:async()=>({ok:releaseReady,contract:'swtb-typed-day-v1',project_ref:'pmwxryavkrjcdobwkryw',release_id:releaseReady?'a'.repeat(40):null,actor_id:currentActor,state:releaseReady?'ready':'held'})}}
+  if(rpc==='ops_assignment_typed_release_status_v2'){if(adminWait){const pending=adminWait;adminWait=null;await pending}return {ok:true,json:async()=>({ok:releaseReady,contract:'swtb-typed-day-v2',project_ref:'pmwxryavkrjcdobwkryw',release_id:releaseReady?'a'.repeat(40):null,actor_id:currentActor,state:releaseReady?(releaseDrain?'recover_only':'ready'):'held',revision:releaseRevision})}}
   // Actual staged read adapter, still backed solely by this fake server.
   if(rpc==='ops_get_operations_v3'){reads++;return {ok:true,json:async()=>structuredClone(globalThis.__qaAdminWork)}}
   if(rpc==='ops_list_candidates')return {ok:true,json:async()=>globalThis.__qaOpsAppApi.candidates()}
@@ -83,6 +83,6 @@ globalThis.__qaOpsAppApi={
 }
 // All global fetch calls are served by the fake RPC implementation; browser network routing also denies non-loopback.
 globalThis.fetch=f.config.fetchImpl
-globalThis.__qaTypedRelease={ready:v=>{releaseReady=v},calls:()=>f.calls.map(([route,args])=>({route,action:args.p_action??null}))}
+globalThis.__qaTypedRelease={ready:v=>{releaseReady=v;releaseDrain=false;releaseRevision++},drain:()=>{releaseDrain=true;releaseRevision++},calls:()=>f.calls.map(([route,args])=>({route,action:args.p_action??null}))}
 globalThis.__qaOpsApp={counts:()=>({identityReads,candidateReads,termReads,reportReads,stagedReadRoutes:[...new Set(f.calls.map(x=>x[0]).filter(x=>['ops_get_operations_v3','ops_list_candidates','ops_get_operations_term_dashboard','ops_get_library_desk_shifts'].includes(x)))]}),holdIdentity:()=>{let release;identityWait=new Promise(r=>release=r);return release},candidateFail:value=>{candidateFail=value},role:value=>{role=value},changeActor:()=>{f.setActor(id(90));f.auth('TOKEN_REFRESHED')}}
 createRoot(document.getElementById('root')).render(<OpsApp/>)
