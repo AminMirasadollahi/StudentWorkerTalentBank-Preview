@@ -46,6 +46,7 @@ import {buildOriginalWorkerNameIndex,selectManagerWorkerProfiles} from './lib/ma
 const TermMembershipPanel = lazy(()=>import('./components/TermMembershipPanel'))
 const WorkPoolManagerPanel = lazy(()=>import('./components/WorkPoolManagerPanel'))
 const WorkPoolWorkerPanel = lazy(()=>import('./components/WorkPoolWorkerPanel'))
+const BatchAssignmentPreview = lazy(()=>import('./components/BatchAssignmentPreview.jsx'))
 // SWTB15 separate from mandatory acceptance: informational, nonblocking RC6.
 const WorkerAgreementModalPreview = lazy(()=>import('./components/WorkerAgreementModalPreview.jsx'))
 import * as unifiedPeerApi from './lib/operationsV2'
@@ -1209,6 +1210,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const [createNotice,setCreateNotice]=useState('')
   const commonCreateRef=useRef(null)
   const [taskEditorOpen,setTaskEditorOpen]=useState(false)
+  const [taskEditorKind,setTaskEditorKind]=useState('direct')
   const [prerequisiteTaskId,setPrerequisiteTaskId]=useState(null)
   const [taskEditorRevision,setTaskEditorRevision]=useState(0)
   const taskEditorDialogRef=useRef(null)
@@ -1220,6 +1222,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       else dialog.removeAttribute('open')
     }
     setTaskEditorOpen(false)
+    setTaskEditorKind('direct')
     if(reset)setTaskEditorRevision(v=>v+1)
     const opener=commonCreateRef.current||taskEditorOpenerRef.current
     opener?.focus?.({preventScroll:true})
@@ -1278,10 +1281,11 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     try{
       const result=await getAdminWorkV2()
       if(sequence!==readSequence.current)return false
+      if(assignmentReceiptPort?.batchWorkspace?.mode==='synthetic-review'&&(!settleRead||settleRead('ready',result)!==true))throw Error('WORKSPACE_READ_UNCONFIRMED')
       setData(result||{workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       setReadFailed(false)
       setError('')
-      if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')
+      if(assignmentReceiptPort?.batchWorkspace?.mode!=='synthetic-review'){if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')}
       return true
     }catch(e){
       if(sequence!==readSequence.current)return false
@@ -1298,21 +1302,24 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       return false
     }finally{if(sequence===readSequence.current)setLoading(false)}
   }
-  useEffect(()=>{void refresh();return ()=>{if(assignmentReceiptPort)readSequence.current++}},[refreshRevision,assignmentReceiptPort?.committedRevision])
+  useEffect(()=>{void refresh();return ()=>{if(assignmentReceiptPort)readSequence.current++}},[refreshRevision,assignmentReceiptPort?.committedRevision,assignmentReceiptPort?.workspaceReadRevision])
 
   const workers=data.workers||[]
   const active=workers.filter(w=>w.state==='active')
-  const launchWorkEditor=target=>{
+  const batchWorkspace=assignmentReceiptPort?.batchWorkspace?.mode==='synthetic-review'?assignmentReceiptPort.batchWorkspace:null
+  const batchContext=batchWorkspace?.contextFor?.(data)??null
+  const canOpenBatch=Boolean(batchContext&&batchWorkspace?.port?.mode==='synthetic-review'&&batchWorkspace.port.snapshot?.canStart===true&&active.length>0)
+  const launchWorkEditor=(target,kind='direct')=>{
     setCreateNotice('')
     if(loading||readFailed||!commonWorkEntry||workPoolRouteFence?.getSnapshot()||
-      (target==='tasks'&&active.length===0)){
+      (target==='tasks'&&active.length===0)||kind==='batch'&&(!canOpenBatch||taskEditorOpen||assignmentDialogDate)){
       setCreateNotice('ابتدا دریافت اطلاعات یا بررسی عملیات قبلی را کامل کنید.');return
     }
     if(view===target&&draftScope?.hasDraft()){
       setCreateNotice('ابتدا فرم یا تغییرات ثبت‌نشده فعلی را تعیین‌تکلیف کنید.');return
     }
     setCreateChoiceOpen(false)
-    const intent={target,scope:draftScope,generation:draftScope.generation()}
+    const intent={target,kind,scope:draftScope,generation:draftScope.generation(),owner:assignmentReceiptPort?.readScopeOwner,context:kind==='batch'?batchContext:null}
     if(view!==target&&setNavigation(previous=>({...previous,workView:target}))!==true)return
     setCreateIntent(intent)
   }
@@ -1324,9 +1331,12 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     }
     if(createIntent.target==='tasks'){
       setCreateIntent(null)
-      if(!loading&&active.length>0)setTaskEditorOpen(true)
+      if(!loading&&active.length>0){
+        if(createIntent.kind==='batch'&&(!canOpenBatch||createIntent.owner!==assignmentReceiptPort?.readScopeOwner||createIntent.context!==batchContext||assignmentDialogDate||taskEditorOpen))return
+        setTaskEditorKind(createIntent.kind==='batch'?'batch':'direct');setTaskEditorOpen(true)
+      }
     }
-  },[createIntent,commonWorkEntry,draftScope,view,readFailed,loading,active.length,workPoolRouteFence])
+  },[createIntent,commonWorkEntry,draftScope,view,readFailed,loading,active.length,workPoolRouteFence,canOpenBatch,batchContext,assignmentReceiptPort?.readScopeOwner,assignmentDialogDate,taskEditorOpen])
   useEffect(()=>{setCreateChoiceOpen(false);setCreateNotice('')},[view,draftScope])
   const finishPoolLaunch=(intent)=>setCreateIntent(current=>current===intent?null:current)
   const chosen=workers.find(w=>w.id===workerId)
@@ -1451,6 +1461,9 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
         <button type="button" disabled={active.length===0} onClick={()=>launchWorkEditor('tasks')}>
           <strong>واگذاری مستقیم</strong><small>انتخاب دانشجوکاران مشخص توسط مدیر</small>
         </button>
+        {batchWorkspace&&<button type="button" disabled={!canOpenBatch} onClick={()=>launchWorkEditor('tasks','batch')}>
+          <strong>واگذاری مجموعه‌ای</strong><small>{canOpenBatch?'تعریف چند کار و تعیین مسئولان هر کار':'در انتظار نیمسال فعال و وضعیت معتبر واگذاری'}</small>
+        </button>}
         <button type="button" onClick={()=>launchWorkEditor('workPool')}>
           <strong>انتشار فرصت کاری</strong><small>انتخاب کار توسط دانشجوکاران واجد شرایط</small>
         </button>
@@ -1606,20 +1619,20 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
        ref={taskEditorDialogRef} className="ow-assignment-dialog swtb22-task-editor-dialog"
        aria-labelledby="swtb22-task-editor-heading"
        onCancel={event=>{event.preventDefault();closeTaskEditor()}}
-       onClose={()=>{setTaskEditorOpen(false);(commonCreateRef.current||taskEditorOpenerRef.current)?.focus?.({preventScroll:true})}}>
+       onClose={()=>{setTaskEditorOpen(false);setTaskEditorKind('direct');(commonCreateRef.current||taskEditorOpenerRef.current)?.focus?.({preventScroll:true})}}>
        <div className="swtb22-task-editor-dialog-head">
         <div><h2 id="swtb22-task-editor-heading" tabIndex={-1}
-         data-swtb22-task-editor-heading>واگذاری مستقیم کار جدید</h2>
-         <p>این فرم برای واگذاری به دانشجوکاران مشخص است؛ فرصت‌های انتخاب آزاد در «مخزن فرصت‌های کاری» منتشر می‌شوند.</p>
+         data-swtb22-task-editor-heading>{taskEditorKind==='batch'?'واگذاری مجموعه‌ای کارها':'واگذاری مستقیم کار جدید'}</h2>
+         <p>{taskEditorKind==='batch'?'چند کار و مسئولان هر کار را مشخص کنید. ثبت آزمایشی فقط با اطلاعات معتبر انجام می‌شود.':'این فرم برای واگذاری به دانشجوکاران مشخص است؛ فرصت‌های انتخاب آزاد در «مخزن فرصت‌های کاری» منتشر می‌شوند.'}</p>
         </div>
         <button type="button" className="report-btn report-btn--light"
          onClick={()=>closeTaskEditor()}>بستن و حفظ پیش‌نویس</button>
        </div>
        {taskEditorOpen&&!assignmentDialogDate&&assignmentReceiptPort?.panel}
-       <TaskAssignmentEditor key={assignmentReceiptPort?taskEditorRevision+':'+assignmentReceiptPort.editorRevision:taskEditorRevision}
+       {taskEditorKind==='batch'? (batchContext&&batchWorkspace?<Suspense fallback={<p role="status">در حال آماده‌سازی فرم مجموعه‌ای…</p>}><BatchAssignmentPreview key={batchWorkspace.port.editorRevision} context={batchContext} reviewPort={batchWorkspace.port}/></Suspense>:<p role="status">اطلاعات معتبر مجموعه در حال بازخوانی یا در دسترس نیست.</p>):<TaskAssignmentEditor key={assignmentReceiptPort?taskEditorRevision+':'+assignmentReceiptPort.editorRevision:taskEditorRevision}
         retentionKey="direct-task" assignmentReceiptPort={assignmentReceiptPort} workers={active} data={data} defaultWorkerId={workerId} defaultDate={date}
         onSaved={refresh} onCancel={()=>closeTaskEditor()}
-        onClose={()=>closeTaskEditor(true)}/>
+        onClose={()=>closeTaskEditor(true)}/>}
       </dialog>}
     </>}
 
