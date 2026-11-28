@@ -1282,17 +1282,17 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     try{
       const result=assignmentReceiptPort?.readWork?await assignmentReceiptPort.readWork(settleRead):await getAdminWorkV2()
       if(sequence!==readSequence.current)return false
-      if(assignmentReceiptPort?.batchWorkspace?.mode==='synthetic-review'){
+      if(['synthetic-review','typed-release'].includes(assignmentReceiptPort?.batchWorkspace?.mode)){
         if(settleRead?.isCurrent?.()!==true)return false
         if(settleRead('ready',result)!==true)throw Error('WORKSPACE_READ_UNCONFIRMED')
       }
       setData(result||{workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       setReadFailed(false)
       setError('')
-      if(assignmentReceiptPort?.batchWorkspace?.mode!=='synthetic-review'){if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')}
+      if(!['synthetic-review','typed-release'].includes(assignmentReceiptPort?.batchWorkspace?.mode)){if(settleRead)settleRead('ready');else assignmentReceiptPort?.setReadState?.('ready')}
       return true
     }catch(e){
-      if(sequence!==readSequence.current||assignmentReceiptPort?.batchWorkspace?.mode==='synthetic-review'&&settleRead?.isCurrent?.()!==true)return false
+      if(sequence!==readSequence.current||['synthetic-review','typed-release'].includes(assignmentReceiptPort?.batchWorkspace?.mode)&&settleRead?.isCurrent?.()!==true)return false
       // A previous successful read is not proof of CURRENT authorization.
       setData({workers:[],tasks:[],weekly_slots:[],exceptions:[],time_entries:[]})
       draftScope?.clearRetained()
@@ -1310,9 +1310,9 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
 
   const workers=data.workers||[]
   const active=workers.filter(w=>w.state==='active')
-  const batchWorkspace=assignmentReceiptPort?.batchWorkspace?.mode==='synthetic-review'?assignmentReceiptPort.batchWorkspace:null
+  const batchWorkspace=['synthetic-review','typed-release'].includes(assignmentReceiptPort?.batchWorkspace?.mode)?assignmentReceiptPort.batchWorkspace:null
   const batchContext=batchWorkspace?.contextFor?.(data)??null
-  const canOpenBatch=Boolean(batchContext&&batchWorkspace?.port?.mode==='synthetic-review'&&batchWorkspace.port.snapshot?.canStart===true&&active.length>0)
+  const canOpenBatch=Boolean(batchContext&&['synthetic-review','typed-release'].includes(batchWorkspace?.port?.mode)&&batchWorkspace.port.snapshot?.canStart===true&&active.length>0)
   const launchWorkEditor=(target,kind='direct')=>{
     setCreateNotice('')
     if(loading||readFailed||!commonWorkEntry||workPoolRouteFence?.getSnapshot()||
@@ -1627,7 +1627,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
        <div className="swtb22-task-editor-dialog-head">
         <div><h2 id="swtb22-task-editor-heading" tabIndex={-1}
          data-swtb22-task-editor-heading>{taskEditorKind==='batch'?'واگذاری مجموعه‌ای کارها':'واگذاری مستقیم کار جدید'}</h2>
-         <p>{taskEditorKind==='batch'?'چند کار و مسئولان هر کار را مشخص کنید. ثبت آزمایشی فقط با اطلاعات معتبر انجام می‌شود.':'این فرم برای واگذاری به دانشجوکاران مشخص است؛ فرصت‌های انتخاب آزاد در «مخزن فرصت‌های کاری» منتشر می‌شوند.'}</p>
+         <p>{taskEditorKind==='batch'?'چند کار و مسئولان هر کار را مشخص کنید. ثبت مجموعه فقط با اطلاعات معتبر انجام می‌شود.':'این فرم برای واگذاری به دانشجوکاران مشخص است؛ فرصت‌های انتخاب آزاد در «مخزن فرصت‌های کاری» منتشر می‌شوند.'}</p>
         </div>
         <button type="button" className="report-btn report-btn--light"
          onClick={()=>closeTaskEditor()}>بستن و حفظ پیش‌نویس</button>

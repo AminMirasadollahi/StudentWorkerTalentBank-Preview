@@ -51,7 +51,8 @@ export function createTypedAssignmentReleaseAdmission({env,auth,actorId,isCurren
 const releaseRoutes=Object.freeze([
  'ops_assignment_recovery_write_v3','ops_assignment_recovery_control_v2',
  'ops_assignment_batch_write_v1','ops_assignment_batch_control_v1',
- 'ops_desk_cancel_write_v1','ops_desk_cancel_control_v1'
+ 'ops_desk_cancel_write_v1','ops_desk_cancel_control_v1',
+ 'ops_get_operations_v3','ops_list_candidates','ops_get_operations_term_dashboard','ops_get_library_desk_shifts'
 ])
 export function createTypedAssignmentReleaseRequestBoundary({env,auth,actorId,isCurrent,fetchImpl}){
  const config=resolveTypedAssignmentReleaseConfig(env)

@@ -29,7 +29,7 @@ export default function TaskAssignmentEditor({workers=[],data={},defaultDate,def
  // Only an explicitly supplied, scoped V2 capability may perform it.
  const receiptCancelAllowed=[2,3].includes(assignmentReceiptPort?.version)&&!receiptBlocked&&
    typeof assignmentReceiptPort?.cancelExistingShift==='function'
- const typedDesk=assignmentReceiptPort?.deskCancelPort?.mode==='synthetic-review'?assignmentReceiptPort.deskCancelPort:null
+ const typedDesk=['synthetic-review','typed-release'].includes(assignmentReceiptPort?.deskCancelPort?.mode)?assignmentReceiptPort.deskCancelPort:null
  const deskCancelAllowed=typedDesk?(!receiptBlocked&&typedDesk.canStart===true):(!receiptMode&&!policyRequiresAtomic)||receiptCancelAllowed
  const Fields=receiptMode?'fieldset':Fragment
  const fieldProps=receiptMode?{disabled:receiptBlocked,style:{border:0,margin:0,padding:0,minWidth:0}}:{}

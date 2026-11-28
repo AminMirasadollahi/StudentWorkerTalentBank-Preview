@@ -1,5 +1,5 @@
 import {ManagerDraftContext,createManagerDraftGuard,sameManagerRoute,DISCARD_DRAFT_MESSAGE} from './lib/managerDraftGuard.mjs'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { documentTitleForOperationsIdentity } from './lib/routeTitles.mjs'
 import {
   currentOperationsIdentity,
@@ -48,6 +48,8 @@ const managerShellEnabled=import.meta.env.VITE_SWTB22_MANAGER_SHELL_UI==='true'
 // Six-space manager IA is opt-in and remains OFF in the production env until owner visual acceptance.
 const managerR5IaEnabled=import.meta.env.VITE_SWTB24_R5_MANAGER_IA_UI==='true'
 const recoveryReviewConfig=resolveRecoveryReviewConfig(import.meta.env)
+const typedReleaseRequested=import.meta.env.VITE_SWTB32_TYPED_ASSIGNMENT_RELEASE!==undefined&&import.meta.env.VITE_SWTB32_TYPED_ASSIGNMENT_RELEASE!=='false'
+const TypedReleaseHost=import.meta.env.PROD&&import.meta.env.VITE_SWTB32_TYPED_ASSIGNMENT_RELEASE==='true'?lazy(()=>import('./components/TypedAssignmentReleaseHost.jsx')):null
 const managerNavFlags={
  workPoolEnabled:import.meta.env.VITE_SWTB21_WORK_POOL_UI!=='false',
  termMembershipEnabled:import.meta.env.VITE_SWTB21_TERM_MEMBERSHIP_UI!=='false',
@@ -578,7 +580,7 @@ function AdminView({ onLogout, navigation, setNavigation:commitNavigation, refre
   const [fence]=useState(createWorkPoolRouteFence)
   const draftGuard=useMemo(createManagerDraftGuard,[assignmentReceiptPort?.readScopeOwner])
   const r5IaActive=managerShellEnabled&&(r5IaFixture===true||managerR5IaEnabled)
-  const sharedReview=import.meta.env.DEV&&assignmentReceiptPort?.batchWorkspace?.mode==='synthetic-review'
+  const sharedReview=(import.meta.env.DEV&&assignmentReceiptPort?.batchWorkspace?.mode==='synthetic-review')||(typedReleaseRequested&&assignmentReceiptPort?.batchWorkspace?.mode==='typed-release')
   const activeDraftGuard=r5IaActive?(sharedReview?assignmentReceiptPort.managerDraftGuard:draftGuard):null
   const [routeNotice,setRouteNotice]=useState('')
   const routeFence=managerShellEnabled&&(workHubFixture===true||r5IaActive)&&managerNavFlags.workPoolEnabled?(sharedReview?assignmentReceiptPort.workPoolRouteFence:fence):null
@@ -1183,7 +1185,12 @@ export default function OpsApp({ mode = 'admin', assignmentReceiptFixture=null, 
   const validDayBatchReview=dayBatchRequested&&r5IaFixture===true&&managerShellEnabled&&assignmentReceiptFixture===null&&typeof ReviewHost==='function'&&validReviewMode&&reviewFixture.actorId===identity.user?.id
   const reviewScope=adminNavigation.section==='work'?'work':adminNavigation.candidateView==='report'?'report':'candidates'
   const authorizedView = identity.role === 'admin'
-    ? (dayBatchRequested
+    ? (typedReleaseRequested
+      ? (TypedReleaseHost&&managerShellEnabled&&managerR5IaEnabled&&dayBatchReviewFixture===null&&assignmentReceiptFixture===null&&recoveryReviewConfig.mode==='release'&&recoveryReviewConfig.version===3
+        ? <Suspense fallback={<p role="status">در حال آماده‌سازی مسیر جدید واگذاری…</p>}><TypedReleaseHost key={'typed-release:'+identity.user?.id} auth={opsClient.auth} actorId={identity.user?.id} scope={reviewScope} checking={recheckingAccess||busy} onLogout={logout}>
+           {({workspacePort,guardedLogout})=><AdminView onLogout={guardedLogout} navigation={adminNavigation} setNavigation={setAdminNavigation} refreshRevision={dataRefreshRevision} assignmentReceiptPort={workspacePort}/>}
+          </TypedReleaseHost></Suspense>:<main role="alert" dir="rtl">مسیر جدید واگذاری در دسترس نیست؛ ثبت جایگزین انجام نمی‌شود.<button type="button" onClick={logout}>خروج</button></main>)
+      : dayBatchRequested
       ? (validDayBatchReview?<ReviewHost key={'day-batch-review:'+identity.user?.id} workspace fixture={reviewFixture} scope={reviewScope} checking={recheckingAccess||busy} onLogout={logout}>
          {({workspacePort,guardedLogout})=><AdminView onLogout={guardedLogout} navigation={adminNavigation} setNavigation={setAdminNavigation} refreshRevision={dataRefreshRevision} assignmentReceiptPort={workspacePort} r5IaFixture={r5IaFixture} workHubFixture={workHubFixture}/>}
         </ReviewHost>:<main role="alert" dir="rtl">مسیر بررسی آزمایشی در دسترس نیست.<button type="button" onClick={logout}>خروج</button></main>)
