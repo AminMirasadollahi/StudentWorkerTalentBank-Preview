@@ -11,6 +11,22 @@ export function validWorkerPasswordPair(password, confirmation) {
 
 export function workerPasswordChangeErrorCopy({ initialSetup = false } = {}) {
   return initialSetup
-    ? 'تکمیل فعال‌سازی تأیید نشد. ممکن است رمز جدید قبلاً ثبت شده باشد. ابتدا با همین رمز دوباره تلاش کنید؛ اگر نشست منقضی شده یا تلاش دوباره موفق نشد، برای دریافت لینک امن جدید با مسئول سامانه هماهنگ کنید.'
+    ? 'تکمیل فعال‌سازی تأیید نشد. ممکن است رمز جدید قبلاً ثبت شده باشد. برای جلوگیری از تغییر دوباره رمز، گزینه «تکمیل با همین رمز» را بزنید؛ این مسیر فقط رمز موجود را تأیید می‌کند. اگر نشست منقضی شده با همین رمز دوباره وارد شوید؛ اگر دسترسی ندارید، برای دریافت لینک امن جدید با مسئول سامانه هماهنگ کنید.'
     : 'تغییر رمز تأیید نشد. ممکن است رمز جدید ثبت شده باشد؛ پیش از انتخاب رمز متفاوت، وضعیت ورود به حساب را بررسی کنید.'
+}
+
+/**
+ * A structured Edge 422/password_update_failed reply is a reason to OFFER
+ * an explicit user-chosen retry, not proof that Auth made no change.
+ * Default on every uncertain result remains existing-password proof.
+ * Supabase FunctionsHttpError carries the HTTP Response in .context.
+ */
+export async function edgeReportedPasswordUpdateFailure(error,data) {
+  const response=error?.context
+  if(response?.status!==422)return false
+  let body=data
+  if(typeof body?.error!=='string' && typeof response.clone==='function'){
+    try{body=await response.clone().json()}catch{return false}
+  }
+  return body?.error==='password_update_failed'
 }
