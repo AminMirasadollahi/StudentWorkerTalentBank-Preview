@@ -25,7 +25,7 @@ test('release owner inert, exact admission plus fresh read required, durable own
  f.setReady(true);assert.equal(await o.check(),true);assert.equal(await o.discover(),'blocked')
  f.load();assert.equal(await o.discover(),'idle');assert.equal(o.snapshot().canStart,true)
  assert.equal(await o.submitBatch(draft,context),'committed')
- assert.equal(o.snapshot().canAcknowledge,true);await assert.rejects(()=>o.cancelExistingShift({shiftId:id(7),reason:'test reason'}))
+ assert.equal(o.snapshot().canAcknowledge,false);assert.equal(await o.discover(),'committed');assert.equal(o.snapshot().canAcknowledge,true);await assert.rejects(()=>o.cancelExistingShift({shiftId:id(7),reason:'test reason'}))
  assert.equal(calls.some(x=>x.route==='ops_cancel_library_desk_shift'),false)
  for(let i=1;i<calls.length;i++)if(calls[i].route!=='ops_assignment_typed_release_status_v1')assert.equal(calls[i-1].route,'ops_assignment_typed_release_status_v1')
 })
