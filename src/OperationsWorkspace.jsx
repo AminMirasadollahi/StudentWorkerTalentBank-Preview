@@ -1311,12 +1311,15 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
   const workers=data.workers||[]
   const active=workers.filter(w=>w.state==='active')
   const batchWorkspace=['synthetic-review','typed-release'].includes(assignmentReceiptPort?.batchWorkspace?.mode)?assignmentReceiptPort.batchWorkspace:null
+  // The common launcher also contains independent Work Pool publishing.
+  // Disable only fresh assignment paths during typed recovery-only admission.
+  const typedRecoveryOnly=batchWorkspace?.mode==='typed-release'&&assignmentReceiptPort?.snapshot?.releaseCapability==='recover_only'
   const batchContext=batchWorkspace?.contextFor?.(data)??null
   const canOpenBatch=Boolean(batchContext&&['synthetic-review','typed-release'].includes(batchWorkspace?.port?.mode)&&batchWorkspace.port.snapshot?.canStart===true&&active.length>0)
   const launchWorkEditor=(target,kind='direct')=>{
     setCreateNotice('')
     if(loading||readFailed||!commonWorkEntry||workPoolRouteFence?.getSnapshot()||
-      (target==='tasks'&&active.length===0)||kind==='batch'&&(!canOpenBatch||taskEditorOpen||assignmentDialogDate)){
+      (target==='tasks'&&(active.length===0||typedRecoveryOnly))||kind==='batch'&&(!canOpenBatch||taskEditorOpen||assignmentDialogDate)){
       setCreateNotice('ابتدا دریافت اطلاعات یا بررسی عملیات قبلی را کامل کنید.');return
     }
     if(view===target&&draftScope?.hasDraft()){
@@ -1335,12 +1338,12 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
     }
     if(createIntent.target==='tasks'){
       setCreateIntent(null)
-      if(!loading&&active.length>0){
+      if(!loading&&active.length>0&&!typedRecoveryOnly){
         if(createIntent.kind==='batch'&&(!canOpenBatch||createIntent.owner!==assignmentReceiptPort?.readScopeOwner||createIntent.context!==batchContext||assignmentDialogDate||taskEditorOpen))return
         setTaskEditorKind(createIntent.kind==='batch'?'batch':'direct');setTaskEditorOpen(true)
       }
     }
-  },[createIntent,commonWorkEntry,draftScope,view,readFailed,loading,active.length,workPoolRouteFence,canOpenBatch,batchContext,assignmentReceiptPort?.readScopeOwner,assignmentDialogDate,taskEditorOpen])
+  },[createIntent,commonWorkEntry,draftScope,view,readFailed,loading,active.length,workPoolRouteFence,canOpenBatch,batchContext,assignmentReceiptPort?.readScopeOwner,assignmentDialogDate,taskEditorOpen,typedRecoveryOnly])
   useEffect(()=>{setCreateChoiceOpen(false);setCreateNotice('')},[view,draftScope])
   const finishPoolLaunch=(intent)=>setCreateIntent(current=>current===intent?null:current)
   const chosen=workers.find(w=>w.id===workerId)
@@ -1462,7 +1465,7 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       </div>
       {createChoiceOpen&&<div id="swtb24-create-choices" className="swtb24-create-choices"
         role="group" aria-label="روش تخصیص کار">
-        <button type="button" disabled={active.length===0} onClick={()=>launchWorkEditor('tasks')}>
+        <button type="button" disabled={active.length===0||typedRecoveryOnly} onClick={()=>launchWorkEditor('tasks')}>
           <strong>واگذاری مستقیم</strong><small>انتخاب دانشجوکاران مشخص توسط مدیر</small>
         </button>
         {batchWorkspace&&<button type="button" disabled={!canOpenBatch} onClick={()=>launchWorkEditor('tasks','batch')}>
@@ -1713,8 +1716,8 @@ export function AdminOperations({ navigation, setNavigation, refreshRevision = 0
       </label>
       {workerId?<ScheduleEditor key={focusedPresence?workerId+':'+presenceEditingDate:workerId}
         workerId={workerId} data={data} initialDate={focusedPresence?presenceEditingDate:''}
-        onSaved={refresh} onPlanAssignment={setAssignmentDialogDate}/>:<TeamScheduleOverview
-           data={data} todayIso={today()} onPlanAssignment={setAssignmentDialogDate}
+        onSaved={refresh} onPlanAssignment={typedRecoveryOnly?undefined:setAssignmentDialogDate}/>:<TeamScheduleOverview
+           data={data} todayIso={today()} onPlanAssignment={typedRecoveryOnly?undefined:setAssignmentDialogDate}
            inlineManager={focusedPresence}
            selectedDay={focusedPresence?presenceSelectedDate:''}
            onSelectedDayChange={focusedPresence?setPresenceSelectedDate:null}
